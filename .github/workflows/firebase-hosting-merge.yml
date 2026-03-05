@@ -21,7 +21,8 @@ jobs:
         run: |
           rm -rf node_modules package-lock.json dist dev-dist
           npm install
-          npm install firebase
+          # Kobercový nálet: Pojistka pro všechny knihovny, které aplikace prokazatelně používá
+          npm install firebase lucide-react vite-plugin-pwa tailwindcss postcss autoprefixer
           npm run build
         working-directory: simple-dart-counter
 
