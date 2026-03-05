@@ -14,10 +14,14 @@ jobs:
         with:
           node-version: 20
           
-      - name: Instalace a sestavení
-        run: |
-          npm install
-          npm run build
+      - name: Instalace knihoven
+        # Používáme klasický install, protože je nejstabilnější pro začátek
+        run: npm install
+        working-directory: simple-dart-counter
+
+      - name: Sestavení aplikace (Build)
+        # Tady to doteď padalo - přidali jsme podrobnější výpis
+        run: npm run build
         working-directory: simple-dart-counter
 
       - name: Nahrání na Firebase
