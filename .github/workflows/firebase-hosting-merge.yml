@@ -7,23 +7,25 @@ jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Stažení kódu z GitHubu
+      - name: Stažení kódu
         uses: actions/checkout@v4
       
-      - name: Nastavení Node.js (verze 20)
+      - name: Nastavení Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           
-      - name: Čistá instalace a build
+      - name: Totální očista a Build
+        env:
+          CI: false 
         run: |
-          # Smažeme případné zbytky, které by mohly build hatit
-          rm -rf node_modules dist dev-dist
+          rm -rf node_modules package-lock.json dist dev-dist
           npm install
+          npm install firebase
           npm run build
         working-directory: simple-dart-counter
 
-      - name: Nahrání na Firebase Hosting
+      - name: Nahrání na Firebase
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
