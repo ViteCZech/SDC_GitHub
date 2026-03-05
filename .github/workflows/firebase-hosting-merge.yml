@@ -15,14 +15,12 @@ jobs:
         with:
           node-version: 20
           
-      - name: Instalace závislostí
-        # Používáme 'install' místo 'ci' pro maximální kompatibilitu
-        run: npm install
-        working-directory: simple-dart-counter
-
-      - name: Sestavení aplikace (Build)
-        # Tento krok vytvoří složku 'dist'
-        run: npm run build
+      - name: Čistá instalace a build
+        run: |
+          # Smažeme případné zbytky, které by mohly build hatit
+          rm -rf node_modules dist dev-dist
+          npm install
+          npm run build
         working-directory: simple-dart-counter
 
       - name: Nahrání na Firebase Hosting
