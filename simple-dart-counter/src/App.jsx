@@ -1989,6 +1989,11 @@ function AppContent({ onError }) {
 >
     {typeof t === 'function' ? t('privacyPolicy') : 'Zásady ochrany soukromí'}
 </button>
+                    onClick={() => window.location.href = '/privacy.html'}
+                    className="text-emerald-500 hover:text-emerald-400 font-bold text-sm mt-8 flex justify-center items-center gap-2 underline uppercase tracking-widest"
+                    >
+                    {typeof t === 'function' ? t('privacyPolicy') : 'Zásady ochrany soukromí'}
+                    </button>
                 </div>
 
                 <div className="text-center text-[10px] text-slate-500 pt-4 border-t border-slate-800">
