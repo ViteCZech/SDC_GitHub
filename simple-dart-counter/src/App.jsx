@@ -10,8 +10,8 @@ import {
 } from 'lucide-react';
 
 // --- VERZOVÁNÍ ---
-// Zvýšeno na v1.6.3 - oprava stahování dat z cloudu (obousměrná synchronizace)
-const APP_VERSION = "v1.6.3"; 
+// Zvýšeno na v1.6.4 - odstranění duplicitních nadpisů pod lištou
+const APP_VERSION = "v1.6.4"; 
 
 // --- SAFE STORAGE HELPER ---
 const safeStorage = {
@@ -90,7 +90,7 @@ const translations = {
     tutCheckoutTitle: '5. Rychlé zavření',
     tutCheckoutDesc: 'Jakmile máte skóre, které lze zavřít, objeví se nahoře zelená tlačítka pro zavření 1, 2 nebo 3 šipkami. Stačí kliknout a je hotovo.',
     tutHistoryTitle: '6. Oprava chyb',
-    tutHistoryDesc: 'Udělali jste chybu? Tlačítkem "Zpět" (šipka) vrátíte poslední hod. Pozor: Při hře s Botem vás tlačítko vrátí jen k Botovi, který ihned hodí znovu. Pro úpravu starších hodů klikněte přímo na daný hod v tabulce historie.',
+    tutHistoryDesc: 'Udělali jste chybu? Tlačítkem "Zpět" (šipka) vrátíte poslední hod. Pozor: Při hře s Botem vás tlačítko vrátí jen k Botovi, który ihned hodí znovu. Pro úpravu starších hodů klikněte přímo na daný hod v tabulce historie.',
     tutVoiceTitle: '7. Hlasové ovládání',
     tutVoiceDesc: 'Zapněte mikrofon a diktujte skóre (např. "sto čtyřicet"). Můžete také říkat "zavřeno", "další leg" nebo "odveta". Upozornění: V hlučném prostředí (např. v hospodě) může být rozpoznávání nepřesné.',
     tutCloudTitle: '8. Cloud a Statistiky',
@@ -325,8 +325,8 @@ const calculateStats = (legs, p1Name, p2Name) => {
         p2M.forEach(m => updateHigh(m.score, p2High));
         const lP1S = p1M.reduce((a,b)=>a+(b.score||0),0); 
         const lP2S = p2M.reduce((a,b)=>a+(b.score||0),0);
-        const lP1D = p1M.reduce((a,b)=>a+(b.dartsUsed||3),0); 
-        const lP2D = p2M.reduce((a,b)=>a+(b.dartsUsed||3),0);
+        const lP1D = p1M.reduce((a,b)=>a+(b.score||0),0); 
+        const lP2D = p2M.reduce((a,b)=>a+(b.score||0),0);
         p1ScoreTotal+=lP1S; p1DartsTotal+=lP1D; 
         p2ScoreTotal+=lP2S; p2DartsTotal+=lP2D;
         const winnerKey = leg.winner;
@@ -991,7 +991,6 @@ function AppContent({ onError }) {
   const handleTurnCommitRef = useRef(null);
 
   // --- OBOUSMĚRNÁ SYNCHRONIZACE S CLOUDEM ---
-  // Toto chybělo! Nyní aplikace stahuje data z cloudu, když se uživatel přihlásí.
   useEffect(() => {
     if (!user || user.isAnonymous || !db) return;
 
@@ -1846,11 +1845,20 @@ function AppContent({ onError }) {
 
       <header className={`relative p-2 min-h-16 landscape:min-h-10 h-auto bg-slate-900 border-b border-slate-800 flex justify-between items-center shadow-md shrink-0 sticky top-0 z-20 transition-all duration-300`}>
         <div className={`absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none z-10 pr-12 sm:pr-16 transition-opacity duration-300 ${appState === 'home' ? 'opacity-0' : 'opacity-100'}`}>
-            <div className="flex items-center gap-1.5 sm:gap-4 whitespace-nowrap bg-slate-900/40 backdrop-blur-sm rounded-xl px-2 py-0.5 border border-white/5 transform scale-90 sm:scale-100 landscape:scale-[0.65] origin-top sm:origin-center mt-1 sm:mt-0">
-                <div className="flex items-baseline gap-1"><span className="text-2xl sm:text-3xl font-black text-emerald-500 tracking-tight leading-none">{settings.startScore}</span><span className="text-white-500 text-sm sm:text-base font-bold self-end mb-0.5">{settings.outMode==='double'?'DO':'SO'}</span></div>
-                <div className="w-px h-6 bg-slate-700/50 rotate-12 mx-1"></div>
-                <div className="flex items-baseline gap-1.5"><span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider self-center">{settings.matchMode==='first_to'?t('firstTo'):t('bestOf')}</span><span className="text-xl sm:text-2xl font-black text-white leading-none">{settings.matchTarget}</span></div>
-            </div>
+            {['setup', 'playing', 'leg_finished', 'match_finished'].includes(appState) || selectedMatchDetail ? (
+                <div className="flex items-center gap-1.5 sm:gap-4 whitespace-nowrap bg-slate-900/40 backdrop-blur-sm rounded-xl px-2 py-0.5 border border-white/5 transform scale-90 sm:scale-100 landscape:scale-[0.65] origin-top sm:origin-center mt-1 sm:mt-0">
+                    <div className="flex items-baseline gap-1"><span className="text-2xl sm:text-3xl font-black text-emerald-500 tracking-tight leading-none">{settings.startScore}</span><span className="text-white-500 text-sm sm:text-base font-bold self-end mb-0.5">{settings.outMode==='double'?'DO':'SO'}</span></div>
+                    <div className="w-px h-6 bg-slate-700/50 rotate-12 mx-1"></div>
+                    <div className="flex items-baseline gap-1.5"><span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider self-center">{settings.matchMode==='first_to'?t('firstTo'):t('bestOf')}</span><span className="text-xl sm:text-2xl font-black text-white leading-none">{settings.matchTarget}</span></div>
+                </div>
+            ) : (
+                <div className="font-black text-slate-300 uppercase tracking-widest text-sm sm:text-base truncate px-4 drop-shadow-md">
+                    {appState === 'tutorial' && t('tutorial')}
+                    {appState === 'history' && t('matchHistory')}
+                    {appState === 'about' && t('aboutApp')}
+                    {appState === 'profile' && t('statsPersonal')}
+                </div>
+            )}
         </div>
         
         <div className="flex items-center gap-2 shrink-0 w-auto min-w-[2.5rem] relative z-30">
@@ -1931,11 +1939,7 @@ function AppContent({ onError }) {
 
       {/* --- PRŮVODCE (TUTORIAL) --- */}
       {appState === 'tutorial' && (
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col items-center w-full relative z-10 pb-20">
-            <h2 className="text-2xl font-black text-white mb-6 tracking-widest uppercase flex items-center gap-2">
-                <FileText className="w-6 h-6 text-emerald-500"/> {t('tutorial')}
-            </h2>
-            
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pt-6 flex flex-col items-center w-full relative z-10 pb-20">
             <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {[
                     { icon: <Target className="w-6 h-6 text-blue-400" />, title: t('tutStartTitle'), desc: t('tutStartDesc') },
@@ -1965,9 +1969,7 @@ function AppContent({ onError }) {
 
       {/* --- O APLIKACI --- */}
       {appState === 'about' && (
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col items-center w-full max-w-lg mx-auto relative z-10 pb-20">
-            <h2 className="text-2xl font-black text-white mb-6 tracking-widest uppercase flex items-center gap-2"><Info className="w-6 h-6 text-emerald-500"/> {t('aboutApp')}</h2>
-            
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pt-6 flex flex-col items-center w-full max-w-lg mx-auto relative z-10 pb-20">
             <div className="bg-slate-900 w-full p-6 rounded-2xl border border-slate-800 shadow-xl space-y-6">
                 <div className="text-center space-y-2 border-b border-slate-800 pb-6">
                     <div className="w-20 h-20 bg-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-900/50">
@@ -1978,7 +1980,7 @@ function AppContent({ onError }) {
                     <div className="text-slate-500 font-mono text-xs mt-2">Verze {APP_VERSION}</div>
                 </div>
 
-                <div className="text-center pt-2">
+                <div className="text-center pt-2 flex flex-col items-center">
                     <p className="text-slate-400 text-sm">
                         {t('aboutText')}
                     </p>
@@ -1996,7 +1998,8 @@ function AppContent({ onError }) {
         gap-2 
         underline 
         uppercase 
-        tracking-widest">
+        tracking-widest
+        mx-auto">
 
     {typeof t === 'function' ? t('privacyPolicy') : 'Zásady ochrany soukromí'}
 </button>
@@ -2093,11 +2096,8 @@ function AppContent({ onError }) {
 
       {/* --- HISTORIE ZÁPASŮ --- */}
       {appState === 'history' && (
-        <main className="flex-1 overflow-y-auto p-4 flex flex-col items-center w-full">
+        <main className="flex-1 overflow-y-auto p-4 pt-6 flex flex-col items-center w-full">
             <div className="w-full max-w-lg space-y-4 pb-20">
-                <h2 className="text-2xl font-black text-white mb-6 tracking-widest uppercase flex items-center justify-center gap-2 mt-4">
-                    <History className="w-6 h-6 text-emerald-500"/> {translations[lang].matchHistory}
-                </h2>
                 
                 {(!user || user.isAnonymous) && (
                     <div className="bg-blue-900/20 border border-blue-500/30 p-4 rounded-xl flex flex-col items-center text-center mb-4">
@@ -2107,7 +2107,7 @@ function AppContent({ onError }) {
                     </div>
                 )}
 
-                <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden mt-2">
+                <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
                     {(() => {
                         const myMatches = (user && !user.isAnonymous) 
                             ? matchHistory.filter(m => m.p1Id === user.uid || m.p2Id === user.uid)
