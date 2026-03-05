@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.viteczech.simpledartcounter",
+        "sha256_cert_fingerprints": ["B4:F7:5A:34:A6:EE:11:54:9F:CB:B0:7B:BE:E7:D4:90:64:39:A9:41:6F:F3:57:74:8C:C8:E6:4A:60:B7:A9:E0"]
+      }
+    }]
