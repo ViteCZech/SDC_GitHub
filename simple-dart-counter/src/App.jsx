@@ -1996,9 +1996,8 @@ function AppContent({ onError }) {
         gap-2 
         underline 
         uppercase 
-        tracking-widest
-    "
->
+        tracking-widest">
+
     {typeof t === 'function' ? t('privacyPolicy') : 'Zásady ochrany soukromí'}
 </button>
                 </div>
