@@ -1998,7 +1998,7 @@ function AppContent({ onError }) {
         uppercase 
         tracking-widest
     "
- >
+>
     {typeof t === 'function' ? t('privacyPolicy') : 'Zásady ochrany soukromí'}
 </button>
                 </div>
