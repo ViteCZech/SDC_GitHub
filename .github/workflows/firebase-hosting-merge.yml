@@ -7,24 +7,25 @@ jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Stažení kódu z GitHubu
+        uses: actions/checkout@v4
       
-      - name: Nastavení Node.js
+      - name: Nastavení Node.js (verze 20)
         uses: actions/setup-node@v4
         with:
           node-version: 20
           
-      - name: Instalace knihoven
-        # Používáme klasický install, protože je nejstabilnější pro začátek
+      - name: Instalace závislostí
+        # Používáme 'install' místo 'ci' pro maximální kompatibilitu
         run: npm install
         working-directory: simple-dart-counter
 
       - name: Sestavení aplikace (Build)
-        # Tady to doteď padalo - přidali jsme podrobnější výpis
+        # Tento krok vytvoří složku 'dist'
         run: npm run build
         working-directory: simple-dart-counter
 
-      - name: Nahrání na Firebase
+      - name: Nahrání na Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
