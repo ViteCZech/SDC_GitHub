@@ -17,4 +17,6 @@ export default defineConfig({
       }
     })
   ],
+  // Zajišťuje, že statické soubory včetně .well-known budou v buildu
+  publicDir: 'public'
 })
