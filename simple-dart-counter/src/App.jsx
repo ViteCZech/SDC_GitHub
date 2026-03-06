@@ -6,12 +6,13 @@ import {
   AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, Delete, 
   DownloadCloud, FileText, Heart, History, Home, Info, Keyboard as KeyboardIcon, 
   Maximize, Mic, MicOff, MousePointer2, Play, RefreshCw, RotateCcw, 
-  Target, Trash2, Trophy, Undo2, User, Cloud, X, BarChart2, List
+  Target, Trash2, Trophy, Undo2, User, Cloud, X, BarChart2, List,
+  TrendingUp, TrendingDown, Minus
 } from 'lucide-react';
 
 // --- VERZOVÁNÍ ---
-// Zvýšeno na v1.7.1 - Chytré tlačítko Zpět při hře s botem
-const APP_VERSION = "v1.7.1"; 
+// Zvýšeno na v1.7.2 - Pokročilé statistiky (kasičky pro grafy, trendy srovnávající období)
+const APP_VERSION = "v1.7.2"; 
 
 // --- SAFE STORAGE HELPER ---
 const safeStorage = {
@@ -113,12 +114,13 @@ const translations = {
     syncNo: 'Ne, ignorovat',
     historyLoginInfo: 'Vidíte pouze lokální zápasy. Pro zobrazení všech statistik a zálohu do cloudu se přihlaste.',
     historyLoginBtn: 'Přihlásit přes Google',
-    statsAllTime: 'Celkově', stats7Days: '7 Dní', stats30Days: '30 Dní', stats90Days: '90 Dní',
+    statsToday: 'Dnes', statsAllTime: 'Celkově', stats7Days: '7 Dní', stats30Days: '30 Dní', stats90Days: '90 Dní',
     matchesPlayed: 'Zápasů', winRate: 'Úspěšnost', total180s: 'Počet 180', avgTrend: 'Vývoj průměru',
     checkout100: 'Zavření 100+', statsPersonal: 'Osobní statistiky', statsFirst9: 'First 9 Avg',
     stats100p: '100+', stats140p: '140+', statsAvgCheckout: 'Průměr zavření', statsRoundDist: 'Zavření (Kola)',
     statsRound: 'Kolo', statsCharts: 'Grafy', statsData: 'Data', statsUserFallback: 'Uživatel',
-    statsMatchLeg: 'ZÁP | LEG',
+    statsMatchLeg: 'ZÁP | LEG', trendAvg: 'Průměr', trendFirst9: 'First 9', trendCheckoutRounds: 'Kola k výhře',
+    noTrendData: 'Málo dat',
     deleteAccount: 'Smazat účet a všechna data',
     deleteAccountConfirm: 'Opravdu chcete nenávratně smazat svůj účet a veškerou historii zápasů? Tuto akci nelze vrátit.',
     privacyPolicy: 'Zásady ochrany osobních údajů',
@@ -189,12 +191,13 @@ const translations = {
     syncNo: 'No, ignore',
     historyLoginInfo: 'You are viewing local matches only. Log in to see all stats and backup to the cloud.',
     historyLoginBtn: 'Sign in with Google',
-    statsAllTime: 'All Time', stats7Days: '7 Days', stats30Days: '30 Days', stats90Days: '90 Days',
+    statsToday: 'Today', statsAllTime: 'All Time', stats7Days: '7 Days', stats30Days: '30 Days', stats90Days: '90 Days',
     matchesPlayed: 'Matches', winRate: 'Win Rate', total180s: 'Total 180s', avgTrend: 'Average Trend',
     checkout100: '100+ Checkouts', statsPersonal: 'Personal Stats', statsFirst9: 'First 9 Avg',
     stats100p: '100+', stats140p: '140+', statsAvgCheckout: 'Avg Checkout', statsRoundDist: 'Checkout (Rounds)',
     statsRound: 'Round', statsCharts: 'Charts', statsData: 'Data', statsUserFallback: 'User',
-    statsMatchLeg: 'MAT | LEG',
+    statsMatchLeg: 'MAT | LEG', trendAvg: 'Average', trendFirst9: 'First 9', trendCheckoutRounds: 'Checkout Rnds',
+    noTrendData: 'No Data',
     deleteAccount: 'Delete Account & All Data',
     deleteAccountConfirm: 'Are you sure you want to permanently delete your account and all match history? This action cannot be undone.',
     privacyPolicy: 'Privacy Policy',
@@ -265,12 +268,13 @@ const translations = {
     syncNo: 'Nie, ignoruj',
     historyLoginInfo: 'Widzisz tylko mecze lokalne. Zaloguj się, aby zobaczyć wszystkie statystyki i kopię w chmurze.',
     historyLoginBtn: 'Zaloguj przez Google',
-    statsAllTime: 'Zawsze', stats7Days: '7 Dni', stats30Days: '30 Dni', stats90Days: '90 Dni',
+    statsToday: 'Dzisiaj', statsAllTime: 'Zawsze', stats7Days: '7 Dni', stats30Days: '30 Dni', stats90Days: '90 Dni',
     matchesPlayed: 'Mecze', winRate: 'Wygrane', total180s: 'Ilość 180', avgTrend: 'Trend średniej',
     checkout100: 'Zamknięcia 100+', statsPersonal: 'Moje Statystyki', statsFirst9: 'Średnia 1. 9',
     stats100p: '100+', stats140p: '140+', statsAvgCheckout: 'Śr. Zamknięcia', statsRoundDist: 'Zamknięcie (Rundy)',
     statsRound: 'Runda', statsCharts: 'Wykresy', statsData: 'Dane', statsUserFallback: 'Użytkownik',
-    statsMatchLeg: 'MECZ | LEG',
+    statsMatchLeg: 'MECZ | LEG', trendAvg: 'Średnia', trendFirst9: 'First 9', trendCheckoutRounds: 'Rundy Wygr.',
+    noTrendData: 'Mało Danych',
     deleteAccount: 'Usuń konto i wszystkie dane',
     deleteAccountConfirm: 'Czy na pewno chcesz trwale usunąć swoje konto i całą historię meczów? Tej czynności nie można cofnąć.',
     privacyPolicy: 'Polityka prywatności',
@@ -343,6 +347,19 @@ const calculateStats = (legs, p1Name, p2Name) => {
 const randNormal = (mean, stdDev) => {
     let u=0, v=0; while(u===0) u=Math.random(); while(v===0) v=Math.random();
     return Math.round((Math.sqrt(-2.0*Math.log(u))*Math.cos(2.0*Math.PI*v))*stdDev+mean);
+};
+
+const getBinLabel = (timestamp, strategy, lang) => {
+    const d = new Date(timestamp);
+    if (strategy === 'match') return d.toLocaleTimeString(lang, {hour: '2-digit', minute:'2-digit'});
+    if (strategy === 'day') return d.toLocaleDateString(lang, {day: 'numeric', month: 'numeric'});
+    if (strategy === 'week') {
+        const day = d.getDay() === 0 ? 7 : d.getDay();
+        const start = new Date(d.getTime() - (day - 1) * 24 * 60 * 60 * 1000);
+        return start.toLocaleDateString(lang, {day: 'numeric', month: 'numeric'});
+    }
+    if (strategy === 'month') return d.toLocaleDateString(lang, {month: 'short', year: '2-digit'});
+    return '';
 };
 
 // --- KOMPONENTY ---
@@ -645,42 +662,64 @@ const MatchStatsView = ({ data, onClose, title, lang, onStartMatch }) => {
 // --- KOMPONENTA OSOBNÍCH STATISTIK ---
 const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
     const t = (k) => translations[lang][k] || k;
-    const [timeRange, setTimeRange] = useState('all');
+    const [timeRange, setTimeRange] = useState('today');
     const [tab, setTab] = useState('data');
 
+    // ČASOVÁ OBDOBÍ PRO AKTUÁLNÍ A PŘEDCHOZÍ BLOK
+    const nowTs = Date.now();
+    const todayStartTs = new Date(new Date().setHours(0,0,0,0)).getTime();
+    
+    let currentStart, prevStart, binStrategy;
+    if (timeRange === 'today') {
+        currentStart = todayStartTs;
+        prevStart = todayStartTs - 24 * 60 * 60 * 1000;
+        binStrategy = 'match';
+    } else if (timeRange === 7) {
+        currentStart = nowTs - 7 * 24 * 60 * 60 * 1000;
+        prevStart = currentStart - 7 * 24 * 60 * 60 * 1000;
+        binStrategy = 'day';
+    } else if (timeRange === 30) {
+        currentStart = nowTs - 30 * 24 * 60 * 60 * 1000;
+        prevStart = currentStart - 30 * 24 * 60 * 60 * 1000;
+        binStrategy = 'day';
+    } else if (timeRange === 90) {
+        currentStart = nowTs - 90 * 24 * 60 * 60 * 1000;
+        prevStart = currentStart - 90 * 24 * 60 * 60 * 1000;
+        binStrategy = 'week';
+    } else { // all
+        currentStart = 0;
+        prevStart = 0;
+        binStrategy = 'month';
+    }
+
     const myMatches = matches.filter(m => m.p1Id === user.uid || m.p2Id === user.uid);
-    const filteredMatches = myMatches.filter(m => {
-        if (timeRange === 'all') return true;
-        const cutoff = Date.now() - (timeRange * 24 * 60 * 60 * 1000);
-        return m.id >= cutoff;
-    });
+    const currentMatches = myMatches.filter(m => m.id >= currentStart);
+    const prevMatches = timeRange !== 'all' ? myMatches.filter(m => m.id >= prevStart && m.id < currentStart) : [];
 
+    // DATA AKTUÁLNÍHO OBDOBÍ
     let totalWins = 0, total180s = 0, total140s = 0, total100s = 0, checkouts100plus = 0, highestCheckout = 0;
-    let sumAvgs = 0, avgCount = 0;
-    let sumFirst9 = 0, first9Count = 0;
-    let sumCheckouts = 0, checkoutsCount = 0;
     let totalLegsPlayed = 0, totalLegsWon = 0;
-    const roundsDist = {}; 
-    const chartData = [];
+    
+    let curSumScore = 0, curSumDarts = 0;
+    let curSumF9Score = 0, curSumF9Darts = 0;
+    let curSumChkRounds = 0, curChkCount = 0;
+    let sumCheckouts = 0;
 
-    [...filteredMatches].reverse().forEach(m => {
+    const roundsDist = {}; 
+    const binsMap = {};
+
+    [...currentMatches].reverse().forEach(m => {
         const isP1 = m.p1Id === user.uid;
         const myKey = isP1 ? 'p1' : 'p2';
         if (m.matchWinner === myKey) totalWins++;
-        
-        const name1 = getTranslatedName(m.p1Name, true, lang);
-        const name2 = getTranslatedName(m.p2Name, false, lang);
-        const stats = calculateStats(m.completedLegs, name1, name2);
-        
-        const myAvg = isP1 ? stats.p1Avg : stats.p2Avg;
-        if (myAvg > 0) {
-            sumAvgs += myAvg; avgCount++;
-            chartData.push({ date: m.date.split(',')[0], avg: myAvg });
-        }
+
+        const binLabel = getBinLabel(m.id, binStrategy, lang);
+        if (!binsMap[binLabel]) binsMap[binLabel] = { score: 0, darts: 0, label: binLabel, ts: m.id };
 
         m.completedLegs.forEach(leg => {
             totalLegsPlayed++;
             if (leg.winner === myKey) totalLegsWon++;
+
             const myThrows = leg.history.filter(h => h.player === myKey);
             
             myThrows.forEach(th => {
@@ -689,34 +728,102 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
                 else if (th.score >= 100) total100s++;
             });
 
+            // Přesný výpočet všech vhozených bodů a šipek
+            const lScore = myThrows.reduce((a,b)=>a+(b.score||0),0);
+            const lDarts = myThrows.reduce((a,b)=>a+(b.dartsUsed||3),0);
+            curSumScore += lScore; curSumDarts += lDarts;
+            
+            // Plnění "kasiček" pro graf
+            binsMap[binLabel].score += lScore; 
+            binsMap[binLabel].darts += lDarts;
+
             const f9Throws = myThrows.slice(0, 3);
-            const f9Score = f9Throws.reduce((a, b) => a + b.score, 0);
-            const f9Darts = f9Throws.reduce((a, b) => a + (b.dartsUsed || 3), 0);
-            if (f9Darts > 0) { sumFirst9 += (f9Score / f9Darts) * 3; first9Count++; }
+            curSumF9Score += f9Throws.reduce((a, b) => a + b.score, 0);
+            curSumF9Darts += f9Throws.reduce((a, b) => a + (b.dartsUsed || 3), 0);
 
             if (leg.winner === myKey) {
                 const winThrow = myThrows.find(th => th.remaining === 0 && !th.isBust);
                 if (winThrow) {
                     sumCheckouts += winThrow.score;
-                    checkoutsCount++;
                     if (winThrow.score > highestCheckout) highestCheckout = winThrow.score;
                     if (winThrow.score >= 100) checkouts100plus++;
                 }
-                const totalDarts = myThrows.reduce((a, b) => a + (b.dartsUsed || 3), 0);
-                const round = Math.ceil(totalDarts / 3);
-                roundsDist[round] = (roundsDist[round] || 0) + 1;
+                const chkRounds = Math.ceil(lDarts / 3);
+                curSumChkRounds += chkRounds;
+                curChkCount++;
+                roundsDist[chkRounds] = (roundsDist[chkRounds] || 0) + 1;
             }
         });
     });
 
-    const winRate = filteredMatches.length > 0 ? Math.round((totalWins / filteredMatches.length) * 100) : 0;
-    const legWinRate = totalLegsPlayed > 0 ? Math.round((totalLegsWon / totalLegsPlayed) * 100) : 0;
-    const overallAvg = avgCount > 0 ? (sumAvgs / avgCount).toFixed(1) : '0.0';
-    const overallFirst9 = first9Count > 0 ? (sumFirst9 / first9Count).toFixed(1) : '0.0';
-    const avgCheckout = checkoutsCount > 0 ? Math.round(sumCheckouts / checkoutsCount) : 0;
+    // DATA PŘEDCHOZÍHO OBDOBÍ (pro trendovou analýzu)
+    let prevSumScore = 0, prevSumDarts = 0, prevSumF9Score = 0, prevSumF9Darts = 0, prevSumChkRounds = 0, prevChkCount = 0;
+    prevMatches.forEach(m => {
+        const isP1 = m.p1Id === user.uid;
+        const myKey = isP1 ? 'p1' : 'p2';
+        m.completedLegs.forEach(leg => {
+            const myThrows = leg.history.filter(h => h.player === myKey);
+            prevSumScore += myThrows.reduce((a,b)=>a+(b.score||0),0);
+            prevSumDarts += myThrows.reduce((a,b)=>a+(b.dartsUsed||3),0);
+            
+            const f9 = myThrows.slice(0, 3);
+            prevSumF9Score += f9.reduce((a,b)=>a+b.score,0);
+            prevSumF9Darts += f9.reduce((a,b)=>a+(b.dartsUsed||3),0);
 
+            if (leg.winner === myKey) {
+                const lDarts = myThrows.reduce((a,b)=>a+(b.dartsUsed||3),0);
+                prevSumChkRounds += Math.ceil(lDarts / 3);
+                prevChkCount++;
+            }
+        });
+    });
+
+    // PRŮMĚRY AKTUÁLNÍHO OBDOBÍ
+    const overallAvgRaw = curSumDarts > 0 ? (curSumScore / curSumDarts) * 3 : 0;
+    const overallAvg = overallAvgRaw > 0 ? overallAvgRaw.toFixed(1) : '0.0';
+
+    const overallFirst9Raw = curSumF9Darts > 0 ? (curSumF9Score / curSumF9Darts) * 3 : 0;
+    const overallFirst9 = overallFirst9Raw > 0 ? overallFirst9Raw.toFixed(1) : '0.0';
+
+    const overallChkRaw = curChkCount > 0 ? (curSumChkRounds / curChkCount) : 0;
+
+    const winRate = currentMatches.length > 0 ? Math.round((totalWins / currentMatches.length) * 100) : 0;
+    const legWinRate = totalLegsPlayed > 0 ? Math.round((totalLegsWon / totalLegsPlayed) * 100) : 0;
+    const avgCheckout = curChkCount > 0 ? Math.round(sumCheckouts / curChkCount) : 0;
+
+    // PRŮMĚRY PŘEDCHOZÍHO OBDOBÍ
+    const prevAvg = prevSumDarts > 0 ? (prevSumScore / prevSumDarts) * 3 : null;
+    const prevF9Avg = prevSumF9Darts > 0 ? (prevSumF9Score / prevSumF9Darts) * 3 : null;
+    const prevChk = prevChkCount > 0 ? (prevSumChkRounds / prevChkCount) : null;
+
+    // VÝPOČET TRENDŮ
+    const getTrend = (current, prev, isInverse = false) => {
+        if (prev === null || current === 0) return null;
+        const diff = current - prev;
+        if (Math.abs(diff) < 0.1) return { val: '0.0', color: 'text-slate-500', Icon: Minus };
+        
+        let isGood = diff > 0;
+        if (isInverse) isGood = diff < 0; // U kol k výhře je mínus lepší
+
+        return {
+            val: (diff > 0 ? '+' : '') + diff.toFixed(1),
+            color: isGood ? 'text-emerald-500' : 'text-red-500',
+            Icon: diff > 0 ? TrendingUp : TrendingDown
+        };
+    };
+
+    const trendAvgObj = timeRange !== 'all' ? getTrend(overallAvgRaw, prevAvg) : null;
+    const trendF9Obj = timeRange !== 'all' ? getTrend(overallFirst9Raw, prevF9Avg) : null;
+    const trendChkObj = timeRange !== 'all' ? getTrend(overallChkRaw, prevChk, true) : null;
+
+    // PŘÍPRAVA DAT GRAFU
     let maxRoundCount = 0;
     Object.values(roundsDist).forEach(val => { if (val > maxRoundCount) maxRoundCount = val; });
+
+    const chartData = Object.values(binsMap).sort((a,b)=>a.ts-b.ts).map(b => ({
+        date: b.label,
+        avg: b.darts > 0 ? (b.score / b.darts) * 3 : 0
+    })).filter(d => d.avg > 0);
 
     const chartHeight = 160;
     const pointWidth = 60; 
@@ -749,8 +856,8 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
                 </div>
 
                 <div className="flex bg-slate-900 rounded-lg border border-slate-800 p-1">
-                    {[{v:'all', l:t('statsAllTime')}, {v:7, l:t('stats7Days')}, {v:30, l:t('stats30Days')}, {v:90, l:t('stats90Days')}].map(f => (
-                        <button key={f.v} onClick={() => setTimeRange(f.v)} className={`flex-1 py-2 text-[10px] sm:text-xs font-bold rounded-md uppercase tracking-wider transition-colors ${timeRange === f.v ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>
+                    {[{v:'today', l:t('statsToday')}, {v:7, l:t('stats7Days')}, {v:30, l:t('stats30Days')}, {v:90, l:t('stats90Days')}, {v:'all', l:t('statsAllTime')}].map(f => (
+                        <button key={f.v} onClick={() => setTimeRange(f.v)} className={`flex-1 py-2 text-[9px] sm:text-[11px] font-bold rounded-md uppercase tracking-wider transition-colors ${timeRange === f.v ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>
                             {f.l}
                         </button>
                     ))}
@@ -783,7 +890,7 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
                                     <span className="text-sm font-bold text-slate-600">|</span>
                                     <span className="text-2xl sm:text-3xl font-black text-cyan-400 font-mono">{legWinRate}%</span>
                                 </div>
-                                <span className="text-[8px] sm:text-[9px] text-slate-500 mt-1">{filteredMatches.length} {t('matchesPlayed')} / {totalLegsPlayed} {t('legs').toLowerCase()}</span>
+                                <span className="text-[8px] sm:text-[9px] text-slate-500 mt-1">{currentMatches.length} {t('matchesPlayed')} / {totalLegsPlayed} {t('legs').toLowerCase()}</span>
                             </div>
                             <div className="bg-slate-900 border border-slate-800 p-3 sm:p-4 rounded-xl flex flex-col items-center justify-center text-center">
                                 <span className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">{t('statsAvgCheckout')}</span>
@@ -805,7 +912,7 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
                             <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-4">{t('statsRoundDist')}</span>
                             <div className="flex flex-col gap-2">
                                 {Object.keys(roundsDist).length > 0 ? Object.entries(roundsDist).sort((a,b) => Number(a[0]) - Number(b[0])).map(([round, count]) => {
-                                    const percentage = (count / checkoutsCount) * 100;
+                                    const percentage = (count / curChkCount) * 100;
                                     const widthPct = (count / maxRoundCount) * 100;
                                     return (
                                         <div key={round} className="flex items-center gap-3">
@@ -823,61 +930,86 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
                 )}
 
                 {tab === 'charts' && (
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-4">{t('avgTrend')}</span>
-                        {chartData.length > 1 ? (
-                            <div className="w-full overflow-x-auto no-scrollbar border-b border-l border-slate-800 pb-2 pl-2">
-                                <div style={{ width: `${svgWidth}px`, height: `${chartHeight}px` }} className="relative mt-2">
-                                    <svg width="100%" height="100%" className="overflow-visible">
-                                        <defs>
-                                            <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#10b981" stopOpacity="0.5"/>
-                                                <stop offset="100%" stopColor="#10b981" stopOpacity="0.0"/>
-                                            </linearGradient>
-                                            <pattern id="diagonalHatch" width="6" height="6" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
-                                                <line x1="0" y1="0" x2="0" y2="6" stroke="#10b981" strokeWidth="1.5" strokeOpacity="0.3" />
-                                            </pattern>
-                                        </defs>
-                                        {gridLines.map(val => {
-                                            const y = chartHeight - ((val - minAvg) / (maxAvg - minAvg)) * chartHeight;
-                                            return (
-                                                <g key={`grid-${val}`}>
-                                                    <line x1="15" y1={y} x2="100%" y2={y} stroke="#334155" strokeWidth="1" strokeDasharray="4 4" opacity="0.5" />
-                                                    <text x="0" y={y + 3} fill="#64748b" fontSize="9" fontWeight="bold" className="font-mono">{val}</text>
-                                                </g>
-                                            );
-                                        })}
-                                        <polygon 
-                                            points={`15,${chartHeight} ${chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight}`).join(' ')} ${(chartData.length - 1) * pointWidth + 15},${chartHeight}`}
-                                            fill="url(#chartFill)" 
-                                        />
-                                        <polygon 
-                                            points={`15,${chartHeight} ${chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight}`).join(' ')} ${(chartData.length - 1) * pointWidth + 15},${chartHeight}`}
-                                            fill="url(#diagonalHatch)" 
-                                        />
-                                        <polyline
-                                            fill="none"
-                                            stroke="#10b981"
-                                            strokeWidth="3"
-                                            points={chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight}`).join(' ')}
-                                        />
-                                        {chartData.map((d, i) => {
-                                            const x = (i * pointWidth) + 15;
-                                            const y = chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight;
-                                            return (
-                                                <g key={`point-${i}`}>
-                                                    <circle cx={x} cy={y} r="4" fill="#0f172a" stroke="#10b981" strokeWidth="2" />
-                                                    <text x={x} y={y - 12} fill="#94a3b8" fontSize="10" textAnchor="middle" fontWeight="bold" className="font-mono">{d.avg.toFixed(1)}</text>
-                                                    <text x={x} y={chartHeight + 15} fill="#64748b" fontSize="8" textAnchor="middle">{d.date.slice(0,5)}</text>
-                                                </g>
-                                            );
-                                        })}
-                                    </svg>
+                    <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
+                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-4">{t('avgTrend')}</span>
+                            {chartData.length > 1 ? (
+                                <div className="w-full overflow-x-auto no-scrollbar border-b border-l border-slate-800 pb-2 pl-2">
+                                    <div style={{ width: `${svgWidth}px`, height: `${chartHeight}px` }} className="relative mt-2">
+                                        <svg width="100%" height="100%" className="overflow-visible">
+                                            <defs>
+                                                <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.5"/>
+                                                    <stop offset="100%" stopColor="#10b981" stopOpacity="0.0"/>
+                                                </linearGradient>
+                                                <pattern id="diagonalHatch" width="6" height="6" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+                                                    <line x1="0" y1="0" x2="0" y2="6" stroke="#10b981" strokeWidth="1.5" strokeOpacity="0.3" />
+                                                </pattern>
+                                            </defs>
+                                            {gridLines.map(val => {
+                                                const y = chartHeight - ((val - minAvg) / (maxAvg - minAvg)) * chartHeight;
+                                                return (
+                                                    <g key={`grid-${val}`}>
+                                                        <line x1="15" y1={y} x2="100%" y2={y} stroke="#334155" strokeWidth="1" strokeDasharray="4 4" opacity="0.5" />
+                                                        <text x="0" y={y + 3} fill="#64748b" fontSize="9" fontWeight="bold" className="font-mono">{val}</text>
+                                                    </g>
+                                                );
+                                            })}
+                                            <polygon 
+                                                points={`15,${chartHeight} ${chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight}`).join(' ')} ${(chartData.length - 1) * pointWidth + 15},${chartHeight}`}
+                                                fill="url(#chartFill)" 
+                                            />
+                                            <polygon 
+                                                points={`15,${chartHeight} ${chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight}`).join(' ')} ${(chartData.length - 1) * pointWidth + 15},${chartHeight}`}
+                                                fill="url(#diagonalHatch)" 
+                                            />
+                                            <polyline
+                                                fill="none"
+                                                stroke="#10b981"
+                                                strokeWidth="3"
+                                                points={chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight}`).join(' ')}
+                                            />
+                                            {chartData.map((d, i) => {
+                                                const x = (i * pointWidth) + 15;
+                                                const y = chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight;
+                                                return (
+                                                    <g key={`point-${i}`}>
+                                                        <circle cx={x} cy={y} r="4" fill="#0f172a" stroke="#10b981" strokeWidth="2" />
+                                                        <text x={x} y={y - 12} fill="#94a3b8" fontSize="10" textAnchor="middle" fontWeight="bold" className="font-mono">{d.avg.toFixed(1)}</text>
+                                                        <text x={x} y={chartHeight + 15} fill="#64748b" fontSize="8" textAnchor="middle">{d.date}</text>
+                                                    </g>
+                                                );
+                                            })}
+                                        </svg>
+                                    </div>
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="text-center text-slate-600 text-xs py-10">Málo dat pro vykreslení grafu. Odehrajte více zápasů v tomto období.</div>
-                        )}
+                            ) : (
+                                <div className="text-center text-slate-600 text-xs py-10">Málo dat pro vykreslení grafu. Odehrajte více zápasů v tomto období.</div>
+                            )}
+                        </div>
+
+                        {/* TRENDY SROVNÁVAJÍCÍ OBDOBÍ */}
+                        <div className="grid grid-cols-3 gap-2">
+                            {[
+                                { title: t('trendAvg'), current: overallAvg, trend: trendAvgObj },
+                                { title: t('trendFirst9'), current: overallFirst9, trend: trendF9Obj },
+                                { title: t('trendCheckoutRounds'), current: overallChkRaw ? overallChkRaw.toFixed(1) : '-', trend: trendChkObj }
+                            ].map((item, i) => (
+                                <div key={i} className="bg-slate-800/40 border border-slate-700/50 p-2 sm:p-3 rounded-xl flex flex-col items-center justify-center text-center shadow-inner">
+                                    <span className="text-[8px] sm:text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1 leading-tight h-6 flex items-center">{item.title}</span>
+                                    <span className="text-xl sm:text-2xl font-black text-white font-mono leading-none my-1">{item.current}</span>
+                                    {item.trend ? (
+                                        <div className={`text-[10px] sm:text-xs font-bold font-mono mt-1 ${item.trend.color} flex items-center justify-center gap-0.5 bg-slate-900/50 px-2 py-0.5 rounded border border-slate-700/50`}>
+                                            <item.trend.Icon className="w-3 h-3 stroke-[3]" /> {item.trend.val}
+                                        </div>
+                                    ) : (
+                                        <div className="text-[8px] sm:text-[9px] font-bold text-slate-600 mt-1 uppercase tracking-widest bg-slate-900/50 px-2 py-1 rounded border border-slate-800">
+                                            {timeRange === 'all' ? '-' : t('noTrendData')}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
                 
@@ -1117,13 +1249,12 @@ function AppContent({ onError }) {
           return;
       }
       
-      // CHYTRÉ HLASOVÉ ZPĚT
       if (tMap.cmdUndo.some(p => transcript.includes(p))) {
            if (st === 'playing' && gameStateRef.current.history.length > 0) {
                let sliceCount = 1;
                if (settingsRef.current.isBot && gameStateRef.current.currentPlayer === 'p1' && gameStateRef.current.history.length >= 2) {
                    if (gameStateRef.current.history[0].player === 'p2') {
-                       sliceCount = 2; // Smažeme botův i hráčův hod
+                       sliceCount = 2;
                    }
                }
                setGameState(recalculateGame(gameStateRef.current.history.slice(sliceCount)));
@@ -1580,20 +1711,11 @@ function AppContent({ onError }) {
   };
   handleTurnCommitRef.current = handleTurnCommit;
 
-  // --- CHYTRÉ TLAČÍTKO ZPĚT ---
   const handleUndoClick = () => {
     if (gameState.history.length === 0) return;
-    
     let sliceCount = 1;
-    // Pokud hraješ s botem a na řadě je právě člověk (p1)
-    // znamená to, že naposledy házel bot. Tlačítko Zpět by normálně smazalo
-    // jen botův hod a hned by zas házel bot. 
-    // Proto smažeme dva poslední hody (botův a ten před ním), 
-    // čímž se opraví chyba člověka.
     if (settings.isBot && gameState.currentPlayer === 'p1' && gameState.history.length >= 2) {
-        if (gameState.history[0].player === 'p2') {
-            sliceCount = 2;
-        }
+        if (gameState.history[0].player === 'p2') sliceCount = 2;
     }
     setGameState(recalculateGame(gameState.history.slice(sliceCount)));
   };
@@ -1788,7 +1910,6 @@ function AppContent({ onError }) {
          <div className="flex flex-col min-w-0 flex-1 mr-2 justify-center"><span className="text-[9px] text-slate-500 uppercase font-bold shrink-0">{translations[lang].throw}</span><div className={`font-bold flex-1 flex items-center ${errorMsg ? 'text-red-500 text-sm sm:text-xl leading-tight whitespace-normal' : 'text-white text-3xl sm:text-5xl font-mono truncate'}`}>{errorMsg || currentInput || <span className="text-slate-700">0</span>}</div></div>
          <div className="flex gap-1.5 sm:gap-2 shrink-0">
              <button onClick={toggleMic} className={`w-10 h-10 sm:w-12 sm:h-12 rounded flex items-center justify-center border transition-all ${isMicActive ? (isListening ? 'bg-red-600 border-red-500 animate-pulse text-white' : 'bg-red-900/50 border-red-500/50 text-red-200') : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'}`}>{isMicActive ? <Mic className="w-5 h-5 sm:w-6 sm:h-6" /> : <MicOff className="w-5 h-5 sm:w-6 sm:h-6" />}</button>
-             {/* ZMĚNĚNÉ TLAČÍTKO ZPĚT */}
              <button onClick={handleUndoClick} className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-800 text-slate-400 rounded flex items-center justify-center border border-slate-700 hover:text-white hover:bg-slate-700"><Undo2 className="w-5 h-5 sm:w-6 sm:h-6" /></button>
              <button onClick={() => handleTurnCommit(parseInt(currentInput))} disabled={!currentInput} className={`bg-emerald-600 text-white h-10 sm:h-12 w-14 sm:w-20 rounded flex items-center justify-center transition-all ${!currentInput ? 'opacity-30' : 'hover:bg-emerald-500'}`}><CheckCircle className="w-6 h-6 sm:w-8 sm:h-8" /></button>
          </div>
