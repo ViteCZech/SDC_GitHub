@@ -7,12 +7,11 @@ import {
   DownloadCloud, FileText, Heart, History, Home, Info, Keyboard as KeyboardIcon, 
   Maximize, Mic, MicOff, MousePointer2, Play, RefreshCw, RotateCcw, 
   Target, Trash2, Trophy, Undo2, User, Cloud, X, BarChart2, List,
-  TrendingUp, TrendingDown, Minus
+  TrendingUp, TrendingDown, Minus, WifiOff
 } from 'lucide-react';
 
 // --- VERZOVÁNÍ ---
-// Zvýšeno na v1.7.2 - Pokročilé statistiky (kasičky pro grafy, trendy srovnávající období)
-const APP_VERSION = "v1.7.2"; 
+const APP_VERSION = "v1.7.3"; 
 
 // --- SAFE STORAGE HELPER ---
 const safeStorage = {
@@ -99,26 +98,26 @@ const translations = {
     tutUpdateTitle: '9. Aktualizace aplikace',
     tutUpdateDesc: 'Když vyjde nová verze, v menu a nahoře se objeví blikající zelené tlačítko. Pokud spouštíte apku z plochy jako plnohodnotnou aplikaci, může se kvůli rychlosti nejprve načíst starší verze z paměti. V takovém případě stačí chvilku počkat na tlačítko aktualizace. Pro 100% jistotu aktuální verze je často nejlepší smazat starou ikonu a přidat si na plochu apku znovu z webu.',
     tutProfileTitle: '10. Osobní statistiky',
-    tutProfileDesc: 'Po přihlášení se na úvodní obrazovce zpřístupní Osobní statistiky. Najdete zde vývoj průměru, procento výher, úspěšnost kol a kompletní historii náhozů roztříděnou podle období.',
+    tutProfileDesc: 'Najdete zde vývoj průměru, procento výher, úspěšnost kol a kompletní historii náhozů roztříděnou podle období. Data se berou lokálně, dokud se nepřihlásíte.',
     originalScore: 'Původní:',
-    loginWithGoogle: 'Přihlásit přes Google',
+    loginWithGoogle: 'Přihlásit přes Google (Cloud záloha)',
     logout: 'ODHLÁSIT SE',
     loggedInAs: 'Přihlášen:',
     loginSuccess: 'Přihlášeno!',
     loginError: 'Chyba přihlášení',
     loginDesc: 'Zálohujte své statistiky a propojte svá zařízení',
-    loginForHistory: 'Nejdříve se přihlaste přes Google (účet), abyste viděl(a) své statistiky.',
+    loginForHistory: 'Zobrazují se pouze lokální zápasy. Pro cloudovou zálohu se přihlaste.',
     syncTitle: 'Nalezeny offline zápasy',
     syncDesc: 'Našli jsme %d zápasů odehraných na tomto zařízení bez přihlášení. Chcete je přiřadit ke svému účtu a zálohovat do cloudu?',
     syncYes: 'Ano, zálohovat',
     syncNo: 'Ne, ignorovat',
     historyLoginInfo: 'Vidíte pouze lokální zápasy. Pro zobrazení všech statistik a zálohu do cloudu se přihlaste.',
-    historyLoginBtn: 'Přihlásit přes Google',
+    historyLoginBtn: 'Přihlásit do Cloudu',
     statsToday: 'Dnes', statsAllTime: 'Celkově', stats7Days: '7 Dní', stats30Days: '30 Dní', stats90Days: '90 Dní',
     matchesPlayed: 'Zápasů', winRate: 'Úspěšnost', total180s: 'Počet 180', avgTrend: 'Vývoj průměru',
     checkout100: 'Zavření 100+', statsPersonal: 'Osobní statistiky', statsFirst9: 'First 9 Avg',
     stats100p: '100+', stats140p: '140+', statsAvgCheckout: 'Průměr zavření', statsRoundDist: 'Zavření (Kola)',
-    statsRound: 'Kolo', statsCharts: 'Grafy', statsData: 'Data', statsUserFallback: 'Uživatel',
+    statsRound: 'Kolo', statsCharts: 'Grafy', statsData: 'Data', statsUserFallback: 'Offline Hráč',
     statsMatchLeg: 'ZÁP | LEG', trendAvg: 'Průměr', trendFirst9: 'First 9', trendCheckoutRounds: 'Kola k výhře',
     noTrendData: 'Málo dat',
     deleteAccount: 'Smazat účet a všechna data',
@@ -176,26 +175,26 @@ const translations = {
     tutUpdateTitle: '9. App Updates',
     tutUpdateDesc: 'When a new version is released, a blinking green Update button will appear. If you run the app from your home screen, an older version might load from memory first for speed. Just wait a moment for the update button to appear. To be absolutely sure you have the newest version, it is often best to delete the old icon and re-add the app to your home screen from the website.',
     tutProfileTitle: '10. Personal Stats',
-    tutProfileDesc: 'After logging in, Personal Stats become available on the home screen. Here you can find your averages, win rate, checkout rounds, and trend charts filtered by time.',
+    tutProfileDesc: 'Here you can find your averages, win rate, checkout rounds, and trend charts filtered by time. Data is local until you log in.',
     originalScore: 'Original:',
-    loginWithGoogle: 'Sign in with Google',
+    loginWithGoogle: 'Sign in with Google (Cloud Backup)',
     logout: 'LOGOUT',
     loggedInAs: 'Logged In:',
     loginSuccess: 'Logged in!',
     loginError: 'Login error',
     loginDesc: 'Backup your stats and link your devices',
-    loginForHistory: 'Please log in with Google first to view your statistics.',
+    loginForHistory: 'Showing local matches only. Log in for cloud backup.',
     syncTitle: 'Offline Matches Found',
     syncDesc: 'We found %d matches played offline on this device. Do you want to assign them to your account and back them up to the cloud?',
     syncYes: 'Yes, backup',
     syncNo: 'No, ignore',
     historyLoginInfo: 'You are viewing local matches only. Log in to see all stats and backup to the cloud.',
-    historyLoginBtn: 'Sign in with Google',
+    historyLoginBtn: 'Sign in to Cloud',
     statsToday: 'Today', statsAllTime: 'All Time', stats7Days: '7 Days', stats30Days: '30 Days', stats90Days: '90 Days',
     matchesPlayed: 'Matches', winRate: 'Win Rate', total180s: 'Total 180s', avgTrend: 'Average Trend',
     checkout100: '100+ Checkouts', statsPersonal: 'Personal Stats', statsFirst9: 'First 9 Avg',
     stats100p: '100+', stats140p: '140+', statsAvgCheckout: 'Avg Checkout', statsRoundDist: 'Checkout (Rounds)',
-    statsRound: 'Round', statsCharts: 'Charts', statsData: 'Data', statsUserFallback: 'User',
+    statsRound: 'Round', statsCharts: 'Charts', statsData: 'Data', statsUserFallback: 'Offline User',
     statsMatchLeg: 'MAT | LEG', trendAvg: 'Average', trendFirst9: 'First 9', trendCheckoutRounds: 'Checkout Rnds',
     noTrendData: 'No Data',
     deleteAccount: 'Delete Account & All Data',
@@ -253,26 +252,26 @@ const translations = {
     tutUpdateTitle: '9. Aktualizacje aplikacji',
     tutUpdateDesc: 'Gdy pojawi się nowa wersja, pojawi się migający zielony przycisk aktualizacji. Jeśli uruchamiasz aplikację z ekranu głównego, dla szybkości z pamięci może załadować się starsza wersja. Po prostu poczekaj chwilę na przycisk aktualizacji. Aby mieć absolutną pewność co do nowej wersji, często najlepiej jest usunąć starą ikonę i ponownie dodać aplikację do ekranu głównego z przeglądarki.',
     tutProfileTitle: '10. Moje Statystyki',
-    tutProfileDesc: 'Po zalogowaniu na ekranie głównym pojawią się Moje Statystyki. Znajdziesz tam swoje średnie, wskaźnik zwycięstw, podział na rundy kończące i wykresy trendów z podziałem na czas.',
+    tutProfileDesc: 'Znajdziesz tam swoje średnie, wskaźnik zwycięstw, podział na rundy kończące i wykresy trendów. Dane są lokalne do momentu logowania.',
     originalScore: 'Oryginał:',
-    loginWithGoogle: 'Zaloguj przez Google',
+    loginWithGoogle: 'Zaloguj przez Google (Kopia)',
     logout: 'WYLOGUJ',
     loggedInAs: 'Zalogowano:',
     loginSuccess: 'Zalogowano!',
     loginError: 'Błąd logowania',
     loginDesc: 'Kopia zapasowa w chmurze i synchronizacja',
-    loginForHistory: 'Zaloguj się przez Google, aby zobaczyć swoje statystyki.',
+    loginForHistory: 'Widzisz tylko mecze lokalne. Zaloguj się dla kopii w chmurze.',
     syncTitle: 'Znaleziono mecze offline',
     syncDesc: 'Znaleźliśmy %d meczów rozegranych offline na tym urządzeniu. Czy chcesz przypisać je do swojego konta i zapisać w chmurze?',
     syncYes: 'Tak, zapisz',
     syncNo: 'Nie, ignoruj',
     historyLoginInfo: 'Widzisz tylko mecze lokalne. Zaloguj się, aby zobaczyć wszystkie statystyki i kopię w chmurze.',
-    historyLoginBtn: 'Zaloguj przez Google',
+    historyLoginBtn: 'Zaloguj do Chmury',
     statsToday: 'Dzisiaj', statsAllTime: 'Zawsze', stats7Days: '7 Dni', stats30Days: '30 Dni', stats90Days: '90 Dni',
     matchesPlayed: 'Mecze', winRate: 'Wygrane', total180s: 'Ilość 180', avgTrend: 'Trend średniej',
     checkout100: 'Zamknięcia 100+', statsPersonal: 'Moje Statystyki', statsFirst9: 'Średnia 1. 9',
     stats100p: '100+', stats140p: '140+', statsAvgCheckout: 'Śr. Zamknięcia', statsRoundDist: 'Zamknięcie (Rundy)',
-    statsRound: 'Runda', statsCharts: 'Wykresy', statsData: 'Dane', statsUserFallback: 'Użytkownik',
+    statsRound: 'Runda', statsCharts: 'Wykresy', statsData: 'Dane', statsUserFallback: 'Gracz Offline',
     statsMatchLeg: 'MECZ | LEG', trendAvg: 'Średnia', trendFirst9: 'First 9', trendCheckoutRounds: 'Rundy Wygr.',
     noTrendData: 'Mało Danych',
     deleteAccount: 'Usuń konto i wszystkie dane',
@@ -665,6 +664,8 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
     const [timeRange, setTimeRange] = useState('today');
     const [tab, setTab] = useState('data');
 
+    const isOffline = !user || user.isAnonymous;
+
     // ČASOVÁ OBDOBÍ PRO AKTUÁLNÍ A PŘEDCHOZÍ BLOK
     const nowTs = Date.now();
     const todayStartTs = new Date(new Date().setHours(0,0,0,0)).getTime();
@@ -692,7 +693,12 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
         binStrategy = 'month';
     }
 
-    const myMatches = matches.filter(m => m.p1Id === user.uid || m.p2Id === user.uid);
+    // Pokud je uživatel offline, bereme všechny lokální zápasy. 
+    // Pokud je online, bereme jen ty s jeho uid.
+    const myMatches = isOffline 
+        ? matches 
+        : matches.filter(m => m.p1Id === user.uid || m.p2Id === user.uid);
+        
     const currentMatches = myMatches.filter(m => m.id >= currentStart);
     const prevMatches = timeRange !== 'all' ? myMatches.filter(m => m.id >= prevStart && m.id < currentStart) : [];
 
@@ -709,7 +715,8 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
     const binsMap = {};
 
     [...currentMatches].reverse().forEach(m => {
-        const isP1 = m.p1Id === user.uid;
+        // Z offline pohledu hrajeme vždy za p1. Z online podle p1Id.
+        const isP1 = isOffline ? true : (m.p1Id === user?.uid);
         const myKey = isP1 ? 'p1' : 'p2';
         if (m.matchWinner === myKey) totalWins++;
 
@@ -728,12 +735,10 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
                 else if (th.score >= 100) total100s++;
             });
 
-            // Přesný výpočet všech vhozených bodů a šipek
             const lScore = myThrows.reduce((a,b)=>a+(b.score||0),0);
             const lDarts = myThrows.reduce((a,b)=>a+(b.dartsUsed||3),0);
             curSumScore += lScore; curSumDarts += lDarts;
             
-            // Plnění "kasiček" pro graf
             binsMap[binLabel].score += lScore; 
             binsMap[binLabel].darts += lDarts;
 
@@ -756,10 +761,10 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
         });
     });
 
-    // DATA PŘEDCHOZÍHO OBDOBÍ (pro trendovou analýzu)
+    // DATA PŘEDCHOZÍHO OBDOBÍ
     let prevSumScore = 0, prevSumDarts = 0, prevSumF9Score = 0, prevSumF9Darts = 0, prevSumChkRounds = 0, prevChkCount = 0;
     prevMatches.forEach(m => {
-        const isP1 = m.p1Id === user.uid;
+        const isP1 = isOffline ? true : (m.p1Id === user?.uid);
         const myKey = isP1 ? 'p1' : 'p2';
         m.completedLegs.forEach(leg => {
             const myThrows = leg.history.filter(h => h.player === myKey);
@@ -803,7 +808,7 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
         if (Math.abs(diff) < 0.1) return { val: '0.0', color: 'text-slate-500', Icon: Minus };
         
         let isGood = diff > 0;
-        if (isInverse) isGood = diff < 0; // U kol k výhře je mínus lepší
+        if (isInverse) isGood = diff < 0; 
 
         return {
             val: (diff > 0 ? '+' : '') + diff.toFixed(1),
@@ -838,21 +843,23 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
     return (
         <main className="flex-1 overflow-y-auto w-full bg-slate-950 relative z-10">
             <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 pb-24 flex flex-col gap-4">
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4 shadow-md flex items-center justify-between">
+                <div className={`bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4 shadow-md flex items-center justify-between ${isOffline ? 'opacity-80' : ''}`}>
                     <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                        <div className="bg-emerald-900/30 p-2 rounded-full shrink-0">
-                            <User className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" />
+                        <div className={`${isOffline ? 'bg-slate-800' : 'bg-emerald-900/30'} p-2 rounded-full shrink-0`}>
+                            {isOffline ? <WifiOff className="w-5 h-5 sm:w-6 sm:h-6 text-slate-500" /> : <User className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" />}
                         </div>
                         <div className="flex flex-col min-w-0">
                             <h2 className="text-sm sm:text-base font-black text-white tracking-widest uppercase truncate">
-                                {user.displayName ? user.displayName.split(' ')[0] : t('statsUserFallback')}
+                                {isOffline ? t('statsUserFallback') : (user?.displayName ? user.displayName.split(' ')[0] : t('statsUserFallback'))}
                             </h2>
-                            <span className="text-[9px] sm:text-[10px] text-slate-500 truncate">{user.email}</span>
+                            <span className="text-[9px] sm:text-[10px] text-slate-500 truncate">{isOffline ? t('offlineMode') : user?.email}</span>
                         </div>
                     </div>
-                    <button onClick={onLogout} className="bg-red-900/20 hover:bg-red-900/40 text-red-400 text-[10px] sm:text-xs font-bold uppercase tracking-widest px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-red-500/30 transition-colors shrink-0 ml-2">
-                        {t('logout')}
-                    </button>
+                    {!isOffline && (
+                        <button onClick={onLogout} className="bg-red-900/20 hover:bg-red-900/40 text-red-400 text-[10px] sm:text-xs font-bold uppercase tracking-widest px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-red-500/30 transition-colors shrink-0 ml-2">
+                            {t('logout')}
+                        </button>
+                    )}
                 </div>
 
                 <div className="flex bg-slate-900 rounded-lg border border-slate-800 p-1">
@@ -1391,7 +1398,7 @@ function AppContent({ onError }) {
           } else if (error.code === 'auth/popup-closed-by-user') {
               setErrorMsg("Přihlášení zrušeno (okno zavřeno).");
           } else {
-              setErrorMsg("Chyba přihlášení: " + error.code);
+              setErrorMsg("Chyba přihlášení. (Běžíte v Preview?)");
           }
           setTimeout(() => setErrorMsg(''), 4000);
       }
@@ -1402,23 +1409,28 @@ function AppContent({ onError }) {
   const handleDeleteAccount = async () => {
       if (!window.confirm(translations[lang].deleteAccountConfirm)) return;
       try {
-          if (db && user) {
+          if (db && user && !user.isAnonymous) {
               const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'matches'), where('p1Id', '==', user.uid));
               const snap = await getDocs(q);
               const batch = writeBatch(db);
               snap.docs.forEach(d => batch.delete(d.ref));
               await batch.commit();
           }
-          await deleteUser(user);
+          if (user && !user.isAnonymous) {
+              await deleteUser(user);
+          } else {
+              setMatchHistory([]);
+              safeStorage.setItem('dartsMatchHistory', JSON.stringify([]));
+          }
           setAppState('home');
-          setErrorMsg("Účet smazán.");
+          setErrorMsg("Smazáno.");
           setTimeout(()=>setErrorMsg(''), 2000);
       } catch (error) {
           console.error(error);
           if (error.code === 'auth/requires-recent-login') {
               setErrorMsg("Pro smazání účtu se musíte znovu přihlásit.");
           } else {
-              setErrorMsg("Chyba při mazání účtu.");
+              setErrorMsg("Chyba při mazání.");
           }
           setTimeout(()=>setErrorMsg(''), 3000);
       }
@@ -1939,7 +1951,7 @@ function AppContent({ onError }) {
     </div>
   );
 
-  const isSuccessMsg = errorMsg && ['!', 'Přihlášeno', 'Uloženo', 'Zálohováno', 'Recognized', 'Matched', 'smazán'].some(w => String(errorMsg).includes(w));
+  const isSuccessMsg = errorMsg && ['!', 'Přihlášeno', 'Uloženo', 'Zálohováno', 'Recognized', 'Matched', 'Smazáno'].some(w => String(errorMsg).includes(w));
 
   return (
     <div className="bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden">
@@ -2038,33 +2050,31 @@ function AppContent({ onError }) {
                         <History className="w-7 h-7 text-blue-400" />
                         <span className="text-sm font-bold text-white">{t('matchHistory')}</span>
                     </button>
+                    <button onClick={() => setAppState('profile')} className="bg-slate-800 hover:bg-slate-700 border border-emerald-500/30 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 transition-transform active:scale-95 shadow-md relative overflow-hidden">
+                        {(!user || user.isAnonymous) && <div className="absolute top-1 right-1"><WifiOff className="w-3 h-3 text-slate-500" /></div>}
+                        <Cloud className={`w-7 h-7 ${user && !user.isAnonymous ? 'text-emerald-500' : 'text-slate-400'}`} />
+                        <span className="text-sm font-bold text-white text-center leading-tight">{t('statsPersonal')}</span>
+                    </button>
                     <button onClick={() => setAppState('about')} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 transition-transform active:scale-95 shadow-md">
                         <Info className="w-7 h-7 text-purple-400" />
                         <span className="text-sm font-bold text-white">{t('aboutApp')}</span>
                     </button>
-                    
-                    {loadingUser ? (
-                        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-md">
-                            <RefreshCw className="w-6 h-6 text-slate-500 animate-spin" />
-                        </div>
-                    ) : user && !user.isAnonymous ? (
-                        <button onClick={() => setAppState('profile')} className="bg-slate-800 hover:bg-slate-700 border border-emerald-500/30 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 transition-transform active:scale-95 shadow-md">
-                            <Cloud className="w-7 h-7 text-emerald-500" />
-                            <span className="text-sm font-bold text-white text-center leading-tight">{t('statsPersonal')}</span>
-                        </button>
-                    ) : (
-                        <button onClick={handleLogin} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 transition-transform active:scale-95 shadow-md">
-                            <svg viewBox="0 0 24 24" className="w-6 h-6"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                </div>
+
+                {(!user || user.isAnonymous) && !loadingUser && (
+                    <div className="w-full mt-2">
+                        <button onClick={handleLogin} className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl p-3 flex items-center justify-center gap-3 transition-transform active:scale-95 shadow-md">
+                            <svg viewBox="0 0 24 24" className="w-5 h-5"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
                             <span className="text-xs font-bold text-slate-300">{t('loginWithGoogle')}</span>
                         </button>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
         </main>
       )}
 
       {/* --- MŮJ PROFIL --- */}
-      {appState === 'profile' && user && (
+      {appState === 'profile' && (
           <UserProfile user={user} matches={matchHistory} onLogout={() => { handleLogout(); setAppState('home'); }} onDeleteAccount={handleDeleteAccount} lang={lang} />
       )}
 
