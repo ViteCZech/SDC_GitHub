@@ -10,8 +10,9 @@ import {
 } from 'lucide-react';
 
 // --- VERZOVÁNÍ ---
-// Zvýšeno na v1.6.5 - oprava výpočtu spotřebovaných šipek (b.score -> b.dartsUsed) pro graf a celkový průměr
-const APP_VERSION = "v1.6.5"; 
+// Zvýšeno na v1.7.0 - Kompletní přepracování grafů. Agregace po dnech (kyblíčky), 
+// matematicky přesný výpočet celkového průměru za den, responzivní osy a spojnice.
+const APP_VERSION = "v1.7.0"; 
 
 // --- SAFE STORAGE HELPER ---
 const safeStorage = {
@@ -325,7 +326,6 @@ const calculateStats = (legs, p1Name, p2Name) => {
         p2M.forEach(m => updateHigh(m.score, p2High));
         const lP1S = p1M.reduce((a,b)=>a+(b.score||0),0); 
         const lP2S = p2M.reduce((a,b)=>a+(b.score||0),0);
-        // OPRAVA BUGU ZDE: b.score -> b.dartsUsed
         const lP1D = p1M.reduce((a,b)=>a+(b.dartsUsed||3),0); 
         const lP2D = p2M.reduce((a,b)=>a+(b.dartsUsed||3),0);
         p1ScoreTotal+=lP1S; p1DartsTotal+=lP1D; 
@@ -659,8 +659,9 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
     let sumCheckouts = 0, checkoutsCount = 0;
     let totalLegsPlayed = 0, totalLegsWon = 0;
     const roundsDist = {}; 
-    const chartData = [];
+    const dailyBuckets = {}; // Objekt pro seskupení dat do grafu po dnech
 
+    // Projdeme zápasy od nejstaršího po nejnovější
     [...filteredMatches].reverse().forEach(m => {
         const isP1 = m.p1Id === user.uid;
         const myKey = isP1 ? 'p1' : 'p2';
@@ -673,7 +674,15 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
         const myAvg = isP1 ? stats.p1Avg : stats.p2Avg;
         if (myAvg > 0) {
             sumAvgs += myAvg; avgCount++;
-            chartData.push({ date: m.date.split(',')[0], avg: myAvg });
+        }
+
+        // --- Logika pro grafy (Kyblíčky po dnech) ---
+        const d = new Date(m.id);
+        const dKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const dLabel = `${d.getDate()}.${d.getMonth()+1}.`;
+
+        if (!dailyBuckets[dKey]) {
+            dailyBuckets[dKey] = { label: dLabel, score: 0, darts: 0, timestamp: d.getTime() };
         }
 
         m.completedLegs.forEach(leg => {
@@ -686,6 +695,10 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
                 if (th.score >= 180) total180s++;
                 else if (th.score >= 140) total140s++;
                 else if (th.score >= 100) total100s++;
+                
+                // Záznam pro graf
+                dailyBuckets[dKey].score += th.score;
+                dailyBuckets[dKey].darts += (th.dartsUsed || 3);
             });
 
             const f9Throws = myThrows.slice(0, 3);
@@ -708,6 +721,15 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
         });
     });
 
+    // Sestavení dat pro graf (smazání dnů bez šipek)
+    const chartData = Object.values(dailyBuckets)
+        .sort((a, b) => a.timestamp - b.timestamp)
+        .map(b => ({
+            date: b.label,
+            avg: b.darts > 0 ? (b.score / b.darts) * 3 : 0
+        }))
+        .filter(d => d.avg > 0);
+
     const winRate = filteredMatches.length > 0 ? Math.round((totalWins / filteredMatches.length) * 100) : 0;
     const legWinRate = totalLegsPlayed > 0 ? Math.round((totalLegsWon / totalLegsPlayed) * 100) : 0;
     const overallAvg = avgCount > 0 ? (sumAvgs / avgCount).toFixed(1) : '0.0';
@@ -717,17 +739,28 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
     let maxRoundCount = 0;
     Object.values(roundsDist).forEach(val => { if (val > maxRoundCount) maxRoundCount = val; });
 
+    // --- Výpočet os pro graf ---
     const chartHeight = 160;
     const pointWidth = 60; 
+    
     const minRaw = chartData.length > 0 ? Math.min(...chartData.map(d => d.avg)) : 0;
     const maxRaw = chartData.length > 0 ? Math.max(...chartData.map(d => d.avg)) : 100;
     
-    const minAvg = Math.max(0, Math.floor((minRaw - 5) / 10) * 10);
-    const maxAvg = Math.ceil((maxRaw + 5) / 10) * 10;
+    // Přidáme trochu polstrování k ose Y (odřízneme na násobky 5)
+    const minAvg = Math.max(0, Math.floor((minRaw - 5) / 5) * 5);
+    const maxAvg = Math.ceil((maxRaw + 5) / 5) * 5;
+    const chartRange = Math.max(maxAvg - minAvg, 10); // Zabrání dělení nulou a zajistí rozsah min 10
     
+    // Rozšiřování kontejneru pro horizontální scroll
     const svgWidth = Math.max(300, chartData.length * pointWidth + 30); 
+    
+    // Výpočet mřížky (max 5-6 vodorovných čar)
     const gridLines = [];
-    for (let v = minAvg; v <= maxAvg; v += 10) gridLines.push(v);
+    const step = Math.max(5, Math.ceil(chartRange / 5)); 
+    for (let v = minAvg; v <= maxAvg; v += step) gridLines.push(v);
+    
+    // Rozumný krok pro vykreslování popisků osy X (aby se texty nepřekrývaly u mnoha dnů)
+    const labelStep = Math.max(1, Math.ceil(chartData.length / 8));
 
     return (
         <main className="flex-1 overflow-y-auto w-full bg-slate-950 relative z-10">
@@ -826,7 +859,7 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
 
                 {tab === 'charts' && (
                     <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-4">{t('avgTrend')}</span>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-4">{t('avgTrend')} (Denní průměry)</span>
                         {chartData.length > 1 ? (
                             <div className="w-full overflow-x-auto no-scrollbar border-b border-l border-slate-800 pb-2 pl-2">
                                 <div style={{ width: `${svgWidth}px`, height: `${chartHeight}px` }} className="relative mt-2">
@@ -841,8 +874,9 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
                                             </pattern>
                                         </defs>
 
+                                        {/* Horizontální mřížka a osy Y */}
                                         {gridLines.map(val => {
-                                            const y = chartHeight - ((val - minAvg) / (maxAvg - minAvg)) * chartHeight;
+                                            const y = chartHeight - ((val - minAvg) / chartRange) * chartHeight;
                                             return (
                                                 <g key={`grid-${val}`}>
                                                     <line x1="15" y1={y} x2="100%" y2={y} stroke="#334155" strokeWidth="1" strokeDasharray="4 4" opacity="0.5" />
@@ -851,30 +885,45 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
                                             );
                                         })}
 
+                                        {/* Výplň grafu */}
                                         <polygon 
-                                            points={`15,${chartHeight} ${chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight}`).join(' ')} ${(chartData.length - 1) * pointWidth + 15},${chartHeight}`}
+                                            points={`15,${chartHeight} ${chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / chartRange) * chartHeight}`).join(' ')} ${(chartData.length - 1) * pointWidth + 15},${chartHeight}`}
                                             fill="url(#chartFill)" 
                                         />
                                         <polygon 
-                                            points={`15,${chartHeight} ${chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight}`).join(' ')} ${(chartData.length - 1) * pointWidth + 15},${chartHeight}`}
+                                            points={`15,${chartHeight} ${chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / chartRange) * chartHeight}`).join(' ')} ${(chartData.length - 1) * pointWidth + 15},${chartHeight}`}
                                             fill="url(#diagonalHatch)" 
                                         />
 
+                                        {/* Spojnice bodů */}
                                         <polyline
                                             fill="none"
                                             stroke="#10b981"
                                             strokeWidth="3"
-                                            points={chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight}`).join(' ')}
+                                            strokeLinejoin="round"
+                                            points={chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / chartRange) * chartHeight}`).join(' ')}
                                         />
 
+                                        {/* Samotné body, hodnoty a datumovka */}
                                         {chartData.map((d, i) => {
                                             const x = (i * pointWidth) + 15;
-                                            const y = chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight;
+                                            const y = chartHeight - ((d.avg - minAvg) / chartRange) * chartHeight;
+                                            // Inteligentní skrývání popisků osy X, pokud je tam moc bodů
+                                            const showLabel = (i % labelStep === 0) || (i === chartData.length - 1);
+                                            
                                             return (
                                                 <g key={`point-${i}`}>
                                                     <circle cx={x} cy={y} r="4" fill="#0f172a" stroke="#10b981" strokeWidth="2" />
-                                                    <text x={x} y={y - 12} fill="#94a3b8" fontSize="10" textAnchor="middle" fontWeight="bold" className="font-mono">{d.avg.toFixed(1)}</text>
-                                                    <text x={x} y={chartHeight + 15} fill="#64748b" fontSize="8" textAnchor="middle">{d.date.slice(0,5)}</text>
+                                                    
+                                                    {/* Text s hodnotou bodu */}
+                                                    {(chartData.length <= 15 || showLabel) && (
+                                                        <text x={x} y={y - 12} fill="#94a3b8" fontSize="10" textAnchor="middle" fontWeight="bold" className="font-mono">{d.avg.toFixed(1)}</text>
+                                                    )}
+                                                    
+                                                    {/* Osa X (Datum) */}
+                                                    {showLabel && (
+                                                        <text x={x} y={chartHeight + 15} fill="#64748b" fontSize="8" textAnchor="middle">{d.date}</text>
+                                                    )}
                                                 </g>
                                             );
                                         })}
@@ -882,7 +931,7 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-center text-slate-600 text-xs py-10">Málo dat pro vykreslení grafu. Odehrajte více zápasů v tomto období.</div>
+                            <div className="text-center text-slate-600 text-xs py-10">Málo dat pro vykreslení grafu. Odehrajte více šipek ve více dnech v tomto období.</div>
                         )}
                     </div>
                 )}
