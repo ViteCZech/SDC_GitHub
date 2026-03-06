@@ -10,8 +10,8 @@ import {
 } from 'lucide-react';
 
 // --- VERZOVÁNÍ ---
-// Zvýšeno na v1.6.4 - odstranění duplicitních nadpisů pod lištou
-const APP_VERSION = "v1.6.4"; 
+// Zvýšeno na v1.6.5 - oprava výpočtu spotřebovaných šipek (b.score -> b.dartsUsed) pro graf a celkový průměr
+const APP_VERSION = "v1.6.5"; 
 
 // --- SAFE STORAGE HELPER ---
 const safeStorage = {
@@ -90,7 +90,7 @@ const translations = {
     tutCheckoutTitle: '5. Rychlé zavření',
     tutCheckoutDesc: 'Jakmile máte skóre, které lze zavřít, objeví se nahoře zelená tlačítka pro zavření 1, 2 nebo 3 šipkami. Stačí kliknout a je hotovo.',
     tutHistoryTitle: '6. Oprava chyb',
-    tutHistoryDesc: 'Udělali jste chybu? Tlačítkem "Zpět" (šipka) vrátíte poslední hod. Pozor: Při hře s Botem vás tlačítko vrátí jen k Botovi, który ihned hodí znovu. Pro úpravu starších hodů klikněte přímo na daný hod v tabulce historie.',
+    tutHistoryDesc: 'Udělali jste chybu? Tlačítkem "Zpět" (šipka) vrátíte poslední hod. Pozor: Při hře s Botem vás tlačítko vrátí jen k Botovi, který ihned hodí znovu. Pro úpravu starších hodů klikněte přímo na daný hod v tabulce historie.',
     tutVoiceTitle: '7. Hlasové ovládání',
     tutVoiceDesc: 'Zapněte mikrofon a diktujte skóre (např. "sto čtyřicet"). Můžete také říkat "zavřeno", "další leg" nebo "odveta". Upozornění: V hlučném prostředí (např. v hospodě) může být rozpoznávání nepřesné.',
     tutCloudTitle: '8. Cloud a Statistiky',
@@ -325,8 +325,9 @@ const calculateStats = (legs, p1Name, p2Name) => {
         p2M.forEach(m => updateHigh(m.score, p2High));
         const lP1S = p1M.reduce((a,b)=>a+(b.score||0),0); 
         const lP2S = p2M.reduce((a,b)=>a+(b.score||0),0);
-        const lP1D = p1M.reduce((a,b)=>a+(b.score||0),0); 
-        const lP2D = p2M.reduce((a,b)=>a+(b.score||0),0);
+        // OPRAVA BUGU ZDE: b.score -> b.dartsUsed
+        const lP1D = p1M.reduce((a,b)=>a+(b.dartsUsed||3),0); 
+        const lP2D = p2M.reduce((a,b)=>a+(b.dartsUsed||3),0);
         p1ScoreTotal+=lP1S; p1DartsTotal+=lP1D; 
         p2ScoreTotal+=lP2S; p2DartsTotal+=lP2D;
         const winnerKey = leg.winner;
