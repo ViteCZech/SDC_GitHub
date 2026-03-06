@@ -10,9 +10,8 @@ import {
 } from 'lucide-react';
 
 // --- VERZOVÁNÍ ---
-// Zvýšeno na v1.7.0 - Kompletní přepracování grafů. Agregace po dnech (kyblíčky), 
-// matematicky přesný výpočet celkového průměru za den, responzivní osy a spojnice.
-const APP_VERSION = "v1.7.0"; 
+// Zvýšeno na v1.7.1 - Chytré tlačítko Zpět při hře s botem
+const APP_VERSION = "v1.7.1"; 
 
 // --- SAFE STORAGE HELPER ---
 const safeStorage = {
@@ -91,7 +90,7 @@ const translations = {
     tutCheckoutTitle: '5. Rychlé zavření',
     tutCheckoutDesc: 'Jakmile máte skóre, které lze zavřít, objeví se nahoře zelená tlačítka pro zavření 1, 2 nebo 3 šipkami. Stačí kliknout a je hotovo.',
     tutHistoryTitle: '6. Oprava chyb',
-    tutHistoryDesc: 'Udělali jste chybu? Tlačítkem "Zpět" (šipka) vrátíte poslední hod. Pozor: Při hře s Botem vás tlačítko vrátí jen k Botovi, který ihned hodí znovu. Pro úpravu starších hodů klikněte přímo na daný hod v tabulce historie.',
+    tutHistoryDesc: 'Udělali jste chybu? Tlačítkem "Zpět" (šipka) vrátíte poslední hod. Při hře s Botem se nyní automaticky vrátí váš i botův hod, abyste mohli rovnou opravit svou chybu. Pro úpravu starších hodů klikněte přímo na daný hod v tabulce historie.',
     tutVoiceTitle: '7. Hlasové ovládání',
     tutVoiceDesc: 'Zapněte mikrofon a diktujte skóre (např. "sto čtyřicet"). Můžete také říkat "zavřeno", "další leg" nebo "odveta". Upozornění: V hlučném prostředí (např. v hospodě) může být rozpoznávání nepřesné.',
     tutCloudTitle: '8. Cloud a Statistiky',
@@ -167,7 +166,7 @@ const translations = {
     tutCheckoutTitle: '5. Quick Checkout',
     tutCheckoutDesc: 'When you are on a finish, green buttons will appear above the numpad to quickly checkout with 1, 2, or 3 darts.',
     tutHistoryTitle: '6. Fixing Mistakes',
-    tutHistoryDesc: 'Use the Undo button to revert the last throw. Note: When playing a Bot, Undo only goes back to the Bot, who throws again immediately. To fix older throws, tap them directly in the history list.',
+    tutHistoryDesc: 'Use the Undo button to revert the last throw. When playing against a Bot, it now reverts both your and the bot\'s throw so you can fix your mistake immediately. To fix older throws, tap them directly in the history list.',
     tutVoiceTitle: '7. Voice Control',
     tutVoiceDesc: 'Enable the mic to dictate scores (e.g., "one hundred"). You can also say "checkout", "next leg", or "rematch". Note: Voice control may perform poorly in noisy environments.',
     tutCloudTitle: '8. Cloud & Stats',
@@ -243,7 +242,7 @@ const translations = {
     tutCheckoutTitle: '5. Szybkie kończenie',
     tutCheckoutDesc: 'Gdy masz wynik możliwy do zamknięcia, nad klawiaturą pojawią się zielone przyciski, by szybko zamknąć 1, 2 lub 3 lotkami.',
     tutHistoryTitle: '6. Poprawa błędów',
-    tutHistoryDesc: 'Użyj przycisku Cofnij, aby anulować rzut. Uwaga: Grając z Botem, przycisk cofa tylko do Bota, który od razu rzuca ponownie. Aby poprawić starsze rzuty, kliknij je bezpośrednio w historii.',
+    tutHistoryDesc: 'Użyj przycisku Cofnij, aby anulować rzut. Grając z Botem, przycisk cofa teraz zarówno Twój rzut, jak i bota, dzięki czemu możesz od razu poprawić błąd. Aby poprawić starsze rzuty, kliknij je bezpośrednio w historii.',
     tutVoiceTitle: '7. Sterowanie głosem',
     tutVoiceDesc: 'Włącz mikrofon, aby dyktować wyniki (np. "sto"). Możesz też powiedzieć "zamknięte", "następny leg" lub "rewanż". Uwaga: W hałaśliwym otoczeniu rozpoznawanie głosu może działać niedokładnie.',
     tutCloudTitle: '8. Chmura i Statystyki',
@@ -280,7 +279,6 @@ const translations = {
 };
 
 // --- LOGIKA ---
-
 const getTranslatedName = (name, isPlayer1, currentLang) => {
     if (!name) return '';
     const p1Defaults = [translations.cs.p1Default, translations.en.p1Default, translations.pl.p1Default];
@@ -316,7 +314,6 @@ const calculateStats = (legs, p1Name, p2Name) => {
     let p1DartsTotal=0, p1ScoreTotal=0, p2DartsTotal=0, p2ScoreTotal=0;
     const p1High={'60+':0,'100+':0,'140+':0,'180':0}, p2High={'60+':0,'100+':0,'140+':0,'180':0};
     let p1HighCheck=0, p2HighCheck=0;
-
     const updateHigh = (s, obj) => { if(s===180) obj['180']++; else if(s>=140) obj['140+']++; else if(s>=100) obj['100+']++; else if(s>=60) obj['60+']++; };
 
     const legDetails = (legs||[]).map((leg, i) => {
@@ -340,7 +337,6 @@ const calculateStats = (legs, p1Name, p2Name) => {
         const winnerAvg = winnerDarts > 0 ? (winnerScore / winnerDarts) * 3 : 0;
         return { index: i+1, winner: winnerName, winnerKey: winnerKey, darts: winnerDarts, avg: winnerAvg, checkout: check };
     });
-
     return { p1Avg: p1DartsTotal ? (p1ScoreTotal/p1DartsTotal)*3 : 0, p2Avg: p2DartsTotal ? (p2ScoreTotal/p2DartsTotal)*3 : 0, legDetails, p1High, p2High, p1HighCheckout: p1HighCheck, p2HighCheckout: p2HighCheck };
 };
 
@@ -350,7 +346,6 @@ const randNormal = (mean, stdDev) => {
 };
 
 // --- KOMPONENTY ---
-
 const FlagIcon = ({ lang }) => {
     if (lang === 'cs') return <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" className="w-5 h-3.5 rounded-sm object-cover"><rect width="900" height="600" fill="#D7141A"/><rect width="900" height="300" fill="#FFF"/><polygon points="0,0 0,600 450,300" fill="#11457E"/></svg>;
     if (lang === 'en') return <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" className="w-5 h-3.5 rounded-sm object-cover"><clipPath id="t"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" strokeWidth="6"/><path d="M0,0 L60,30 M60,0 L0,30" clipPath="url(#t)" stroke="#C8102E" strokeWidth="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" strokeWidth="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" strokeWidth="6"/></svg>;
@@ -364,6 +359,7 @@ const VirtualKeyboard = ({ onChar, onDelete, onClose, lang }) => {
     const timerRef = useRef(null);
     const pressedRef = useRef(false);
     const specialChars = { 'A':['Á','Ą','Ä'], 'C':['Č','Ć'], 'D':['Ď'], 'E':['É','Ě','Ę','Ë'], 'I':['Í'], 'L':['Ł','Ĺ'], 'N':['Ň','Ń'], 'O':['Ó','Ö'], 'R':['Ř'], 'S':['Š','Ś'], 'T':['Ť'], 'U':['Ú','Ů','Ü'], 'Y':['Ý'], 'Z':['Ž','Ź','Ż'] };
+    
     const rows = [
         ['1','2','3','4','5','6','7','8','9','0'],
         ['Q','W','E','R','T','Z','U','I','O','P'], 
@@ -413,7 +409,6 @@ const VirtualKeyboard = ({ onChar, onDelete, onClose, lang }) => {
     return (
         <>
             {popup && <div className="fixed inset-0 z-[600]" onClick={() => setPopup(null)} onTouchStart={() => setPopup(null)}></div>}
-            
             <div className="fixed bottom-0 left-0 w-full bg-slate-900 border-t border-slate-700 p-1.5 sm:p-2 pb-4 sm:pb-6 z-[600] shadow-2xl animate-in slide-in-from-bottom duration-200 select-none">
                 <div className="bg-slate-800 p-2 flex justify-between items-center border-b border-slate-700 mb-2 rounded-t-lg max-w-lg mx-auto shadow-sm">
                     <span className="text-[10px] text-slate-500 font-bold uppercase ml-2 tracking-widest">{t('players')}</span>
@@ -461,8 +456,10 @@ const EditScoreModal = ({ initialScore, initialDarts, isFinish, scoreBefore, out
     const [darts, setDarts] = useState(initialDarts);
     const [isFirstEntry, setIsFirstEntry] = useState(true); 
     const t = (k) => translations[lang][k] || k;
+
     const handleNum = (n) => { if (isFirstEntry) { setScore(n); setIsFirstEntry(false); } else { if (score.length >= 3) return; setScore(score === '0' ? n : score + n); } };
     const handleDel = () => { setIsFirstEntry(false); setScore(score.length > 1 ? score.slice(0, -1) : '0'); };
+
     const currentScoreInt = parseInt(score) || 0;
     const isNewFinish = (scoreBefore - currentScoreInt) === 0;
     const minDartsNeeded = isNewFinish ? getMinDartsToCheckout(scoreBefore, outMode) : 1;
@@ -493,6 +490,7 @@ const EditScoreModal = ({ initialScore, initialDarts, isFinish, scoreBefore, out
                 </div>
                 <div className="p-4 landscape:p-2 sm:p-6 flex flex-col items-center gap-2 landscape:gap-1 sm:gap-4 overflow-y-auto">
                     <div className={`text-5xl landscape:text-3xl sm:text-6xl font-black font-mono px-6 py-2 landscape:py-1 sm:py-4 rounded-xl border shadow-inner transition-colors ${isFirstEntry ? 'text-slate-500 bg-slate-900 border-slate-800' : 'text-emerald-500 bg-slate-950 border-emerald-500/30'}`}>{score}</div>
+                    
                     {isNewFinish && (
                         <div className="flex flex-col items-center gap-1">
                             <span className="text-[10px] landscape:text-[8px] font-bold text-slate-500 uppercase tracking-widest">{t('howManyDarts')}</span>
@@ -501,6 +499,7 @@ const EditScoreModal = ({ initialScore, initialDarts, isFinish, scoreBefore, out
                             </div>
                         </div>
                     )}
+
                     <div className="grid grid-cols-3 gap-1.5 landscape:gap-1 sm:gap-2 w-full mt-1 sm:mt-2">
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (<button key={n} onClick={() => handleNum(n.toString())} className={btnBase}>{n}</button>))}
                         <button onClick={handleDel} className={`${btnBase} text-red-400 active:bg-red-900/20`}><Delete className="w-5 h-5 sm:w-6 sm:h-6"/></button>
@@ -520,6 +519,7 @@ const FinishDartsSelector = ({ points, minDarts, onConfirm, onCancel, lang, play
     const borderColor = isP1 ? 'border-emerald-500' : 'border-purple-500';
     const textColor = isP1 ? 'text-emerald-500' : 'text-purple-500';
     const btnActiveColor = isP1 ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/40 border-emerald-800' : 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/40 border-purple-800';
+
     return (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[110] flex flex-col items-center justify-center p-4">
             <div className={`bg-slate-900 border-2 ${borderColor} w-full max-w-xs rounded-2xl shadow-2xl p-6 flex flex-col items-center gap-6 animate-in zoom-in duration-200`}>
@@ -585,6 +585,7 @@ const MatchStatsView = ({ data, onClose, title, lang, onStartMatch }) => {
                             </div>
                         </div>
                     </div>
+
                     <div className="flex justify-center items-center gap-6">
                         <div className="text-center">
                             <div className="text-xs text-slate-400 font-bold mb-1">{displayP1Name}</div>
@@ -596,6 +597,7 @@ const MatchStatsView = ({ data, onClose, title, lang, onStartMatch }) => {
                             <div className={`text-5xl font-black ${data.matchWinner === 'p2' ? 'text-purple-500' : 'text-slate-600'}`}>{data.p2Legs}</div>
                         </div>
                     </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
                             <div className="text-center text-xs font-bold text-slate-500 mb-2">{t('avg3')}</div>
@@ -659,9 +661,8 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
     let sumCheckouts = 0, checkoutsCount = 0;
     let totalLegsPlayed = 0, totalLegsWon = 0;
     const roundsDist = {}; 
-    const dailyBuckets = {}; // Objekt pro seskupení dat do grafu po dnech
+    const chartData = [];
 
-    // Projdeme zápasy od nejstaršího po nejnovější
     [...filteredMatches].reverse().forEach(m => {
         const isP1 = m.p1Id === user.uid;
         const myKey = isP1 ? 'p1' : 'p2';
@@ -674,31 +675,18 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
         const myAvg = isP1 ? stats.p1Avg : stats.p2Avg;
         if (myAvg > 0) {
             sumAvgs += myAvg; avgCount++;
-        }
-
-        // --- Logika pro grafy (Kyblíčky po dnech) ---
-        const d = new Date(m.id);
-        const dKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        const dLabel = `${d.getDate()}.${d.getMonth()+1}.`;
-
-        if (!dailyBuckets[dKey]) {
-            dailyBuckets[dKey] = { label: dLabel, score: 0, darts: 0, timestamp: d.getTime() };
+            chartData.push({ date: m.date.split(',')[0], avg: myAvg });
         }
 
         m.completedLegs.forEach(leg => {
             totalLegsPlayed++;
             if (leg.winner === myKey) totalLegsWon++;
-
             const myThrows = leg.history.filter(h => h.player === myKey);
             
             myThrows.forEach(th => {
                 if (th.score >= 180) total180s++;
                 else if (th.score >= 140) total140s++;
                 else if (th.score >= 100) total100s++;
-                
-                // Záznam pro graf
-                dailyBuckets[dKey].score += th.score;
-                dailyBuckets[dKey].darts += (th.dartsUsed || 3);
             });
 
             const f9Throws = myThrows.slice(0, 3);
@@ -721,15 +709,6 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
         });
     });
 
-    // Sestavení dat pro graf (smazání dnů bez šipek)
-    const chartData = Object.values(dailyBuckets)
-        .sort((a, b) => a.timestamp - b.timestamp)
-        .map(b => ({
-            date: b.label,
-            avg: b.darts > 0 ? (b.score / b.darts) * 3 : 0
-        }))
-        .filter(d => d.avg > 0);
-
     const winRate = filteredMatches.length > 0 ? Math.round((totalWins / filteredMatches.length) * 100) : 0;
     const legWinRate = totalLegsPlayed > 0 ? Math.round((totalLegsWon / totalLegsPlayed) * 100) : 0;
     const overallAvg = avgCount > 0 ? (sumAvgs / avgCount).toFixed(1) : '0.0';
@@ -739,33 +718,19 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
     let maxRoundCount = 0;
     Object.values(roundsDist).forEach(val => { if (val > maxRoundCount) maxRoundCount = val; });
 
-    // --- Výpočet os pro graf ---
     const chartHeight = 160;
     const pointWidth = 60; 
-    
     const minRaw = chartData.length > 0 ? Math.min(...chartData.map(d => d.avg)) : 0;
     const maxRaw = chartData.length > 0 ? Math.max(...chartData.map(d => d.avg)) : 100;
-    
-    // Přidáme trochu polstrování k ose Y (odřízneme na násobky 5)
-    const minAvg = Math.max(0, Math.floor((minRaw - 5) / 5) * 5);
-    const maxAvg = Math.ceil((maxRaw + 5) / 5) * 5;
-    const chartRange = Math.max(maxAvg - minAvg, 10); // Zabrání dělení nulou a zajistí rozsah min 10
-    
-    // Rozšiřování kontejneru pro horizontální scroll
+    const minAvg = Math.max(0, Math.floor((minRaw - 5) / 10) * 10);
+    const maxAvg = Math.ceil((maxRaw + 5) / 10) * 10;
     const svgWidth = Math.max(300, chartData.length * pointWidth + 30); 
-    
-    // Výpočet mřížky (max 5-6 vodorovných čar)
     const gridLines = [];
-    const step = Math.max(5, Math.ceil(chartRange / 5)); 
-    for (let v = minAvg; v <= maxAvg; v += step) gridLines.push(v);
-    
-    // Rozumný krok pro vykreslování popisků osy X (aby se texty nepřekrývaly u mnoha dnů)
-    const labelStep = Math.max(1, Math.ceil(chartData.length / 8));
+    for (let v = minAvg; v <= maxAvg; v += 10) gridLines.push(v);
 
     return (
         <main className="flex-1 overflow-y-auto w-full bg-slate-950 relative z-10">
             <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 pb-24 flex flex-col gap-4">
-                
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4 shadow-md flex items-center justify-between">
                     <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                         <div className="bg-emerald-900/30 p-2 rounded-full shrink-0">
@@ -859,7 +824,7 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
 
                 {tab === 'charts' && (
                     <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-4">{t('avgTrend')} (Denní průměry)</span>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-4">{t('avgTrend')}</span>
                         {chartData.length > 1 ? (
                             <div className="w-full overflow-x-auto no-scrollbar border-b border-l border-slate-800 pb-2 pl-2">
                                 <div style={{ width: `${svgWidth}px`, height: `${chartHeight}px` }} className="relative mt-2">
@@ -873,10 +838,8 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
                                                 <line x1="0" y1="0" x2="0" y2="6" stroke="#10b981" strokeWidth="1.5" strokeOpacity="0.3" />
                                             </pattern>
                                         </defs>
-
-                                        {/* Horizontální mřížka a osy Y */}
                                         {gridLines.map(val => {
-                                            const y = chartHeight - ((val - minAvg) / chartRange) * chartHeight;
+                                            const y = chartHeight - ((val - minAvg) / (maxAvg - minAvg)) * chartHeight;
                                             return (
                                                 <g key={`grid-${val}`}>
                                                     <line x1="15" y1={y} x2="100%" y2={y} stroke="#334155" strokeWidth="1" strokeDasharray="4 4" opacity="0.5" />
@@ -884,46 +847,28 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
                                                 </g>
                                             );
                                         })}
-
-                                        {/* Výplň grafu */}
                                         <polygon 
-                                            points={`15,${chartHeight} ${chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / chartRange) * chartHeight}`).join(' ')} ${(chartData.length - 1) * pointWidth + 15},${chartHeight}`}
+                                            points={`15,${chartHeight} ${chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight}`).join(' ')} ${(chartData.length - 1) * pointWidth + 15},${chartHeight}`}
                                             fill="url(#chartFill)" 
                                         />
                                         <polygon 
-                                            points={`15,${chartHeight} ${chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / chartRange) * chartHeight}`).join(' ')} ${(chartData.length - 1) * pointWidth + 15},${chartHeight}`}
+                                            points={`15,${chartHeight} ${chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight}`).join(' ')} ${(chartData.length - 1) * pointWidth + 15},${chartHeight}`}
                                             fill="url(#diagonalHatch)" 
                                         />
-
-                                        {/* Spojnice bodů */}
                                         <polyline
                                             fill="none"
                                             stroke="#10b981"
                                             strokeWidth="3"
-                                            strokeLinejoin="round"
-                                            points={chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / chartRange) * chartHeight}`).join(' ')}
+                                            points={chartData.map((d, i) => `${(i * pointWidth) + 15},${chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight}`).join(' ')}
                                         />
-
-                                        {/* Samotné body, hodnoty a datumovka */}
                                         {chartData.map((d, i) => {
                                             const x = (i * pointWidth) + 15;
-                                            const y = chartHeight - ((d.avg - minAvg) / chartRange) * chartHeight;
-                                            // Inteligentní skrývání popisků osy X, pokud je tam moc bodů
-                                            const showLabel = (i % labelStep === 0) || (i === chartData.length - 1);
-                                            
+                                            const y = chartHeight - ((d.avg - minAvg) / (maxAvg - minAvg)) * chartHeight;
                                             return (
                                                 <g key={`point-${i}`}>
                                                     <circle cx={x} cy={y} r="4" fill="#0f172a" stroke="#10b981" strokeWidth="2" />
-                                                    
-                                                    {/* Text s hodnotou bodu */}
-                                                    {(chartData.length <= 15 || showLabel) && (
-                                                        <text x={x} y={y - 12} fill="#94a3b8" fontSize="10" textAnchor="middle" fontWeight="bold" className="font-mono">{d.avg.toFixed(1)}</text>
-                                                    )}
-                                                    
-                                                    {/* Osa X (Datum) */}
-                                                    {showLabel && (
-                                                        <text x={x} y={chartHeight + 15} fill="#64748b" fontSize="8" textAnchor="middle">{d.date}</text>
-                                                    )}
+                                                    <text x={x} y={y - 12} fill="#94a3b8" fontSize="10" textAnchor="middle" fontWeight="bold" className="font-mono">{d.avg.toFixed(1)}</text>
+                                                    <text x={x} y={chartHeight + 15} fill="#64748b" fontSize="8" textAnchor="middle">{d.date.slice(0,5)}</text>
                                                 </g>
                                             );
                                         })}
@@ -931,7 +876,7 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-center text-slate-600 text-xs py-10">Málo dat pro vykreslení grafu. Odehrajte více šipek ve více dnech v tomto období.</div>
+                            <div className="text-center text-slate-600 text-xs py-10">Málo dat pro vykreslení grafu. Odehrajte více zápasů v tomto období.</div>
                         )}
                     </div>
                 )}
@@ -945,7 +890,6 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang }) => {
 };
 
 // --- HLAVNÍ APLIKACE ---
-
 export default function App() {
   const [hasError, setHasError] = useState(false);
 
@@ -959,7 +903,6 @@ export default function App() {
           </div>
       );
   }
-
   try {
       return <AppContent onError={() => setHasError(true)} />;
   } catch (e) {
@@ -977,6 +920,7 @@ function AppContent({ onError }) {
       return id; 
   });
   const [offlineMode, setOfflineMode] = useState(false);
+
   const [activeKeyboardInput, setActiveKeyboardInput] = useState(null);
   const [inputPristine, setInputPristine] = useState(true);
   
@@ -999,8 +943,10 @@ function AppContent({ onError }) {
 
   const [showBotLevels, setShowBotLevels] = useState(false);
   const [selectedMatchDetail, setSelectedMatchDetail] = useState(null); 
+
   const [isListening, setIsListening] = useState(false); 
   const [isMicActive, setIsMicActive] = useState(false); 
+
   const [syncPromptMatches, setSyncPromptMatches] = useState([]);
 
   const [settings, setSettings] = useState({
@@ -1020,15 +966,15 @@ function AppContent({ onError }) {
   });
 
   const [matchHistory, setMatchHistory] = useState(() => { try { const saved = safeStorage.getItem('dartsMatchHistory'); return saved ? JSON.parse(saved) : []; } catch(e){ return []; } });
-
   const [currentInput, setCurrentInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [editingMove, setEditingMove] = useState(null); 
   const [finishData, setFinishData] = useState(null);
-  const [longPressIdx, setLongPressIdx] = useState(null);
 
+  const [longPressIdx, setLongPressIdx] = useState(null);
   const longPressTimer = useRef(null);
   const historyRef = useRef(null);
+
   const recognitionRef = useRef(null);
   const gameStateRef = useRef(gameState);
   const isMicActiveRef = useRef(isMicActive);
@@ -1036,43 +982,33 @@ function AppContent({ onError }) {
   const appStateRef = useRef(appState); 
   const currentInputRef = useRef(currentInput);
   const finishDataRef = useRef(finishData);
-
   const processTurnRef = useRef(null);
   const handleTurnCommitRef = useRef(null);
 
   // --- OBOUSMĚRNÁ SYNCHRONIZACE S CLOUDEM ---
   useEffect(() => {
     if (!user || user.isAnonymous || !db) return;
-
-    // Ptáme se na zápasy, kde uživatel je jako Hráč 1
     const matchesRef = collection(db, 'artifacts', appId, 'public', 'data', 'matches');
     const q = query(matchesRef, where('p1Id', '==', user.uid));
-
-    // Přihlásíme se k neustálému odběru změn
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
         const cloudMatches = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
-
         setMatchHistory(prevLocal => {
             const merged = [...prevLocal];
             let changed = false;
-
             cloudMatches.forEach(cloudMatch => {
                 const existingIdx = merged.findIndex(m => m.id === cloudMatch.id);
                 if (existingIdx >= 0) {
-                    // Aktualizujeme existující zápas (např. abychom si uložili jeho docId z databáze)
                     if (!merged[existingIdx].docId) {
                         merged[existingIdx] = { ...merged[existingIdx], ...cloudMatch };
                         changed = true;
                     }
                 } else {
-                    // Zcela nový zápas objeven v cloudu (odehrán na jiném zařízení)
                     merged.push(cloudMatch);
                     changed = true;
                 }
             });
-
             if (changed) {
-                // Seřadíme nově od nejnovějšího po nejstarší
                 return merged.sort((a, b) => b.id - a.id);
             }
             return prevLocal;
@@ -1083,7 +1019,6 @@ function AppContent({ onError }) {
 
     return () => unsubscribe();
   }, [user]);
-
 
   // --- SPLASH SCREEN LOGIKA ---
   useEffect(() => {
@@ -1115,7 +1050,6 @@ function AppContent({ onError }) {
           recognition.continuous = true;
           recognition.interimResults = false;
           recognition.lang = lang === 'en' ? 'en-US' : (lang === 'pl' ? 'pl-PL' : 'cs-CZ');
-
           recognition.onstart = () => setIsListening(true);
           
           recognition.onend = () => {
@@ -1183,10 +1117,18 @@ function AppContent({ onError }) {
           return;
       }
       
+      // CHYTRÉ HLASOVÉ ZPĚT
       if (tMap.cmdUndo.some(p => transcript.includes(p))) {
            if (st === 'playing' && gameStateRef.current.history.length > 0) {
-               setGameState(recalculateGame(gameStateRef.current.history.slice(1)));
-               setErrorMsg('Vracím hod'); setTimeout(() => setErrorMsg(''), 1000);
+               let sliceCount = 1;
+               if (settingsRef.current.isBot && gameStateRef.current.currentPlayer === 'p1' && gameStateRef.current.history.length >= 2) {
+                   if (gameStateRef.current.history[0].player === 'p2') {
+                       sliceCount = 2; // Smažeme botův i hráčův hod
+                   }
+               }
+               setGameState(recalculateGame(gameStateRef.current.history.slice(sliceCount)));
+               setErrorMsg(translations[lang].cmdUndo[0]); 
+               setTimeout(() => setErrorMsg(''), 1000);
            }
            return;
       }
@@ -1224,7 +1166,6 @@ function AppContent({ onError }) {
       }
   };
 
-
   useEffect(() => {
       if (user && !user.isAnonymous) {
           const rawLocal = safeStorage.getItem('dartsMatchHistory');
@@ -1251,6 +1192,7 @@ function AppContent({ onError }) {
 
       let syncedCount = 0;
       let errorsCount = 0;
+
       for (const m of toSync) {
           const updatedMatch = { 
               ...m, 
@@ -1414,6 +1356,7 @@ function AppContent({ onError }) {
                     }
                 });
             }).catch(err => {});
+
             const handleVisibilityChange = () => { if (document.visibilityState === 'visible' && swRegistration) swRegistration.update().catch(() => {}); };
             document.addEventListener('visibilitychange', handleVisibilityChange);
             return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -1442,6 +1385,7 @@ function AppContent({ onError }) {
         window.addEventListener('resize', debouncedCheck);
         setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream);
         setIsStandalone(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true);
+        
         return () => { window.removeEventListener('resize', debouncedCheck); clearTimeout(timeout); };
     }
   }, []);
@@ -1449,6 +1393,7 @@ function AppContent({ onError }) {
   useEffect(() => {
     let isMounted = true;
     const finishLoading = () => { if (isMounted) setTimeout(() => setIsReady(true), 250); };
+
     try {
         const existingScript = document.getElementById('tailwind-script');
         if (!existingScript) {
@@ -1558,6 +1503,7 @@ function AppContent({ onError }) {
           const tAvg = parseInt(settings.botAvg) || 50;
           if (canOut && Math.random() < Math.min(0.95, tAvg/110)) pts = cScore; else pts = canOut ? 0 : randNormal(tAvg, 22);
       } else { pts = randNormal(50, 20); }
+
       processTurn(Math.min(180, Math.max(0, pts)), cScore === pts ? getMinDartsToCheckout(cScore, settings.outMode) : 3);
   };
 
@@ -1634,6 +1580,24 @@ function AppContent({ onError }) {
   };
   handleTurnCommitRef.current = handleTurnCommit;
 
+  // --- CHYTRÉ TLAČÍTKO ZPĚT ---
+  const handleUndoClick = () => {
+    if (gameState.history.length === 0) return;
+    
+    let sliceCount = 1;
+    // Pokud hraješ s botem a na řadě je právě člověk (p1)
+    // znamená to, že naposledy házel bot. Tlačítko Zpět by normálně smazalo
+    // jen botův hod a hned by zas házel bot. 
+    // Proto smažeme dva poslední hody (botův a ten před ním), 
+    // čímž se opraví chyba člověka.
+    if (settings.isBot && gameState.currentPlayer === 'p1' && gameState.history.length >= 2) {
+        if (gameState.history[0].player === 'p2') {
+            sliceCount = 2;
+        }
+    }
+    setGameState(recalculateGame(gameState.history.slice(sliceCount)));
+  };
+
   const handleQuickBtnDown = (idx) => { setLongPressIdx(idx); longPressTimer.current = setTimeout(() => { if (currentInput && parseInt(currentInput) <= 180) { const newB = [...settings.quickButtons]; newB[idx] = parseInt(currentInput); setSettings({...settings, quickButtons: newB}); setCurrentInput(''); setErrorMsg(String(translations[lang].presetSaved)); setTimeout(()=>setErrorMsg(''), 1000); } setLongPressIdx(null); }, 700); };
   const handleQuickBtnUp = (val) => { if (longPressTimer.current) { clearTimeout(longPressTimer.current); if (longPressIdx !== null) handleTurnCommit(val); setLongPressIdx(null); } };
 
@@ -1650,7 +1614,7 @@ function AppContent({ onError }) {
     if (isNaN(newS) || newS < 0 || newS > 180 || IMPOSSIBLE_SCORES.includes(newS)) { setErrorMsg(String(translations[lang].impossible)); return; }
     const uh = gameState.history.map(m => m.id === editingMove.id ? { ...m, score: newS, dartsUsed: (m.remaining+m.score-newS)===0 ? newD : 3 } : m);
     const ns = recalculateGame(uh);
-
+    
     let nextAppState = appState;
     let nextP1Legs = gameState.p1Legs;
     let nextP2Legs = gameState.p2Legs;
@@ -1668,6 +1632,7 @@ function AppContent({ onError }) {
         if (ns.winner === 'p1') nextP1Legs++;
         if (ns.winner === 'p2') nextP2Legs++;
         nextCompletedLegs.push({ history: ns.history, winner: ns.winner });
+
         const tgt = settings.matchMode === 'first_to' ? settings.matchTarget : Math.ceil(settings.matchTarget / 2);
         const isOver = nextP1Legs >= tgt || nextP2Legs >= tgt;
         ns.matchWinner = isOver ? ns.winner : null;
@@ -1686,7 +1651,6 @@ function AppContent({ onError }) {
             }
         }
     }
-
     setGameState({ ...ns, p1Legs: nextP1Legs, p2Legs: nextP2Legs, completedLegs: nextCompletedLegs });
     setAppState(nextAppState); setEditingMove(null);
   };
@@ -1695,6 +1659,7 @@ function AppContent({ onError }) {
       const p1Final = settings.p1Name && settings.p1Name.trim() !== '' ? settings.p1Name : translations[lang].p1Default;
       const p2Final = settings.p2Name && settings.p2Name.trim() !== '' ? settings.p2Name : (settings.isBot ? translations[lang].botDefault : translations[lang].p2Default);
       if (p1Final !== settings.p1Name || p2Final !== settings.p2Name) { setSettings(s => ({ ...s, p1Name: p1Final, p2Name: p2Final })); }
+      
       setGameState({ p1Score: settings.startScore, p2Score: settings.startScore, p1Legs: 0, p2Legs: 0, currentPlayer: settings.startPlayer, startingPlayer: settings.startPlayer, winner: null, matchWinner: null, history: [], completedLegs: [] }); 
       setAppState('playing'); 
   };
@@ -1728,6 +1693,7 @@ function AppContent({ onError }) {
           const next = { ...prev };
           const p1Defaults = [translations.cs.p1Default, translations.en.p1Default, translations.pl.p1Default];
           const p2Defaults = [translations.cs.p2Default, translations.en.p2Default, translations.pl.p2Default, translations.cs.botDefault, translations.en.botDefault, translations.pl.botDefault];
+          
           if (prevField && prevField !== field) { const val = next[prevField]; if (!val || val.trim() === '') next[prevField] = prevField === 'p1Name' ? translations[lang].p1Default : (next.isBot ? translations[lang].botDefault : translations[lang].p2Default); }
           const defaults = field === 'p1Name' ? p1Defaults : p2Defaults;
           if (defaults.includes(next[field])) { next[field] = ''; setInputPristine(false); } else { setInputPristine(false); }
@@ -1739,7 +1705,6 @@ function AppContent({ onError }) {
   const handleP1Blur = () => { if(settings.p1Name.trim() === '') setSettings({...settings, p1Name: translations[lang].p1Default}); };
   const handleP2Focus = () => { const p2Defaults = [translations.cs.p2Default, translations.en.p2Default, translations.pl.p2Default, translations.cs.botDefault, translations.en.botDefault, translations.pl.botDefault]; if(p2Defaults.includes(settings.p2Name)) setSettings({...settings, p2Name: ''}); };
   const handleP2Blur = () => { if(settings.p2Name.trim() === '') setSettings({...settings, p2Name: translations[lang].p2Default}); };
-
   const handleBotToggle = () => {
       const nextState = !settings.isBot; 
       const p2Defaults = [translations.cs.p2Default, translations.en.p2Default, translations.pl.p2Default, translations.cs.botDefault, translations.en.botDefault, translations.pl.botDefault];
@@ -1821,7 +1786,12 @@ function AppContent({ onError }) {
         </div>
       <div className="mobile-input-area bg-slate-900 px-2 sm:px-4 py-1 sm:py-2 rounded-lg border border-slate-800 flex justify-between items-center h-12 sm:h-20 shrink-0">
          <div className="flex flex-col min-w-0 flex-1 mr-2 justify-center"><span className="text-[9px] text-slate-500 uppercase font-bold shrink-0">{translations[lang].throw}</span><div className={`font-bold flex-1 flex items-center ${errorMsg ? 'text-red-500 text-sm sm:text-xl leading-tight whitespace-normal' : 'text-white text-3xl sm:text-5xl font-mono truncate'}`}>{errorMsg || currentInput || <span className="text-slate-700">0</span>}</div></div>
-         <div className="flex gap-1.5 sm:gap-2 shrink-0"><button onClick={toggleMic} className={`w-10 h-10 sm:w-12 sm:h-12 rounded flex items-center justify-center border transition-all ${isMicActive ? (isListening ? 'bg-red-600 border-red-500 animate-pulse text-white' : 'bg-red-900/50 border-red-500/50 text-red-200') : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'}`}>{isMicActive ? <Mic className="w-5 h-5 sm:w-6 sm:h-6" /> : <MicOff className="w-5 h-5 sm:w-6 sm:h-6" />}</button><button onClick={() => setGameState(recalculateGame(gameState.history.slice(1)))} className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-800 text-slate-400 rounded flex items-center justify-center border border-slate-700"><Undo2 className="w-5 h-5 sm:w-6 sm:h-6" /></button><button onClick={() => handleTurnCommit(parseInt(currentInput))} disabled={!currentInput} className={`bg-emerald-600 text-white h-10 sm:h-12 w-14 sm:w-20 rounded flex items-center justify-center transition-all ${!currentInput ? 'opacity-30' : 'hover:bg-emerald-500'}`}><CheckCircle className="w-6 h-6 sm:w-8 sm:h-8" /></button></div>
+         <div className="flex gap-1.5 sm:gap-2 shrink-0">
+             <button onClick={toggleMic} className={`w-10 h-10 sm:w-12 sm:h-12 rounded flex items-center justify-center border transition-all ${isMicActive ? (isListening ? 'bg-red-600 border-red-500 animate-pulse text-white' : 'bg-red-900/50 border-red-500/50 text-red-200') : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'}`}>{isMicActive ? <Mic className="w-5 h-5 sm:w-6 sm:h-6" /> : <MicOff className="w-5 h-5 sm:w-6 sm:h-6" />}</button>
+             {/* ZMĚNĚNÉ TLAČÍTKO ZPĚT */}
+             <button onClick={handleUndoClick} className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-800 text-slate-400 rounded flex items-center justify-center border border-slate-700 hover:text-white hover:bg-slate-700"><Undo2 className="w-5 h-5 sm:w-6 sm:h-6" /></button>
+             <button onClick={() => handleTurnCommit(parseInt(currentInput))} disabled={!currentInput} className={`bg-emerald-600 text-white h-10 sm:h-12 w-14 sm:w-20 rounded flex items-center justify-center transition-all ${!currentInput ? 'opacity-30' : 'hover:bg-emerald-500'}`}><CheckCircle className="w-6 h-6 sm:w-8 sm:h-8" /></button>
+         </div>
       </div>
       
       <div className="grid grid-cols-6 gap-1 shrink-0">
@@ -1888,6 +1858,7 @@ function AppContent({ onError }) {
       )}
 
       {syncPromptMatches.length > 0 && <SyncModal matches={syncPromptMatches} onAccept={handleSyncAccept} onDecline={handleSyncDecline} lang={lang} />}
+      
       {finishData && <FinishDartsSelector points={finishData.points} minDarts={finishData.minD} onConfirm={(d) => { processTurn(finishData.points, d); setFinishData(null); }} onCancel={() => setFinishData(null)} lang={lang} player={gameState.currentPlayer} />}
       {editingMove && <EditScoreModal initialScore={editingMove.score} initialDarts={editingMove.dartsUsed} isFinish={(editingMove.remaining+editingMove.score)-editingMove.score===0} scoreBefore={editingMove.remaining+editingMove.score} outMode={settings.outMode} onSave={handleSaveEdit} onCancel={()=>setEditingMove(null)} lang={lang} />}
       
@@ -1895,20 +1866,11 @@ function AppContent({ onError }) {
 
       <header className={`relative p-2 min-h-16 landscape:min-h-10 h-auto bg-slate-900 border-b border-slate-800 flex justify-between items-center shadow-md shrink-0 sticky top-0 z-20 transition-all duration-300`}>
         <div className={`absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none z-10 pr-12 sm:pr-16 transition-opacity duration-300 ${appState === 'home' ? 'opacity-0' : 'opacity-100'}`}>
-            {['setup', 'playing', 'leg_finished', 'match_finished'].includes(appState) || selectedMatchDetail ? (
-                <div className="flex items-center gap-1.5 sm:gap-4 whitespace-nowrap bg-slate-900/40 backdrop-blur-sm rounded-xl px-2 py-0.5 border border-white/5 transform scale-90 sm:scale-100 landscape:scale-[0.65] origin-top sm:origin-center mt-1 sm:mt-0">
-                    <div className="flex items-baseline gap-1"><span className="text-2xl sm:text-3xl font-black text-emerald-500 tracking-tight leading-none">{settings.startScore}</span><span className="text-white-500 text-sm sm:text-base font-bold self-end mb-0.5">{settings.outMode==='double'?'DO':'SO'}</span></div>
-                    <div className="w-px h-6 bg-slate-700/50 rotate-12 mx-1"></div>
-                    <div className="flex items-baseline gap-1.5"><span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider self-center">{settings.matchMode==='first_to'?t('firstTo'):t('bestOf')}</span><span className="text-xl sm:text-2xl font-black text-white leading-none">{settings.matchTarget}</span></div>
-                </div>
-            ) : (
-                <div className="font-black text-slate-300 uppercase tracking-widest text-sm sm:text-base truncate px-4 drop-shadow-md">
-                    {appState === 'tutorial' && t('tutorial')}
-                    {appState === 'history' && t('matchHistory')}
-                    {appState === 'about' && t('aboutApp')}
-                    {appState === 'profile' && t('statsPersonal')}
-                </div>
-            )}
+            <div className="flex items-center gap-1.5 sm:gap-4 whitespace-nowrap bg-slate-900/40 backdrop-blur-sm rounded-xl px-2 py-0.5 border border-white/5 transform scale-90 sm:scale-100 landscape:scale-[0.65] origin-top sm:origin-center mt-1 sm:mt-0">
+                <div className="flex items-baseline gap-1"><span className="text-2xl sm:text-3xl font-black text-emerald-500 tracking-tight leading-none">{settings.startScore}</span><span className="text-white-500 text-sm sm:text-base font-bold self-end mb-0.5">{settings.outMode==='double'?'DO':'SO'}</span></div>
+                <div className="w-px h-6 bg-slate-700/50 rotate-12 mx-1"></div>
+                <div className="flex items-baseline gap-1.5"><span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider self-center">{settings.matchMode==='first_to'?t('firstTo'):t('bestOf')}</span><span className="text-xl sm:text-2xl font-black text-white leading-none">{settings.matchTarget}</span></div>
+            </div>
         </div>
         
         <div className="flex items-center gap-2 shrink-0 w-auto min-w-[2.5rem] relative z-30">
@@ -1951,17 +1913,15 @@ function AppContent({ onError }) {
                         <FileText className="w-7 h-7 text-emerald-400" />
                         <span className="text-sm font-bold text-white">{t('tutorial')}</span>
                     </button>
-
                     <button onClick={() => { setAppState('history'); }} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 transition-transform active:scale-95 shadow-md">
                         <History className="w-7 h-7 text-blue-400" />
                         <span className="text-sm font-bold text-white">{t('matchHistory')}</span>
                     </button>
-
                     <button onClick={() => setAppState('about')} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 transition-transform active:scale-95 shadow-md">
                         <Info className="w-7 h-7 text-purple-400" />
                         <span className="text-sm font-bold text-white">{t('aboutApp')}</span>
                     </button>
-
+                    
                     {loadingUser ? (
                         <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-md">
                             <RefreshCw className="w-6 h-6 text-slate-500 animate-spin" />
@@ -1989,7 +1949,11 @@ function AppContent({ onError }) {
 
       {/* --- PRŮVODCE (TUTORIAL) --- */}
       {appState === 'tutorial' && (
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pt-6 flex flex-col items-center w-full relative z-10 pb-20">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col items-center w-full relative z-10 pb-20">
+            <h2 className="text-2xl font-black text-white mb-6 tracking-widest uppercase flex items-center gap-2">
+                <FileText className="w-6 h-6 text-emerald-500"/> {t('tutorial')}
+            </h2>
+            
             <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {[
                     { icon: <Target className="w-6 h-6 text-blue-400" />, title: t('tutStartTitle'), desc: t('tutStartDesc') },
@@ -2019,7 +1983,9 @@ function AppContent({ onError }) {
 
       {/* --- O APLIKACI --- */}
       {appState === 'about' && (
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pt-6 flex flex-col items-center w-full max-w-lg mx-auto relative z-10 pb-20">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col items-center w-full max-w-lg mx-auto relative z-10 pb-20">
+            <h2 className="text-2xl font-black text-white mb-6 tracking-widest uppercase flex items-center gap-2"><Info className="w-6 h-6 text-emerald-500"/> {t('aboutApp')}</h2>
+            
             <div className="bg-slate-900 w-full p-6 rounded-2xl border border-slate-800 shadow-xl space-y-6">
                 <div className="text-center space-y-2 border-b border-slate-800 pb-6">
                     <div className="w-20 h-20 bg-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-900/50">
@@ -2030,29 +1996,15 @@ function AppContent({ onError }) {
                     <div className="text-slate-500 font-mono text-xs mt-2">Verze {APP_VERSION}</div>
                 </div>
 
-                <div className="text-center pt-2 flex flex-col items-center">
+                <div className="text-center pt-2">
                     <p className="text-slate-400 text-sm">
                         {t('aboutText')}
                     </p>
-                 <button 
-    onClick={() => window.location.href = '/privacy.html'}
-    className="
-        text-emerald-500 
-        hover:text-emerald-400 
-        font-bold 
-        text-sm 
-        mt-8 
-        flex 
-        justify-center 
-        items-center 
-        gap-2 
-        underline 
-        uppercase 
-        tracking-widest
-        mx-auto">
-
-    {typeof t === 'function' ? t('privacyPolicy') : 'Zásady ochrany soukromí'}
-</button>
+                    <button 
+                        onClick={() => window.location.href = '/privacy.html'}
+                        className="text-emerald-500 hover:text-emerald-400 font-bold text-sm mt-8 flex justify-center items-center gap-2 underline uppercase tracking-widest">
+                        {typeof t === 'function' ? t('privacyPolicy') : 'Zásady ochrany soukromí'}
+                    </button>
                 </div>
 
                 <div className="text-center text-[10px] text-slate-500 pt-4 border-t border-slate-800">
@@ -2146,8 +2098,11 @@ function AppContent({ onError }) {
 
       {/* --- HISTORIE ZÁPASŮ --- */}
       {appState === 'history' && (
-        <main className="flex-1 overflow-y-auto p-4 pt-6 flex flex-col items-center w-full">
+        <main className="flex-1 overflow-y-auto p-4 flex flex-col items-center w-full">
             <div className="w-full max-w-lg space-y-4 pb-20">
+                <h2 className="text-2xl font-black text-white mb-6 tracking-widest uppercase flex items-center justify-center gap-2 mt-4">
+                    <History className="w-6 h-6 text-emerald-500"/> {translations[lang].matchHistory}
+                </h2>
                 
                 {(!user || user.isAnonymous) && (
                     <div className="bg-blue-900/20 border border-blue-500/30 p-4 rounded-xl flex flex-col items-center text-center mb-4">
@@ -2157,7 +2112,7 @@ function AppContent({ onError }) {
                     </div>
                 )}
 
-                <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+                <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden mt-2">
                     {(() => {
                         const myMatches = (user && !user.isAnonymous) 
                             ? matchHistory.filter(m => m.p1Id === user.uid || m.p2Id === user.uid)
@@ -2166,6 +2121,7 @@ function AppContent({ onError }) {
                         if (myMatches.length === 0) {
                             return <div className="p-8 text-center text-slate-500">{translations[lang].noMatches}</div>;
                         }
+
                         return (
                             <div className="divide-y divide-slate-800">
                                 {myMatches.map(m => (
