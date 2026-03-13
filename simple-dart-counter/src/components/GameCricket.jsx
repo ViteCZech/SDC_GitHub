@@ -1,0 +1,388 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Mic, MicOff, Trophy, Undo2 } from 'lucide-react';
+
+// --- MOCK PŘEKLADŮ (V reálném projektu smažte a použijte import) ---
+const translations = {
+  cs: { serving: 'Hází', legFor: 'Leg vyhrává', nextLeg: 'Další leg', p1Default: 'Domácí', p2Default: 'Hosté', botDefault: 'Robot' },
+  en: { serving: 'Serving', legFor: 'Leg winner', nextLeg: 'Next leg', p1Default: 'Home', p2Default: 'Away', botDefault: 'Bot' },
+  pl: { serving: 'Rzuca', legFor: 'Leg wygrywa', nextLeg: 'Następny leg', p1Default: 'Gospodarze', p2Default: 'Goście', botDefault: 'Bot' }
+};
+
+const TARGETS = [20, 19, 18, 17, 16, 15, 25];
+const INITIAL_MARKS = TARGETS.reduce((acc, t) => ({ ...acc, [t]: 0 }), {});
+
+const CricketMark = ({ marks, colorClass }) => {
+  if (marks === 0) return <div className="h-full aspect-square max-h-8 max-w-[2rem]"></div>;
+  return (
+    <div className={`h-full aspect-square max-h-8 max-w-[2rem] flex items-center justify-center ${colorClass}`}>
+      <svg viewBox="0 0 100 100" className="w-full h-full stroke-current fill-none stroke-[12] stroke-linecap-round shadow-sm transition-all duration-300">
+        {marks >= 1 && <line x1="20" y1="80" x2="80" y2="20" />}
+        {marks >= 2 && <line x1="20" y1="20" x2="80" y2="80" />}
+        {marks >= 3 && <circle cx="50" cy="50" r="40" />}
+      </svg>
+    </div>
+  );
+};
+
+const DartsIndicator = ({ dartsThrown }) => {
+  const dartsLeft = 3 - dartsThrown;
+  return (
+    <div className="flex justify-center gap-2 p-2 border shadow-inner bg-slate-900/50 rounded-xl border-slate-700/50">
+      {[1, 2, 3].map((num) => (
+        <div 
+          key={num} 
+          className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full shadow-inner transition-all duration-300 ${
+            num <= dartsLeft 
+              ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' 
+              : 'bg-slate-800 border border-slate-700/50'
+          }`} 
+        />
+      ))}
+    </div>
+  );
+};
+
+export default function GameCricket({ settings, lang, onMatchComplete, isLandscape, isPC }) {
+  const [gameState, setGameState] = useState({
+    p1Score: 0, p2Score: 0,
+    p1Marks: { ...INITIAL_MARKS }, p2Marks: { ...INITIAL_MARKS },
+    p1Legs: 0, p2Legs: 0,
+    currentPlayer: settings?.startPlayer || 'p1', startingPlayer: settings?.startPlayer || 'p1',
+    dartsThrown: 0, 
+    multiplier: 1,
+    winner: null, matchWinner: null, history: [], completedLegs: []
+  });
+
+  const [isMicActive, setIsMicActive] = useState(false); 
+
+  const t = (k) => translations[lang]?.[k] || k;
+
+  const getDisplayName = (name, isP1, isBot) => {
+    if (!name) return '';
+    
+    // Převod na malá písmena pro bezpečné porovnání
+    const lowerName = name.trim().toLowerCase();
+    
+    const p1Defaults = ['domácí', 'home', 'gospodarze'];
+    const p2Defaults = ['hosté', 'away', 'goście'];
+    const botDefaults = ['robot', 'bot'];
+
+    if (isP1 && p1Defaults.includes(lowerName)) return t('p1Default') || 'Domácí';
+    if (!isP1 && isBot && (botDefaults.includes(lowerName) || p2Defaults.includes(lowerName))) return t('botDefault') || 'Robot';
+    if (!isP1 && p2Defaults.includes(lowerName)) return t('p2Default') || 'Hosté';
+    
+    return name;
+  };
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (!isPC || gameState.winner) return;
+      const key = e.key.toLowerCase();
+      if (key === 'm') handleThrow(0);
+      else if (key === 's') setGameState(prev => ({...prev, multiplier: 1}));
+      else if (key === 'd') setGameState(prev => ({...prev, multiplier: 2}));
+      else if (key === 't') setGameState(prev => ({...prev, multiplier: 3}));
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [isPC, gameState.winner, gameState.multiplier]);
+
+  const recalculateGame = (baseHistory) => {
+    const moves = [...baseHistory].reverse();
+    let st = {
+      p1Score: 0, p2Score: 0,
+      p1Marks: { ...INITIAL_MARKS }, p2Marks: { ...INITIAL_MARKS },
+      currentPlayer: gameState.startingPlayer,
+      dartsThrown: 0,
+      winner: null
+    };
+
+    for (let i = 0; i < moves.length; i++) {
+      const move = moves[i];
+      if (st.winner) break;
+
+      st.currentPlayer = move.player;
+
+      if (move.target !== 0) {
+        const myMarks = move.player === 'p1' ? st.p1Marks : st.p2Marks;
+        const oppMarks = move.player === 'p1' ? st.p2Marks : st.p1Marks;
+        
+        let remainingHits = move.multiplier;
+        const neededToClose = 3 - myMarks[move.target];
+        
+        // Zde je přesně ta matematika: "Rozkouskování" zásahů
+        if (neededToClose > 0) {
+          const hitsToApply = Math.min(remainingHits, neededToClose);
+          myMarks[move.target] += hitsToApply;
+          remainingHits -= hitsToApply;
+        }
+
+        // Pokud něco zbylo a soupeř nemá zavřeno, stávají se z toho body
+        if (remainingHits > 0 && oppMarks[move.target] < 3) {
+          const points = remainingHits * (move.target === 25 ? 25 : move.target);
+          if (move.player === 'p1') st.p1Score += points; else st.p2Score += points;
+        }
+      }
+
+      const currentMyMarks = move.player === 'p1' ? st.p1Marks : st.p2Marks;
+      const myScore = move.player === 'p1' ? st.p1Score : st.p2Score;
+      const oppScore = move.player === 'p1' ? st.p2Score : st.p1Score;
+
+      const allClosed = TARGETS.every(t => currentMyMarks[t] >= 3);
+      if (allClosed && myScore >= oppScore) {
+        st.winner = move.player;
+      } else {
+        st.dartsThrown++;
+        if (st.dartsThrown === 3) {
+          st.currentPlayer = st.currentPlayer === 'p1' ? 'p2' : 'p1';
+          st.dartsThrown = 0;
+        }
+      }
+    }
+
+    return { 
+      ...gameState, 
+      p1Score: st.p1Score, p2Score: st.p2Score, 
+      p1Marks: st.p1Marks, p2Marks: st.p2Marks,
+      currentPlayer: st.winner ? st.currentPlayer : st.currentPlayer, 
+      dartsThrown: st.dartsThrown,
+      winner: st.winner,
+      history: baseHistory,
+      multiplier: 1 
+    };
+  };
+
+  const handleThrow = (target, overrideMultiplier = null) => {
+    if (gameState.winner) return;
+    
+    let finalMultiplier = gameState.multiplier;
+    if (overrideMultiplier !== null) {
+      finalMultiplier = overrideMultiplier;
+    } else if (target === 25 && gameState.multiplier === 3) {
+      finalMultiplier = 2;
+    }
+
+    const newMove = { 
+        id: Date.now(), 
+        player: gameState.currentPlayer, 
+        target: target, 
+        multiplier: target === 0 ? 1 : finalMultiplier 
+    };
+    
+    const newState = recalculateGame([newMove, ...gameState.history]);
+
+    if (newState.winner) {
+      const p1W = newState.winner === 'p1' ? gameState.p1Legs + 1 : gameState.p1Legs;
+      const p2W = newState.winner === 'p2' ? gameState.p2Legs + 1 : gameState.p2Legs;
+      const tgt = settings?.matchMode === 'first_to' ? settings.matchTarget : Math.ceil((settings?.matchTarget || 1) / 2);
+      const isOver = p1W >= tgt || p2W >= tgt;
+      const uLegs = [...gameState.completedLegs, { history: newState.history, winner: newState.winner }];
+
+      if (isOver && onMatchComplete) {
+        onMatchComplete({ 
+          id: Date.now(), date: new Date().toLocaleString(), gameType: 'cricket', 
+          p1Name: settings.p1Name, p2Name: settings.p2Name, p1Legs: p1W, p2Legs: p2W, 
+          matchWinner: newState.winner, completedLegs: uLegs, 
+          isBot: settings.isBot, botLevel: settings.botLevel 
+        });
+      } else {
+        setGameState({ ...newState, p1Legs: p1W, p2Legs: p2W, matchWinner: null, completedLegs: uLegs });
+      }
+    } else {
+      setGameState(newState);
+    }
+  };
+
+  const handleUndoClick = () => {
+    if (gameState.history.length === 0) return;
+    let sliceCount = 1;
+    if (settings?.isBot && gameState.currentPlayer === 'p1' && gameState.history.length >= 3) {
+       if (gameState.history[0].player === 'p2') sliceCount = 1 + gameState.history.filter(m => m.player === 'p2').length % 3 || 3;
+    }
+    setGameState(recalculateGame(gameState.history.slice(sliceCount)));
+  };
+
+  const handleNextLeg = () => {
+    const nS = gameState.startingPlayer === 'p1' ? 'p2' : 'p1'; 
+    setGameState(prev => ({ 
+      ...prev, p1Score: 0, p2Score: 0, p1Marks: {...INITIAL_MARKS}, p2Marks: {...INITIAL_MARKS}, 
+      winner: null, history: [], currentPlayer: nS, startingPlayer: nS, dartsThrown: 0, multiplier: 1 
+    })); 
+  };
+
+  useEffect(() => {
+    if (settings?.isBot && gameState.currentPlayer === 'p2' && !gameState.winner) {
+      const timeout = setTimeout(() => playBotDart(), 800);
+      return () => clearTimeout(timeout);
+    }
+  }, [gameState.currentPlayer, gameState.dartsThrown, gameState.winner, settings?.isBot]);
+
+  const playBotDart = () => {
+    const lvl = settings?.botLevel || 'amateur';
+    let target = 0; let mult = 1;
+
+    const getBestTarget = () => {
+      const toClose = TARGETS.find(t => gameState.p2Marks[t] > 0 && gameState.p2Marks[t] < 3);
+      if (toClose) return toClose;
+      const toOpen = TARGETS.find(t => gameState.p2Marks[t] < 3);
+      if (toOpen) return toOpen;
+      if (gameState.p2Score <= gameState.p1Score) {
+          const toPoint = TARGETS.find(t => gameState.p2Marks[t] === 3 && gameState.p1Marks[t] < 3);
+          if (toPoint) return toPoint;
+      }
+      return 20; 
+    };
+
+    const bestTarget = getBestTarget();
+    const rand = Math.random();
+    
+    if (lvl === 'world_class') {
+        if (rand < 0.8) { target = bestTarget; mult = 3; } else if (rand < 0.95) { target = bestTarget; mult = 1; } else target = TARGETS[Math.floor(Math.random() * TARGETS.length)];
+    } else if (lvl === 'pro') {
+        if (rand < 0.4) { target = bestTarget; mult = 3; } else if (rand < 0.8) { target = bestTarget; mult = 1; } else { target = TARGETS[Math.floor(Math.random() * TARGETS.length)]; mult = 1; }
+    } else if (lvl === 'amateur') {
+        if (rand < 0.1) { target = bestTarget; mult = 3; } else if (rand < 0.5) { target = bestTarget; mult = 1; } else { target = Math.random() < 0.2 ? 0 : TARGETS[Math.floor(Math.random() * TARGETS.length)]; mult = 1; }
+    } else {
+        const hitChance = Math.min(0.9, (settings?.botAvg || 50) / 100);
+        if (rand < hitChance) { target = bestTarget; mult = Math.random() < hitChance ? 3 : 1; } else target = 0;
+    }
+
+    if (target === 25 && mult === 3) mult = 2;
+    setGameState(prev => ({...prev, multiplier: mult}));
+    setTimeout(() => handleThrow(target), 200);
+  };
+
+  const calculateMPR = (playerKey) => {
+    const pHistory = gameState.history.filter(h => h.player === playerKey);
+    if (pHistory.length === 0) return "0.00";
+    let totalMarks = 0;
+    pHistory.forEach(h => { if(h.target !== 0) { totalMarks += (h.target === 25 && h.multiplier === 3) ? 2 : h.multiplier; } });
+    const rounds = Math.max(1, pHistory.length / 3);
+    return (totalMarks / rounds).toFixed(2);
+  };
+
+  const isP1Active = gameState.currentPlayer === 'p1' && !gameState.winner;
+  const isP2Active = gameState.currentPlayer === 'p2' && !gameState.winner;
+
+  return (
+    <main className={`h-full w-full flex-1 overflow-hidden p-2 grid gap-2 sm:gap-4 ${isLandscape ? 'grid-cols-[1.2fr_1.5fr_1fr]' : 'flex flex-col'}`}>
+      
+      <div className={`flex gap-2 shrink-0 ${isLandscape ? 'flex-col h-full justify-center' : 'flex-row'}`}>
+        <div className={`flex-1 relative p-2 sm:p-5 rounded-xl border-2 transition-all duration-300 flex flex-col items-center justify-center ${isP1Active ? 'bg-slate-800 border-emerald-500 shadow-xl shadow-emerald-900/20' : 'bg-slate-900 border-slate-800 opacity-80'}`}>
+            {isP1Active && <div className="absolute -top-3 bg-emerald-500 text-slate-900 text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full z-10">{t('serving')}</div>}
+            {gameState.startingPlayer === 'p1' && <div className="absolute w-2 h-2 rounded-full top-2 left-2 bg-slate-500"></div>}
+            <div className="flex items-center justify-between w-full mb-1">
+                <h2 className="pr-2 text-xs font-bold uppercase truncate text-slate-300 sm:text-sm">
+                    {getDisplayName(settings?.p1Name, true, false)}
+                </h2>
+                <div className="bg-slate-950 px-2 py-0.5 rounded border border-slate-700 text-yellow-400 font-black text-sm sm:text-xl shrink-0">{gameState.p1Legs}</div>
+            </div>
+            <div className={`font-mono font-black text-white leading-none ${isP1Active ? 'text-emerald-400' : ''}`} style={{ fontSize: isLandscape ? 'clamp(3rem, 10vh, 8rem)' : 'clamp(2rem, 12vw, 4rem)' }}>
+                {gameState.p1Score}
+            </div>
+            <div className="text-[10px] sm:text-xs text-slate-400 font-mono mt-1 tracking-widest">MPR: {calculateMPR('p1')}</div>
+        </div>
+
+        <div className={`flex-1 relative p-2 sm:p-5 rounded-xl border-2 transition-all duration-300 flex flex-col items-center justify-center ${isP2Active ? 'bg-slate-800 border-purple-500 shadow-xl shadow-purple-900/20' : 'bg-slate-900 border-slate-800 opacity-80'}`}>
+            {isP2Active && <div className="absolute -top-3 bg-purple-500 text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full z-10">{t('serving')}</div>}
+            {gameState.startingPlayer === 'p2' && <div className="absolute w-2 h-2 rounded-full top-2 left-2 bg-slate-500"></div>}
+            <div className="flex items-center justify-between w-full mb-1">
+                <h2 className="pr-2 text-xs font-bold uppercase truncate text-slate-300 sm:text-sm">
+                    {getDisplayName(settings?.p2Name, false, settings?.isBot)}
+                </h2>
+                <div className="bg-slate-950 px-2 py-0.5 rounded border border-slate-700 text-yellow-400 font-black text-sm sm:text-xl shrink-0">{gameState.p2Legs}</div>
+            </div>
+            <div className={`font-mono font-black text-white leading-none ${isP2Active ? 'text-purple-400' : ''}`} style={{ fontSize: isLandscape ? 'clamp(3rem, 10vh, 8rem)' : 'clamp(2rem, 12vw, 4rem)' }}>
+                {gameState.p2Score}
+            </div>
+            <div className="text-[10px] sm:text-xs text-slate-400 font-mono mt-1 tracking-widest">MPR: {calculateMPR('p2')}</div>
+        </div>
+      </div>
+
+      <div className="flex flex-col justify-center flex-1 min-h-0">
+        {!gameState.winner ? (
+            <div className={`flex flex-col h-full gap-1 sm:gap-2 transition-opacity ${settings?.isBot && gameState.currentPlayer === 'p2' ? 'opacity-60 pointer-events-none' : ''}`}>
+                {TARGETS.map(target => (
+                    <div key={target} className="flex items-center flex-1 min-h-0 overflow-hidden border bg-slate-800/40 rounded-xl border-slate-700/50">
+                        <div className="flex items-center justify-end flex-1 h-full py-1 pr-2">
+                            <CricketMark marks={gameState.p1Marks[target]} colorClass="text-emerald-500" />
+                        </div>
+                        
+                        <button 
+                            onClick={() => handleThrow(target)}
+                            className="flex items-center justify-center w-16 h-full font-mono text-xl font-black transition-all shadow-lg sm:w-24 lg:w-32 bg-slate-800 sm:text-2xl border-x-2 border-slate-900/50 hover:bg-slate-700 active:scale-95 text-slate-100"
+                        >
+                            {target === 25 ? 'B' : target}
+                        </button>
+                        
+                        <div className="flex items-center justify-start flex-1 h-full py-1 pl-2">
+                            <CricketMark marks={gameState.p2Marks[target]} colorClass="text-purple-500" />
+                        </div>
+                    </div>
+                ))}
+            </div>
+        ) : (
+            <div className={`w-full h-full flex flex-col items-center justify-center ${gameState.winner === 'p1' ? 'bg-emerald-900/40 border-emerald-500/50' : 'bg-purple-900/40 border-purple-500/50'} border-2 p-4 rounded-xl text-center animate-in zoom-in duration-300 shadow-2xl`}>
+                <Trophy className={`w-12 h-12 sm:w-16 sm:h-16 mb-4 ${gameState.winner === 'p1' ? 'text-emerald-400' : 'text-purple-400'}`} />
+                <h3 className={`text-xl sm:text-3xl font-black uppercase tracking-widest ${gameState.winner === 'p1' ? 'text-emerald-400' : 'text-purple-400'} mb-4`}>
+                    {t('legFor')} {getDisplayName(gameState.winner === 'p1' ? settings?.p1Name : settings?.p2Name, gameState.winner === 'p1', gameState.winner === 'p2' && settings?.isBot)}
+                </h3>
+                <button onClick={handleNextLeg} className={`w-full max-w-xs ${gameState.winner === 'p1' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-purple-600 hover:bg-purple-500'} text-white py-4 rounded-xl font-black text-lg mt-4 shadow-lg active:scale-95 transition-all`}>
+                    {t('nextLeg')}
+                </button>
+            </div>
+        )}
+      </div>
+
+      <div className={`shrink-0 flex gap-2 justify-center ${isLandscape ? 'flex-col h-full' : 'flex-row'}`}>
+        
+        <div className="flex flex-col flex-1 gap-2">
+            <DartsIndicator dartsThrown={gameState.dartsThrown} />
+            <button onClick={() => setGameState(prev => ({...prev, multiplier: 1}))} disabled={gameState.winner}
+                className={`flex-1 py-2 rounded-xl font-black text-sm transition-all border ${gameState.multiplier === 1 ? 'bg-slate-200 text-slate-900 border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]' : 'bg-slate-800 text-slate-500 border-slate-700 hover:bg-slate-700'}`}>
+                SINGLE
+            </button>
+            <button onClick={() => setGameState(prev => ({...prev, multiplier: 2}))} disabled={gameState.winner}
+                className={`flex-1 py-2 rounded-xl font-black text-sm transition-all border ${gameState.multiplier === 2 ? 'bg-orange-500 text-white border-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.4)]' : 'bg-slate-800 text-slate-500 border-slate-700 hover:bg-slate-700'}`}>
+                DOUBLE
+            </button>
+            <button onClick={() => setGameState(prev => ({...prev, multiplier: 3}))} disabled={gameState.winner}
+                className={`flex-1 py-2 rounded-xl font-black text-sm transition-all border ${gameState.multiplier === 3 ? 'bg-red-500 text-white border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)]' : 'bg-slate-800 text-slate-500 border-slate-700 hover:bg-slate-700'}`}>
+                TRIPLE
+            </button>
+        </div>
+
+        <div className="flex flex-col flex-1 gap-2">
+            <button onClick={() => handleThrow(0)} disabled={gameState.winner}
+                className="flex-1 w-full text-lg font-black tracking-widest uppercase transition-all border bg-slate-900 border-slate-700 text-slate-400 rounded-xl hover:bg-slate-800 active:scale-95">
+                Miss
+            </button>
+            
+            <div className="flex gap-2 shrink-0">
+                <button onClick={() => handleThrow(25, 1)} disabled={gameState.winner}
+                    className="flex-1 py-2 text-sm font-black transition-all border sm:py-3 bg-emerald-700/60 border-emerald-600 text-emerald-100 rounded-xl hover:bg-emerald-600 active:scale-95">
+                    25
+                </button>
+                <button onClick={() => handleThrow(25, 2)} disabled={gameState.winner}
+                    className="flex-1 py-2 text-sm font-black text-red-100 transition-all border border-red-600 sm:py-3 bg-red-700/60 rounded-xl hover:bg-red-600 active:scale-95">
+                    50
+                </button>
+            </div>
+            
+            <div className="flex h-12 gap-2 sm:h-14 shrink-0">
+                <button onClick={() => setIsMicActive(!isMicActive)} className={`flex-1 rounded-xl flex items-center justify-center border transition-all ${isMicActive ? 'bg-red-600 border-red-500 text-white animate-pulse' : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'}`}>
+                    {isMicActive ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                </button>
+                <button onClick={handleUndoClick} disabled={gameState.history.length === 0}
+                    className={`flex-[2] rounded-xl font-bold flex flex-col items-center justify-center uppercase tracking-widest border transition-all ${gameState.history.length === 0 ? 'bg-slate-900 border-slate-800 text-slate-700 cursor-not-allowed' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-red-900/40 hover:text-red-400 hover:border-red-900 active:scale-95'}`}>
+                    <Undo2 className="w-4 h-4 mb-0.5" />
+                    <span className="text-[10px]">Undo</span>
+                </button>
+            </div>
+        </div>
+
+      </div>
+
+    </main>
+  );
+}
