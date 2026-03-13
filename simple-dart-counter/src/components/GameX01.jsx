@@ -109,6 +109,26 @@ const FinishDartsSelector = ({ points, minDarts, onConfirm, onCancel, lang, play
 };
 
 export default function GameX01({ settings, lang, onMatchComplete, isLandscape, isPC }) {
+    // 1. Zde máte překladovou funkci (pokud ne, přidejte ji)
+  const t = (k) => translations[lang]?.[k] || k;
+
+  // 2. HNED POD NI VLOŽTE getDisplayName:
+  const getDisplayName = (name, isP1, isBot) => {
+    if (!name) return '';
+    
+    // Bezpečný převod na malá písmena
+    const lowerName = String(name).trim().toLowerCase();
+    
+    const p1Defaults = ['domácí', 'home', 'gospodarze'];
+    const p2Defaults = ['hosté', 'away', 'goście'];
+    const botDefaults = ['robot', 'bot'];
+
+    if (isP1 && p1Defaults.includes(lowerName)) return t('p1Default') || 'Domácí';
+    if (!isP1 && isBot && (botDefaults.includes(lowerName) || p2Defaults.includes(lowerName))) return t('botDefault') || 'Robot';
+    if (!isP1 && p2Defaults.includes(lowerName)) return t('p2Default') || 'Hosté';
+    
+    return name;
+  };
   const [gameState, setGameState] = useState({
     p1Score: settings.startScore, p2Score: settings.startScore, p1Legs: 0, p2Legs: 0,
     currentPlayer: settings.startPlayer, startingPlayer: settings.startPlayer,
@@ -137,25 +157,7 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
 
   const [quickButtons, setQuickButtons] = useState(settings.quickButtons || [41, 45, 60, 100, 140, 180]);
 
-  // --- Pomocná funkce pro správný překlad jmen za běhu ---
-  const getDisplayName = (name, isP1, isBot) => {
-    if (!name) return '';
-    
-    // Převod na malá písmena pro bezpečné porovnání
-    const lowerName = name.trim().toLowerCase();
-    
-    const p1Defaults = ['domácí', 'home', 'gospodarze'];
-    const p2Defaults = ['hosté', 'away', 'goście'];
-    const botDefaults = ['robot', 'bot'];
-
-    if (isP1 && p1Defaults.includes(lowerName)) return t('p1Default') || 'Domácí';
-    if (!isP1 && isBot && (botDefaults.includes(lowerName) || p2Defaults.includes(lowerName))) return t('botDefault') || 'Robot';
-    if (!isP1 && p2Defaults.includes(lowerName)) return t('p2Default') || 'Hosté';
-    
-    return name;
-  };
-
-  useEffect(() => {
+    useEffect(() => {
       gameStateRef.current = gameState; isMicActiveRef.current = isMicActive;
       currentInputRef.current = currentInput; finishDataRef.current = finishData;
       if (historyRef.current) historyRef.current.scrollTop = historyRef.current.scrollHeight; 
