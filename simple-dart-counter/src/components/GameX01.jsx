@@ -154,6 +154,7 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
   const finishDataRef = useRef(finishData);
   const processTurnRef = useRef(null);
   const handleTurnCommitRef = useRef(null);
+  const micTimeoutRef = useRef(null);
 
   const [quickButtons, setQuickButtons] = useState(settings.quickButtons || [41, 45, 60, 100, 140, 180]);
 
@@ -176,6 +177,50 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
       window.addEventListener('keydown', handleGlobalKeyDown);
       return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [editingMove, finishData, isPC, gameState.matchWinner]);
+
+  // Pomocná funkce: převod mluvených čísel na číslo (např. "sto" -> 100)
+  const parseNumberFromSpeech = (transcript) => {
+      if (!transcript) return null;
+      // 1) nejdřív zkusit číslice (původní chování, když engine vrátí např. "100")
+      const digits = transcript.match(/\d+/g);
+      if (digits) return parseInt(digits.join(''));
+
+      const text = transcript.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+      // Pár konkrétních frází pro skóre do 180 (cz)
+      const exactMap = {
+          'sto osmdesat': 180,
+          'sto sedmdesat': 170,
+          'sto sedesat': 160,
+          'sto padesat': 150,
+          'sto ctyricet': 140,
+          'sto tricet': 130,
+          'sto dvacet': 120,
+          'sto deset': 110,
+          'sto': 100
+      };
+      if (exactMap[text] != null) return exactMap[text];
+
+      // Základní slovní čísla – hlavně pro 1–3 ("na dvě", "na tři" atd.)
+      const wordToNum = {
+          // Czech
+          'nula': 0, 'jedna': 1, 'jeden': 1, 'dva': 2, 'dve': 2, 'tri': 3,
+          'ctyri': 4, 'pet': 5, 'sest': 6, 'sedm': 7, 'osm': 8, 'devet': 9,
+          'deset': 10,
+          // English
+          'zero': 0, 'one': 1, 'two': 2, 'three': 3,
+          // Polish (základ)
+          'jeden': 1, 'dwa': 2, 'trzy': 3
+      };
+      const tokens = text.split(/\s+/);
+      for (let i = 0; i < tokens.length; i++) {
+          const w = tokens[i];
+          if (wordToNum[w] != null) {
+              return wordToNum[w];
+          }
+      }
+      return null;
+  };
 
   // Mikrofon
   useEffect(() => {
@@ -202,19 +247,37 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
 
   const handleVoiceCommand = (transcript) => {
       const tMap = translations[lang];
+      // už čekáme jen na počet šipek pro checkout
       if (finishDataRef.current) {
-          const numbers = transcript.match(/\d+/g);
-          if (numbers) {
-              const num = parseInt(numbers.join(''));
-              if (num >= finishDataRef.current.minD && num <= 3) { processTurnRef.current(finishDataRef.current.points, num); setFinishData(null); } 
-              else { setErrorMsg(`Nemožné zavřít na ${num} šipek`); setTimeout(() => setErrorMsg(''), 2000); }
+          const num = parseNumberFromSpeech(transcript);
+          if (num != null) {
+              if (num >= finishDataRef.current.minD && num <= 3) {
+                  processTurnRef.current(finishDataRef.current.points, num);
+                  setFinishData(null);
+              } else {
+                  setErrorMsg(`Nemožné zavřít na ${num} šipek`);
+                  setTimeout(() => setErrorMsg(''), 2000);
+              }
           }
           return; 
       }
+      // "zavřeno na dvě / tři" – zkusíme z hlasu vytáhnout i počet šipek
       if (tMap?.checkoutPhrases?.some(p => transcript.includes(p))) {
           if (!gameStateRef.current.winner) {
               const cScore = gameStateRef.current.currentPlayer === 'p1' ? gameStateRef.current.p1Score : gameStateRef.current.p2Score;
-              handleTurnCommitRef.current(cScore);
+              const requestedDarts = parseNumberFromSpeech(transcript);
+              if (requestedDarts != null && requestedDarts >= 1 && requestedDarts <= 3) {
+                  const minD = getMinDartsToCheckout(cScore, settings.outMode);
+                  if (minD === Infinity || requestedDarts < minD) {
+                      setErrorMsg(`Nemožné zavřít na ${requestedDarts} šipky`);
+                      setTimeout(() => setErrorMsg(''), 2000);
+                  } else {
+                      processTurnRef.current(cScore, requestedDarts);
+                  }
+              } else {
+                  // bez konkrétního počtu šipek – chová se jako dříve
+                  handleTurnCommitRef.current(cScore);
+              }
           }
           return;
       }
@@ -227,11 +290,13 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
           return;
       }
       if (!gameStateRef.current.winner) {
-          const numbers = transcript.match(/\d+/g);
-          if (numbers) {
-              const num = parseInt(numbers.join(''));
-              if (num >= 0 && num <= 180) handleTurnCommitRef.current(num);
-          } else { setErrorMsg(`? "${transcript}"`); setTimeout(() => setErrorMsg(''), 1500); }
+          const num = parseNumberFromSpeech(transcript);
+          if (num != null && num >= 0 && num <= 180) {
+              handleTurnCommitRef.current(num);
+          } else {
+              setErrorMsg(`? "${transcript}"`);
+              setTimeout(() => setErrorMsg(''), 1500);
+          }
       }
   };
 
@@ -305,6 +370,13 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
 
       if (isOver) {
         const record = { id: Date.now(), date: new Date().toLocaleString(), gameType: 'x01', p1Name: settings.p1Name, p1Id: settings.p1Id || null, p2Name: settings.p2Name, p2Id: settings.p2Id || null, p1Legs: p1W, p2Legs: p2W, matchWinner: ns.winner, completedLegs: uLegs, isBot: settings.isBot, botLevel: settings.botLevel, botAvg: settings.botAvg };
+        // Vypnout mikrofon 10 vteřin po konci zápasu (pokud je teď zapnutý)
+        if (isMicActiveRef.current) {
+          if (micTimeoutRef.current) clearTimeout(micTimeoutRef.current);
+          micTimeoutRef.current = setTimeout(() => {
+            setIsMicActive(false);
+          }, 10000);
+        }
         onMatchComplete(record);
       } else {
         setGameState({ ...ns, p1Legs: p1W, p2Legs: p2W, matchWinner: null, completedLegs: uLegs });

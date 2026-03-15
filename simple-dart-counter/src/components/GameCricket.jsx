@@ -54,8 +54,12 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
   });
 
   const [isMicActive, setIsMicActive] = useState(false); 
+  const [isListening, setIsListening] = useState(false);
 
   const t = (k) => translations[lang]?.[k] || k;
+
+  const recognitionRef = useRef(null);
+  const isMicActiveRef = useRef(isMicActive);
 
   const getDisplayName = (name, isP1, isBot) => {
     if (!name) return '';
@@ -75,6 +79,10 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
   };
 
   useEffect(() => {
+    isMicActiveRef.current = isMicActive;
+  }, [isMicActive]);
+
+  useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       if (!isPC || gameState.winner) return;
       const key = e.key.toLowerCase();
@@ -87,12 +95,213 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [isPC, gameState.winner, gameState.multiplier]);
 
-  const recalculateGame = (baseHistory) => {
+  // --- HLASOVÉ OVLÁDÁNÍ – CRICKET ---
+  const sanitizeSpeech = (text) => {
+    if (!text) return '';
+    let clean = text.toLowerCase().trim();
+    // sjednotíme oddělovače na mezery
+    clean = clean.replace(/[;,]/g, ' ');
+
+    const wordMap = {
+      // Czech targets
+      'patnáct': '15', 'patnáctka': '15', 'patnáctku': '15',
+      'šestnáct': '16', 'šestnáctka': '16', 'šestnáctku': '16',
+      'sedmnáct': '17', 'sedmnáctka': '17', 'sedmnáctku': '17',
+      'osmnáct': '18', 'osmnáctka': '18', 'osmnáctku': '18',
+      'devatenáct': '19', 'devatenáctka': '19', 'devatenáctku': '19',
+      'dvacet': '20', 'dvacítka': '20', 'dvacítku': '20',
+      'pětadvacet': '25', 'čistý střed': '25',
+      'padesát': '50', 'střed': '50',
+      // English targets
+      'fifteen': '15',
+      'sixteen': '16',
+      'seventeen': '17',
+      'eighteen': '18',
+      'nineteen': '19',
+      'twenty': '20',
+      'bull': '50', 'bullseye': '50', 'outer bull': '25', 'inner bull': '50',
+      // Polish targets
+      'piętnaście': '15', 'pietnascie': '15',
+      'szesnaście': '16', 'szesnascie': '16',
+      'siedemnaście': '17', 'siedemnascie': '17',
+      'osiemnaście': '18', 'osiemnascie': '18',
+      'dziewiętnaście': '19', 'dziewietnascie': '19',
+      'dwadzieścia': '20', 'dwadziescia': '20',
+      'bullseye': '50',
+      // Miss / zero
+      'vedle': '0', 'mimo': '0', 'nula': '0', 'nic': '0', 'minul': '0',
+      'miss': '0', 'outside': '0', 'no score': '0',
+      'pudło': '0', 'pudlo': '0', 'obok': '0'
+    };
+
+    // Kvantifikátory počtu šipek (x1/x2/x3)
+    const countMap = {
+      // Czech
+      'jednou': 'x1', 'jedenkrát': 'x1', 'jednou.': 'x1',
+      'dvakrát': 'x2', 'dva krát': 'x2',
+      'třikrát': 'x3', 'tri krát': 'x3',
+      // English
+      'once': 'x1', 'one time': 'x1',
+      'twice': 'x2', 'two times': 'x2',
+      'three times': 'x3',
+      // Polish
+      'raz': 'x1', 'jeden raz': 'x1',
+      'dwa razy': 'x2', 'dwa raz': 'x2',
+      'trzy razy': 'x3'
+    };
+
+    const multiplierMap = {
+      // Czech / generic
+      'tripl': 'T', 'trojitá': 'T', 'trojitý': 'T',
+      'dabl': 'D', 'dvojitá': 'D', 'dvojitý': 'D',
+      // English
+      'triple': 'T', 'treble': 'T',
+      'double': 'D',
+      // Polish
+      'potrójny': 'T', 'potrojny': 'T',
+      'podwójny': 'D', 'podwojny': 'D'
+    };
+
+    Object.entries(wordMap).forEach(([word, val]) => {
+      clean = clean.replace(new RegExp(`\\b${word}\\b`, 'g'), val);
+    });
+    Object.entries(countMap).forEach(([word, val]) => {
+      clean = clean.replace(new RegExp(`\\b${word}\\b`, 'g'), val);
+    });
+    Object.entries(multiplierMap).forEach(([word, val]) => {
+      clean = clean.replace(new RegExp(`\\b${word}\\b`, 'g'), val);
+    });
+
+    return clean;
+  };
+
+  const parseCricketDarts = (cleanText) => {
+    const darts = [];
+    if (!cleanText) return darts;
+
+    const tokens = cleanText.split(/\s+/).filter(Boolean);
+    let currentMultiplier = 1;
+    let currentRepeat = 1;
+
+    const validDirectTargets = [15, 16, 17, 18, 19, 20, 25, 50, 0];
+
+    const pushDart = (target, multiplier) => {
+      if (darts.length >= 3) return;
+      if (target === 25 && multiplier === 3) multiplier = 2;
+      if (target === 50) { target = 25; multiplier = 2; }
+      if (target === 0) multiplier = 1;
+      darts.push({ target, multiplier });
+    };
+
+    for (let token of tokens) {
+      if (darts.length >= 3) break;
+
+      if (token === 'x3') { currentRepeat = 3; continue; }
+      if (token === 'x2') { currentRepeat = 2; continue; }
+      if (token === 'x1') { currentRepeat = 1; continue; }
+
+      if (token === 'T') { currentMultiplier = 3; continue; }
+      if (token === 'D') { currentMultiplier = 2; continue; }
+
+      const num = parseInt(token, 10);
+      if (Number.isNaN(num)) continue;
+
+      let target = null;
+      let multFromNumber = 1;
+
+      if (validDirectTargets.includes(num)) {
+        target = num;
+      } else {
+        // rozklad čísel jako 45, 60, 40 -> base * mult
+        for (let base of [15, 16, 17, 18, 19, 20]) {
+          for (let m of [3, 2, 1]) {
+            if (base * m === num) {
+              target = base;
+              multFromNumber = m;
+              break;
+            }
+          }
+          if (target !== null) break;
+        }
+      }
+
+      if (target === null) continue;
+
+      let effectiveMult = currentMultiplier !== 1 ? currentMultiplier : multFromNumber;
+
+      const repeats = Math.min(3 - darts.length, currentRepeat);
+      for (let i = 0; i < repeats; i++) {
+        pushDart(target, effectiveMult);
+      }
+
+      currentMultiplier = 1;
+      currentRepeat = 1;
+    }
+
+    return darts;
+  };
+
+  const handleVoiceCommand = (rawTranscript) => {
+    const transcript = (rawTranscript || '').toLowerCase().trim();
+    const cleanText = sanitizeSpeech(transcript);
+
+    // Řídící příkazy – krok zpět
+    if (cleanText.includes('zpět') || cleanText.includes('krok zpět')) {
+      handleUndoClick();
+      return;
+    }
+
+    const darts = parseCricketDarts(cleanText);
+    darts.forEach(d => handleThrow(d.target, d.multiplier));
+  };
+
+  useEffect(() => {
+    let recognition = recognitionRef.current;
+    if (isMicActive) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        setIsMicActive(false);
+        return;
+      }
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = lang === 'en' ? 'en-US' : (lang === 'pl' ? 'pl-PL' : 'cs-CZ');
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => {
+        setIsListening(false);
+        if (isMicActiveRef.current) {
+          try { recognition.start(); } catch (e) {}
+        }
+      };
+      recognition.onresult = (event) => {
+        const res = event.results[event.results.length - 1][0].transcript;
+        handleVoiceCommand(res);
+      };
+      recognition.onerror = () => {};
+      try { recognition.start(); } catch (e) {}
+      recognitionRef.current = recognition;
+    } else {
+      if (recognition) {
+        recognition.onend = null;
+        recognition.stop();
+        setIsListening(false);
+      }
+    }
+    return () => {
+      if (recognition) {
+        recognition.onend = null;
+        recognition.stop();
+      }
+    };
+  }, [isMicActive, lang]);
+
+  const recalculateGame = (baseHistory, baseState) => {
     const moves = [...baseHistory].reverse();
     let st = {
       p1Score: 0, p2Score: 0,
       p1Marks: { ...INITIAL_MARKS }, p2Marks: { ...INITIAL_MARKS },
-      currentPlayer: gameState.startingPlayer,
+      currentPlayer: baseState.startingPlayer,
       dartsThrown: 0,
       winner: null
     };
@@ -141,7 +350,7 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
     }
 
     return { 
-      ...gameState, 
+      ...baseState, 
       p1Score: st.p1Score, p2Score: st.p2Score, 
       p1Marks: st.p1Marks, p2Marks: st.p2Marks,
       currentPlayer: st.winner ? st.currentPlayer : st.currentPlayer, 
@@ -155,42 +364,45 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
   const handleThrow = (target, overrideMultiplier = null) => {
     if (gameState.winner) return;
     
-    let finalMultiplier = gameState.multiplier;
-    if (overrideMultiplier !== null) {
-      finalMultiplier = overrideMultiplier;
-    } else if (target === 25 && gameState.multiplier === 3) {
-      finalMultiplier = 2;
-    }
-
-    const newMove = { 
-        id: Date.now(), 
-        player: gameState.currentPlayer, 
-        target: target, 
-        multiplier: target === 0 ? 1 : finalMultiplier 
-    };
-    
-    const newState = recalculateGame([newMove, ...gameState.history]);
-
-    if (newState.winner) {
-      const p1W = newState.winner === 'p1' ? gameState.p1Legs + 1 : gameState.p1Legs;
-      const p2W = newState.winner === 'p2' ? gameState.p2Legs + 1 : gameState.p2Legs;
-      const tgt = settings?.matchMode === 'first_to' ? settings.matchTarget : Math.ceil((settings?.matchTarget || 1) / 2);
-      const isOver = p1W >= tgt || p2W >= tgt;
-      const uLegs = [...gameState.completedLegs, { history: newState.history, winner: newState.winner }];
-
-      if (isOver && onMatchComplete) {
-        onMatchComplete({ 
-          id: Date.now(), date: new Date().toLocaleString(), gameType: 'cricket', 
-          p1Name: settings.p1Name, p2Name: settings.p2Name, p1Legs: p1W, p2Legs: p2W, 
-          matchWinner: newState.winner, completedLegs: uLegs, 
-          isBot: settings.isBot, botLevel: settings.botLevel 
-        });
-      } else {
-        setGameState({ ...newState, p1Legs: p1W, p2Legs: p2W, matchWinner: null, completedLegs: uLegs });
+    setGameState(prev => {
+      let finalMultiplier = prev.multiplier;
+      if (overrideMultiplier !== null) {
+        finalMultiplier = overrideMultiplier;
+      } else if (target === 25 && prev.multiplier === 3) {
+        finalMultiplier = 2;
       }
-    } else {
-      setGameState(newState);
-    }
+
+      const newMove = { 
+          id: Date.now(), 
+          player: prev.currentPlayer, 
+          target: target, 
+          multiplier: target === 0 ? 1 : finalMultiplier 
+      };
+      
+      const newState = recalculateGame([newMove, ...prev.history], prev);
+
+      if (newState.winner) {
+        const p1W = newState.winner === 'p1' ? prev.p1Legs + 1 : prev.p1Legs;
+        const p2W = newState.winner === 'p2' ? prev.p2Legs + 1 : prev.p2Legs;
+        const tgt = settings?.matchMode === 'first_to' ? settings.matchTarget : Math.ceil((settings?.matchTarget || 1) / 2);
+        const isOver = p1W >= tgt || p2W >= tgt;
+        const uLegs = [...prev.completedLegs, { history: newState.history, winner: newState.winner }];
+
+        if (isOver && onMatchComplete) {
+          onMatchComplete({ 
+            id: Date.now(), date: new Date().toLocaleString(), gameType: 'cricket', 
+            p1Name: settings.p1Name, p2Name: settings.p2Name, p1Legs: p1W, p2Legs: p2W, 
+            matchWinner: newState.winner, completedLegs: uLegs, 
+            isBot: settings.isBot, botLevel: settings.botLevel 
+          });
+          return { ...newState, p1Legs: p1W, p2Legs: p2W, completedLegs: uLegs };
+        } else {
+          return { ...newState, p1Legs: p1W, p2Legs: p2W, matchWinner: null, completedLegs: uLegs };
+        }
+      } else {
+        return newState;
+      }
+    });
   };
 
   const handleUndoClick = () => {
@@ -370,7 +582,16 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
             </div>
             
             <div className="flex h-12 gap-2 sm:h-14 shrink-0">
-                <button onClick={() => setIsMicActive(!isMicActive)} className={`flex-1 rounded-xl flex items-center justify-center border transition-all ${isMicActive ? 'bg-red-600 border-red-500 text-white animate-pulse' : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'}`}>
+                <button
+                  onClick={() => setIsMicActive(!isMicActive)}
+                  className={`flex-1 rounded-xl flex items-center justify-center border transition-all ${
+                    isMicActive
+                      ? (isListening
+                          ? 'bg-red-600 border-red-500 text-white animate-pulse'
+                          : 'bg-red-900/60 border-red-500 text-red-100')
+                      : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'
+                  }`}
+                >
                     {isMicActive ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                 </button>
                 <button onClick={handleUndoClick} disabled={gameState.history.length === 0}

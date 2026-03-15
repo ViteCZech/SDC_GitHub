@@ -256,7 +256,7 @@ const MatchStatsView = ({ data, onClose, title, lang, onStartMatch }) => {
 };
 
 // --- UŽIVATELSKÝ PROFIL S ROZDĚLENÍM X01 A CRICKET ---
-const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang, currentP1Name }) => {
+const UserProfile = ({ user, matches, onLogout, onDeleteAccount, onLogin, lang, currentP1Name }) => {
     const t = (k) => translations[lang]?.[k] || k;
     const [timeRange, setTimeRange] = useState('all');
     const [gameTab, setGameTab] = useState('x01');
@@ -361,12 +361,22 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, lang, currentP1
                     <div className="flex items-center min-w-0 gap-2 sm:gap-3">
                         <div className="p-2 rounded-full bg-emerald-900/30 shrink-0"><User className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" /></div>
                         <div className="flex flex-col min-w-0">
-                            <h2 className="text-sm font-black tracking-widest text-white uppercase truncate sm:text-base">{user.isAnonymous ? currentP1Name : (user.displayName ? user.displayName.split(' ')[0] : t('statsUserFallback'))}</h2>
-                            <span className="text-[9px] sm:text-[10px] text-slate-500 truncate">user.isAnonymous ? t('localOfflineProfile') : user.email</span>
+                            <h2 className="text-sm font-black tracking-widest text-white uppercase truncate sm:text-base">
+                                {user.isAnonymous ? (currentP1Name || t('statsUserFallback')) : (user.displayName ? user.displayName.split(' ')[0] : t('statsUserFallback'))}
+                            </h2>
+                            <span className="text-[9px] sm:text-[10px] text-slate-500 truncate">
+                                {user.isAnonymous ? (t('localOfflineProfile') || 'Nikdo není přihlášen') : (user.email || t('localOfflineProfile'))}
+                            </span>
                         </div>
                     </div>
                     {user.isAnonymous ? (
-                        <button onClick={onLogout} className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] sm:text-xs font-bold uppercase tracking-widest px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg transition-colors shrink-0 ml-2 shadow-lg flex gap-2 items-center"><Cloud className="w-4 h-4"/> {t('backupBtn')}</button>                    ) : (
+                        <button
+                            onClick={onLogin}
+                            className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] sm:text-xs font-bold uppercase tracking-widest px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg transition-colors shrink-0 ml-2 shadow-lg flex gap-2 items-center"
+                        >
+                            <Cloud className="w-4 h-4"/> {t('backupBtn')}
+                        </button>
+                    ) : (
                         <button onClick={onLogout} className="bg-red-900/20 hover:bg-red-900/40 text-red-400 text-[10px] sm:text-xs font-bold uppercase tracking-widest px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-red-500/30 transition-colors shrink-0 ml-2">{t('logout')}</button>
                     )}
                 </div>
@@ -896,6 +906,7 @@ export default function App() {
               user={user} 
               matches={matchHistory} 
               onLogout={()=>signOut(auth)} 
+              onLogin={handleLogin}
               
               // Komplexní smazání účtu včetně historie zápasů
               onDeleteAccount={async () => { 
