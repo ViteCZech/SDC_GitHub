@@ -14,7 +14,7 @@ import GameX01 from './components/GameX01';
 import GameCricket from './components/GameCricket';
 import GameStats from './Stats';
 
-const APP_VERSION = "v1.9.0"; 
+const APP_VERSION = "v1.9.1"; 
 
 const safeStorage = {
   getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return null; } },

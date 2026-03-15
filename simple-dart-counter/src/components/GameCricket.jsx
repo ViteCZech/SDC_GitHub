@@ -99,67 +99,33 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
   const sanitizeSpeech = (text) => {
     if (!text) return '';
     let clean = text.toLowerCase().trim();
-    // sjednotíme oddělovače na mezery
     clean = clean.replace(/[;,]/g, ' ');
 
     const wordMap = {
-      // Czech targets
       'patnáct': '15', 'patnáctka': '15', 'patnáctku': '15',
       'šestnáct': '16', 'šestnáctka': '16', 'šestnáctku': '16',
       'sedmnáct': '17', 'sedmnáctka': '17', 'sedmnáctku': '17',
       'osmnáct': '18', 'osmnáctka': '18', 'osmnáctku': '18',
       'devatenáct': '19', 'devatenáctka': '19', 'devatenáctku': '19',
       'dvacet': '20', 'dvacítka': '20', 'dvacítku': '20',
-      'pětadvacet': '25', 'čistý střed': '25',
-      'padesát': '50', 'střed': '50',
-      // English targets
-      'fifteen': '15',
-      'sixteen': '16',
-      'seventeen': '17',
-      'eighteen': '18',
-      'nineteen': '19',
-      'twenty': '20',
-      'bull': '50', 'bullseye': '50', 'outer bull': '25', 'inner bull': '50',
-      // Polish targets
-      'piętnaście': '15', 'pietnascie': '15',
-      'szesnaście': '16', 'szesnascie': '16',
-      'siedemnaście': '17', 'siedemnascie': '17',
-      'osiemnaście': '18', 'osiemnascie': '18',
-      'dziewiętnaście': '19', 'dziewietnascie': '19',
-      'dwadzieścia': '20', 'dwadziescia': '20',
-      'bullseye': '50',
-      // Miss / zero
-      'vedle': '0', 'mimo': '0', 'nula': '0', 'nic': '0', 'minul': '0',
-      'miss': '0', 'outside': '0', 'no score': '0',
-      'pudło': '0', 'pudlo': '0', 'obok': '0'
+      
+      // Specifické středy
+      'zelený střed': '25', 'zelenej střed': '25', 'zelenou': '25', 'pětadvacet': '25', 
+      'červený střed': '50', 'červenej střed': '50', 'červenou': '50', 'čistý střed': '50', 'padesát': '50', 'střed': '50', 'bullseye': '50', 'bull': '50',
+      
+      'vedle': '0', 'mimo': '0', 'nula': '0', 'nic': '0', 'minul': '0', 'miss': '0'
     };
 
-    // Kvantifikátory počtu šipek (x1/x2/x3)
+    // Vylepšené chytání opakování (včetně např. "2x")
     const countMap = {
-      // Czech
-      'jednou': 'x1', 'jedenkrát': 'x1', 'jednou.': 'x1',
-      'dvakrát': 'x2', 'dva krát': 'x2',
-      'třikrát': 'x3', 'tri krát': 'x3',
-      // English
-      'once': 'x1', 'one time': 'x1',
-      'twice': 'x2', 'two times': 'x2',
-      'three times': 'x3',
-      // Polish
-      'raz': 'x1', 'jeden raz': 'x1',
-      'dwa razy': 'x2', 'dwa raz': 'x2',
-      'trzy razy': 'x3'
+      '2x': 'x2', '2 x': 'x2', 'dvě': 'x2', 'dvakrát': 'x2', 'dva krát': 'x2',
+      '3x': 'x3', '3 x': 'x3', 'tři': 'x3', 'třikrát': 'x3', 'tri krát': 'x3',
+      '1x': 'x1', '1 x': 'x1', 'jedna': 'x1', 'jednou': 'x1', 'jedenkrát': 'x1'
     };
 
     const multiplierMap = {
-      // Czech / generic
-      'tripl': 'T', 'trojitá': 'T', 'trojitý': 'T',
-      'dabl': 'D', 'dvojitá': 'D', 'dvojitý': 'D',
-      // English
-      'triple': 'T', 'treble': 'T',
-      'double': 'D',
-      // Polish
-      'potrójny': 'T', 'potrojny': 'T',
-      'podwójny': 'D', 'podwojny': 'D'
+      'tripl': 'T', 'trojitá': 'T', 'trojitý': 'T', 'triple': 'T',
+      'dabl': 'D', 'dvojitá': 'D', 'dvojitý': 'D', 'double': 'D'
     };
 
     Object.entries(wordMap).forEach(([word, val]) => {
@@ -174,7 +140,7 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
 
     return clean;
   };
-
+    
   const parseCricketDarts = (cleanText) => {
     const darts = [];
     if (!cleanText) return darts;
@@ -250,6 +216,12 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
       handleUndoClick();
       return;
     }
+    
+    // Řídící příkazy - po skončení legu/zápasu
+    if (gameState.winner && (cleanText.includes('další leg') || cleanText.includes('nová hra') || cleanText.includes('odveta'))) {
+      handleNextLeg();
+      return;
+    }
 
     const darts = parseCricketDarts(cleanText);
     darts.forEach(d => handleThrow(d.target, d.multiplier));
@@ -295,6 +267,16 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
       }
     };
   }, [isMicActive, lang]);
+
+  // Automatické vypnutí mikrofonu 5 sekund po konci hry
+  useEffect(() => {
+    if (gameState.winner && isMicActive) {
+      const timer = setTimeout(() => {
+        setIsMicActive(false);
+      }, 5000);
+      return () => clearTimeout(timer); // Vyčistí časovač, pokud by se hra resetovala dřív
+    }
+  }, [gameState.winner, isMicActive]);
 
   const recalculateGame = (baseHistory, baseState) => {
     const moves = [...baseHistory].reverse();
@@ -606,4 +588,4 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
 
     </main>
   );
-}
+};
