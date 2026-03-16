@@ -261,7 +261,14 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, onLogin, lang, 
     const [timeRange, setTimeRange] = useState('all');
     const [gameTab, setGameTab] = useState('x01');
 
-    const myMatches = matches.filter(m => m.p1Id === user.uid || m.p2Id === user.uid || (!user.uid && m.p1Name === currentP1Name));
+    // Zápasy patří uživateli pokud:
+    // - mají jeho UID v p1Id/p2Id (cloudové),
+    // - nebo jsou čistě lokální (bez p1Id/p2Id) a shoduje se jméno hráče 1
+    const myMatches = matches.filter(m => {
+        if (m.p1Id === user.uid || m.p2Id === user.uid) return true;
+        const isPureLocal = !m.p1Id && !m.p2Id;
+        return isPureLocal && m.p1Name === currentP1Name;
+    });
     
     const filteredMatches = myMatches.filter(m => {
         const isTargetGame = gameTab === 'x01' ? m.gameType !== 'cricket' : m.gameType === 'cricket';
