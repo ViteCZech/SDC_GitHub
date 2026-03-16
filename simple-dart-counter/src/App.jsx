@@ -14,7 +14,7 @@ import GameX01 from './components/GameX01';
 import GameCricket from './components/GameCricket';
 import GameStats from './Stats';
 
-const APP_VERSION = "v1.9.1"; 
+const APP_VERSION = "v1.9.2"; 
 
 const safeStorage = {
   getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return null; } },
@@ -631,18 +631,31 @@ export default function App() {
 
       {/* --- HOME --- */}
       {appState === 'home' && (
-        <main className="flex flex-col items-center justify-center flex-1 w-full max-w-md gap-5 p-6 mx-auto overflow-y-auto">
-            <div className="flex flex-col items-center mb-2">
-                <div className="flex items-center justify-center w-20 h-20 mb-3 rounded-full shadow-lg bg-emerald-600 shadow-emerald-900/50">
+        <main className={`flex flex-col flex-1 w-full max-w-md mx-auto overflow-y-auto ${
+          isLandscape ? 'items-stretch justify-start gap-3 p-3 pt-4 pb-4' : 'items-center justify-center gap-5 p-6'
+        }`}>
+            <div className={`flex flex-col items-center ${
+              isLandscape ? 'mb-1' : 'mb-2'
+            }`}>
+                <div className={`flex items-center justify-center rounded-full shadow-lg bg-emerald-600 shadow-emerald-900/50 ${
+                  isLandscape ? 'w-14 h-14 mb-2' : 'w-20 h-20 mb-3'
+                }`}>
                     <Target className="w-10 h-10 text-slate-900" />
                 </div>
                 <h1 className="text-3xl font-black leading-none tracking-widest text-white">SIMPLE DART</h1>
                 <h2 className="mt-1 text-sm font-bold tracking-widest text-emerald-500">COUNTER</h2>
             </div>
             
-            <button onClick={() => setAppState('setup')} className="flex justify-center w-full gap-3 py-4 text-xl font-black text-white transition-transform shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-2xl active:scale-95"><Play className="fill-current w-7 h-7" /> {t('newGame')}</button>
+            <button
+              onClick={() => setAppState('setup')}
+              className={`flex justify-center w-full gap-3 text-xl font-black text-white transition-transform shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-2xl active:scale-95 ${
+                isLandscape ? 'py-3' : 'py-4'
+              }`}
+            >
+              <Play className="fill-current w-7 h-7" /> {t('newGame')}
+            </button>
             
-            <div className="grid w-full grid-cols-2 gap-3">
+            <div className={`grid w-full grid-cols-2 ${isLandscape ? 'gap-2' : 'gap-3'}`}>
                 <button onClick={() => setAppState('tutorial')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><FileText className="w-7 h-7 text-emerald-400" /><span className="text-sm font-bold text-white">{t('tutorial')}</span></button>
                 <button onClick={() => setAppState('history')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><History className="text-blue-400 w-7 h-7" /><span className="text-sm font-bold text-white">{t('matchHistory')}</span></button>
                 <button onClick={() => setAppState('profile')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><BarChart2 className="text-purple-400 w-7 h-7" /><span>{t('statsPersonal')}</span></button>
