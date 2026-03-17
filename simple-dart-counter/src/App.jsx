@@ -5,7 +5,7 @@ import { getFirestore, collection, addDoc, deleteDoc, doc, query, where, getDocs
 import { 
   AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, Delete, 
   DownloadCloud, FileText, History, Home, Info, Keyboard as KeyboardIcon, 
-  Maximize, Mimize, Mic, MicOff, MousePointer2, Play, RefreshCw, RotateCcw, 
+  Maximize, Mic, MicOff, MousePointer2, Play, RefreshCw, RotateCcw, 
   Target, Trash2, Trophy, Undo2, User, Cloud, X, BarChart2, List, Swords
 } from 'lucide-react';
 
