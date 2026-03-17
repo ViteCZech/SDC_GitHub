@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, deleteUser } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, query, where, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, deleteDoc, doc, query, where, getDocs } from 'firebase/firestore';
 import { 
   AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, Delete, 
   DownloadCloud, FileText, History, Home, Info, Keyboard as KeyboardIcon, 
-  Maximize, Mic, MicOff, MousePointer2, Play, RefreshCw, RotateCcw, 
+  Maximize, Mimize, Mic, MicOff, MousePointer2, Play, RefreshCw, RotateCcw, 
   Target, Trash2, Trophy, Undo2, User, Cloud, X, BarChart2, List, Swords
 } from 'lucide-react';
 
@@ -45,7 +45,6 @@ const appId = 'sdc_global_production';
 // --- POMOCNÉ FUNKCE ---
 const getTranslatedName = (name, isPlayer1, currentLang) => {
     if (!name) return '';
-    // Přidány otazníky (?.) pro bezpečné čtení z externího souboru translations
     const p1Defaults = ['Domácí', 'Home', 'Gospodarze', translations?.cs?.p1Default, translations?.en?.p1Default, translations?.pl?.p1Default];
     const p2Defaults = ['Hosté', 'Away', 'Goście', translations?.cs?.p2Default, translations?.en?.p2Default, translations?.pl?.p2Default];
     const botDefaults = ['Robot', 'Bot', translations?.cs?.botDefault, translations?.en?.botDefault, translations?.pl?.botDefault];
@@ -260,7 +259,7 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, onLogin, lang, 
     const t = (k) => translations[lang]?.[k] || k;
     const [timeRange, setTimeRange] = useState('all');
     const [gameTab, setGameTab] = useState('x01');
-
+   
     // Zápasy patří uživateli pokud:
     // - mají jeho UID v p1Id/p2Id (cloudové),
     // - nebo jsou čistě lokální (bez p1Id/p2Id) a shoduje se jméno hráče 1
@@ -360,6 +359,12 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, onLogin, lang, 
     let maxRoundCount = 0; Object.values(roundsDist).forEach(val => { if (val > maxRoundCount) maxRoundCount = val; });
     const overallMPR = sumCricDarts > 0 ? ((sumMarks / sumCricDarts) * 3).toFixed(2) : '0.00';
 
+    const roundEntries = Object.entries(roundsDist)
+        .map(([round, cnt]) => ({ round: parseInt(round, 10), count: cnt }))
+        .filter(x => !Number.isNaN(x.round))
+        .sort((a, b) => a.round - b.round);
+    const totalCheckouts = roundEntries.reduce((a, b) => a + (b.count || 0), 0);
+
     return (
         <main className="relative z-10 flex-1 w-full overflow-y-auto bg-slate-950">
             <div className="flex flex-col w-full max-w-4xl gap-4 p-4 pb-24 mx-auto sm:p-6">
@@ -419,6 +424,30 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, onLogin, lang, 
                                 <span className="text-[9px] text-slate-500 font-bold uppercase mb-1">{t('highestCheckout')}</span>
                                 <div className="flex items-center gap-3"><span className="font-mono text-2xl font-black text-yellow-400">{highestCheckout}</span><span className="text-[9px] text-slate-500 border-l border-slate-700 pl-3">{checkouts100plus}x {t('checkout100')}</span></div>
                             </div>
+                        </div>
+
+                        <div className="p-4 border bg-slate-900 rounded-xl border-slate-800">
+                            <div className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                {t('statsRoundDist')}
+                            </div>
+                            {totalCheckouts === 0 ? (
+                                <div className="text-xs text-slate-600">-</div>
+                            ) : (
+                                <div className="flex flex-col gap-2">
+                                    {roundEntries.map(({ round, count }) => {
+                                        const pct = Math.round((count / totalCheckouts) * 100);
+                                        return (
+                                            <div key={round} className="grid grid-cols-[3rem_1fr_3rem] items-center gap-3">
+                                                <div className="text-xs font-bold text-slate-500">R{round}</div>
+                                                <div className="h-3 rounded bg-slate-800 overflow-hidden border border-slate-700">
+                                                    <div className="h-full bg-emerald-500" style={{ width: `${pct}%` }} />
+                                                </div>
+                                                <div className="text-xs font-mono font-bold text-emerald-400 text-right">{pct}%</div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -483,12 +512,50 @@ export default function App() {
   const [isLandscape, setIsLandscape] = useState(false);
   const [isPC, setIsPC] = useState(false);
   const [tutorialTab, setTutorialTab] = useState('x01');
+  const [showSyncPrompt, setShowSyncPrompt] = useState(false);
 
   useEffect(() => {
     const check = () => { setIsLandscape(window.innerWidth > window.innerHeight && window.innerWidth > 500); setIsPC(window.matchMedia("(pointer: fine)").matches && window.innerWidth >= 768); };
     window.addEventListener('resize', check); check();
     return () => window.removeEventListener('resize', check);
   }, []);
+
+  // Hlídač přihlášení pro zálohu offline zápasů
+  useEffect(() => {
+      // Najde, jestli existují zápasy, které ještě nemají ID hráče a nejsou označené jako zálohované
+      const hasUnsynced = matchHistory.some(m => !m.synced && !m.p1Id);
+      if (user && !user.isAnonymous && hasUnsynced) {
+          setShowSyncPrompt(true);
+      }
+  }, [user, matchHistory]);
+
+  const handleSyncOfflineMatches = async () => {
+      if (!db || !user || user.isAnonymous) return;
+      try {
+          // 1. Vyfiltrujeme jen ty, co skutečně nejsou zálohované
+          const unsyncedMatches = matchHistory.filter(m => !m.synced && !m.p1Id);
+          
+          // 2. Odešleme je do cloudu, ale PŘIDÁME jim vaše UID a značku synced
+          for (const match of unsyncedMatches) {
+              const matchToSync = { ...match, p1Id: user.uid, synced: true };
+              await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'matches'), matchToSync);
+          }
+
+          // 3. Upravíme lokální paměť, ať už s tím neotravuje znovu
+          const updatedHistory = matchHistory.map(m => {
+              if (!m.synced && !m.p1Id) {
+                  return { ...m, p1Id: user.uid, synced: true };
+              }
+              return m;
+          });
+          
+          setMatchHistory(updatedHistory); // Přepíše localStorage
+          setShowSyncPrompt(false); // Zavře okno
+      } catch (err) {
+          console.error("Chyba při zálohování:", err);
+      }
+  };
+
   // Sledování změny jazyka a aktualizace výchozích jmen v nastavení
   useEffect(() => {
       setSettings(prev => {
@@ -628,7 +695,31 @@ export default function App() {
             <div className="flex p-1 border rounded-lg bg-slate-800 border-slate-700">{['cs','en','pl'].map(l=><button key={l} onClick={()=>setLang(l)} className={`p-1 rounded transition-all ${lang===l?'bg-slate-600 opacity-100 shadow-sm':'opacity-40 grayscale'}`}><FlagIcon lang={l} /></button>)}</div>
         </div>
       </header>
-
+      {showSyncPrompt && (
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-sm w-full shadow-2xl text-center">
+            <Cloud className="w-12 h-12 text-blue-500 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-white mb-2">Záloha zápasů</h3>
+            <p className="text-slate-400 text-sm mb-6">
+                Našli jsme nepřihlášené lokální zápasy ({matchHistory.filter(m => !m.synced && !m.p1Id).length}). Chcete je nyní nahrát a trvale zálohovat pod svým účtem?
+            </p>
+            <div className="flex gap-3">
+                <button 
+                    onClick={() => setShowSyncPrompt(false)} 
+                    className="flex-1 py-3 rounded-xl font-bold text-slate-400 bg-slate-800 hover:bg-slate-700 transition-colors"
+                >
+                    Ignorovat
+                </button>
+                <button 
+                    onClick={handleSyncOfflineMatches} 
+                    className="flex-1 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-500 transition-colors shadow-lg shadow-blue-900/20"
+                >
+                    Zálohovat
+                </button>
+            </div>
+        </div>
+    </div>
+)}
       {/* --- HOME --- */}
       {appState === 'home' && (
         <main className={`flex flex-col flex-1 w-full max-w-md mx-auto overflow-y-auto ${
@@ -676,9 +767,19 @@ export default function App() {
                             <span className="text-xs font-bold truncate">{user.email}</span>
                         </div>
                     </div>
-                    <button onClick={() => signOut(auth)} className="shrink-0 bg-red-900/20 hover:bg-red-900/40 border border-red-500/30 text-red-400 text-[10px] uppercase font-bold tracking-widest px-3 py-2 rounded-lg transition-colors">
-                        {t('logout') || 'Odhlásit'}
-                    </button>
+                    <button 
+    onClick={() => {
+        signOut(auth);
+        setSettings(prev => ({
+            ...prev,
+            p1Name: translations[lang]?.p1Default || 'Domácí',
+            p1Id: null
+        }));
+    }} 
+    className="shrink-0 bg-red-900/20 hover:bg-red-900/40 border border-red-500/30 text-red-400 text-[10px] uppercase font-bold tracking-widest px-3 py-2 rounded-lg transition-colors"
+>
+    {t('logout') || 'Odhlásit'}
+</button>
                 </div>
             )}
         </main>

@@ -60,6 +60,7 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
 
   const recognitionRef = useRef(null);
   const isMicActiveRef = useRef(isMicActive);
+  const gameStateRef = useRef(gameState);
 
   const getDisplayName = (name, isP1, isBot) => {
     if (!name) return '';
@@ -83,6 +84,10 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
   }, [isMicActive]);
 
   useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+
+  useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       if (!isPC || gameState.winner) return;
       const key = e.key.toLowerCase();
@@ -99,21 +104,23 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
   const sanitizeSpeech = (text) => {
     if (!text) return '';
     let clean = text.toLowerCase().trim();
-    // sjednotíme oddělovače na mezery
+    // sjednotíme oddělovače na mezery + odstraníme diakritiku pro stabilní slovníky
     clean = clean.replace(/[;,]/g, ' ');
+    clean = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
     const wordMap = {
       // Czech targets
-      'patnáct': '15', 'patnáctka': '15', 'patnáctku': '15',
-      'šestnáct': '16', 'šestnáctka': '16', 'šestnáctku': '16',
-      'sedmnáct': '17', 'sedmnáctka': '17', 'sedmnáctku': '17',
-      'osmnáct': '18', 'osmnáctka': '18', 'osmnáctku': '18',
-      'devatenáct': '19', 'devatenáctka': '19', 'devatenáctku': '19',
-      'dvacet': '20', 'dvacítka': '20', 'dvacítku': '20',
-      'pětadvacet': '25', 'čistý střed': '25',
-      'zelený střed': '25', 'zeleny stred': '25',
-      'červený střed': '50', 'cerveny stred': '50',
-      'padesát': '50', 'střed': '50',
+      'patnact': '15', 'patnactka': '15', 'patnactku': '15',
+      'sestnact': '16', 'sestnactka': '16', 'sestnactku': '16',
+      'sedmnact': '17', 'sedmnactka': '17', 'sedmnactku': '17',
+      'osmnact': '18', 'osmnactka': '18', 'osmnactku': '18',
+      'devatenact': '19', 'devatenactka': '19', 'devatenactku': '19',
+      'dvacet': '20', 'dvacitka': '20', 'dvacitku': '20',
+      'petadvacet': '25', 'cisty stred': '25',
+      // bull color hints (standalone or with "stred")
+      'zeleny': '25', 'zeleny stred': '25',
+      'cerveny': '50', 'cerveny stred': '50',
+      'padesat': '50', 'stred': '50',
       // English targets
       'fifteen': '15',
       'sixteen': '16',
@@ -123,25 +130,25 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
       'twenty': '20',
       'bull': '50', 'bullseye': '50', 'outer bull': '25', 'inner bull': '50',
       // Polish targets
-      'piętnaście': '15', 'pietnascie': '15',
-      'szesnaście': '16', 'szesnascie': '16',
-      'siedemnaście': '17', 'siedemnascie': '17',
-      'osiemnaście': '18', 'osiemnascie': '18',
-      'dziewiętnaście': '19', 'dziewietnascie': '19',
-      'dwadzieścia': '20', 'dwadziescia': '20',
+      'pietnascie': '15',
+      'szesnascie': '16',
+      'siedemnascie': '17',
+      'osiemnascie': '18',
+      'dziewietnascie': '19',
+      'dwadziescia': '20',
       'bullseye': '50',
       // Miss / zero
       'vedle': '0', 'mimo': '0', 'nula': '0', 'nic': '0', 'minul': '0',
       'miss': '0', 'outside': '0', 'no score': '0',
-      'pudło': '0', 'pudlo': '0', 'obok': '0'
+      'pudlo': '0', 'obok': '0'
     };
 
     // Kvantifikátory počtu šipek (x1/x2/x3)
     const countMap = {
-      // Czech
-      'jednou': 'x1', 'jedenkrát': 'x1', 'jednou.': 'x1',
-      'dvakrát': 'x2', 'dva krát': 'x2',
-      'třikrát': 'x3', 'tri krát': 'x3',
+      // Czech (explicit repeats phrasing)
+      'jedna sipka': 'x1', 'jednu sipku': 'x1',
+      'dve sipky': 'x2', 'dvema sipkama': 'x2',
+      'tri sipky': 'x3', 'trema sipkama': 'x3',
       // English
       'once': 'x1', 'one time': 'x1',
       'twice': 'x2', 'two times': 'x2',
@@ -156,12 +163,15 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
       // Czech / generic
       'tripl': 'T', 'trojitá': 'T', 'trojitý': 'T',
       'dabl': 'D', 'dvojitá': 'D', 'dvojitý': 'D',
+      // Czech spoken: "dvakrát 20" usually means double 20, "třikrát 20" triple 20
+      'dvakrat': 'D',
+      'trikrat': 'T',
       // English
       'triple': 'T', 'treble': 'T',
       'double': 'D',
       // Polish
-      'potrójny': 'T', 'potrojny': 'T',
-      'podwójny': 'D', 'podwojny': 'D'
+      'potrojny': 'T',
+      'podwojny': 'D'
     };
 
     Object.entries(wordMap).forEach(([word, val]) => {
@@ -180,7 +190,7 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
     return clean;
   };
 
-  const parseCricketDarts = (cleanText) => {
+  const parseCricketDarts = (cleanText, maxDarts = 3) => {
     const darts = [];
     if (!cleanText) return darts;
 
@@ -191,7 +201,7 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
     const validDirectTargets = [15, 16, 17, 18, 19, 20, 25, 50, 0];
 
     const pushDart = (target, multiplier) => {
-      if (darts.length >= 3) return;
+      if (darts.length >= maxDarts) return;
       if (target === 25 && multiplier === 3) multiplier = 2;
       if (target === 50) { target = 25; multiplier = 2; }
       if (target === 0) multiplier = 1;
@@ -199,7 +209,7 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
     };
 
     for (let token of tokens) {
-      if (darts.length >= 3) break;
+      if (darts.length >= maxDarts) break;
 
       if (token === 'x3') { currentRepeat = 3; continue; }
       if (token === 'x2') { currentRepeat = 2; continue; }
@@ -234,7 +244,13 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
 
       let effectiveMult = currentMultiplier !== 1 ? currentMultiplier : multFromNumber;
 
-      const repeats = Math.min(3 - darts.length, currentRepeat);
+      // Speciál: "dvakrát mimo" / "třikrát miss" – v praxi jde o počet šipek mimo
+      if (target === 0 && currentMultiplier > 1 && currentRepeat === 1) {
+        currentRepeat = currentMultiplier;
+        effectiveMult = 1;
+      }
+
+      const repeats = Math.min(maxDarts - darts.length, currentRepeat);
       for (let i = 0; i < repeats; i++) {
         pushDart(target, effectiveMult);
       }
@@ -256,7 +272,8 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
       return;
     }
 
-    const darts = parseCricketDarts(cleanText);
+    const remaining = Math.max(0, 3 - (gameStateRef.current?.dartsThrown ?? 0));
+    const darts = parseCricketDarts(cleanText, remaining || 3);
     darts.forEach(d => handleThrow(d.target, d.multiplier));
   };
 
@@ -518,9 +535,9 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
 
       <div className="flex flex-col justify-center flex-1 min-h-0">
         {!gameState.winner ? (
-            <div className={`flex flex-col h-full gap-1 sm:gap-2 transition-opacity ${settings?.isBot && gameState.currentPlayer === 'p2' ? 'opacity-60 pointer-events-none' : ''}`}>
+            <div className={`flex flex-col h-full gap-1 sm:gap-2 transition-opacity overflow-y-auto ${settings?.isBot && gameState.currentPlayer === 'p2' ? 'opacity-60 pointer-events-none' : ''}`}>
                 {TARGETS.map(target => (
-                    <div key={target} className="flex items-center flex-1 min-h-0 overflow-hidden border bg-slate-800/40 rounded-xl border-slate-700/50">
+                    <div key={target} className="flex items-center overflow-hidden border bg-slate-800/40 rounded-xl border-slate-700/50 h-12 sm:h-14 lg:h-16 shrink-0">
                         <div className="flex items-center justify-end flex-1 h-full py-1 pr-2">
                             <CricketMark marks={gameState.p1Marks[target]} colorClass="text-emerald-500" />
                         </div>
