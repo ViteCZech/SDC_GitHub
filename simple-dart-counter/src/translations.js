@@ -2,7 +2,7 @@ export const translations = {
   cs: { 
     newGame: 'Nová hra', profile: 'Můj profil', friends: 'Přátelé/Cloud', tutorial: 'Průvodce', aboutApp: 'O aplikaci',
     setupTitle: 'Nastavení zápasu', players: 'Hráči', p1Default: 'Domácí', p2Default: 'Hosté', botDefault: 'Robot',
-    p1Placeholder: 'Jméno hráče 1', p2Placeholder: 'Jméno hráče 2', matchFormat: 'Formát zápasu',
+    p1Placeholder: 'Jméno hráče 1', p2Placeholder: 'Jméno hráče 2', matchFormat: 'Formát hry', rulesX01: 'Pravidla X01',
     firstTo: 'FIRST TO', firstToDesc: 'Kdo dřív vyhraje X legů', bestOf: 'BEST OF', bestOfDesc: 'Hraje se na X legů (většina)',
     startMatch: 'START ZÁPASU', matchHistory: 'Historie zápasů', noMatches: 'Zatím žádné odehrané zápasy',
     backMenu: 'Zpět do menu', legs: 'LEGS', avg: 'AVG', serving: 'HÁZÍ', legFor: 'LEG PRO', 
@@ -37,6 +37,7 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     tutCommonTitle2: 'Kdo začíná? (Terč)', tutCommonDesc2: 'V nastavení hry klikněte na ikonu terče u hráče, který má do zápasu odhazovat jako první.',
     tutCommonTitle3: 'Krok Zpět', tutCommonDesc3: 'Tlačítko zatočené šipky (vlevo dole) vrací hru o krok zpět. Funguje i po chybném ukončení zápasu.',
     tutCommonTitle4: 'Lokální vs Cloud záloha', tutCommonDesc4: 'Bez přihlášení zůstávají zápasy jen v mobilu. Po přihlášení přes Google získáte Cloud zálohu statistik!',
+    tutSetsLegs: 'Zápas se hraje na vítězné sety a legy. Běžně se hraje na 1 vítězný set. Hráč, který první získá cílový počet legů, vyhrává set a legy se nulují.',
 
     loginWithGoogle: 'Přihlásit přes Google (Cloud záloha)', logout: 'ODHLÁSIT SE',
     historyLoginInfo: 'Vidíte pouze lokální zápasy. Pro zobrazení všech statistik se přihlaste.',
@@ -46,13 +47,14 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     checkout100: 'Zavření 100+', statsPersonal: 'Osobní statistiky', statsFirst9: 'First 9 Avg',
     stats100p: '100+', stats140p: '140+', statsAvgCheckout: 'Průměr zavření', statsRoundDist: 'Zavření (Kola)',
     statsRound: 'Kolo', statsCharts: 'Grafy', statsData: 'Data', statsUserFallback: 'Offline Hráč',
-    deleteAccount: 'Smazat účet a všechna data', deleteAccountConfirm: 'Opravdu smazat účet?',
+    custom: 'Vlastní', sets: 'Sety', legsPerSet: 'Legy / set', saveFormat: 'Uložit formát',
+    deleteAccount: 'Smazat účet a všechna data', deleteAccountConfirm: 'Opravdu smazat účet?', renameConfirm: 'Opravdu se chcete pro tento zápas přejmenovat?',
     aboutText: 'Bezplatná aplikace pro počítání skóre a statistik v šipkách.', privacyPolicy: 'Zásady ochrany osobních údajů'
   },
   en: { 
     newGame: 'New Game', profile: 'My profile', friends: 'Friends/Cloud', tutorial: 'Tutorial', aboutApp: 'About App',
     setupTitle: 'Match Setup', players: 'Players', p1Default: 'Home', p2Default: 'Away', botDefault: 'Bot',
-    p1Placeholder: 'Player 1 Name', p2Placeholder: 'Player 2 Name', matchFormat: 'Match Format',
+    p1Placeholder: 'Player 1 Name', p2Placeholder: 'Player 2 Name', matchFormat: 'Match Format', rulesX01: 'X01 Rules',
     firstTo: 'FIRST TO', bestOf: 'BEST OF', serving: 'SERVING', legFor: 'LEG WINNER', nextLeg: 'NEXT LEG',
     startMatch: 'START MATCH', matchHistory: 'Match History', noMatches: 'No matches yet',
     backMenu: 'Back to menu', matchWinner: 'MATCH WINNER', matchStats: 'Match Stats', avg3: 'AVG (3 darts)', first9: 'FIRST 9 AVG',
@@ -78,6 +80,7 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     tutCommonTitle2: 'Who Starts?', tutCommonDesc2: 'Click the target icon next to a player\'s name in setup.',
     tutCommonTitle3: 'Undo Button', tutCommonDesc3: 'Bottom left curved arrow takes back a throw.',
     tutCommonTitle4: 'Cloud Backup', tutCommonDesc4: 'Sign in with Google to backup all stats to the cloud!',
+    tutSetsLegs: 'The match is played for winning sets and legs. Usually it is played as first to 1 set. A player who reaches the target number of legs wins the set and legs reset to zero.',
 
     kbdDone: 'CLOSE', kbdSpace: 'SPACE', loginWithGoogle: 'Sign in with Google', logout: 'LOGOUT',
     historyLoginInfo: 'Local matches only. Log in for cloud.', historyLoginBtn: 'Sign in to Cloud',
@@ -85,12 +88,13 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     matchesPlayed: 'Matches', winRate: 'Win Rate', total180s: 'Total 180s', statsPersonal: 'Personal Stats',
     statsFirst9: 'First 9 Avg', stats100p: '100+', stats140p: '140+', statsAvgCheckout: 'Avg Checkout', statsRoundDist: 'Checkout (Rounds)',
     statsRound: 'Round', statsCharts: 'Charts', statsData: 'Data', statsUserFallback: 'Offline User',
-    deleteAccount: 'Delete Account', deleteAccountConfirm: 'Are you sure?', aboutText: 'Free darts app.', privacyPolicy: 'Privacy Policy'
+    custom: 'Custom', sets: 'Sets', legsPerSet: 'Legs / set', saveFormat: 'Save format',
+    deleteAccount: 'Delete Account', deleteAccountConfirm: 'Are you sure?', renameConfirm: 'Are you sure you want to change your name for this match?', aboutText: 'Free darts app.', privacyPolicy: 'Privacy Policy'
   },
   pl: {
     newGame: 'Nowa Gra', profile: 'Mój profil', friends: 'Znajomi/Cloud', tutorial: 'Samouczek', aboutApp: 'O aplikacji',
     setupTitle: 'Ustawienia meczu', players: 'Gracze', p1Default: 'Gospodarze', p2Default: 'Goście', botDefault: 'Bot',
-    p1Placeholder: 'Nazwa gracza 1', p2Placeholder: 'Nazwa gracza 2', matchFormat: 'Format meczu',
+    p1Placeholder: 'Nazwa gracza 1', p2Placeholder: 'Nazwa gracza 2', matchFormat: 'Format Gry', rulesX01: 'Zasady X01',
     firstTo: 'FIRST TO', bestOf: 'BEST OF', serving: 'RZUCA', legFor: 'ZWYCIĘZCA LEGA', nextLeg: 'NASTĘPNY LEG',
     startMatch: 'ROZPOCZNIJ MECZ', matchHistory: 'Historia meczów', noMatches: 'Brak meczów',
     backMenu: 'Powrót', matchWinner: 'ZWYCIĘZCA MECZU', matchStats: 'Statystyki', avg3: 'ŚREDNIA', first9: 'ŚREDNIA 1. 9',
@@ -115,6 +119,7 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
     tutCommonTitle2: 'Kto zaczyna?', tutCommonDesc2: 'Kliknij ikonę tarczy.',
     tutCommonTitle3: 'Cofnij', tutCommonDesc3: 'Strzałka w lewo cofa rzut.',
     tutCommonTitle4: 'Chmura', tutCommonDesc4: 'Zaloguj się przez Google by zapisać dane.',
+    tutSetsLegs: 'Mecz jest rozgrywany na wygrane sety i legi. Zwykle gra się do 1 wygranego seta. Gracz, który pierwszy zdobędzie docelową liczbę legów, wygrywa set, a legi zerują się.',
 
     kbdDone: 'ZAMKNIJ', kbdSpace: 'SPACJA', loginWithGoogle: 'Zaloguj przez Google', logout: 'WYLOGUJ',
     historyLoginInfo: 'Tylko mecze lokalne.', historyLoginBtn: 'Zaloguj',
@@ -122,6 +127,7 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
     matchesPlayed: 'Mecze', winRate: 'Wygrane', total180s: 'Ilość 180', statsPersonal: 'Moje Statystyki',
     statsFirst9: 'Średnia 1. 9', stats100p: '100+', stats140p: '140+', statsAvgCheckout: 'Śr. Zamknięcia', statsRoundDist: 'Zamknięcie (Rundy)',
     statsRound: 'Runda', statsCharts: 'Wykresy', statsData: 'Dane', statsUserFallback: 'Gracz Offline',
-    deleteAccount: 'Usuń konto', deleteAccountConfirm: 'Jesteś pewien?', aboutText: 'Darmowa aplikacja.', privacyPolicy: 'Polityka prywatności'
+    custom: 'Własny', sets: 'Sety', legsPerSet: 'Legi / set', saveFormat: 'Zapisz format',
+    deleteAccount: 'Usuń konto', deleteAccountConfirm: 'Jesteś pewien?', renameConfirm: 'Czy na pewno chcesz zmienić nazwę?', aboutText: 'Darmowa aplikacja.', privacyPolicy: 'Polityka prywatności'
   }
 };

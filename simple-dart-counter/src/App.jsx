@@ -5,7 +5,7 @@ import { getFirestore, collection, addDoc, deleteDoc, doc, query, where, getDocs
 import { 
   AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, Delete, 
   DownloadCloud, FileText, History, Home, Info, Keyboard as KeyboardIcon, 
-  Maximize, Mic, MicOff, MousePointer2, Play, RefreshCw, RotateCcw, 
+  Maximize, Minimize, Mic, MicOff, MousePointer2, Play, RefreshCw, RotateCcw, 
   Target, Trash2, Trophy, Undo2, User, Cloud, X, BarChart2, List, Swords
 } from 'lucide-react';
 
@@ -14,7 +14,7 @@ import GameX01 from './components/GameX01';
 import GameCricket from './components/GameCricket';
 import GameStats from './Stats';
 
-const APP_VERSION = "v1.9.2"; 
+const APP_VERSION = "v1.9.3"; 
 
 const safeStorage = {
   getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return null; } },
@@ -98,7 +98,17 @@ const VirtualKeyboard = ({ onChar, onDelete, onClose, lang }) => {
     const [popup, setPopup] = useState(null);
     const timerRef = useRef(null);
     const pressedRef = useRef(false);
-    const specialChars = { 'A':['Á','Ą','Ä'], 'C':['Č','Ć'], 'D':['Ď'], 'E':['É','Ě','Ę','Ë'], 'I':['Í'], 'L':['Ł','Ĺ'], 'N':['Ň','Ń'], 'O':['Ó','Ö'], 'R':['Ř'], 'S':['Š','Ś'], 'T':['Ť'], 'U':['Ú','Ů','Ü'], 'Y':['Ý'], 'Z':['Ž','Ź','Ż'] };
+    const specialCharsByLang = {
+        cs: {
+            'A': ['Á'], 'C': ['Č'], 'D': ['Ď'], 'E': ['É', 'Ě'], 'I': ['Í'], 'N': ['Ň'],
+            'O': ['Ó'], 'R': ['Ř'], 'S': ['Š'], 'T': ['Ť'], 'U': ['Ú', 'Ů'], 'Y': ['Ý'], 'Z': ['Ž']
+        },
+        pl: {
+            'A': ['Ą'], 'C': ['Ć'], 'E': ['Ę'], 'L': ['Ł'], 'N': ['Ń'], 'O': ['Ó'], 'S': ['Ś'], 'Z': ['Ź', 'Ż']
+        },
+        en: {}
+    };
+    const specialChars = specialCharsByLang[lang] || {};
     
     const rows = [['1','2','3','4','5','6','7','8','9','0'], ['Q','W','E','R','T','Z','U','I','O','P'], ['A','S','D','F','G','H','J','K','L'], ['Y','X','C','V','B','N','M']];
     if (lang === 'en' || lang === 'pl') { rows[1][5] = 'Y'; rows[3][0] = 'Z'; }
@@ -205,10 +215,17 @@ const MatchStatsView = ({ data, onClose, title, lang, onStartMatch }) => {
                         </div>
                     </div>
                     
-                    <div className="flex items-center justify-center gap-6">
-                        <div className="text-center"><div className="mb-1 text-xs font-bold text-slate-400">{displayP1Name}</div><div className={`text-5xl font-black ${isP1 ? 'text-emerald-500' : 'text-slate-600'}`}>{data.p1Legs}</div></div>
-                        <div className="text-xl font-bold text-slate-700">vs</div>
-                        <div className="text-center"><div className="mb-1 text-xs font-bold text-slate-400">{displayP2Name}</div><div className={`text-5xl font-black ${!isP1 ? 'text-purple-500' : 'text-slate-600'}`}>{data.p2Legs}</div></div>
+                    <div className="grid w-full grid-cols-2 gap-3">
+                        <div className="p-3 text-center border rounded-xl bg-slate-900 border-slate-800">
+                            <div className="mb-1 text-xs font-bold text-slate-400">{displayP1Name}</div>
+                            <div className={`text-3xl font-black ${isP1 ? 'text-emerald-500' : 'text-slate-600'}`}>S {data.p1Sets || 0}</div>
+                            <div className="text-xs font-mono text-slate-500">L {data.p1Legs || 0}</div>
+                        </div>
+                        <div className="p-3 text-center border rounded-xl bg-slate-900 border-slate-800">
+                            <div className="mb-1 text-xs font-bold text-slate-400">{displayP2Name}</div>
+                            <div className={`text-3xl font-black ${!isP1 ? 'text-purple-500' : 'text-slate-600'}`}>S {data.p2Sets || 0}</div>
+                            <div className="text-xs font-mono text-slate-500">L {data.p2Legs || 0}</div>
+                        </div>
                     </div>
 
                     {data.gameType === 'cricket' ? (
@@ -501,7 +518,7 @@ export default function App() {
     p1Name: translations[lang]?.p1Default || 'Domácí', p1Id: null,
     p2Name: translations[lang]?.p2Default || 'Hosté', p2Id: null,
     quickButtons: [41, 45, 60, 100, 140, 180],
-    matchMode: 'first_to', matchTarget: 3,
+    matchMode: 'first_to', matchTarget: 3, matchSets: 1,
     isBot: false, botLevel: 'pro', botAvg: 65,
     startPlayer: 'p1'
   });
@@ -513,11 +530,21 @@ export default function App() {
   const [isPC, setIsPC] = useState(false);
   const [tutorialTab, setTutorialTab] = useState('x01');
   const [showSyncPrompt, setShowSyncPrompt] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+  const [showCustomFormat, setShowCustomFormat] = useState(false);
+  const [customSetsValue, setCustomSetsValue] = useState(1);
+  const [customLegsValue, setCustomLegsValue] = useState(3);
 
   useEffect(() => {
     const check = () => { setIsLandscape(window.innerWidth > window.innerHeight && window.innerWidth > 500); setIsPC(window.matchMedia("(pointer: fine)").matches && window.innerWidth >= 768); };
     window.addEventListener('resize', check); check();
     return () => window.removeEventListener('resize', check);
+  }, []);
+
+  useEffect(() => {
+      const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+      document.addEventListener('fullscreenchange', handleFsChange);
+      return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
   // Hlídač přihlášení pro zálohu offline zápasů
@@ -532,18 +559,20 @@ export default function App() {
   const handleSyncOfflineMatches = async () => {
       if (!db || !user || user.isAnonymous) return;
       try {
-          // 1. Vyfiltrujeme jen ty, co skutečně nejsou zálohované
           const unsyncedMatches = matchHistory.filter(m => !m.synced && !m.p1Id);
+          if (unsyncedMatches.length === 0) {
+              setShowSyncPrompt(false);
+              return;
+          }
           
-          // 2. Odešleme je do cloudu, ale PŘIDÁME jim vaše UID a značku synced
           for (const match of unsyncedMatches) {
               const matchToSync = { ...match, p1Id: user.uid, synced: true };
               await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'matches'), matchToSync);
           }
 
-          // 3. Upravíme lokální paměť, ať už s tím neotravuje znovu
+          const uploadedIds = new Set(unsyncedMatches.map(m => m.id));
           const updatedHistory = matchHistory.map(m => {
-              if (!m.synced && !m.p1Id) {
+              if (uploadedIds.has(m.id)) {
                   return { ...m, p1Id: user.uid, synced: true };
               }
               return m;
@@ -621,12 +650,49 @@ export default function App() {
       try { await signInWithPopup(auth, provider); } catch (error) {} 
   };
 
+  const toggleFullscreen = async () => {
+      try {
+          if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+          else await document.exitFullscreen();
+      } catch (e) {}
+  };
+
   let legOptions = [];
   if (settings.matchMode === 'first_to') {
       legOptions = [1, 2, 3, 4, 5];
   } else {
       legOptions = [3, 5, 7, 9, 11];
   }
+
+  const p1Defaults = ['Domácí', 'Home', 'Gospodarze', translations?.cs?.p1Default, translations?.en?.p1Default, translations?.pl?.p1Default].filter(Boolean);
+  const p2Defaults = ['Hosté', 'Away', 'Goście', translations?.cs?.p2Default, translations?.en?.p2Default, translations?.pl?.p2Default].filter(Boolean);
+
+  const handleKeyboardClose = () => {
+      if (!activeKeyboardInput) return setActiveKeyboardInput(null);
+      setSettings(prev => {
+          const key = activeKeyboardInput;
+          const value = String(prev[key] || '').trim();
+          if (value !== '') return prev;
+          if (key === 'p1Name') return { ...prev, p1Name: translations[lang]?.p1Default || 'Domácí' };
+          if (key === 'p2Name') return { ...prev, p2Name: (prev.isBot ? (translations[lang]?.botDefault || 'Robot') : (translations[lang]?.p2Default || 'Hosté')) };
+          return prev;
+      });
+      setActiveKeyboardInput(null);
+  };
+
+  const handleNameFieldClick = (fieldKey) => {
+      if (fieldKey === 'p2Name' && settings.isBot) return;
+      if (user && !user.isAnonymous) {
+          const confirmed = window.confirm(t('renameConfirm'));
+          if (!confirmed) return;
+      }
+      setSettings(prev => {
+          if (fieldKey === 'p1Name' && p1Defaults.includes(prev.p1Name)) return { ...prev, p1Name: '' };
+          if (fieldKey === 'p2Name' && p2Defaults.includes(prev.p2Name)) return { ...prev, p2Name: '' };
+          return prev;
+      });
+      setActiveKeyboardInput(fieldKey);
+  };
 
   useEffect(() => {
       if (!legOptions.includes(settings.matchTarget)) {
@@ -665,8 +731,13 @@ export default function App() {
                           </div>
                       </div>
                   </div>
-                  <div className="flex p-1 border rounded-lg bg-slate-800 border-slate-700">
-                      {['cs','en','pl'].map(l=><button key={l} onClick={()=>setLang(l)} className={`p-1 rounded transition-all ${lang===l?'bg-slate-600 opacity-100 shadow-sm':'opacity-40 grayscale'}`}><FlagIcon lang={l} /></button>)}
+                  <div className="flex items-center gap-2">
+                      <button onClick={toggleFullscreen} className="p-2 transition-colors rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700">
+                          {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+                      </button>
+                      <div className="flex p-1 border rounded-lg bg-slate-800 border-slate-700">
+                          {['cs','en','pl'].map(l=><button key={l} onClick={()=>setLang(l)} className={`p-1 rounded transition-all ${lang===l?'bg-slate-600 opacity-100 shadow-sm':'opacity-40 grayscale'}`}><FlagIcon lang={l} /></button>)}
+                      </div>
                   </div>
               </header>
               {settings.gameType === 'x01' ? (
@@ -681,7 +752,7 @@ export default function App() {
   return (
     <div className="bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden">
       
-      {activeKeyboardInput && <VirtualKeyboard onChar={handleKeyboardInput} onDelete={() => setSettings(s => ({...s, [activeKeyboardInput]: s[activeKeyboardInput].slice(0,-1)}))} onClose={() => setActiveKeyboardInput(null)} lang={lang} />}
+      {activeKeyboardInput && <VirtualKeyboard onChar={handleKeyboardInput} onDelete={() => setSettings(s => ({...s, [activeKeyboardInput]: s[activeKeyboardInput].slice(0,-1)}))} onClose={handleKeyboardClose} lang={lang} />}
 
       <header className="relative z-20 flex items-center justify-between p-2 border-b h-14 bg-slate-900 border-slate-800 shrink-0">
         <div className="flex items-center gap-2">
@@ -692,6 +763,9 @@ export default function App() {
             )}
         </div>
         <div className="flex items-center gap-2">
+            <button onClick={toggleFullscreen} className="p-2 transition-colors rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700">
+                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            </button>
             <div className="flex p-1 border rounded-lg bg-slate-800 border-slate-700">{['cs','en','pl'].map(l=><button key={l} onClick={()=>setLang(l)} className={`p-1 rounded transition-all ${lang===l?'bg-slate-600 opacity-100 shadow-sm':'opacity-40 grayscale'}`}><FlagIcon lang={l} /></button>)}</div>
         </div>
       </header>
@@ -720,6 +794,43 @@ export default function App() {
         </div>
     </div>
 )}
+      {showCustomFormat && (
+        <div className="fixed inset-0 z-[2100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <div className="w-full max-w-sm p-5 border shadow-2xl bg-slate-900 border-slate-700 rounded-2xl">
+                <h3 className="mb-4 text-sm font-black tracking-widest text-center text-white uppercase">{t('matchFormat')}</h3>
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 border rounded-lg bg-slate-800 border-slate-700">
+                        <span className="text-xs font-bold text-slate-300">{t('sets') || 'Sety'}</span>
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => setCustomSetsValue(v => Math.max(1, v - 1))} className="w-8 h-8 font-black text-white rounded bg-slate-700">-</button>
+                            <span className="w-8 text-center font-mono font-black text-emerald-400">{customSetsValue}</span>
+                            <button onClick={() => setCustomSetsValue(v => Math.min(9, v + 1))} className="w-8 h-8 font-black text-white rounded bg-slate-700">+</button>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between p-3 border rounded-lg bg-slate-800 border-slate-700">
+                        <span className="text-xs font-bold text-slate-300">{t('legsPerSet') || 'Legy / set'}</span>
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => setCustomLegsValue(v => Math.max(1, v - 1))} className="w-8 h-8 font-black text-white rounded bg-slate-700">-</button>
+                            <span className="w-8 text-center font-mono font-black text-emerald-400">{customLegsValue}</span>
+                            <button onClick={() => setCustomLegsValue(v => Math.min(21, v + 1))} className="w-8 h-8 font-black text-white rounded bg-slate-700">+</button>
+                        </div>
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-5">
+                    <button onClick={() => setShowCustomFormat(false)} className="py-2 text-xs font-bold rounded-lg bg-slate-800 text-slate-400">{t('cancel')}</button>
+                    <button
+                        onClick={() => {
+                            setSettings(prev => ({ ...prev, matchSets: customSetsValue, matchTarget: customLegsValue }));
+                            setShowCustomFormat(false);
+                        }}
+                        className="py-2 text-xs font-bold text-white rounded-lg bg-emerald-600"
+                    >
+                        {t('saveFormat') || 'Uložit formát'}
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
       {/* --- HOME --- */}
       {appState === 'home' && (
         <main className={`flex flex-col flex-1 w-full max-w-md mx-auto overflow-y-auto ${
@@ -803,7 +914,7 @@ export default function App() {
                     </div>
                 </div>
                 <div className="flex items-stretch gap-2">
-                    <div onClick={() => setActiveKeyboardInput('p1Name')} className="flex items-center flex-1 gap-3 px-4 py-3 text-sm text-white border rounded-lg shadow-inner cursor-pointer bg-slate-800 border-slate-700">
+                    <div onClick={() => handleNameFieldClick('p1Name')} className="flex items-center flex-1 gap-3 px-4 py-3 text-sm text-white border rounded-lg shadow-inner cursor-pointer bg-slate-800 border-slate-700">
                         <User className="w-5 h-5 text-slate-400 shrink-0" />
                         <span className="font-bold truncate">{settings.p1Name || t('p1Placeholder')}</span>
                     </div>
@@ -813,7 +924,7 @@ export default function App() {
                 </div>
                 
                 <div className="flex items-stretch gap-2">
-                    <div onClick={() => !settings.isBot && setActiveKeyboardInput('p2Name')} className={`flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-sm flex items-center gap-3 ${settings.isBot ? 'text-emerald-400 bg-emerald-900/10 border-emerald-900/50' : 'text-white cursor-pointer shadow-inner'}`}>
+                    <div onClick={() => handleNameFieldClick('p2Name')} className={`flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-sm flex items-center gap-3 ${settings.isBot ? 'text-emerald-400 bg-emerald-900/10 border-emerald-900/50' : 'text-white cursor-pointer shadow-inner'}`}>
                         {settings.isBot ? <Cpu className="w-5 h-5 shrink-0" /> : <User className="w-5 h-5 text-slate-400 shrink-0" />}
                         <span className="font-bold truncate">{settings.isBot ? getTranslatedName(settings.p2Name, false, lang) : (settings.p2Name || t('p2Placeholder'))}</span>
                     </div>
@@ -865,7 +976,7 @@ export default function App() {
             </div>
             {settings.gameType === 'x01' && (
                 <div className="p-4 border bg-slate-900 rounded-xl border-slate-800 animate-in fade-in slide-in-from-top-2">
-                    <label className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-3 block">Pravidla X01</label>
+                    <label className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-3 block">{t('rulesX01') || 'Pravidla X01'}</label>
                     <div className="grid grid-cols-2 gap-3 mb-3">{[301, 501].map(s => <button key={s} onClick={()=>setSettings({...settings, startScore:s})} className={`py-3 px-3 rounded-lg font-bold border transition-colors ${settings.startScore===s?'bg-emerald-600 border-emerald-500 text-white':'bg-slate-800 border-slate-700 text-slate-400'}`}>{s}</button>)}</div>
                     <div className="grid grid-cols-2 gap-3">{['single', 'double'].map(m => <button key={m} onClick={()=>setSettings({...settings, outMode:m})} className={`py-3 px-3 rounded-lg font-bold text-sm border uppercase transition-colors ${settings.outMode===m?'bg-blue-600 border-blue-500 text-white':'bg-slate-800 border-slate-700 text-slate-400'}`}>{m} OUT</button>)}</div>
                 </div>
@@ -877,7 +988,17 @@ export default function App() {
                     <button onClick={() => setSettings({...settings, matchMode: 'best_of'})} className={`flex-1 py-2 text-xs font-black rounded-md uppercase tracking-widest transition-colors ${settings.matchMode === 'best_of' ? 'bg-slate-100 text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{t('bestOf')}</button>
                 </div>
                 <div className="grid grid-cols-5 gap-2">
-                    {legOptions.map(n => <button key={n} onClick={()=>setSettings({...settings, matchTarget:n})} className={`py-3 rounded-lg font-bold border transition-colors ${settings.matchTarget===n?'bg-emerald-600 border-emerald-500 text-white':'bg-slate-800 border-slate-700 text-slate-400'}`}>{n}</button>)}
+                    {legOptions.slice(0, -1).map(n => <button key={n} onClick={()=>setSettings({...settings, matchTarget:n})} className={`py-3 rounded-lg font-bold border transition-colors ${settings.matchTarget===n?'bg-emerald-600 border-emerald-500 text-white':'bg-slate-800 border-slate-700 text-slate-400'}`}>{n}</button>)}
+                    <button
+                        onClick={() => {
+                            setCustomSetsValue(settings.matchSets || 1);
+                            setCustomLegsValue(settings.matchTarget || legOptions[0]);
+                            setShowCustomFormat(true);
+                        }}
+                        className="py-3 rounded-lg font-bold border transition-colors bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+                    >
+                        ⚙️ {t('custom') || 'Vlastní'}
+                    </button>
                 </div>
             </div>
             <button onClick={() => setAppState('playing')} className="flex items-center justify-center w-full gap-2 py-4 mt-2 text-xl font-black transition-all shadow-lg bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-xl shadow-emerald-900/20 active:scale-95"><Play className="w-6 h-6 fill-current" /> {t('startMatch')}</button>
@@ -993,6 +1114,10 @@ export default function App() {
                     <div className="flex items-start gap-4 p-4 bg-slate-900 rounded-2xl">
                         <div className="p-2 shrink-0"><Cloud className="w-6 h-6 text-purple-400" /></div>
                         <div className="flex-1 pt-0.5"><h3 className="mb-1 text-sm font-bold tracking-wider text-white uppercase">{t('tutCommonTitle4')}</h3><p className="text-xs leading-relaxed text-slate-500">{t('tutCommonDesc4')}</p></div>
+                    </div>
+                    <div className="flex items-start gap-4 p-4 bg-slate-900 rounded-2xl md:col-span-2">
+                        <div className="p-2 shrink-0"><Trophy className="w-6 h-6 text-emerald-400" /></div>
+                        <div className="flex-1 pt-0.5"><h3 className="mb-1 text-sm font-bold tracking-wider text-white uppercase">SETS & LEGS</h3><p className="text-xs leading-relaxed text-slate-500">{t('tutSetsLegs')}</p></div>
                     </div>
                 </div>
             </div>

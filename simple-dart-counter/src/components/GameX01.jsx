@@ -130,7 +130,7 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
     return name;
   };
   const [gameState, setGameState] = useState({
-    p1Score: settings.startScore, p2Score: settings.startScore, p1Legs: 0, p2Legs: 0,
+    p1Score: settings.startScore, p2Score: settings.startScore, p1Legs: 0, p2Legs: 0, p1Sets: 0, p2Sets: 0,
     currentPlayer: settings.startPlayer, startingPlayer: settings.startPlayer,
     winner: null, matchWinner: null, history: [], completedLegs: [] 
   });
@@ -362,14 +362,19 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
     if (ns.history[0].isBust) { setErrorMsg(String(translations[lang]?.bust || 'Bust')); setTimeout(() => setErrorMsg(''), 1500); }
 
     if (ns.winner) {
-      const p1W = ns.winner === 'p1' ? gameState.p1Legs + 1 : gameState.p1Legs;
-      const p2W = ns.winner === 'p2' ? gameState.p2Legs + 1 : gameState.p2Legs;
-      const tgt = settings.matchMode === 'first_to' ? settings.matchTarget : Math.ceil(settings.matchTarget / 2);
-      const isOver = p1W >= tgt || p2W >= tgt;
+      const legTarget = settings.matchMode === 'first_to' ? settings.matchTarget : Math.ceil(settings.matchTarget / 2);
+      let p1W = ns.winner === 'p1' ? gameState.p1Legs + 1 : gameState.p1Legs;
+      let p2W = ns.winner === 'p2' ? gameState.p2Legs + 1 : gameState.p2Legs;
+      let p1S = gameState.p1Sets || 0;
+      let p2S = gameState.p2Sets || 0;
+      if (p1W >= legTarget) { p1S += 1; p1W = 0; p2W = 0; }
+      if (p2W >= legTarget) { p2S += 1; p1W = 0; p2W = 0; }
+      const setTarget = settings.matchSets || 1;
+      const isOver = p1S >= setTarget || p2S >= setTarget;
       const uLegs = [...gameState.completedLegs, { history: ns.history, winner: ns.winner }];
 
       if (isOver) {
-        const record = { id: Date.now(), date: new Date().toLocaleString(), gameType: 'x01', p1Name: settings.p1Name, p1Id: settings.p1Id || null, p2Name: settings.p2Name, p2Id: settings.p2Id || null, p1Legs: p1W, p2Legs: p2W, matchWinner: ns.winner, completedLegs: uLegs, isBot: settings.isBot, botLevel: settings.botLevel, botAvg: settings.botAvg };
+        const record = { id: Date.now(), date: new Date().toLocaleString(), gameType: 'x01', p1Name: settings.p1Name, p1Id: settings.p1Id || null, p2Name: settings.p2Name, p2Id: settings.p2Id || null, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S, matchWinner: ns.winner, completedLegs: uLegs, isBot: settings.isBot, botLevel: settings.botLevel, botAvg: settings.botAvg };
         // Vypnout mikrofon 10 vteřin po konci zápasu (pokud je teď zapnutý)
         if (isMicActiveRef.current) {
           if (micTimeoutRef.current) clearTimeout(micTimeoutRef.current);
@@ -379,7 +384,7 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
         }
         onMatchComplete(record);
       } else {
-        setGameState({ ...ns, p1Legs: p1W, p2Legs: p2W, matchWinner: null, completedLegs: uLegs });
+        setGameState({ ...ns, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S, matchWinner: null, completedLegs: uLegs });
       }
     } else { 
       setGameState(ns); 
@@ -502,7 +507,10 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
                                     )}
                                 </h2>
                             </div>
-                            <div className="bg-slate-950 px-2 py-0.5 rounded border border-slate-700 text-yellow-400 font-black text-lg sm:text-xl leading-tight shrink-0">{isP1?gameState.p1Legs:gameState.p2Legs}</div>
+                            <div className="flex flex-col items-end gap-0.5 shrink-0">
+                                <div className="bg-slate-950 px-1.5 py-0.5 rounded border border-slate-700 text-emerald-400 font-black text-[10px] sm:text-xs leading-tight">S:{isP1 ? (gameState.p1Sets || 0) : (gameState.p2Sets || 0)}</div>
+                                <div className="bg-slate-950 px-1.5 py-0.5 rounded border border-slate-700 text-yellow-400 font-black text-[10px] sm:text-xs leading-tight">L:{isP1 ? gameState.p1Legs : gameState.p2Legs}</div>
+                            </div>
                         </div>
                         <div className={`font-mono font-black text-white mb-0 sm:mb-2 leading-none transition-transform select-none ${act ? `active:scale-95 cursor-pointer ${isP1 ? 'active:text-emerald-400' : 'active:text-purple-400'}` : ''}`} style={{ fontSize: isLandscape ? 'clamp(4rem, 15vh + 5vw, 15rem)' : 'clamp(4rem, 20vw, 10rem)' }}>
                             {isP1?gameState.p1Score:gameState.p2Score}
