@@ -14,7 +14,7 @@ import GameX01 from './components/GameX01';
 import GameCricket from './components/GameCricket';
 import GameStats from './Stats';
 
-const APP_VERSION = "v1.9.3"; 
+const APP_VERSION = "v1.9.4"; 
 
 const safeStorage = {
   getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return null; } },
@@ -134,28 +134,28 @@ const VirtualKeyboard = ({ onChar, onDelete, onClose, lang }) => {
     return (
         <>
             {popup && <div className="fixed inset-0 z-[600]" onClick={() => setPopup(null)}></div>}
-            <div className="fixed bottom-0 left-0 w-full bg-slate-900 border-t border-slate-700 p-1.5 sm:p-2 pb-4 sm:pb-6 z-[600] shadow-2xl animate-in slide-in-from-bottom duration-200 select-none">
-                <div className="flex items-center justify-between max-w-lg p-2 mx-auto mb-2 border-b rounded-t-lg shadow-sm bg-slate-800 border-slate-700">
+            <div className="fixed bottom-0 left-0 w-full bg-slate-900 border-t border-slate-700 p-1.5 sm:p-2 pb-4 sm:pb-6 landscape:pb-2 z-[600] shadow-2xl animate-in slide-in-from-bottom duration-200 select-none">
+                <div className="flex items-center justify-between max-w-lg p-2 landscape:p-1.5 mx-auto mb-2 landscape:mb-1 border-b rounded-t-lg shadow-sm bg-slate-800 border-slate-700">
                     <span className="text-[10px] text-slate-500 font-bold uppercase ml-2 tracking-widest">{t('players')}</span>
-                    <button onClick={onClose} className="px-5 py-1.5 bg-slate-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-black transition-colors shadow-sm">{t('kbdDone')}</button>
+                    <button onClick={onClose} className="px-5 py-1.5 landscape:px-4 landscape:py-1 bg-slate-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-black transition-colors shadow-sm">{t('kbdDone')}</button>
                 </div>
-                <div className="flex flex-col gap-1 max-w-lg mx-auto relative z-[610]">
+                <div className="flex flex-col gap-1 landscape:gap-0.5 max-w-lg mx-auto relative z-[610]">
                     {rows.map((row, i) => (
-                        <div key={i} className="flex justify-center gap-1">
+                        <div key={i} className="flex justify-center gap-1 landscape:gap-0.5">
                             {row.map(char => (
-                                <div key={char} className="relative flex-1 max-w-[40px]">
+                                <div key={char} className="relative flex-1 max-w-[40px] landscape:max-w-[36px]">
                                     {popup && popup.char === char && (
                                         <div className="absolute flex p-1 mb-2 duration-100 -translate-x-1/2 border rounded-lg shadow-xl bottom-full left-1/2 bg-slate-800 border-slate-600 animate-in zoom-in">
-                                            {popup.variants.map(v => (<button key={v} onClick={(e) => { e.stopPropagation(); onChar(v); setPopup(null); }} className="w-10 h-10 text-lg font-bold text-white rounded sm:h-12 hover:bg-emerald-600">{v}</button>))}
+                                            {popup.variants.map(v => (<button key={v} onClick={(e) => { e.stopPropagation(); onChar(v); setPopup(null); }} className="w-10 h-10 landscape:w-9 landscape:h-9 text-lg landscape:text-base font-bold text-white rounded sm:h-12 hover:bg-emerald-600">{v}</button>))}
                                         </div>
                                     )}
-                                    <button onPointerDown={(e) => { e.preventDefault(); handleDown(char); }} onPointerUp={(e) => { e.preventDefault(); handleUp(char); }} onPointerLeave={() => { clearTimeout(timerRef.current); pressedRef.current = false; }} className={`w-full h-9 sm:h-12 bg-slate-800 text-white font-bold rounded shadow border-b-2 border-slate-950 active:translate-y-0.5 active:border-b-0 active:bg-slate-700 transition-all text-xs sm:text-base ${popup && popup.char === char ? 'bg-slate-700' : ''}`}>{char}</button>
+                                    <button onPointerDown={(e) => { e.preventDefault(); handleDown(char); }} onPointerUp={(e) => { e.preventDefault(); handleUp(char); }} onPointerLeave={() => { clearTimeout(timerRef.current); pressedRef.current = false; }} className={`w-full h-9 sm:h-12 landscape:h-8 bg-slate-800 text-white font-bold rounded shadow border-b-2 border-slate-950 active:translate-y-0.5 active:border-b-0 active:bg-slate-700 transition-all text-xs sm:text-base landscape:text-[11px] ${popup && popup.char === char ? 'bg-slate-700' : ''}`}>{char}</button>
                                 </div>
                             ))}
                         </div>
                     ))}
                     <div className="flex justify-center gap-1 mt-1">
-                        <button onClick={() => onChar(' ')} className="flex-1 max-w-[280px] bg-slate-800 text-slate-400 font-bold rounded shadow border-b-2 border-slate-950 active:translate-y-0.5 active:border-b-0 active:bg-slate-700 py-2 sm:py-3 text-xs uppercase tracking-widest">{t('kbdSpace')}</button>
+                        <button onClick={() => onChar(' ')} className="flex-1 max-w-[280px] bg-slate-800 text-slate-400 font-bold rounded shadow border-b-2 border-slate-950 active:translate-y-0.5 active:border-b-0 active:bg-slate-700 py-2 sm:py-3 landscape:py-1.5 text-xs uppercase tracking-widest">{t('kbdSpace')}</button>
                         <button onClick={onDelete} className="flex-1 max-w-[80px] bg-red-900/30 text-red-400 font-bold rounded shadow border-b-2 border-slate-950 active:translate-y-0.5 active:border-b-0 active:bg-red-900/50 flex items-center justify-center"><Delete className="w-5 h-5 sm:w-6 sm:h-6"/></button>
                     </div>
                 </div>
@@ -190,6 +190,10 @@ const MatchStatsView = ({ data, onClose, title, lang, onStartMatch }) => {
     }
 
     const stats = data.gameType !== 'cricket' ? calculateStats(data.completedLegs, displayP1Name, displayP2Name) : null;
+    const isMultiSet = (data.matchSets || 1) > 1;
+    const mainP1 = isMultiSet ? (data.p1Sets || 0) : (data.setScores?.[0]?.p1 ?? data.p1Legs ?? 0);
+    const mainP2 = isMultiSet ? (data.p2Sets || 0) : (data.setScores?.[0]?.p2 ?? data.p2Legs ?? 0);
+    const legsBreakdown = isMultiSet && data.setScores?.length ? `(${data.setScores.map(s => `${s.p1}:${s.p2}`).join(', ')})` : '';
 
     return (
         <div className="flex flex-col h-full w-full bg-slate-950 fixed inset-0 z-[1000] overflow-hidden">
@@ -218,15 +222,16 @@ const MatchStatsView = ({ data, onClose, title, lang, onStartMatch }) => {
                     <div className="grid w-full grid-cols-2 gap-3">
                         <div className="p-3 text-center border rounded-xl bg-slate-900 border-slate-800">
                             <div className="mb-1 text-xs font-bold text-slate-400">{displayP1Name}</div>
-                            <div className={`text-3xl font-black ${isP1 ? 'text-emerald-500' : 'text-slate-600'}`}>S {data.p1Sets || 0}</div>
-                            <div className="text-xs font-mono text-slate-500">L {data.p1Legs || 0}</div>
+                            <div className={`text-3xl font-black ${isP1 ? 'text-emerald-500' : 'text-slate-600'}`}>{mainP1}</div>
+                            <div className="text-xs font-mono text-slate-500">{isMultiSet ? `S | L ${data.p1Legs || 0}` : 'LEGS'}</div>
                         </div>
                         <div className="p-3 text-center border rounded-xl bg-slate-900 border-slate-800">
                             <div className="mb-1 text-xs font-bold text-slate-400">{displayP2Name}</div>
-                            <div className={`text-3xl font-black ${!isP1 ? 'text-purple-500' : 'text-slate-600'}`}>S {data.p2Sets || 0}</div>
-                            <div className="text-xs font-mono text-slate-500">L {data.p2Legs || 0}</div>
+                            <div className={`text-3xl font-black ${!isP1 ? 'text-purple-500' : 'text-slate-600'}`}>{mainP2}</div>
+                            <div className="text-xs font-mono text-slate-500">{isMultiSet ? `S | L ${data.p2Legs || 0}` : 'LEGS'}</div>
                         </div>
                     </div>
+                    {legsBreakdown && <div className="text-sm font-mono text-slate-400 mt-1 text-center">{legsBreakdown}</div>}
 
                     {data.gameType === 'cricket' ? (
                         <div className="flex justify-around w-full p-4 mt-4 border shadow-md bg-slate-900 rounded-xl border-slate-800">
@@ -534,6 +539,7 @@ export default function App() {
   const [showCustomFormat, setShowCustomFormat] = useState(false);
   const [customSetsValue, setCustomSetsValue] = useState(1);
   const [customLegsValue, setCustomLegsValue] = useState(3);
+  const isKeyboardOpen = Boolean(activeKeyboardInput);
 
   useEffect(() => {
     const check = () => { setIsLandscape(window.innerWidth > window.innerHeight && window.innerWidth > 500); setIsPC(window.matchMedia("(pointer: fine)").matches && window.innerWidth >= 768); };
@@ -729,6 +735,11 @@ export default function App() {
                               </span>
                               <span className="text-white">{settings.matchTarget}</span>
                           </div>
+                          <span className="text-slate-700">/</span>
+                          <div className="flex items-center gap-1">
+                              <span className="text-emerald-400">{settings.matchSets || 1}</span>
+                              <span className="text-slate-500">{(settings.matchSets || 1) === 1 ? (t('setSingular') || 'Set') : (t('setPlural') || 'Sety')}</span>
+                          </div>
                       </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -833,79 +844,76 @@ export default function App() {
       )}
       {/* --- HOME --- */}
       {appState === 'home' && (
-        <main className={`flex flex-col flex-1 w-full max-w-md mx-auto overflow-y-auto ${
-          isLandscape ? 'items-stretch justify-start gap-3 p-3 pt-4 pb-4' : 'items-center justify-center gap-5 p-6'
-        }`}>
-            <div className={`flex flex-col items-center ${
-              isLandscape ? 'mb-1' : 'mb-2'
-            }`}>
-                <div className={`flex items-center justify-center rounded-full shadow-lg bg-emerald-600 shadow-emerald-900/50 ${
-                  isLandscape ? 'w-14 h-14 mb-2' : 'w-20 h-20 mb-3'
-                }`}>
-                    <Target className="w-10 h-10 text-slate-900" />
-                </div>
-                <h1 className="text-3xl font-black leading-none tracking-widest text-white">SIMPLE DART</h1>
-                <h2 className="mt-1 text-sm font-bold tracking-widest text-emerald-500">COUNTER</h2>
-            </div>
-            
-            <button
-              onClick={() => setAppState('setup')}
-              className={`flex justify-center w-full gap-3 text-xl font-black text-white transition-transform shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-2xl active:scale-95 ${
-                isLandscape ? 'py-3' : 'py-4'
-              }`}
-            >
-              <Play className="fill-current w-7 h-7" /> {t('newGame')}
-            </button>
-            
-            <div className={`grid w-full grid-cols-2 ${isLandscape ? 'gap-2' : 'gap-3'}`}>
-                <button onClick={() => setAppState('tutorial')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><FileText className="w-7 h-7 text-emerald-400" /><span className="text-sm font-bold text-white">{t('tutorial')}</span></button>
-                <button onClick={() => setAppState('history')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><History className="text-blue-400 w-7 h-7" /><span className="text-sm font-bold text-white">{t('matchHistory')}</span></button>
-                <button onClick={() => setAppState('profile')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><BarChart2 className="text-purple-400 w-7 h-7" /><span>{t('statsPersonal')}</span></button>
-                <button onClick={() => setAppState('about')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><Info className="text-yellow-400 w-7 h-7" /><span className="text-sm font-bold text-white">{t('aboutApp')}</span></button>
-            </div>
-
-            {(!user || user.isAnonymous) ? (
-                <button onClick={handleLogin} className="flex items-center justify-center w-full gap-3 p-3 mt-2 transition-transform border shadow-md bg-slate-900 hover:bg-slate-800 border-slate-700 rounded-xl active:scale-95">
-                    <svg viewBox="0 0 24 24" className="w-5 h-5"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                    <span className="text-xs font-bold tracking-widest uppercase text-slate-300">{t('loginWithGoogle') || 'Přihlásit přes Google'}</span>
-                </button>
-            ) : (
-                <div className="flex items-center justify-between w-full p-3 mt-2 border shadow-md bg-slate-900 border-slate-700 rounded-xl">
-                    <div className="flex flex-col min-w-0 pr-2">
-                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Přihlášen jako:</span>
-                        <div className="flex items-center gap-1.5 text-slate-300">
-                            <Cloud className="w-4 h-4 text-emerald-500 shrink-0" />
-                            <span className="text-xs font-bold truncate">{user.email}</span>
+        <main className="flex-1 w-full overflow-y-auto p-4 sm:p-6 landscape:p-3">
+            <div className="w-full max-w-md mx-auto landscape:max-w-4xl landscape:grid landscape:grid-cols-2 landscape:items-center landscape:gap-4">
+                <div className="flex flex-col items-center gap-3 landscape:gap-2">
+                    <div className="flex flex-col items-center mb-1 landscape:mb-0">
+                        <div className="flex items-center justify-center w-20 h-20 mb-3 rounded-full shadow-lg bg-emerald-600 shadow-emerald-900/50 landscape:w-14 landscape:h-14 landscape:mb-2">
+                            <Target className="w-10 h-10 text-slate-900" />
                         </div>
+                        <h1 className="text-3xl font-black leading-none tracking-widest text-white">SIMPLE DART</h1>
+                        <h2 className="mt-1 text-sm font-bold tracking-widest text-emerald-500">COUNTER</h2>
                     </div>
-                    <button 
-    onClick={() => {
-        signOut(auth);
-        setSettings(prev => ({
-            ...prev,
-            p1Name: translations[lang]?.p1Default || 'Domácí',
-            p1Id: null
-        }));
-    }} 
-    className="shrink-0 bg-red-900/20 hover:bg-red-900/40 border border-red-500/30 text-red-400 text-[10px] uppercase font-bold tracking-widest px-3 py-2 rounded-lg transition-colors"
->
-    {t('logout') || 'Odhlásit'}
-</button>
+
+                    <button
+                      onClick={() => setAppState('setup')}
+                      className="flex justify-center w-full gap-3 py-4 landscape:py-2.5 text-xl landscape:text-lg font-black text-white transition-transform shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-2xl active:scale-95"
+                    >
+                      <Play className="fill-current w-7 h-7" /> {t('newGame')}
+                    </button>
+
+                    {(!user || user.isAnonymous) ? (
+                        <button onClick={handleLogin} className="flex items-center justify-center w-full gap-3 p-3 mt-1 transition-transform border shadow-md bg-slate-900 hover:bg-slate-800 border-slate-700 rounded-xl active:scale-95 landscape:p-2.5 landscape:mt-0">
+                            <svg viewBox="0 0 24 24" className="w-5 h-5"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                            <span className="text-xs font-bold tracking-widest uppercase text-slate-300">{t('loginWithGoogle') || 'Přihlásit přes Google'}</span>
+                        </button>
+                    ) : (
+                        <div className="flex items-center justify-between w-full p-3 mt-1 border shadow-md bg-slate-900 border-slate-700 rounded-xl landscape:p-2.5 landscape:mt-0">
+                            <div className="flex flex-col min-w-0 pr-2">
+                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Přihlášen jako:</span>
+                                <div className="flex items-center gap-1.5 text-slate-300">
+                                    <Cloud className="w-4 h-4 text-emerald-500 shrink-0" />
+                                    <span className="text-xs font-bold truncate">{user.email}</span>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => {
+                                    signOut(auth);
+                                    setSettings(prev => ({
+                                        ...prev,
+                                        p1Name: translations[lang]?.p1Default || 'Domácí',
+                                        p1Id: null
+                                    }));
+                                }} 
+                                className="shrink-0 bg-red-900/20 hover:bg-red-900/40 border border-red-500/30 text-red-400 text-[10px] uppercase font-bold tracking-widest px-3 py-2 rounded-lg transition-colors landscape:py-1.5"
+                            >
+                                {t('logout') || 'Odhlásit'}
+                            </button>
+                        </div>
+                    )}
                 </div>
-            )}
+                <div className="grid w-full grid-cols-2 gap-3 landscape:gap-2">
+                    <button onClick={() => setAppState('tutorial')} className="flex flex-col items-center gap-2 landscape:gap-1.5 p-4 landscape:p-3 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><FileText className="w-7 h-7 landscape:w-6 landscape:h-6 text-emerald-400" /><span className="text-sm landscape:text-xs font-bold text-white">{t('tutorial')}</span></button>
+                    <button onClick={() => setAppState('history')} className="flex flex-col items-center gap-2 landscape:gap-1.5 p-4 landscape:p-3 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><History className="text-blue-400 w-7 h-7 landscape:w-6 landscape:h-6" /><span className="text-sm landscape:text-xs font-bold text-white">{t('matchHistory')}</span></button>
+                    <button onClick={() => setAppState('profile')} className="flex flex-col items-center gap-2 landscape:gap-1.5 p-4 landscape:p-3 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><BarChart2 className="text-purple-400 w-7 h-7 landscape:w-6 landscape:h-6" /><span className="text-sm landscape:text-xs">{t('statsPersonal')}</span></button>
+                    <button onClick={() => setAppState('about')} className="flex flex-col items-center gap-2 landscape:gap-1.5 p-4 landscape:p-3 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><Info className="text-yellow-400 w-7 h-7 landscape:w-6 landscape:h-6" /><span className="text-sm landscape:text-xs font-bold text-white">{t('aboutApp')}</span></button>
+                </div>
+            </div>
         </main>
       )}
 
       {/* --- SETUP --- */}
       {appState === 'setup' && (
-        <main className="flex flex-col items-center flex-1 w-full p-4 overflow-y-auto">
-          <div className="w-full max-w-lg pb-20 space-y-4">
+        <main className={`flex flex-col items-center flex-1 w-full overflow-y-auto p-4 landscape:p-3 ${isKeyboardOpen ? 'pb-[190px] landscape:pb-[150px]' : ''}`}>
+          <div className={`w-full max-w-5xl ${isKeyboardOpen ? 'pb-6 landscape:pb-3' : 'pb-20 landscape:pb-8'}`}>
+            <div className="flex flex-col gap-4 landscape:grid landscape:grid-cols-2 landscape:gap-3 landscape:items-start w-full">
+            <div className="space-y-4">
             <div className="flex p-1 border shadow-md bg-slate-800 rounded-xl border-slate-700">
-                <button onClick={() => setSettings({...settings, gameType: 'x01'})} className={`flex-1 py-3 text-sm font-black rounded-lg uppercase tracking-widest transition-colors ${settings.gameType === 'x01' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>X01</button>
-                <button onClick={() => setSettings({...settings, gameType: 'cricket'})} className={`flex-1 py-3 text-sm font-black rounded-lg uppercase tracking-widest transition-colors ${settings.gameType === 'cricket' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>CRICKET</button>
+                <button onClick={() => setSettings({...settings, gameType: 'x01'})} className={`flex-1 py-3 landscape:py-2 text-sm font-black rounded-lg uppercase tracking-widest transition-colors ${settings.gameType === 'x01' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>X01</button>
+                <button onClick={() => setSettings({...settings, gameType: 'cricket'})} className={`flex-1 py-3 landscape:py-2 text-sm font-black rounded-lg uppercase tracking-widest transition-colors ${settings.gameType === 'cricket' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>CRICKET</button>
             </div>
 
-            <div className="p-4 space-y-4 border bg-slate-900 rounded-xl border-slate-800">
+            <div className="p-4 landscape:p-3 space-y-4 landscape:space-y-3 border bg-slate-900 rounded-xl border-slate-800">
                 <div className="flex justify-between items-center text-slate-400 text-[10px] font-bold uppercase tracking-widest">
                     <span>{t('players')}</span>
                     <div className="flex items-center gap-1.5 text-emerald-500">
@@ -974,34 +982,36 @@ export default function App() {
                     </div>
                 )}
             </div>
+            </div>
             {settings.gameType === 'x01' && (
-                <div className="p-4 border bg-slate-900 rounded-xl border-slate-800 animate-in fade-in slide-in-from-top-2">
+                <div className="p-4 landscape:p-3 border bg-slate-900 rounded-xl border-slate-800 animate-in fade-in slide-in-from-top-2">
                     <label className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-3 block">{t('rulesX01') || 'Pravidla X01'}</label>
-                    <div className="grid grid-cols-2 gap-3 mb-3">{[301, 501].map(s => <button key={s} onClick={()=>setSettings({...settings, startScore:s})} className={`py-3 px-3 rounded-lg font-bold border transition-colors ${settings.startScore===s?'bg-emerald-600 border-emerald-500 text-white':'bg-slate-800 border-slate-700 text-slate-400'}`}>{s}</button>)}</div>
-                    <div className="grid grid-cols-2 gap-3">{['single', 'double'].map(m => <button key={m} onClick={()=>setSettings({...settings, outMode:m})} className={`py-3 px-3 rounded-lg font-bold text-sm border uppercase transition-colors ${settings.outMode===m?'bg-blue-600 border-blue-500 text-white':'bg-slate-800 border-slate-700 text-slate-400'}`}>{m} OUT</button>)}</div>
+                    <div className="grid grid-cols-2 gap-3 landscape:gap-2 mb-3">{[301, 501].map(s => <button key={s} onClick={()=>setSettings({...settings, startScore:s})} className={`py-3 landscape:py-2 px-3 rounded-lg font-bold border transition-colors ${settings.startScore===s?'bg-emerald-600 border-emerald-500 text-white':'bg-slate-800 border-slate-700 text-slate-400'}`}>{s}</button>)}</div>
+                    <div className="grid grid-cols-2 gap-3 landscape:gap-2">{['single', 'double'].map(m => <button key={m} onClick={()=>setSettings({...settings, outMode:m})} className={`py-3 landscape:py-2 px-3 rounded-lg font-bold text-sm border uppercase transition-colors ${settings.outMode===m?'bg-blue-600 border-blue-500 text-white':'bg-slate-800 border-slate-700 text-slate-400'}`}>{m} OUT</button>)}</div>
                 </div>
             )}
-            <div className="p-4 border bg-slate-900 rounded-xl border-slate-800">
+            <div className="p-4 landscape:p-3 border bg-slate-900 rounded-xl border-slate-800">
                 <label className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-3 block">{t('matchFormat')}</label>
                 <div className="flex p-1 mb-4 border rounded-lg bg-slate-800 border-slate-700">
-                    <button onClick={() => setSettings({...settings, matchMode: 'first_to'})} className={`flex-1 py-2 text-xs font-black rounded-md uppercase tracking-widest transition-colors ${settings.matchMode === 'first_to' ? 'bg-slate-100 text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{t('firstTo')}</button>
-                    <button onClick={() => setSettings({...settings, matchMode: 'best_of'})} className={`flex-1 py-2 text-xs font-black rounded-md uppercase tracking-widest transition-colors ${settings.matchMode === 'best_of' ? 'bg-slate-100 text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{t('bestOf')}</button>
+                    <button onClick={() => setSettings({...settings, matchMode: 'first_to'})} className={`flex-1 py-2 landscape:py-1.5 text-xs font-black rounded-md uppercase tracking-widest transition-colors ${settings.matchMode === 'first_to' ? 'bg-slate-100 text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{t('firstTo')}</button>
+                    <button onClick={() => setSettings({...settings, matchMode: 'best_of'})} className={`flex-1 py-2 landscape:py-1.5 text-xs font-black rounded-md uppercase tracking-widest transition-colors ${settings.matchMode === 'best_of' ? 'bg-slate-100 text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{t('bestOf')}</button>
                 </div>
                 <div className="grid grid-cols-5 gap-2">
-                    {legOptions.slice(0, -1).map(n => <button key={n} onClick={()=>setSettings({...settings, matchTarget:n})} className={`py-3 rounded-lg font-bold border transition-colors ${settings.matchTarget===n?'bg-emerald-600 border-emerald-500 text-white':'bg-slate-800 border-slate-700 text-slate-400'}`}>{n}</button>)}
+                    {legOptions.slice(0, -1).map(n => <button key={n} onClick={()=>setSettings({...settings, matchTarget:n, matchSets: 1})} className={`py-3 landscape:py-2 rounded-lg font-bold border transition-colors ${settings.matchSets === 1 && settings.matchTarget===n?'bg-emerald-600 border-emerald-500 text-white':'bg-slate-800 border-slate-700 text-slate-400'}`}>{n}</button>)}
                     <button
                         onClick={() => {
                             setCustomSetsValue(settings.matchSets || 1);
                             setCustomLegsValue(settings.matchTarget || legOptions[0]);
                             setShowCustomFormat(true);
                         }}
-                        className="py-3 rounded-lg font-bold border transition-colors bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+                        className={`py-3 landscape:py-2 rounded-lg font-bold border transition-colors ${settings.matchSets > 1 ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`}
                     >
                         ⚙️ {t('custom') || 'Vlastní'}
                     </button>
                 </div>
             </div>
-            <button onClick={() => setAppState('playing')} className="flex items-center justify-center w-full gap-2 py-4 mt-2 text-xl font-black transition-all shadow-lg bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-xl shadow-emerald-900/20 active:scale-95"><Play className="w-6 h-6 fill-current" /> {t('startMatch')}</button>
+            <button onClick={() => setAppState('playing')} className="flex items-center justify-center w-full gap-2 py-4 landscape:py-3 mt-2 landscape:mt-0 text-xl font-black transition-all shadow-lg bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-xl shadow-emerald-900/20 active:scale-95 landscape:col-span-2"><Play className="w-6 h-6 fill-current" /> {t('startMatch')}</button>
+            </div>
           </div>
         </main>
       )}
@@ -1017,7 +1027,12 @@ export default function App() {
                         if (myMatches.length === 0) return <div className="p-8 text-center text-slate-500">{t('noMatches')}</div>;
                         return (
                             <div className="divide-y divide-slate-800">
-                                {myMatches.map(m => (
+                                {myMatches.map(m => {
+                                    const isMultiSet = (m.matchSets || 1) > 1;
+                                    const mainP1 = isMultiSet ? (m.p1Sets || 0) : (m.setScores?.[0]?.p1 ?? m.p1Legs ?? 0);
+                                    const mainP2 = isMultiSet ? (m.p2Sets || 0) : (m.setScores?.[0]?.p2 ?? m.p2Legs ?? 0);
+                                    const legsBreakdown = isMultiSet && m.setScores?.length ? `(${m.setScores.map(s => `${s.p1}:${s.p2}`).join(', ')})` : '';
+                                    return (
                                     <div key={m.id} className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-800/50" onClick={() => setSelectedMatchDetail(m)}>
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-1">
@@ -1029,8 +1044,9 @@ export default function App() {
                                             <div className="flex items-center gap-3">
                                                 <div className={`font-bold ${m.matchWinner === 'p1' ? 'text-emerald-400' : 'text-slate-400'}`}>{getTranslatedName(m.p1Name, true, lang)}</div>
                                                 <div className="bg-slate-950 px-3 py-0.5 rounded text-sm font-mono font-bold border border-slate-800 flex gap-1">
-                                                    <span className={m.matchWinner === 'p1' ? 'text-emerald-500' : 'text-slate-500'}>{m.p1Legs}</span><span className="text-slate-600">-</span><span className={m.matchWinner === 'p2' ? 'text-purple-500' : 'text-slate-500'}>{m.p2Legs}</span>
+                                                    <span className={m.matchWinner === 'p1' ? 'text-emerald-500' : 'text-slate-500'}>{mainP1}</span><span className="text-slate-600">-</span><span className={m.matchWinner === 'p2' ? 'text-purple-500' : 'text-slate-500'}>{mainP2}</span>
                                                 </div>
+                                                {legsBreakdown && <div className="text-[10px] font-mono text-slate-500">{legsBreakdown}</div>}
                                                 
                                                 {/* Přidání obtížnosti Bota v seznamu historie zápasů */}
                                                 <div className={`font-bold flex items-center gap-1 ${m.matchWinner === 'p2' ? 'text-purple-400' : 'text-slate-400'}`}>
@@ -1042,7 +1058,7 @@ export default function App() {
                                         </div>
                                         <button onClick={async (e) => { e.stopPropagation(); setMatchHistory(p => p.filter(x => x.id !== m.id)); if (m.docId && db && user && !offlineMode) { try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'matches', m.docId)); } catch(err) {} } }} className="p-3 transition-colors rounded-lg text-slate-600 hover:text-red-400 hover:bg-slate-800"><Trash2 className="w-5 h-5" /></button>
                                     </div>
-                                ))}
+                                )})}
                             </div>
                         );
                     })()}

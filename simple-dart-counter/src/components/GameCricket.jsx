@@ -55,6 +55,7 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
 
   const [isMicActive, setIsMicActive] = useState(false); 
   const [isListening, setIsListening] = useState(false);
+  const [setScores, setSetScores] = useState([]);
 
   const t = (k) => translations[lang]?.[k] || k;
 
@@ -409,6 +410,10 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
         let p2W = newState.winner === 'p2' ? prev.p2Legs + 1 : prev.p2Legs;
         let p1S = prev.p1Sets || 0;
         let p2S = prev.p2Sets || 0;
+        let nextSetScores = [...setScores];
+        if (p1W >= legTarget || p2W >= legTarget) {
+          nextSetScores = [...nextSetScores, { p1: p1W, p2: p2W }];
+        }
         if (p1W >= legTarget) { p1S += 1; p1W = 0; p2W = 0; }
         if (p2W >= legTarget) { p2S += 1; p1W = 0; p2W = 0; }
         const setTarget = settings?.matchSets || 1;
@@ -419,11 +424,14 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
           onMatchComplete({ 
             id: Date.now(), date: new Date().toLocaleString(), gameType: 'cricket', 
             p1Name: settings.p1Name, p2Name: settings.p2Name, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S,
+            matchSets: settings?.matchSets || 1, setScores: nextSetScores,
             matchWinner: newState.winner, completedLegs: uLegs, 
             isBot: settings.isBot, botLevel: settings.botLevel 
           });
+          setSetScores(nextSetScores);
           return { ...newState, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S, completedLegs: uLegs };
         } else {
+          setSetScores(nextSetScores);
           return { ...newState, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S, matchWinner: null, completedLegs: uLegs };
         }
       } else {
@@ -505,6 +513,17 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
 
   return (
     <main className={`h-full w-full flex-1 overflow-hidden p-2 grid gap-2 sm:gap-4 ${isLandscape ? 'grid-cols-[1.2fr_1.5fr_1fr]' : 'flex flex-col'}`}>
+      <div className={`w-full flex items-center justify-center rounded-lg border border-slate-800 bg-slate-900/70 py-1 px-2 ${isLandscape ? 'col-span-3' : ''}`}>
+        {(settings?.matchSets || 1) === 1 ? (
+          <div className="text-sm sm:text-base font-black text-yellow-400 tracking-wider">LEGS {gameState.p1Legs} - {gameState.p2Legs}</div>
+        ) : (
+          <div className="text-xs sm:text-sm font-black text-slate-200 tracking-wider text-center">
+            <span className="text-emerald-400">SETS {gameState.p1Sets || 0} - {gameState.p2Sets || 0}</span>
+            <span className="mx-2 text-slate-600">|</span>
+            <span className="text-yellow-400">LEGS {gameState.p1Legs} - {gameState.p2Legs}</span>
+          </div>
+        )}
+      </div>
       
       <div className={`flex gap-2 shrink-0 ${isLandscape ? 'flex-col h-full justify-center' : 'flex-row'}`}>
         <div className={`flex-1 relative p-2 sm:p-5 rounded-xl border-2 transition-all duration-300 flex flex-col items-center justify-center ${isP1Active ? 'bg-slate-800 border-emerald-500 shadow-xl shadow-emerald-900/20' : 'bg-slate-900 border-slate-800 opacity-80'}`}>
@@ -514,10 +533,7 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
                 <h2 className="pr-2 text-xs font-bold uppercase truncate text-slate-300 sm:text-sm">
                     {getDisplayName(settings?.p1Name, true, false)}
                 </h2>
-                <div className="flex flex-col items-end gap-0.5 shrink-0">
-                    <div className="bg-slate-950 px-1.5 py-0.5 rounded border border-slate-700 text-emerald-400 font-black text-[10px] sm:text-xs">S:{gameState.p1Sets || 0}</div>
-                    <div className="bg-slate-950 px-1.5 py-0.5 rounded border border-slate-700 text-yellow-400 font-black text-[10px] sm:text-xs">L:{gameState.p1Legs}</div>
-                </div>
+                <div className="w-2 shrink-0" />
             </div>
             <div className={`font-mono font-black text-white leading-none ${isP1Active ? 'text-emerald-400' : ''}`} style={{ fontSize: isLandscape ? 'clamp(3rem, 10vh, 8rem)' : 'clamp(2rem, 12vw, 4rem)' }}>
                 {gameState.p1Score}
@@ -532,10 +548,7 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
                 <h2 className="pr-2 text-xs font-bold uppercase truncate text-slate-300 sm:text-sm">
                     {getDisplayName(settings?.p2Name, false, settings?.isBot)}
                 </h2>
-                <div className="flex flex-col items-end gap-0.5 shrink-0">
-                    <div className="bg-slate-950 px-1.5 py-0.5 rounded border border-slate-700 text-emerald-400 font-black text-[10px] sm:text-xs">S:{gameState.p2Sets || 0}</div>
-                    <div className="bg-slate-950 px-1.5 py-0.5 rounded border border-slate-700 text-yellow-400 font-black text-[10px] sm:text-xs">L:{gameState.p2Legs}</div>
-                </div>
+                <div className="w-2 shrink-0" />
             </div>
             <div className={`font-mono font-black text-white leading-none ${isP2Active ? 'text-purple-400' : ''}`} style={{ fontSize: isLandscape ? 'clamp(3rem, 10vh, 8rem)' : 'clamp(2rem, 12vw, 4rem)' }}>
                 {gameState.p2Score}
