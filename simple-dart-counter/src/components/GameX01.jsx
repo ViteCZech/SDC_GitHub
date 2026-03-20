@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CheckCircle, Delete, Mic, MicOff, Target, Trophy, Undo2, X } from 'lucide-react';
+import { ArrowLeft, Ban, CheckCircle, Delete, Mic, MicOff, Trophy, Undo2, X } from 'lucide-react';
 import { translations } from '../translations';
 
 const IMPOSSIBLE_SCORES = [163, 166, 169, 172, 173, 175, 176, 178, 179];
@@ -108,7 +108,7 @@ const FinishDartsSelector = ({ points, minDarts, onConfirm, onCancel, lang, play
     );
 };
 
-export default function GameX01({ settings, lang, onMatchComplete, isLandscape, isPC }) {
+export default function GameX01({ settings, lang, onMatchComplete, isLandscape, isPC, restoredGameState, onRestoredConsumed }) {
     // 1. Zde máte překladovou funkci (pokud ne, přidejte ji)
   const t = (k) => translations[lang]?.[k] || k;
 
@@ -129,17 +129,28 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
     
     return name;
   };
-  const [gameState, setGameState] = useState({
-    p1Score: settings.startScore, p2Score: settings.startScore, p1Legs: 0, p2Legs: 0, p1Sets: 0, p2Sets: 0,
-    currentPlayer: settings.startPlayer, startingPlayer: settings.startPlayer,
-    winner: null, matchWinner: null, history: [], completedLegs: [] 
-  });
+  const defaultGameState = {
+    p1Score: settings.startScore,
+    p2Score: settings.startScore,
+    p1Legs: 0,
+    p2Legs: 0,
+    p1Sets: 0,
+    p2Sets: 0,
+    currentPlayer: settings.startPlayer,
+    startingPlayer: settings.startPlayer,
+    winner: null,
+    matchWinner: null,
+    history: [],
+    completedLegs: []
+  };
+
+  const [gameState, setGameState] = useState(() => restoredGameState?.gameState || defaultGameState);
 
   const [currentInput, setCurrentInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [editingMove, setEditingMove] = useState(null); 
   const [finishData, setFinishData] = useState(null);
-  const [setScores, setSetScores] = useState([]);
+  const [setScores, setSetScores] = useState(() => restoredGameState?.setScores || []);
 
   const [longPressIdx, setLongPressIdx] = useState(null);
   const longPressTimer = useRef(null);
@@ -164,6 +175,19 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
       currentInputRef.current = currentInput; finishDataRef.current = finishData;
       if (historyRef.current) historyRef.current.scrollTop = historyRef.current.scrollHeight; 
   }, [gameState, isMicActive, currentInput, finishData]);
+
+  // Pokud se uživatel vrátí zpět z obrazovky "konec zápasu",
+  // obnovíme přesně stav před posledním ukončujícím hodem.
+  useEffect(() => {
+    if (!restoredGameState) return;
+    if (restoredGameState.gameState) setGameState(restoredGameState.gameState);
+    if (restoredGameState.setScores) setSetScores(restoredGameState.setScores);
+    setCurrentInput('');
+    setErrorMsg('');
+    setEditingMove(null);
+    setFinishData(null);
+    if (onRestoredConsumed) onRestoredConsumed();
+  }, [restoredGameState, onRestoredConsumed]);
 
   // Klávesnice
   useEffect(() => {
@@ -358,6 +382,10 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
         setErrorMsg(String(translations[lang]?.impossible || 'Chyba')); setTimeout(() => setErrorMsg(''), 1500); setCurrentInput(''); return; 
     }
 
+    // Pro tlačítko "zpět" na obrazovce konce zápasu potřebujeme obnovit přesně stav
+    // před tímto ukončujícím hodem.
+    const restorePayload = { gameState, setScores };
+
     const nm = { id: Date.now(), player: gameState.currentPlayer, score: pts, dartsUsed: dartsCount };
     const ns = recalculateGame([nm, ...gameState.history]);
     if (ns.history[0].isBust) { setErrorMsg(String(translations[lang]?.bust || 'Bust')); setTimeout(() => setErrorMsg(''), 1500); }
@@ -388,7 +416,7 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
             setIsMicActive(false);
           }, 10000);
         }
-        onMatchComplete(record);
+        onMatchComplete(record, restorePayload);
       } else {
         setSetScores(nextSetScores);
         setGameState({ ...ns, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S, matchWinner: null, completedLegs: uLegs });
@@ -434,6 +462,11 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
 
   const handleSaveEdit = (newS, newD) => {
     if (isNaN(newS) || newS < 0 || newS > 180 || IMPOSSIBLE_SCORES.includes(newS)) { setErrorMsg(String(translations[lang]?.impossible || 'Chyba')); return; }
+
+    // Pro případ "zpět" po ukončení zápasu z obrazovky statistik
+    // ukládáme stav před uložením úpravy.
+    const restorePayload = { gameState, setScores };
+
     const uh = gameState.history.map(m => m.id === editingMove.id ? { ...m, score: newS, dartsUsed: (m.remaining+m.score-newS)===0 ? newD : 3 } : m);
     const ns = recalculateGame(uh);
     
@@ -458,7 +491,7 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
         if (isOver) {
            const record = { id: Date.now(), date: new Date().toLocaleString(), gameType: 'x01', p1Name: settings.p1Name, p1Id: settings.p1Id || null, p2Name: settings.p2Name, p2Id: settings.p2Id || null, p1Legs: nextP1Legs, p2Legs: nextP2Legs, matchWinner: ns.winner, completedLegs: nextCompletedLegs, isBot: settings.isBot, botLevel: settings.botLevel, botAvg: settings.botAvg };
            setEditingMove(null);
-           onMatchComplete(record);
+           onMatchComplete(record, restorePayload);
            return;
         }
     }
@@ -466,13 +499,28 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
     setEditingMove(null);
   };
 
+  const prevNextLegStateRef = useRef(null);
+
   const handleNextLeg = () => {
-      const nS = gameState.startingPlayer === 'p1' ? 'p2' : 'p1'; 
-      setGameState(prev => ({ ...prev, p1Score: settings.startScore, p2Score: settings.startScore, winner: null, history: [], currentPlayer: nS, startingPlayer: nS })); 
+      prevNextLegStateRef.current = gameState;
+      const nS = gameState.startingPlayer === 'p1' ? 'p2' : 'p1';
+      setGameState(prev => ({ ...prev, p1Score: settings.startScore, p2Score: settings.startScore, winner: null, history: [], currentPlayer: nS, startingPlayer: nS }));
+      setCurrentInput('');
+      setFinishData(null);
+  };
+
+  const handleBackFromLeg = () => {
+    if (!prevNextLegStateRef.current) return;
+    setGameState(prevNextLegStateRef.current);
+    prevNextLegStateRef.current = null;
+    setCurrentInput('');
+    setFinishData(null);
+    setEditingMove(null);
+    setErrorMsg('');
   };
 
   const btnGameBase = "text-white font-bold py-2 rounded text-[10px] sm:text-xs transition-all select-none touch-manipulation active:scale-95";
-  const numBtnBase = "h-full bg-slate-800 text-xl sm:text-2xl font-bold rounded hover:bg-slate-700 active:bg-slate-600 select-none touch-manipulation flex items-center justify-center";
+  const numBtnBase = "h-full w-full bg-slate-800 text-2xl sm:text-3xl landscape:text-3xl leading-none font-bold rounded-xl border border-slate-700/50 hover:bg-slate-700 active:bg-slate-600 select-none touch-manipulation flex items-center justify-center";
   const isSuccessMsg = errorMsg && ['!', 'Přihlášeno', 'Uloženo', 'Zálohováno', 'Recognized'].some(w => String(errorMsg).includes(w));
 
   const renderUnifiedHistory = () => {
@@ -480,11 +528,60 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
     const renderMove = (move) => {
         if (!move) return <div className="h-8 md:h-12"></div>;
         const isCheckout = move.remaining === 0 && !move.isBust;
-        let cls = 'text-slate-200'; if (isCheckout) cls = 'text-yellow-400'; else if (move.score >= 100) cls = move.player === 'p1' ? 'text-emerald-400' : 'text-purple-400';
-        return (<div className={`flex items-center w-full ${move.player === 'p1' ? 'justify-between pr-2 md:pr-4' : 'justify-between pl-2 md:pl-4'}`}>{move.player === 'p1' && <div className="text-[10px] md:text-sm lg:text-base font-mono text-slate-500 font-bold w-8 md:w-12 text-left">{move.remaining}</div>}<div onClick={() => setEditingMove(move)} className={`cursor-pointer hover:bg-slate-800/50 rounded px-1 md:px-3 flex items-center gap-1 md:gap-2 ${move.player==='p1'?'text-right':'text-left'} ${move.isBust?'opacity-50':''}`}><div className={`${isCheckout?'text-2xl md:text-3xl lg:text-4xl':'text-xl md:text-2xl lg:text-3xl'} font-bold font-mono ${cls} flex items-baseline gap-1 md:gap-2`}>{move.isBust ? <span className="text-red-400 line-through decoration-2">{move.score}</span> : <span>{move.score}</span>}{isCheckout && <span className="text-xs italic text-yellow-400 md:text-sm">({move.dartsUsed}.{translations[lang]?.confirmDarts || 'šipka'})</span>}</div></div>{move.player === 'p2' && <div className="text-[10px] md:text-sm lg:text-base font-mono text-slate-500 font-bold w-8 md:w-12 text-right">{move.remaining}</div>}</div>);
+        let cls = 'text-slate-200';
+        if (isCheckout) cls = 'text-yellow-400';
+        else if (move.score >= 100) cls = move.player === 'p1' ? 'text-emerald-400' : 'text-purple-400';
+
+        return (
+          <div className={`flex items-center w-full ${move.player === 'p1' ? 'justify-between pr-2 md:pr-4' : 'justify-between pl-2 md:pl-4'}`}>
+            {move.player === 'p1' && (
+              <div className="text-[10px] md:text-sm lg:text-base font-mono text-slate-500 font-bold w-8 md:w-12 text-left">
+                {move.remaining}
+              </div>
+            )}
+
+            <div
+              onClick={() => setEditingMove(move)}
+              className={`cursor-pointer hover:bg-slate-800/50 rounded px-1 md:px-3 flex items-center gap-1 md:gap-2 ${move.player === 'p1' ? 'text-right' : 'text-left'} ${move.isBust ? 'opacity-50' : ''}`}
+            >
+              <div className={`${isCheckout ? 'text-2xl md:text-3xl lg:text-4xl' : 'text-xl md:text-2xl lg:text-3xl'} font-bold font-mono ${cls} flex items-baseline gap-1 md:gap-2`}>
+                {move.isBust ? (
+                  <span className="inline-flex items-center justify-center w-full">
+                    <Ban className="w-5 h-5 md:w-6 md:h-6 text-red-500" />
+                  </span>
+                ) : (
+                  <span>{move.score}</span>
+                )}
+                {isCheckout && (
+                  <span className="text-xs italic text-yellow-400 md:text-sm">({move.dartsUsed}.{translations[lang]?.confirmDarts || 'šipka'})</span>
+                )}
+              </div>
+            </div>
+
+            {move.player === 'p2' && (
+              <div className="text-[10px] md:text-sm lg:text-base font-mono text-slate-500 font-bold w-8 md:w-12 text-right">
+                {move.remaining}
+              </div>
+            )}
+          </div>
+        );
     };
     return (<div ref={historyRef} className="border rounded-lg history-container bg-slate-900/50 border-slate-800">{rounds.map(r => <div key={r.id} className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center border-b border-slate-800/60 py-2 md:py-3 last:border-0">{renderMove(r.p1)}<div className="flex items-center justify-center w-6 h-6 md:w-8 md:h-8 rounded-full bg-slate-800 border border-slate-700 shadow-sm text-[10px] md:text-xs font-bold text-slate-500">{r.id}</div>{renderMove(r.p2)}</div>)}{rounds.length === 0 && <div className="py-10 text-xs text-center text-slate-600 md:text-sm">- Zatím bez hodů -</div>}</div>);
   };
+
+  const activeScore = gameState.currentPlayer === 'p1' ? gameState.p1Score : gameState.p2Score;
+  const activeMinDarts = getMinDartsToCheckout(activeScore, settings.outMode);
+  const isInputEmpty = currentInput === '';
+  const isOnCheckout = activeScore > 0 && activeScore <= 170 && activeMinDarts !== Infinity;
+  const showMissBust = isOnCheckout && isInputEmpty && !gameState.winner;
+
+  // Pro "BUST" potřebujeme hodnotu, která jistě přestřelí zbývající skóre.
+  // V rámci X01 tu navíc vyhýbáme hodnotám z IMPOSSIBLE_SCORES (ačkoliv je to interní filtr).
+  const bustPoints = (() => {
+    let pts = activeScore + 1;
+    while (pts <= 180 && IMPOSSIBLE_SCORES.includes(pts)) pts += 1;
+    return pts <= 180 ? pts : Math.min(180, activeScore + 1);
+  })();
 
   return (
     <>
@@ -553,7 +650,6 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
                         <div className="flex gap-1.5 sm:gap-2 shrink-0">
                             <button onClick={toggleMic} className={`w-10 h-10 sm:w-12 sm:h-12 rounded flex items-center justify-center border transition-all ${isMicActive ? (isListening ? 'bg-red-600 border-red-500 animate-pulse text-white' : 'bg-red-900/50 border-red-500/50 text-red-200') : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'}`}>{isMicActive ? <Mic className="w-5 h-5 sm:w-6 sm:h-6" /> : <MicOff className="w-5 h-5 sm:w-6 sm:h-6" />}</button>
                             <button onClick={handleUndoClick} className="flex items-center justify-center w-10 h-10 border rounded sm:w-12 sm:h-12 bg-slate-800 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700"><Undo2 className="w-5 h-5 sm:w-6 sm:h-6" /></button>
-                            <button onClick={() => handleTurnCommit(parseInt(currentInput))} disabled={!currentInput} className={`bg-emerald-600 text-white h-10 sm:h-12 w-14 sm:w-20 rounded flex items-center justify-center transition-all ${!currentInput ? 'opacity-30' : 'hover:bg-emerald-500'}`}><CheckCircle className="w-6 h-6 sm:w-8 sm:h-8" /></button>
                         </div>
                     </div>
                     
@@ -561,14 +657,75 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
                         {quickButtons.map((val, i) => <button key={i} onPointerDown={() => handleQuickBtnDown(i)} onPointerUp={() => handleQuickBtnUp(val)} onPointerLeave={() => { if(longPressTimer.current) { clearTimeout(longPressTimer.current); setLongPressIdx(null); } }} className={`bg-slate-800 text-slate-300 text-xs sm:text-sm font-bold min-h-[2.5rem] sm:min-h-[3rem] rounded-lg sm:rounded-xl border border-slate-700/50 shadow-md transition-all select-none touch-manipulation ${longPressIdx === i ? 'bg-emerald-900 border-emerald-400 shaking' : ''}`}>{val}</button>)}
                     </div>
                     
-                    <div className="flex-1 grid grid-cols-4 gap-1 min-h-[120px]">
-                        {[7, 8, 9].map(n => <button key={n} onClick={() => setCurrentInput(p => p.length < 3 ? p + n : p)} className={numBtnBase}>{n}</button>)}<button onClick={() => setCurrentInput(prev => prev.length < 3 ? prev + '0' : prev)} className={numBtnBase}>0</button>
-                        {[4, 5, 6].map(n => <button key={n} onClick={() => setCurrentInput(p => p.length < 3 ? p + n : p)} className={numBtnBase}>{n}</button>)}<button onClick={() => setCurrentInput(prev => prev.slice(0, -1))} className={`${numBtnBase} text-red-400 active:bg-red-900/20`}><Delete className="w-5 h-5 sm:w-6 sm:h-6"/></button>
-                        {[1, 2, 3].map(n => <button key={n} onClick={() => setCurrentInput(p => p.length < 3 ? p + n : p)} className={numBtnBase}>{n}</button>)}
+                    <div className="flex-1 min-h-0 h-full grid grid-cols-4 grid-rows-3 gap-2 landscape:gap-2">
+                      {[7, 8, 9].map(n => (
+                        <button key={n} onClick={() => setCurrentInput(p => p.length < 3 ? p + n : p)} className={numBtnBase}>
+                          {n}
+                        </button>
+                      ))}
+
+                      {/* 1. řádek, 4. sloupec: MISS (0) nebo smazání */}
+                      <button
+                        onClick={() => {
+                          if (showMissBust) handleTurnCommit(0);
+                          else setCurrentInput(prev => prev.slice(0, -1));
+                        }}
+                        className={`${numBtnBase} ${showMissBust ? 'text-red-400 active:bg-red-900/20' : 'text-red-400 active:bg-red-900/20'}`}
+                        disabled={!showMissBust && currentInput.length === 0}
+                      >
+                        {showMissBust ? (
+                          <span className="text-[12px] sm:text-[13px] font-black tracking-widest">MISS</span>
+                        ) : (
+                          <Delete className="w-6 h-6 sm:w-7 sm:h-7" />
+                        )}
+                      </button>
+
+                      {[4, 5, 6].map(n => (
+                        <button key={n} onClick={() => setCurrentInput(p => p.length < 3 ? p + n : p)} className={numBtnBase}>
+                          {n}
+                        </button>
+                      ))}
+                      <button onClick={() => setCurrentInput(prev => prev.length < 3 ? prev + '0' : prev)} className={numBtnBase}>0</button>
+
+                      {[1, 2, 3].map(n => (
+                        <button key={n} onClick={() => setCurrentInput(p => p.length < 3 ? p + n : p)} className={numBtnBase}>
+                          {n}
+                        </button>
+                      ))}
+
+                      {/* 3. řádek, 4. sloupec: BUST nebo ENTER */}
+                      {(() => {
+                        const isEnterEnabled = !showMissBust && Boolean(currentInput);
+                        const enterBaseClass = showMissBust
+                          ? 'text-slate-500 active:bg-slate-800/60 bg-slate-800'
+                          : isEnterEnabled
+                            ? '!bg-emerald-600 !text-white !hover:bg-emerald-500'
+                            : '!bg-slate-800 !text-slate-500 !opacity-60 !cursor-not-allowed';
+
+                        return (
+                      <button
+                        onClick={() => {
+                          if (showMissBust) handleTurnCommit(bustPoints);
+                          else if (currentInput) handleTurnCommit(parseInt(currentInput));
+                        }}
+                        disabled={!showMissBust && !currentInput}
+                        className={`${numBtnBase} ${enterBaseClass}`}
+                      >
+                        {showMissBust ? (
+                          <span className="text-[12px] sm:text-[13px] font-black tracking-widest">BUST</span>
+                        ) : (
+                          <CheckCircle className="w-7 h-7 sm:w-8 sm:h-8 landscape:w-8 landscape:h-8" />
+                        )}
+                      </button>
+                        );
+                      })()}
                     </div>
                 </div>
             ) : (
-                <div className={`w-full h-full flex flex-col items-center justify-center ${gameState.winner === 'p1' ? 'bg-emerald-900/40 border-emerald-500/50' : 'bg-purple-900/40 border-purple-500/50'} border-2 p-4 rounded-xl text-center animate-in zoom-in duration-300 shadow-2xl shadow-black/50`}>
+                <div className={`relative w-full h-full flex flex-col items-center justify-center ${gameState.winner === 'p1' ? 'bg-emerald-900/40 border-emerald-500/50' : 'bg-purple-900/40 border-purple-500/50'} border-2 p-4 rounded-xl text-center animate-in zoom-in duration-300 shadow-2xl shadow-black/50`}>
+                <button onClick={handleBackFromLeg} className="absolute top-3 left-3 p-2 transition-colors border rounded-lg shadow-lg bg-slate-800/70 hover:bg-slate-700 text-slate-400 hover:text-white border-slate-700">
+                    <ArrowLeft className="w-5 h-5" />
+                </button>
                     <Trophy className={`w-10 h-10 sm:w-12 sm:h-12 mb-2 ${gameState.winner === 'p1' ? 'text-emerald-400' : 'text-purple-400'}`} />
                     <h3 className={`text-lg sm:text-2xl font-black uppercase tracking-widest ${gameState.winner === 'p1' ? 'text-emerald-400' : 'text-purple-400'} mb-2`}>
                         {translations[lang]?.legFor || 'Leg vyhrává'} {getDisplayName(gameState.winner === 'p1' ? settings.p1Name : settings.p2Name, gameState.winner === 'p1', gameState.winner === 'p2' && settings.isBot)}
