@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { Calendar, CalendarDays, CalendarCheck, BarChart3, Activity } from 'lucide-react';
+import { translations } from './translations';
 
 export default function GameStats({ records = [], lang }) {
-    // Přidejte tento řádek hned pod to (a nezapomeňte importovat translations nahoru, pokud je nemáte v souboru)
     const t = (k) => translations[lang]?.[k] || k;
     // Výpočet statistik pomocí timestampů (record.id)
     const stats = useMemo(() => {
@@ -56,7 +56,7 @@ export default function GameStats({ records = [], lang }) {
             </h2>
 
             {/* KASTLÍKY - Dnes, Týden, Měsíc, Celkově */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 landscape:grid-cols-4 landscape:gap-2 landscape:p-1">
                 <div className="relative flex flex-col items-center justify-center p-4 overflow-hidden border bg-slate-900 border-slate-800 rounded-2xl">
                     <div className="absolute -right-4 -top-4 opacity-5 text-emerald-500"><Calendar className="w-24 h-24" /></div>
                     <span className="z-10 mb-1 text-xs font-bold tracking-wider uppercase sm:text-sm text-slate-400">{t('statsToday')}</span>

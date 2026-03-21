@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Trophy, Undo2 } from 'lucide-react';
+import { matchesAnyPhrase, normalizeSpeechCommand, VOICE_PHRASES } from '../voiceSpeech';
 
 // --- MOCK PŘEKLADŮ (V reálném projektu smažte a použijte import) ---
 const translations = {
@@ -53,6 +54,7 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
     winner: null, matchWinner: null, history: [], completedLegs: []
   });
 
+  const [highScoreAnimation, setHighScoreAnimation] = useState(null);
   const [isMicActive, setIsMicActive] = useState(false); 
   const [isListening, setIsListening] = useState(false);
   const [setScores, setSetScores] = useState([]);
@@ -267,9 +269,14 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
     const transcript = (rawTranscript || '').toLowerCase().trim();
     const cleanText = sanitizeSpeech(transcript);
 
-    // Řídící příkazy – krok zpět
-    if (cleanText.includes('zpět') || cleanText.includes('krok zpět')) {
+    const cmd = normalizeSpeechCommand(rawTranscript || '');
+    if (matchesAnyPhrase(cmd, VOICE_PHRASES.undo)) {
       handleUndoClick();
+      return;
+    }
+    if (matchesAnyPhrase(cmd, VOICE_PHRASES.nextLeg)) {
+      const gs = gameStateRef.current;
+      if (gs?.winner && !gs?.matchWinner) handleNextLeg();
       return;
     }
 
@@ -386,7 +393,20 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
 
   const handleThrow = (target, overrideMultiplier = null) => {
     if (gameState.winner) return;
-    
+
+    let finalMult = gameState.multiplier;
+    if (overrideMultiplier !== null) finalMult = overrideMultiplier;
+    else if (target === 25 && gameState.multiplier === 3) finalMult = 2;
+
+    const isHighThrow = target > 0 && (finalMult === 3 || (target === 25 && finalMult === 2));
+    if (isHighThrow) {
+      const isP1 = gameState.currentPlayer === 'p1';
+      const color = isP1 ? 'rgb(52,211,153)' : 'rgb(168,85,247)';
+      const label = target === 25 ? '50' : `T${target}`;
+      setHighScoreAnimation({ score: label, color });
+      setTimeout(() => setHighScoreAnimation(null), 1500);
+    }
+
     setGameState(prev => {
       let finalMultiplier = prev.multiplier;
       if (overrideMultiplier !== null) {
@@ -512,7 +532,17 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
   const isP2Active = gameState.currentPlayer === 'p2' && !gameState.winner;
 
   return (
-    <main className={`h-full w-full flex-1 overflow-hidden p-2 grid gap-2 sm:gap-4 ${isLandscape ? 'grid-cols-[1.2fr_1.5fr_1fr]' : 'flex flex-col'}`}>
+    <main className={`relative h-full w-full flex-1 overflow-hidden p-2 grid gap-2 sm:gap-4 ${isLandscape ? 'grid-cols-[1.2fr_1.5fr_1fr]' : 'flex flex-col'}`}>
+      {highScoreAnimation !== null && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50" aria-hidden>
+          <span
+            className="block text-6xl md:text-8xl font-black font-mono animate-high-score-pop"
+            style={{ color: highScoreAnimation.color, textShadow: `0 0 20px ${highScoreAnimation.color}99` }}
+          >
+            {highScoreAnimation.score}!
+          </span>
+        </div>
+      )}
       <div className={`w-full flex items-center justify-center rounded-lg border border-slate-800 bg-slate-900/70 py-1 px-2 ${isLandscape ? 'col-span-3' : ''}`}>
         {(settings?.matchSets || 1) === 1 ? (
           <div className="text-sm sm:text-base font-black text-yellow-400 tracking-wider">LEGS {gameState.p1Legs} - {gameState.p2Legs}</div>

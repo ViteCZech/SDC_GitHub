@@ -10,11 +10,12 @@ import {
 } from 'lucide-react';
 
 import { translations } from './translations';
+import { matchesRematchPhrase, normalizeSpeechCommand, SPEECH_LANG_MAP } from './voiceSpeech';
 import GameX01 from './components/GameX01';
 import GameCricket from './components/GameCricket';
 import GameStats from './Stats';
 
-const APP_VERSION = "v1.9.5"; 
+const APP_VERSION = "v1.9.6"; 
 
 const safeStorage = {
   getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return null; } },
@@ -86,7 +87,7 @@ const calculateStats = (legs, p1Name, p2Name) => {
         const winnerAvg = winnerDarts > 0 ? (winnerScore / winnerDarts) * 3 : 0;
         return { index: i+1, winner: winnerName, winnerKey: winnerKey, darts: winnerDarts, avg: winnerAvg, checkout: check };
     });
-    return { p1Avg: p1DartsTotal ? (p1ScoreTotal/p1DartsTotal)*3 : 0, p2Avg: p2DartsTotal ? (p2ScoreTotal/p2DartsTotal)*3 : 0, legDetails, p1High, p2High, p1HighCheckout: p1HighCheck, p2HighCheckout: p2HighCheck };
+    return { p1Avg: p1DartsTotal ? (p1ScoreTotal/p1DartsTotal)*3 : 0, p2Avg: p2DartsTotal ? (p2ScoreTotal/p2DartsTotal)*3 : 0, p1DartsTotal, p2DartsTotal, legDetails, p1High, p2High, p1HighCheckout: p1HighCheck, p2HighCheckout: p2HighCheck };
 };
 
 // --- KOMPONENTY MENU / UI ---
@@ -170,6 +171,46 @@ const VirtualKeyboard = ({ onChar, onDelete, onClose, lang }) => {
 
 const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch }) => {
     const t = (k) => translations[lang]?.[k] || k;
+    const [isMicRematch, setIsMicRematch] = useState(false);
+    const isMicRematchRef = useRef(false);
+    const onStartMatchRef = useRef(onStartMatch);
+    useEffect(() => {
+        isMicRematchRef.current = isMicRematch;
+    }, [isMicRematch]);
+    useEffect(() => {
+        onStartMatchRef.current = onStartMatch;
+    }, [onStartMatch]);
+
+    useEffect(() => {
+        if (!isMicRematch) return undefined;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) return undefined;
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = false;
+        recognition.lang = SPEECH_LANG_MAP[lang] || 'cs-CZ';
+        recognition.onend = () => {
+            if (isMicRematchRef.current) {
+                try {
+                    recognition.start();
+                } catch (e) {}
+            }
+        };
+        recognition.onresult = (event) => {
+            const transcript = event.results[event.results.length - 1][0].transcript;
+            const cmd = normalizeSpeechCommand(transcript);
+            if (matchesRematchPhrase(cmd)) {
+                onStartMatchRef.current();
+            }
+        };
+        try {
+            recognition.start();
+        } catch (e) {}
+        return () => {
+            recognition.onend = null;
+            recognition.stop();
+        };
+    }, [isMicRematch, lang]);
     const isP1 = data.matchWinner === 'p1';
     const displayP1Name = getTranslatedName(data.p1Name, true, lang);
     
@@ -215,55 +256,70 @@ const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch }) =>
             </div>
             
             <div className="flex-1 w-full overflow-x-hidden overflow-y-auto bg-slate-950 scrollbar-thin scrollbar-thumb-slate-800">
-                <div className="w-full max-w-4xl p-4 pb-12 mx-auto space-y-6">
-                    <div className="flex justify-center">
-                        <div className={`bg-gradient-to-br ${winColorBg} border ${winBorder} rounded-xl px-6 py-3 flex items-center gap-3 shadow-lg animate-pulse`}>
-                            <Trophy className={`w-8 h-8 ${winColorText}`} />
+                <div className="w-full max-w-4xl p-4 pb-12 mx-auto space-y-4 md:space-y-3 landscape:space-y-2">
+                    <div className="flex justify-center landscape:py-0">
+                        <div className={`bg-gradient-to-br ${winColorBg} border ${winBorder} rounded-xl px-6 py-3 flex items-center gap-3 shadow-lg animate-pulse landscape:py-2 landscape:px-4`}>
+                            <Trophy className={`w-8 h-8 ${winColorText} landscape:w-6 landscape:h-6`} />
                             <div className="text-center">
                                 <div className={`text-[10px] uppercase font-bold tracking-widest ${isP1 ? 'text-emerald-300' : 'text-purple-300'}`}>{t('matchWinner')}</div>
-                                <div className="text-2xl font-black text-white">{isP1 ? displayP1Name : displayP2Name}</div>
+                                <div className="text-2xl font-black text-white landscape:text-xl">{isP1 ? displayP1Name : displayP2Name}</div>
                             </div>
                         </div>
                     </div>
-                    
-                    <div className="grid w-full grid-cols-2 gap-3">
-                        <div className="p-3 text-center border rounded-xl bg-slate-900 border-slate-800">
+
+                    {/* Celkové výsledky – v landscape dva sloupce vedle sebe */}
+                    <div className={`grid w-full gap-3 landscape:grid-cols-2 landscape:gap-4 md:grid-cols-2`}>
+                        <div className="p-3 text-center border rounded-xl bg-slate-900 border-slate-800 landscape:p-2">
                             <div className="mb-1 text-xs font-bold text-slate-400">{displayP1Name}</div>
-                            <div className={`text-3xl font-black ${isP1 ? 'text-emerald-500' : 'text-slate-600'}`}>{mainP1}</div>
+                            <div className={`text-3xl font-black landscape:text-2xl ${isP1 ? 'text-emerald-500' : 'text-slate-600'}`}>{mainP1}</div>
                             <div className="text-xs font-mono text-slate-500">{isMultiSet ? `S | L ${data.p1Legs || 0}` : 'LEGS'}</div>
                         </div>
-                        <div className="p-3 text-center border rounded-xl bg-slate-900 border-slate-800">
+                        <div className="p-3 text-center border rounded-xl bg-slate-900 border-slate-800 landscape:p-2">
                             <div className="mb-1 text-xs font-bold text-slate-400">{displayP2Name}</div>
-                            <div className={`text-3xl font-black ${!isP1 ? 'text-purple-500' : 'text-slate-600'}`}>{mainP2}</div>
+                            <div className={`text-3xl font-black landscape:text-2xl ${!isP1 ? 'text-purple-500' : 'text-slate-600'}`}>{mainP2}</div>
                             <div className="text-xs font-mono text-slate-500">{isMultiSet ? `S | L ${data.p2Legs || 0}` : 'LEGS'}</div>
                         </div>
                     </div>
-                    {legsBreakdown && <div className="text-sm font-mono text-slate-400 mt-1 text-center">{legsBreakdown}</div>}
+                    {legsBreakdown && <div className="text-sm font-mono text-slate-400 text-center landscape:text-xs">{legsBreakdown}</div>}
 
                     {data.gameType === 'cricket' ? (
-                        <div className="flex justify-around w-full p-4 mt-4 border shadow-md bg-slate-900 rounded-xl border-slate-800">
-                            <div className="text-center"><div className="mb-1 text-xs font-bold tracking-widest uppercase text-slate-500">MPR</div><div className="font-mono text-3xl font-black text-emerald-400">{cP1Mpr}</div></div>
-                            <div className="text-center"><div className="mb-1 text-xs font-bold tracking-widest uppercase text-slate-500">MPR</div><div className="font-mono text-3xl font-black text-purple-400">{cP2Mpr}</div></div>
+                        <div className={`flex justify-around w-full p-4 border shadow-md bg-slate-900 rounded-xl border-slate-800 landscape:p-2`}>
+                            <div className="text-center"><div className="mb-1 text-xs font-bold tracking-widest uppercase text-slate-500 landscape:text-[10px]">MPR</div><div className="font-mono text-3xl font-black text-emerald-400 landscape:text-2xl">{cP1Mpr}</div></div>
+                            <div className="text-center"><div className="mb-1 text-xs font-bold tracking-widest uppercase text-slate-500 landscape:text-[10px]">MPR</div><div className="font-mono text-3xl font-black text-purple-400 landscape:text-2xl">{cP2Mpr}</div></div>
                         </div>
                     ) : (
                         <>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="p-3 border rounded-lg bg-slate-900 border-slate-800"><div className="mb-2 text-xs font-bold text-center text-slate-500">{t('avg3')}</div><div className="flex justify-between font-mono text-lg font-bold"><span className="text-emerald-400">{stats.p1Avg.toFixed(1)}</span><span className="text-purple-400">{stats.p2Avg.toFixed(1)}</span></div></div>
-                                <div className="p-3 border rounded-lg bg-slate-900 border-slate-800"><div className="mb-2 text-xs font-bold text-center text-slate-500">{t('highestCheckout')}</div><div className="flex justify-between font-mono text-lg font-bold"><span className="text-emerald-400">{stats.p1HighCheckout}</span><span className="text-purple-400">{stats.p2HighCheckout}</span></div></div>
+                            {/* Kompaktní 3-sloupcový grid: Průměr | Šipky (legs) | Zavření */}
+                            <div className="grid grid-cols-1 gap-2 landscape:grid-cols-3 landscape:gap-3 md:grid-cols-3">
+                                <div className="p-3 border rounded-lg bg-slate-900 border-slate-800 landscape:p-2">
+                                    <div className="mb-1 text-[10px] font-bold text-center text-slate-500 uppercase tracking-wider">{t('avg3')}</div>
+                                    <div className="flex justify-between font-mono text-lg font-bold landscape:text-base"><span className="text-emerald-400">{stats.p1Avg.toFixed(1)}</span><span className="text-purple-400">{stats.p2Avg.toFixed(1)}</span></div>
+                                </div>
+                                <div className="p-3 border rounded-lg bg-slate-900 border-slate-800 landscape:p-2">
+                                    <div className="mb-1 text-[10px] font-bold text-center text-slate-500 uppercase tracking-wider">{t('detailDarts')}</div>
+                                    <div className="flex justify-between font-mono text-lg font-bold landscape:text-base">
+                                        <span className="text-emerald-400">{stats.p1DartsTotal ?? '-'}</span>
+                                        <span className="text-purple-400">{stats.p2DartsTotal ?? '-'}</span>
+                                    </div>
+                                </div>
+                                <div className="p-3 border rounded-lg bg-slate-900 border-slate-800 landscape:p-2">
+                                    <div className="mb-1 text-[10px] font-bold text-center text-slate-500 uppercase tracking-wider">{t('highestCheckout')}</div>
+                                    <div className="flex justify-between font-mono text-lg font-bold landscape:text-base"><span className="text-emerald-400">{stats.p1HighCheckout}</span><span className="text-purple-400">{stats.p2HighCheckout}</span></div>
+                                </div>
                             </div>
                             <div className="w-full overflow-hidden border rounded-lg bg-slate-900 border-slate-800">
                                 <table className="w-full text-sm text-left">
-                                    <thead className="text-[10px] uppercase bg-slate-800 text-slate-400"><tr><th className="px-3 py-2">#</th><th className="px-3 py-2">{t('detailWinner')}</th><th className="px-3 py-2 text-center">{t('detailDarts')}</th><th className="px-3 py-2 text-right">{t('detailCheckout')}</th><th className="px-3 py-2 text-right">{t('detailAvg')}</th></tr></thead>
+                                    <thead className="text-[10px] uppercase bg-slate-800 text-slate-400"><tr><th className="px-2 py-1.5 landscape:px-2 landscape:py-1">#</th><th className="px-2 py-1.5 landscape:px-2 landscape:py-1">{t('detailWinner')}</th><th className="px-2 py-1.5 text-center landscape:px-2 landscape:py-1">{t('detailDarts')}</th><th className="px-2 py-1.5 text-right landscape:px-2 landscape:py-1">{t('detailCheckout')}</th><th className="px-2 py-1.5 text-right landscape:px-2 landscape:py-1">{t('detailAvg')}</th></tr></thead>
                                     <tbody className="divide-y divide-slate-800">
                                         {stats.legDetails.map(l => {
                                             const rowColor = l.winnerKey === 'p1' ? 'text-emerald-400' : 'text-purple-400';
                                             return (
                                                 <tr key={l.index}>
-                                                    <td className="px-3 py-2 font-bold text-slate-500">{l.index}</td>
-                                                    <td className={`px-3 py-2 font-bold ${rowColor}`}>{l.winner}</td>
-                                                    <td className={`px-3 py-2 text-center font-mono ${rowColor}`}>{l.darts}</td>
-                                                    <td className={`px-3 py-2 text-right font-mono ${rowColor}`}>{l.checkout || '-'}</td>
-                                                    <td className={`px-3 py-2 text-right font-mono ${rowColor}`}>{l.avg.toFixed(1)}</td>
+                                                    <td className="px-2 py-1.5 font-bold text-slate-500 landscape:py-1">{l.index}</td>
+                                                    <td className={`px-2 py-1.5 font-bold landscape:py-1 ${rowColor}`}>{l.winner}</td>
+                                                    <td className={`px-2 py-1.5 text-center font-mono landscape:py-1 ${rowColor}`}>{l.darts}</td>
+                                                    <td className={`px-2 py-1.5 text-right font-mono landscape:py-1 ${rowColor}`}>{l.checkout || '-'}</td>
+                                                    <td className={`px-2 py-1.5 text-right font-mono landscape:py-1 ${rowColor}`}>{l.avg.toFixed(1)}</td>
                                                 </tr>
                                             );
                                         })}
@@ -273,10 +329,21 @@ const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch }) =>
                         </>
                     )}
                     
-                    {/* TLAČÍTKO ODVETA */}
-                    <button onClick={onStartMatch} className="flex items-center justify-center w-full gap-3 py-4 mt-6 text-lg font-black text-white transition-all shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-xl active:scale-95">
-                        <RotateCcw className="w-6 h-6" /> {t('rematch')}
-                    </button>
+                    {/* ODVETA + hlas (stejný slovník jako GameX01) */}
+                    <div className="flex flex-col gap-2 mt-6">
+                        <button
+                            type="button"
+                            onClick={() => setIsMicRematch((v) => !v)}
+                            className={`flex items-center justify-center gap-2 w-full py-2 text-sm font-bold uppercase tracking-widest rounded-xl border transition-all ${isMicRematch ? 'bg-emerald-900/40 border-emerald-500 text-emerald-300' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
+                            title="Hlasová odveta (rematch)"
+                        >
+                            {isMicRematch ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                            {isMicRematch ? (t('micOn') || 'Mikrofon zapnutý') : (t('micOff') || 'Hlasová odveta')}
+                        </button>
+                        <button onClick={onStartMatch} className="flex items-center justify-center w-full gap-3 py-4 text-lg font-black text-white transition-all shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-xl active:scale-95">
+                            <RotateCcw className="w-6 h-6" /> {t('rematch')}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -434,18 +501,18 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, onLogin, lang, 
                 </div>
 
                 {gameTab === 'x01' && (
-                    <div className="flex flex-col gap-4 duration-300 animate-in fade-in">
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-                            <div className="flex flex-col items-center justify-center p-3 text-center border bg-slate-900 border-slate-800 sm:p-4 rounded-xl"><span className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">{t('avg3')}</span><span className="font-mono text-2xl font-black sm:text-3xl text-emerald-400">{overallAvg}</span></div>
-                            <div className="flex flex-col items-center justify-center p-3 text-center border bg-slate-900 border-slate-800 sm:p-4 rounded-xl"><span className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">{t('statsFirst9')}</span><span className="font-mono text-2xl font-black text-indigo-400 sm:text-3xl">{overallFirst9}</span></div>
-                            <div className="flex flex-col items-center justify-center p-3 text-center border bg-slate-900 border-slate-800 sm:p-4 rounded-xl">
+                    <div className="flex flex-col gap-4 duration-300 animate-in fade-in landscape:gap-2">
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 landscape:grid-cols-4 landscape:gap-2 landscape:p-1">
+                            <div className="flex flex-col items-center justify-center p-3 text-center border bg-slate-900 border-slate-800 sm:p-4 rounded-xl landscape:p-2"><span className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">{t('avg3')}</span><span className="font-mono text-2xl font-black sm:text-3xl landscape:text-xl text-emerald-400">{overallAvg}</span></div>
+                            <div className="flex flex-col items-center justify-center p-3 text-center border bg-slate-900 border-slate-800 sm:p-4 rounded-xl landscape:p-2"><span className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">{t('statsFirst9')}</span><span className="font-mono text-2xl font-black text-indigo-400 sm:text-3xl landscape:text-xl">{overallFirst9}</span></div>
+                            <div className="flex flex-col items-center justify-center p-3 text-center border bg-slate-900 border-slate-800 sm:p-4 rounded-xl landscape:p-2">
                                 <span className="text-[8px] sm:text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1">{t('winRate')}</span>
-                                <div className="flex items-center gap-2"><span className="font-mono text-2xl font-black text-blue-400 sm:text-3xl">{winRate}%</span><span className="text-sm font-bold text-slate-600">|</span><span className="font-mono text-2xl font-black sm:text-3xl text-cyan-400">{legWinRate}%</span></div>
+                                <div className="flex items-center gap-2"><span className="font-mono text-2xl font-black text-blue-400 sm:text-3xl landscape:text-xl">{winRate}%</span><span className="text-sm font-bold text-slate-600">|</span><span className="font-mono text-2xl font-black sm:text-3xl landscape:text-xl text-cyan-400">{legWinRate}%</span></div>
                                 <span className="text-[8px] sm:text-[9px] text-slate-500 mt-1">{filteredMatches.length} {t('matches')} / {x01LegsPlayed} {t('legs')}</span>
                             </div>
-                            <div className="flex flex-col items-center justify-center p-3 text-center border bg-slate-900 border-slate-800 sm:p-4 rounded-xl"><span className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">{t('statsAvgCheckout')}</span><span className="font-mono text-2xl font-black text-orange-400 sm:text-3xl">{avgCheckout}</span></div>
+                            <div className="flex flex-col items-center justify-center p-3 text-center border bg-slate-900 border-slate-800 sm:p-4 rounded-xl landscape:p-2"><span className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">{t('statsAvgCheckout')}</span><span className="font-mono text-2xl font-black text-orange-400 sm:text-3xl landscape:text-xl">{avgCheckout}</span></div>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 landscape:grid-cols-6 sm:gap-3">
+                        <div className="grid grid-cols-3 gap-2 landscape:grid-cols-6 sm:gap-3 landscape:gap-2">
                             <div className="flex flex-col items-center justify-center p-2 text-center border bg-slate-900 border-slate-800 sm:p-3 rounded-xl"><span className="text-[9px] text-slate-500 font-bold uppercase mb-1">{t('stats100p')}</span><span className="font-mono text-xl font-black text-white">{total100s}</span></div>
                             <div className="flex flex-col items-center justify-center p-2 text-center border bg-slate-900 border-slate-800 sm:p-3 rounded-xl"><span className="text-[9px] text-slate-500 font-bold uppercase mb-1">{t('stats140p')}</span><span className="font-mono text-xl font-black text-white">{total140s}</span></div>
                             <div className="flex flex-col items-center justify-center p-2 text-center border bg-slate-900 border-slate-800 sm:p-3 rounded-xl"><span className="text-[9px] text-slate-500 font-bold uppercase mb-1">{t('total180s')}</span><span className="font-mono text-xl font-black text-red-400">{total180s}</span></div>
@@ -482,28 +549,28 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, onLogin, lang, 
                 )}
 
                 {gameTab === 'cricket' && (
-                    <div className="flex flex-col gap-4 duration-300 animate-in fade-in">
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
-                            <div className="flex flex-col items-center justify-center p-6 text-center border shadow-lg bg-slate-900 border-slate-800 rounded-xl"><span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2">{t('totalMprInfo')}</span><span className="font-mono text-5xl font-black text-emerald-400">{overallMPR}</span></div>
-                            <div className="flex flex-col items-center justify-center p-6 text-center border bg-slate-900 border-slate-800 rounded-xl">
+                    <div className="flex flex-col gap-4 duration-300 animate-in fade-in landscape:gap-2">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 landscape:grid-cols-2 landscape:gap-2">
+                            <div className="flex flex-col items-center justify-center p-6 text-center border shadow-lg bg-slate-900 border-slate-800 rounded-xl landscape:p-3"><span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2">{t('totalMprInfo')}</span><span className="font-mono text-5xl font-black text-emerald-400 landscape:text-3xl">{overallMPR}</span></div>
+                            <div className="flex flex-col items-center justify-center p-6 text-center border bg-slate-900 border-slate-800 rounded-xl landscape:p-3">
                                 <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2">{t('winRate')}</span>
-                                <div className="flex items-center gap-4"><span className="font-mono text-4xl font-black text-blue-400">{winRate}%</span><span className="text-2xl font-bold text-slate-600">|</span><span className="font-mono text-4xl font-black text-cyan-400">{legWinRate}%</span></div>
+                                <div className="flex items-center gap-4"><span className="font-mono text-4xl font-black text-blue-400 landscape:text-2xl">{winRate}%</span><span className="text-2xl font-bold text-slate-600 landscape:text-xl">|</span><span className="font-mono text-4xl font-black text-cyan-400 landscape:text-2xl">{legWinRate}%</span></div>
                                 <span className="text-[9px] text-slate-500 mt-2">{filteredMatches.length} {t('matches')} / {cricLegsPlayed} {t('legs')}</span>
                             </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 mt-2 sm:gap-3">
-                            <div className="relative flex flex-col items-center justify-center p-4 overflow-hidden text-center border bg-slate-900 border-slate-800 rounded-xl">
+                        <div className="grid grid-cols-3 gap-2 mt-2 sm:gap-3 landscape:mt-0 landscape:gap-2">
+                            <div className="relative flex flex-col items-center justify-center p-4 overflow-hidden text-center border bg-slate-900 border-slate-800 rounded-xl landscape:p-2">
                                 <div className="absolute top-0 right-0 w-8 h-8 rounded-bl-full bg-yellow-500/10"></div>
                                 <span className="text-[9px] text-slate-500 font-bold uppercase mb-2 z-10">{t('whiteHorse')}</span>
-                                <span className="z-10 font-mono text-3xl font-black text-yellow-400">{whiteHorses}</span>
+                                <span className="z-10 font-mono text-3xl font-black text-yellow-400 landscape:text-2xl">{whiteHorses}</span>
                             </div>
-                            <div className="flex flex-col items-center justify-center p-4 text-center border bg-slate-900 border-slate-800 rounded-xl">
+                            <div className="flex flex-col items-center justify-center p-4 text-center border bg-slate-900 border-slate-800 rounded-xl landscape:p-2">
                                 <span className="text-[9px] text-slate-500 font-bold uppercase mb-2">{t('marks7plus')}</span>
-                                <span className="font-mono text-3xl font-black text-white">{highMarks}</span>
+                                <span className="font-mono text-3xl font-black text-white landscape:text-2xl">{highMarks}</span>
                             </div>
-                            <div className="flex flex-col items-center justify-center p-4 text-center border bg-slate-900 border-slate-800 rounded-xl">
+                            <div className="flex flex-col items-center justify-center p-4 text-center border bg-slate-900 border-slate-800 rounded-xl landscape:p-2">
                                 <span className="text-[9px] text-slate-500 font-bold uppercase mb-2">{t('marks5plus')}</span>
-                                <span className="font-mono text-3xl font-black text-slate-300">{goodMarks}</span>
+                                <span className="font-mono text-3xl font-black text-slate-300 landscape:text-2xl">{goodMarks}</span>
                             </div>
                         </div>
                     </div>
@@ -883,11 +950,11 @@ export default function App() {
       )}
       {/* --- HOME --- */}
       {appState === 'home' && (
-        <main className="flex-1 w-full overflow-y-auto p-4 sm:p-6 landscape:p-3">
-            <div className="w-full max-w-md mx-auto landscape:max-w-4xl landscape:grid landscape:grid-cols-2 landscape:items-center landscape:gap-4">
-                <div className="flex flex-col items-center gap-3 landscape:gap-3">
-                    <div className="flex flex-col items-center mb-1 landscape:mb-0">
-                        <div className="flex items-center justify-center w-20 h-20 mb-3 rounded-full shadow-lg bg-emerald-600 shadow-emerald-900/50 landscape:w-14 landscape:h-14 landscape:mb-2">
+        <main className="flex flex-col md:grid md:grid-cols-2 flex-1 w-full max-w-md md:max-w-4xl mx-auto items-center justify-center gap-6 md:gap-12 p-6 overflow-y-auto">
+                {/* Levý sloupec: logo, Nová hra, Google / profil */}
+                <div className="flex flex-col w-full gap-4 md:gap-6 items-center">
+                    <div className="flex flex-col items-center mb-1">
+                        <div className="flex items-center justify-center w-20 h-20 mb-3 rounded-full shadow-lg bg-emerald-600 shadow-emerald-900/50">
                             <Target className="w-10 h-10 text-slate-900" />
                         </div>
                         <h1 className="text-3xl font-black leading-none tracking-widest text-white">SIMPLE DART</h1>
@@ -896,18 +963,18 @@ export default function App() {
 
                     <button
                       onClick={() => setAppState('setup')}
-                      className="flex justify-center w-full gap-3 py-4 landscape:py-2.5 text-xl landscape:text-lg font-black text-white transition-transform shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-2xl active:scale-95"
+                      className="flex justify-center w-full gap-3 py-4 text-xl font-black text-white transition-transform shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-2xl active:scale-95"
                     >
                       <Play className="fill-current w-7 h-7" /> {t('newGame')}
                     </button>
 
                     {(!user || user.isAnonymous) ? (
-                        <button onClick={handleLogin} className="flex items-center justify-center w-full gap-3 p-3 mt-2 transition-transform border shadow-md bg-slate-900 hover:bg-slate-800 border-slate-700 rounded-xl active:scale-95 landscape:p-2.5 landscape:mt-3">
+                        <button onClick={handleLogin} className="flex items-center justify-center w-full gap-3 p-3 mt-2 transition-transform border shadow-md bg-slate-900 hover:bg-slate-800 border-slate-700 rounded-xl active:scale-95 md:mt-0">
                             <svg viewBox="0 0 24 24" className="w-5 h-5"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
                             <span className="text-xs font-bold tracking-widest uppercase text-slate-300">{t('loginWithGoogle') || 'Přihlásit přes Google'}</span>
                         </button>
                     ) : (
-                        <div className="flex items-center justify-between w-full p-3 mt-2 border shadow-md bg-slate-900 border-slate-700 rounded-xl landscape:p-2.5 landscape:mt-3">
+                        <div className="flex items-center justify-between w-full p-3 mt-2 border shadow-md bg-slate-900 border-slate-700 rounded-xl md:mt-0">
                             <div className="flex flex-col min-w-0 pr-2">
                                 <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Přihlášen jako:</span>
                                 <div className="flex items-center gap-1.5 text-slate-300">
@@ -924,20 +991,20 @@ export default function App() {
                                         p1Id: null
                                     }));
                                 }} 
-                                className="shrink-0 bg-red-900/20 hover:bg-red-900/40 border border-red-500/30 text-red-400 text-[10px] uppercase font-bold tracking-widest px-3 py-2 rounded-lg transition-colors landscape:py-1.5"
+                                className="shrink-0 bg-red-900/20 hover:bg-red-900/40 border border-red-500/30 text-red-400 text-[10px] uppercase font-bold tracking-widest px-3 py-2 rounded-lg transition-colors"
                             >
                                 {t('logout') || 'Odhlásit'}
                             </button>
                         </div>
                     )}
                 </div>
-                <div className="grid w-full grid-cols-2 gap-3 landscape:gap-2">
-                    <button onClick={() => setAppState('tutorial')} className="flex flex-col items-center gap-2 landscape:gap-1.5 p-4 landscape:p-3 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><FileText className="w-7 h-7 landscape:w-6 landscape:h-6 text-emerald-400" /><span className="text-sm landscape:text-xs font-bold text-white">{t('tutorial')}</span></button>
-                    <button onClick={() => setAppState('history')} className="flex flex-col items-center gap-2 landscape:gap-1.5 p-4 landscape:p-3 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><History className="text-blue-400 w-7 h-7 landscape:w-6 landscape:h-6" /><span className="text-sm landscape:text-xs font-bold text-white">{t('matchHistory')}</span></button>
-                    <button onClick={() => setAppState('profile')} className="flex flex-col items-center gap-2 landscape:gap-1.5 p-4 landscape:p-3 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><BarChart2 className="text-purple-400 w-7 h-7 landscape:w-6 landscape:h-6" /><span className="text-sm landscape:text-xs">{t('statsPersonal')}</span></button>
-                    <button onClick={() => setAppState('about')} className="flex flex-col items-center gap-2 landscape:gap-1.5 p-4 landscape:p-3 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><Info className="text-yellow-400 w-7 h-7 landscape:w-6 landscape:h-6" /><span className="text-sm landscape:text-xs font-bold text-white">{t('aboutApp')}</span></button>
+                {/* Pravý sloupec: 4 doplňková tlačítka */}
+                <div className="grid grid-cols-2 gap-3 w-full">
+                    <button onClick={() => setAppState('tutorial')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><FileText className="w-7 h-7 text-emerald-400" /><span className="text-sm font-bold text-white">{t('tutorial')}</span></button>
+                    <button onClick={() => setAppState('history')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><History className="text-blue-400 w-7 h-7" /><span className="text-sm font-bold text-white">{t('matchHistory')}</span></button>
+                    <button onClick={() => setAppState('profile')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><BarChart2 className="text-purple-400 w-7 h-7" /><span className="text-sm">{t('statsPersonal')}</span></button>
+                    <button onClick={() => setAppState('about')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><Info className="text-yellow-400 w-7 h-7" /><span className="text-sm font-bold text-white">{t('aboutApp')}</span></button>
                 </div>
-            </div>
         </main>
       )}
 

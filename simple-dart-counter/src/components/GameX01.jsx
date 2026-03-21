@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Ban, CheckCircle, Delete, Mic, MicOff, Trophy, Undo2, X } from 'lucide-react';
 import { translations } from '../translations';
+import {
+  SPEECH_LANG_MAP,
+  normalizeSpeechCommand,
+  parseNumberFromSpeech,
+  matchesAnyPhrase,
+  VOICE_PHRASES,
+  CHECKOUT_VOICE_PHRASES,
+  getBustPointsForActiveScore,
+} from '../voiceSpeech';
 
 const IMPOSSIBLE_SCORES = [163, 166, 169, 172, 173, 175, 176, 178, 179];
 
@@ -108,7 +117,7 @@ const FinishDartsSelector = ({ points, minDarts, onConfirm, onCancel, lang, play
     );
 };
 
-export default function GameX01({ settings, lang, onMatchComplete, isLandscape, isPC, restoredGameState, onRestoredConsumed }) {
+export default function GameX01({ settings, lang, onMatchComplete, isLandscape, isPC, restoredGameState, onRestoredConsumed, onRematchVoice }) {
     // 1. Zde máte překladovou funkci (pokud ne, přidejte ji)
   const t = (k) => translations[lang]?.[k] || k;
 
@@ -152,6 +161,7 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
   const [finishData, setFinishData] = useState(null);
   const [setScores, setSetScores] = useState(() => restoredGameState?.setScores || []);
 
+  const [highScoreAnimation, setHighScoreAnimation] = useState(null);
   const [longPressIdx, setLongPressIdx] = useState(null);
   const longPressTimer = useRef(null);
   const historyRef = useRef(null);
@@ -166,6 +176,9 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
   const finishDataRef = useRef(finishData);
   const processTurnRef = useRef(null);
   const handleTurnCommitRef = useRef(null);
+  const handleUndoClickRef = useRef(null);
+  const handleNextLegRef = useRef(null);
+  const handleVoiceCommandRef = useRef(() => {});
   const micTimeoutRef = useRef(null);
 
   const [quickButtons, setQuickButtons] = useState(settings.quickButtons || [41, 45, 60, 100, 140, 180]);
@@ -203,128 +216,6 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
       return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [editingMove, finishData, isPC, gameState.matchWinner]);
 
-  // Pomocná funkce: převod mluvených čísel na číslo (např. "sto" -> 100)
-  const parseNumberFromSpeech = (transcript) => {
-      if (!transcript) return null;
-      // 1) nejdřív zkusit číslice (původní chování, když engine vrátí např. "100")
-      const digits = transcript.match(/\d+/g);
-      if (digits) return parseInt(digits.join(''));
-
-      const text = transcript.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-      // Pár konkrétních frází pro skóre do 180 (cz)
-      const exactMap = {
-          'sto osmdesat': 180,
-          'sto sedmdesat': 170,
-          'sto sedesat': 160,
-          'sto padesat': 150,
-          'sto ctyricet': 140,
-          'sto tricet': 130,
-          'sto dvacet': 120,
-          'sto deset': 110,
-          'sto': 100
-      };
-      if (exactMap[text] != null) return exactMap[text];
-
-      // Základní slovní čísla – hlavně pro 1–3 ("na dvě", "na tři" atd.)
-      const wordToNum = {
-          // Czech
-          'nula': 0, 'jedna': 1, 'jeden': 1, 'dva': 2, 'dve': 2, 'tri': 3,
-          'ctyri': 4, 'pet': 5, 'sest': 6, 'sedm': 7, 'osm': 8, 'devet': 9,
-          'deset': 10,
-          // English
-          'zero': 0, 'one': 1, 'two': 2, 'three': 3,
-          // Polish (základ)
-          'jeden': 1, 'dwa': 2, 'trzy': 3
-      };
-      const tokens = text.split(/\s+/);
-      for (let i = 0; i < tokens.length; i++) {
-          const w = tokens[i];
-          if (wordToNum[w] != null) {
-              return wordToNum[w];
-          }
-      }
-      return null;
-  };
-
-  // Mikrofon
-  useEffect(() => {
-      let recognition = recognitionRef.current;
-      if (isMicActive) {
-          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-          if (!SpeechRecognition) {
-              setIsMicActive(false); setErrorMsg(String(translations[lang]?.micError || 'Chyba mikrofonu')); setTimeout(() => setErrorMsg(''), 2000); return;
-          }
-          recognition = new SpeechRecognition();
-          recognition.continuous = true; recognition.interimResults = false;
-          recognition.lang = lang === 'en' ? 'en-US' : (lang === 'pl' ? 'pl-PL' : 'cs-CZ');
-          recognition.onstart = () => setIsListening(true);
-          recognition.onend = () => { setIsListening(false); if (isMicActiveRef.current) { try { recognition.start(); } catch(e) {} } };
-          recognition.onresult = (event) => { handleVoiceCommand(event.results[event.results.length - 1][0].transcript.toLowerCase().trim()); };
-          recognition.onerror = (e) => { if (e.error === 'not-allowed') { setIsMicActive(false); setErrorMsg('Přístup k mikrofonu odepřen.'); setTimeout(() => setErrorMsg(''), 2500); } };
-          try { recognition.start(); } catch(e) {}
-          recognitionRef.current = recognition;
-      } else {
-          if (recognition) { recognition.onend = null; recognition.stop(); setIsListening(false); }
-      }
-      return () => { if (recognition) { recognition.onend = null; recognition.stop(); } };
-  }, [isMicActive, lang]);
-
-  const handleVoiceCommand = (transcript) => {
-      const tMap = translations[lang];
-      // už čekáme jen na počet šipek pro checkout
-      if (finishDataRef.current) {
-          const num = parseNumberFromSpeech(transcript);
-          if (num != null) {
-              if (num >= finishDataRef.current.minD && num <= 3) {
-                  processTurnRef.current(finishDataRef.current.points, num);
-                  setFinishData(null);
-              } else {
-                  setErrorMsg(`Nemožné zavřít na ${num} šipek`);
-                  setTimeout(() => setErrorMsg(''), 2000);
-              }
-          }
-          return; 
-      }
-      // "zavřeno na dvě / tři" – zkusíme z hlasu vytáhnout i počet šipek
-      if (tMap?.checkoutPhrases?.some(p => transcript.includes(p))) {
-          if (!gameStateRef.current.winner) {
-              const cScore = gameStateRef.current.currentPlayer === 'p1' ? gameStateRef.current.p1Score : gameStateRef.current.p2Score;
-              const requestedDarts = parseNumberFromSpeech(transcript);
-              if (requestedDarts != null && requestedDarts >= 1 && requestedDarts <= 3) {
-                  const minD = getMinDartsToCheckout(cScore, settings.outMode);
-                  if (minD === Infinity || requestedDarts < minD) {
-                      setErrorMsg(`Nemožné zavřít na ${requestedDarts} šipky`);
-                      setTimeout(() => setErrorMsg(''), 2000);
-                  } else {
-                      processTurnRef.current(cScore, requestedDarts);
-                  }
-              } else {
-                  // bez konkrétního počtu šipek – chová se jako dříve
-                  handleTurnCommitRef.current(cScore);
-              }
-          }
-          return;
-      }
-      if (tMap?.cmdUndo?.some(p => transcript.includes(p))) {
-           if (!gameStateRef.current.winner && gameStateRef.current.history.length > 0) handleUndoClick();
-           return;
-      }
-      if (tMap?.cmdNextLeg?.some(p => transcript.includes(p))) {
-          if (gameStateRef.current.winner && !gameStateRef.current.matchWinner) handleNextLeg();
-          return;
-      }
-      if (!gameStateRef.current.winner) {
-          const num = parseNumberFromSpeech(transcript);
-          if (num != null && num >= 0 && num <= 180) {
-              handleTurnCommitRef.current(num);
-          } else {
-              setErrorMsg(`? "${transcript}"`);
-              setTimeout(() => setErrorMsg(''), 1500);
-          }
-      }
-  };
-
   const toggleMic = () => setIsMicActive(!isMicActive);
 
   // Bot logic
@@ -361,7 +252,8 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
       processTurn(Math.min(180, Math.max(0, pts)), cScore === pts ? getMinDartsToCheckout(cScore, settings.outMode) : 3);
   };
 
-  const recalculateGame = (baseHistory) => {
+  const recalculateGame = (baseHistory, baseState) => {
+    const bs = baseState ?? gameState;
     const moves = [...baseHistory].reverse();
     let p1 = settings.startScore, p2 = settings.startScore, winner = null;
     const rec = moves.map((move, i) => {
@@ -372,8 +264,8 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
       if (!isBust && nS === 0) winner = move.player;
       return { ...move, remaining: move.player === 'p1' ? p1 : p2, isBust, turn: i + 1 };
     });
-    let nP = rec.length > 0 ? (rec[rec.length - 1].player === 'p1' ? 'p2' : 'p1') : gameState.startingPlayer;
-    return { ...gameState, p1Score: p1, p2Score: p2, history: rec.reverse(), winner, currentPlayer: winner ? winner : nP };
+    let nP = rec.length > 0 ? (rec[rec.length - 1].player === 'p1' ? 'p2' : 'p1') : bs.startingPlayer;
+    return { ...bs, p1Score: p1, p2Score: p2, history: rec.reverse(), winner, currentPlayer: winner ? winner : nP };
   };
 
   const processTurn = (points, dartsCount = 3) => {
@@ -424,7 +316,14 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
     } else { 
       setGameState(ns); 
     }
-    
+
+    if (pts >= 95 && !ns.history[0].isBust) {
+      const isP1 = gameState.currentPlayer === 'p1';
+      const color = isP1 ? 'rgb(52,211,153)' : 'rgb(168,85,247)';
+      setHighScoreAnimation({ score: pts, color });
+      setTimeout(() => setHighScoreAnimation(null), 1500);
+    }
+
     setCurrentInput('');
   };
   processTurnRef.current = processTurn;
@@ -440,12 +339,13 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
   handleTurnCommitRef.current = handleTurnCommit;
 
   const handleUndoClick = () => {
-    if (gameState.history.length === 0) return;
+    const gs = gameStateRef.current;
+    if (gs.history.length === 0) return;
     let sliceCount = 1;
-    if (settings.isBot && gameState.currentPlayer === 'p1' && gameState.history.length >= 2) {
-        if (gameState.history[0].player === 'p2') sliceCount = 2;
+    if (settings.isBot && gs.currentPlayer === 'p1' && gs.history.length >= 2) {
+        if (gs.history[0].player === 'p2') sliceCount = 2;
     }
-    setGameState(recalculateGame(gameState.history.slice(sliceCount)));
+    setGameState(recalculateGame(gs.history.slice(sliceCount), gs));
   };
 
   const handleQuickBtnDown = (idx) => { setLongPressIdx(idx); longPressTimer.current = setTimeout(() => { if (currentInput && parseInt(currentInput) <= 180) { const newB = [...quickButtons]; newB[idx] = parseInt(currentInput); setQuickButtons(newB); setCurrentInput(''); setErrorMsg(String(translations[lang]?.presetSaved || 'Uloženo')); setTimeout(()=>setErrorMsg(''), 1000); } setLongPressIdx(null); }, 700); };
@@ -468,7 +368,7 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
     const restorePayload = { gameState, setScores };
 
     const uh = gameState.history.map(m => m.id === editingMove.id ? { ...m, score: newS, dartsUsed: (m.remaining+m.score-newS)===0 ? newD : 3 } : m);
-    const ns = recalculateGame(uh);
+    const ns = recalculateGame(uh, gameState);
     
     let nextP1Legs = gameState.p1Legs;
     let nextP2Legs = gameState.p2Legs;
@@ -508,6 +408,150 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
       setCurrentInput('');
       setFinishData(null);
   };
+
+  handleUndoClickRef.current = handleUndoClick;
+  handleNextLegRef.current = handleNextLeg;
+
+  const handleVoiceCommand = (rawTranscript) => {
+    const command = normalizeSpeechCommand(rawTranscript);
+    const gs = gameStateRef.current;
+    const tMap = translations[lang];
+    const legacyUndo = Array.isArray(tMap?.cmdUndo) ? tMap.cmdUndo : [];
+    const legacyNext = Array.isArray(tMap?.cmdNextLeg) ? tMap.cmdNextLeg : [];
+    const checkoutPhrases = [
+      ...(Array.isArray(tMap?.checkoutPhrases) ? tMap.checkoutPhrases : []),
+      ...CHECKOUT_VOICE_PHRASES,
+    ];
+
+    if (matchesAnyPhrase(command, [...VOICE_PHRASES.undo, ...legacyUndo])) {
+      if (finishDataRef.current) {
+        setFinishData(null);
+        return;
+      }
+      if (!gs.winner && gs.history.length > 0) {
+        handleUndoClickRef.current();
+      }
+      return;
+    }
+
+    if (finishDataRef.current) {
+      const num = parseNumberFromSpeech(rawTranscript);
+      if (num != null && num >= finishDataRef.current.minD && num <= 3) {
+        processTurnRef.current(finishDataRef.current.points, num);
+        setFinishData(null);
+      } else if (num != null) {
+        setErrorMsg(`Nemožné zavřít na ${num} šipek`);
+        setTimeout(() => setErrorMsg(''), 2000);
+      }
+      return;
+    }
+
+    if (gs.matchWinner && typeof onRematchVoice === 'function' && matchesAnyPhrase(command, VOICE_PHRASES.rematch)) {
+      onRematchVoice();
+      return;
+    }
+
+    if (matchesAnyPhrase(command, [...VOICE_PHRASES.nextLeg, ...legacyNext])) {
+      if (gs.winner && !gs.matchWinner) {
+        handleNextLegRef.current();
+      }
+      return;
+    }
+
+    if (matchesAnyPhrase(command, VOICE_PHRASES.bust)) {
+      if (!gs.winner) {
+        const cScore = gs.currentPlayer === 'p1' ? gs.p1Score : gs.p2Score;
+        const bustPts = getBustPointsForActiveScore(cScore);
+        handleTurnCommitRef.current(bustPts);
+      }
+      return;
+    }
+
+    const checkoutMatch = checkoutPhrases.some((p) => matchesAnyPhrase(command, [p]));
+    if (checkoutMatch) {
+      if (!gs.winner) {
+        const cScore = gs.currentPlayer === 'p1' ? gs.p1Score : gs.p2Score;
+        const requestedDarts = parseNumberFromSpeech(rawTranscript);
+        if (requestedDarts != null && requestedDarts >= 1 && requestedDarts <= 3) {
+          const minD = getMinDartsToCheckout(cScore, settings.outMode);
+          if (minD === Infinity || requestedDarts < minD) {
+            setErrorMsg(`Nemožné zavřít na ${requestedDarts} šipky`);
+            setTimeout(() => setErrorMsg(''), 2000);
+          } else {
+            processTurnRef.current(cScore, requestedDarts);
+          }
+        } else {
+          handleTurnCommitRef.current(cScore);
+        }
+      }
+      return;
+    }
+
+    if (!gs.winner) {
+      const num = parseNumberFromSpeech(rawTranscript);
+      if (num != null && num >= 0 && num <= 180) {
+        handleTurnCommitRef.current(num);
+      } else {
+        setErrorMsg(`? "${command}"`);
+        setTimeout(() => setErrorMsg(''), 1500);
+      }
+    }
+  };
+
+  handleVoiceCommandRef.current = handleVoiceCommand;
+
+  useEffect(() => {
+    let recognition = recognitionRef.current;
+    if (isMicActive) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        setIsMicActive(false);
+        setErrorMsg(String(translations[lang]?.micError || 'Chyba mikrofonu'));
+        setTimeout(() => setErrorMsg(''), 2000);
+        return;
+      }
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = SPEECH_LANG_MAP[lang] || 'cs-CZ';
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => {
+        setIsListening(false);
+        if (isMicActiveRef.current) {
+          try {
+            recognition.start();
+          } catch (e) {}
+        }
+      };
+      recognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript;
+        handleVoiceCommandRef.current(transcript);
+      };
+      recognition.onerror = (e) => {
+        if (e.error === 'not-allowed') {
+          setIsMicActive(false);
+          setErrorMsg('Přístup k mikrofonu odepřen.');
+          setTimeout(() => setErrorMsg(''), 2500);
+        }
+      };
+      try {
+        recognition.start();
+      } catch (e) {}
+      recognitionRef.current = recognition;
+    } else {
+      if (recognition) {
+        recognition.onend = null;
+        recognition.stop();
+        setIsListening(false);
+      }
+    }
+    return () => {
+      if (recognition) {
+        recognition.onend = null;
+        recognition.stop();
+      }
+    };
+  }, [isMicActive, lang]);
 
   const handleBackFromLeg = () => {
     if (!prevNextLegStateRef.current) return;
@@ -585,7 +629,20 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
 
   return (
     <>
-      <main className={`flex-1 overflow-hidden p-1 sm:p-2 grid gap-1 sm:gap-2 ${isLandscape ? 'grid-cols-[1fr_1.5fr_1fr]' : 'flex flex-col'}`}>
+      <main className={`relative flex-1 overflow-hidden p-1 sm:p-2 grid gap-1 sm:gap-2 ${isLandscape ? 'grid-cols-[1fr_1.5fr_1fr]' : 'flex flex-col'}`}>
+        {highScoreAnimation !== null && (
+          <div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50"
+            aria-hidden
+          >
+            <span
+              className="block text-6xl md:text-8xl font-black font-mono animate-high-score-pop"
+              style={{ color: highScoreAnimation.color, textShadow: `0 0 20px ${highScoreAnimation.color}99` }}
+            >
+              {highScoreAnimation.score}!
+            </span>
+          </div>
+        )}
         <div className={`w-full flex items-center justify-center rounded-lg border border-slate-800 bg-slate-900/70 py-1 px-2 ${isLandscape ? 'col-span-3' : ''}`}>
             {(settings.matchSets || 1) === 1 ? (
                 <div className="text-sm sm:text-base font-black text-yellow-400 tracking-wider">LEGS {gameState.p1Legs} - {gameState.p2Legs}</div>
