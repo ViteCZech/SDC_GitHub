@@ -14,15 +14,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: simple-dart-counter/package-lock.json
           
-      - name: Totální očista a Build
-        env:
-          CI: false 
+      - name: Instalace a build (lockfile)
         run: |
-          rm -rf node_modules package-lock.json dist dev-dist
-          npm install
-          # Kobercový nálet: Pojistka pro všechny knihovny, které aplikace prokazatelně používá
-          npm install firebase lucide-react vite-plugin-pwa tailwindcss postcss autoprefixer
+          rm -rf node_modules dist dev-dist
+          npm ci
           npm run build
         working-directory: simple-dart-counter
 
