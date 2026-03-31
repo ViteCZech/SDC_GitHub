@@ -286,6 +286,8 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
       const legTarget = settings.matchMode === 'first_to' ? settings.matchTarget : Math.ceil(settings.matchTarget / 2);
       let p1W = ns.winner === 'p1' ? gameState.p1Legs + 1 : gameState.p1Legs;
       let p2W = ns.winner === 'p2' ? gameState.p2Legs + 1 : gameState.p2Legs;
+      // Před resetem setu (p1W/p2W → 0) uložíme skóre legů pro turnaj / statistiky
+      const legsAtEndOfMatch = { p1: p1W, p2: p2W };
       let p1S = gameState.p1Sets || 0;
       let p2S = gameState.p2Sets || 0;
       let nextSetScores = [...setScores];
@@ -299,7 +301,16 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
       const uLegs = [...gameState.completedLegs, { history: ns.history, winner: ns.winner }];
 
       if (isOver) {
-        const record = { id: Date.now(), date: new Date().toLocaleString(), gameType: 'x01', p1Name: settings.p1Name, p1Id: settings.p1Id || null, p2Name: settings.p2Name, p2Id: settings.p2Id || null, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S, matchSets: settings.matchSets || 1, setScores: nextSetScores, matchWinner: ns.winner, completedLegs: uLegs, isBot: settings.isBot, botLevel: settings.botLevel, botAvg: settings.botAvg };
+        // TODO: Zde se později vykreslí komponenta 'GroupStandingsPreview' pro hráče na tabletu, než se vrátí do fronty zápasů.
+        const finalResult = {
+          player1: { legsWon: legsAtEndOfMatch.p1 },
+          player2: { legsWon: legsAtEndOfMatch.p2 },
+        };
+        const resultForStore = {
+          p1Legs: Number(finalResult.player1.legsWon) || 0,
+          p2Legs: Number(finalResult.player2.legsWon) || 0,
+        };
+        const record = { id: Date.now(), date: new Date().toLocaleString(), gameType: 'x01', p1Name: settings.p1Name, p1Id: settings.p1Id || null, p2Name: settings.p2Name, p2Id: settings.p2Id || null, p1Legs: resultForStore.p1Legs, p2Legs: resultForStore.p2Legs, finalResult, p1Sets: p1S, p2Sets: p2S, matchSets: settings.matchSets || 1, setScores: nextSetScores, matchWinner: ns.winner, completedLegs: uLegs, isBot: settings.isBot, botLevel: settings.botLevel, botAvg: settings.botAvg };
         setSetScores(nextSetScores);
         // Vypnout mikrofon 10 vteřin po konci zápasu (pokud je teď zapnutý)
         if (isMicActiveRef.current) {
@@ -389,7 +400,15 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
         const isOver = nextP1Legs >= tgt || nextP2Legs >= tgt;
 
         if (isOver) {
-           const record = { id: Date.now(), date: new Date().toLocaleString(), gameType: 'x01', p1Name: settings.p1Name, p1Id: settings.p1Id || null, p2Name: settings.p2Name, p2Id: settings.p2Id || null, p1Legs: nextP1Legs, p2Legs: nextP2Legs, matchWinner: ns.winner, completedLegs: nextCompletedLegs, isBot: settings.isBot, botLevel: settings.botLevel, botAvg: settings.botAvg };
+           const finalResult = {
+             player1: { legsWon: nextP1Legs },
+             player2: { legsWon: nextP2Legs },
+           };
+           const resultForStore = {
+             p1Legs: Number(finalResult.player1.legsWon) || 0,
+             p2Legs: Number(finalResult.player2.legsWon) || 0,
+           };
+           const record = { id: Date.now(), date: new Date().toLocaleString(), gameType: 'x01', p1Name: settings.p1Name, p1Id: settings.p1Id || null, p2Name: settings.p2Name, p2Id: settings.p2Id || null, p1Legs: resultForStore.p1Legs, p2Legs: resultForStore.p2Legs, finalResult, matchWinner: ns.winner, completedLegs: nextCompletedLegs, isBot: settings.isBot, botLevel: settings.botLevel, botAvg: settings.botAvg };
            setEditingMove(null);
            onMatchComplete(record, restorePayload);
            return;

@@ -1,12 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, deleteUser } from 'firebase/auth';
-import { getFirestore, collection, addDoc, deleteDoc, doc, query, where, getDocs } from 'firebase/firestore';
+import { signInAnonymously, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, deleteUser } from 'firebase/auth';
+import { collection, addDoc, deleteDoc, doc, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { db, auth } from './firebase';
+import {
+  syncTournamentToCloud,
+  deleteCloudTournament,
+  archivePastTournamentAndDeleteActive,
+  listenToCloudTournament,
+  verifyTournamentPin,
+  updateCloudMatchFromTablet,
+  mergeAdminGroupMatchesFromTabletCloud,
+  mergeAdminBracketFromTabletCloud,
+} from './services/tournamentSync';
 import { 
   AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, Delete, 
   DownloadCloud, FileText, History, Home, Info, Keyboard as KeyboardIcon, 
   Maximize, Minimize, Mic, MicOff, MousePointer2, Play, RefreshCw, RotateCcw, 
-  Target, Trash2, Trophy, Undo2, User, Cloud, X, BarChart2, List, Swords
+  Target, Trash2, Trophy, Undo2, Unplug, User, Cloud, X, BarChart2, List, Swords
 } from 'lucide-react';
 
 import { translations } from './translations';
@@ -14,34 +24,464 @@ import { matchesRematchPhrase, normalizeSpeechCommand, SPEECH_LANG_MAP } from '.
 import GameX01 from './components/GameX01';
 import GameCricket from './components/GameCricket';
 import GameStats from './Stats';
+import TournamentSetup from './components/TournamentSetup';
+import TournamentHub from './components/TournamentHub';
+import TournamentBoardAssignment from './components/TournamentBoardAssignment';
+import TournamentGroupsView from './components/TournamentGroupsView';
+import TournamentBracketView from './components/TournamentBracketView';
+import TournamentStatisticsView from './components/TournamentStatisticsView';
+import TabletWaitingRoom from './components/TabletWaitingRoom';
+import TournamentHistory from './components/TournamentHistory';
+import { distributePlayersToFixedGroups, generateGroupMatches } from './utils/tournamentGenerator';
+import {
+  generateBracketStructure,
+  getBracketWinLegsForRound,
+  autoAssignSequentialBoardsToRound,
+  updateBracketReferees,
+  propagateBracketWinners,
+  isRealPendingBracketMatch,
+  calculateGroupStandings,
+  isTournamentBracketOnlyFormat,
+} from './utils/tournamentLogic';
 
-const APP_VERSION = "v1.9.6"; 
+const APP_VERSION = "v1.9.6";
+
+function generatePin() {
+  return Math.floor(1000 + Math.random() * 9000).toString();
+}
+
+function createDefaultTournamentDraft() {
+  return {
+    name: '',
+    format: 'groups_bracket',
+    groupLegs: 2,
+    bracketLegs: 3,
+    startScore: 501,
+    outMode: 'double',
+    numBoards: 2,
+    players: [],
+    /** Stejný význam jako advancePerGroup – pro Referee Engine když ještě není v tournamentData */
+    promotersCount: 2,
+    /** map groupId -> raw text z inputu (např. "1, 2") – přežije Zpět z přiřazení terčů */
+    boardAssignments: {},
+    /** Číslo terče z rozcestníku „tablet“ (Firebase později) */
+    hubTabletBoard: '',
+    /** PIN turnaje – přiřadí se hned při vstupu do administrace (před dokončením setupu) */
+    pin: '',
+    /** Síťová hra / tablety – pouze po přihlášení (Google); ukládá se do tournamentData */
+    cloudEnabled: false,
+  };
+}
 
 const safeStorage = {
   getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return null; } },
-  setItem: (key, value) => { try { localStorage.setItem(key, value); } catch (e) {} }
+  setItem: (key, value) => { try { localStorage.setItem(key, value); } catch (e) {} },
+  removeItem: (key) => { try { localStorage.removeItem(key); } catch (e) {} },
+  clear: () => { try { localStorage.clear(); } catch (e) {} },
 };
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCJuKUfdx5hC6jbtgBN_zXEnlVaq6mjcM0",
-  authDomain: "simple-dart-counter-12ff2.firebaseapp.com",
-  projectId: "simple-dart-counter-12ff2",
-  storageBucket: "simple-dart-counter-12ff2.firebasestorage.app",
-  messagingSenderId: "874074054437",
-  appId: "1:874074054437:web:712eec6b4c4f8b9ed644cc",
-  measurementId: "G-5NBXTH3LM7"
-};
+const TOURNAMENT_WIP_KEY = 'dartsTournamentSetupWip';
 
-let app, auth, db;
-try {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app, 'eur3');
-} catch (e) {
-    console.error("Firebase Init Error:", e);
+const SESSION_ROLE_KEY = 'dartsSessionRole';
+const SESSION_PIN_KEY = 'dartsSessionPin';
+const SESSION_BOARD_KEY = 'dartsSessionBoard';
+
+function persistSpectatorSession(role, pin, boardStr = '') {
+  if (role !== 'viewer' && role !== 'tablet') return;
+  const p = String(pin ?? '').trim();
+  if (!/^\d{4}$/.test(p)) return;
+  safeStorage.setItem(SESSION_ROLE_KEY, role);
+  safeStorage.setItem(SESSION_PIN_KEY, p);
+  if (role === 'tablet') {
+    safeStorage.setItem(SESSION_BOARD_KEY, String(boardStr ?? '').trim());
+  } else {
+    safeStorage.removeItem(SESSION_BOARD_KEY);
+  }
+}
+
+function clearSpectatorSession() {
+  safeStorage.removeItem(SESSION_ROLE_KEY);
+  safeStorage.removeItem(SESSION_PIN_KEY);
+  safeStorage.removeItem(SESSION_BOARD_KEY);
+}
+
+function writeTournamentWip(pin) {
+  safeStorage.setItem(TOURNAMENT_WIP_KEY, JSON.stringify({ pin: String(pin).trim() }));
+}
+
+function clearTournamentWip() {
+  safeStorage.removeItem(TOURNAMENT_WIP_KEY);
+}
+
+/** Obecné načtení JSON z localStorage s bezpečným fallbackem. */
+function loadInitialState(key, fallback) {
+  try {
+    const item = safeStorage.getItem(key);
+    if (item == null || item === '') return fallback;
+    const parsed = JSON.parse(item);
+    if (parsed === null || parsed === undefined) return fallback;
+    return parsed;
+  } catch (error) {
+    console.error(`Chyba načítání ${key}:`, error);
+    safeStorage.removeItem(key);
+    return fallback;
+  }
+}
+
+const LOCAL_TOURNAMENT_HISTORY_KEY = 'darts_history_local';
+
+function appendLocalTournamentHistory(entry) {
+  const prev = loadInitialState(LOCAL_TOURNAMENT_HISTORY_KEY, []);
+  const arr = Array.isArray(prev) ? [...prev, entry] : [entry];
+  try {
+    safeStorage.setItem(LOCAL_TOURNAMENT_HISTORY_KEY, JSON.stringify(arr));
+  } catch (e) {
+    console.warn('appendLocalTournamentHistory:', e);
+  }
+}
+
+function loadSafeMatchHistory() {
+  const parsed = loadInitialState('dartsMatchHistory', []);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+/**
+ * Turnaj z localStorage. Vždy vrací { value, hadError } — při prázdné paměti value === null.
+ */
+function loadSafeTournamentData() {
+  try {
+    const raw = safeStorage.getItem('dartsTournamentData');
+    if (!raw) return { value: null, hadError: false };
+    const parsed = JSON.parse(raw);
+    const isObj = parsed && typeof parsed === 'object' && !Array.isArray(parsed);
+    const hasPlayers = Array.isArray(parsed?.players);
+    const hasFormat = parsed?.tournamentFormat == null || typeof parsed.tournamentFormat === 'string';
+    if (!isObj || !hasPlayers || !hasFormat) {
+      throw new Error('Invalid data format');
+    }
+    if (parsed.tournamentFormat === 'groups_ko') parsed.tournamentFormat = 'groups_bracket';
+    if (parsed.tournamentFormat === 'ko_only') parsed.tournamentFormat = 'bracket_only';
+    return { value: parsed, hadError: false };
+  } catch (error) {
+    console.error('Chyba při načítání uloženého turnaje. Data byla resetována:', error);
+    safeStorage.removeItem('dartsTournamentData');
+    // legacy key cleanup
+    safeStorage.removeItem('dartsTournament');
+    return { value: null, hadError: true };
+  }
+}
+
+/** Jednorázové načtení turnaje při startu (data + pavouk z localStorage). */
+let __initialTournamentBootstrapOnce = null;
+function getInitialTournamentBootstrapOnce() {
+  if (__initialTournamentBootstrapOnce === null) {
+    const { value, hadError } = loadSafeTournamentData();
+    if (!value) {
+      __initialTournamentBootstrapOnce = { td: null, bracket: [], hadError };
+    } else {
+      const bracket = Array.isArray(value.tournamentBracket) ? value.tournamentBracket : [];
+      const { tournamentBracket: _tb, ...td } = value;
+      __initialTournamentBootstrapOnce = { td, bracket, hadError };
+    }
+  }
+  return __initialTournamentBootstrapOnce;
 }
 
 const appId = 'sdc_global_production';
+
+const ACTIVE_TOURNAMENTS_COLL = 'active_tournaments';
+
+/** Jméno hráče z turnaje (flat players + skupiny). */
+function resolveTournamentPlayerName(playerId, tournamentData) {
+  if (playerId == null || playerId === '') return '';
+  const id = String(playerId);
+  const td = tournamentData;
+  const flat = td?.players;
+  if (Array.isArray(flat)) {
+    const p = flat.find((x) => String(x.id ?? '') === id);
+    if (p?.name != null && String(p.name).trim() !== '') return String(p.name);
+  }
+  for (const g of td?.groups || []) {
+    const pl = (g.players || []).find((x) => String(x.id ?? '') === id);
+    if (pl?.name != null && String(pl.name).trim() !== '') return String(pl.name);
+  }
+  return '';
+}
+
+function enrichTabletMatchPlayerNames(raw, tournamentData, tournamentGroups) {
+  if (!raw) return raw;
+  let groupPlayers = [];
+  if (raw.groupId) {
+    const grp =
+      tournamentGroups.find((g) => g.groupId === raw.groupId) ||
+      tournamentData?.groups?.find((g) => g.groupId === raw.groupId);
+    groupPlayers = grp?.players || [];
+  }
+  const p1Raw =
+    (raw.player1Name != null && String(raw.player1Name).trim()) ||
+    (raw.p1Name != null && String(raw.p1Name).trim()) ||
+    groupPlayers.find((p) => p.id === raw.player1Id)?.name ||
+    resolveTournamentPlayerName(raw.player1Id, tournamentData) ||
+    (raw.player1Id != null ? String(raw.player1Id) : '');
+  const p2Raw =
+    (raw.player2Name != null && String(raw.player2Name).trim()) ||
+    (raw.p2Name != null && String(raw.p2Name).trim()) ||
+    groupPlayers.find((p) => p.id === raw.player2Id)?.name ||
+    resolveTournamentPlayerName(raw.player2Id, tournamentData) ||
+    (raw.player2Id != null ? String(raw.player2Id) : '');
+  return {
+    ...raw,
+    player1Name: p1Raw || '?',
+    player2Name: p2Raw || '?',
+  };
+}
+
+/** Text výsledku pro rozpis (sety nebo legy). */
+function formatCompletedMatchScoreForSchedule(m) {
+  if (!m || m.status !== 'completed') return null;
+  const s1 = m.p1Sets;
+  const s2 = m.p2Sets;
+  if (s1 != null && s2 != null && Number.isFinite(Number(s1)) && Number.isFinite(Number(s2))) {
+    return `${Number(s1)} : ${Number(s2)}`;
+  }
+  const r = m.result || {};
+  const p1 = Number(r.p1Legs ?? m.legsP1 ?? m.score1 ?? m.score?.p1 ?? 0) || 0;
+  const p2 = Number(r.p2Legs ?? m.legsP2 ?? m.score2 ?? m.score?.p2 ?? 0) || 0;
+  return `${p1} : ${p2}`;
+}
+
+/** Zkrácený formát zápasu pro lištu tabletu, např. „501 DO/Ft4“ nebo „301 SO/Bo5“. */
+function formatTabletPinBarGameSegment(tournamentData, tournamentDraft, activeMatch, playingTabletContext) {
+  const td = tournamentData || {};
+  const am = activeMatch || playingTabletContext?.match;
+  const isBracket =
+    am?.matchType === 'bracket' || playingTabletContext?.tabletMatchType === 'bracket';
+
+  const startScore = td.startScore ?? tournamentDraft?.startScore ?? 501;
+  const outRaw = td.outMode ?? tournamentDraft?.outMode ?? 'double';
+  const outLabel = outRaw === 'double' || outRaw === 'master' ? 'DO' : 'SO';
+  const x01Part = `${startScore} ${outLabel}`;
+
+  const legsFormat = String(td.legsFormat ?? '').toLowerCase();
+  const legsOverride = Number(td.legs);
+  const baseBracket =
+    td.bracketKoLegs ?? td.bracketLegs ?? td.groupsLegs ?? tournamentDraft?.groupLegs ?? 3;
+  const groupLegs = td.groupsLegs ?? td.legsGroup ?? tournamentDraft?.groupLegs ?? 3;
+
+  let nLegs;
+  if (Number.isFinite(legsOverride) && legsOverride >= 1) {
+    nLegs = Math.floor(legsOverride);
+  } else if (isBracket && am) {
+    const ri = am.bracketRoundIndex ?? playingTabletContext?.roundIndex ?? 0;
+    nLegs =
+      am.winLegs != null && Number.isFinite(Number(am.winLegs))
+        ? Math.max(1, Math.floor(Number(am.winLegs)))
+        : getBracketWinLegsForRound(ri, baseBracket, td.prelimLegs);
+  } else {
+    nLegs = Math.max(1, groupLegs);
+  }
+
+  let fmtLabel;
+  if (legsFormat === 'bo' || legsFormat === 'best_of') {
+    fmtLabel = `Bo${nLegs}`;
+  } else if (legsFormat === 'ft' || legsFormat === 'first_to') {
+    fmtLabel = `Ft${nLegs}`;
+  } else {
+    fmtLabel = `Ft${nLegs}`;
+  }
+
+  return `${x01Part}/${fmtLabel}`;
+}
+
+/** Zápas pro tablet na daném terči: pavouk (stejný board) nebo skupina (board ve skupině). */
+function pickTabletMatchForBoard({
+  tournamentData,
+  tournamentMatches,
+  tournamentBracket,
+  tournamentGroups,
+  tabletBoardStr,
+}) {
+  const b = String(tabletBoardStr ?? '').trim();
+  if (!b || !tournamentData) return null;
+
+  const boardMatches = (m) => {
+    if (!m || m.isBye) return false;
+    const mb = m.board != null ? String(m.board).trim() : '';
+    return mb === b && m.player1Id && m.player2Id;
+  };
+
+  const isTabletPickupCandidate = (m) => {
+    if (!m) return false;
+    const s = m.status;
+    if (s === 'pending' || s === 'playing') return true;
+    if (m.tabletStatus === 'checked_in') return true;
+    return false;
+  };
+
+  const groupsList = tournamentData.groups?.length ? tournamentData.groups : tournamentGroups;
+  const allGroupsFinished =
+    !Array.isArray(groupsList) ||
+    groupsList.length === 0 ||
+    groupsList.every((g) => {
+      const gm = (tournamentMatches || []).filter((m) => (m.groupId ?? m.group) === g.groupId);
+      return gm.length > 0 && gm.every((m) => m.status === 'completed' || m.status === 'walkover');
+    });
+
+  if (Array.isArray(tournamentBracket) && tournamentBracket.length > 0 && allGroupsFinished) {
+    for (let ri = 0; ri < tournamentBracket.length; ri++) {
+      const matches = tournamentBracket[ri]?.matches || [];
+      for (let mi = 0; mi < matches.length; mi++) {
+        const m = matches[mi];
+        if (!boardMatches(m) || !isTabletPickupCandidate(m)) continue;
+        return {
+          ...m,
+          matchType: 'bracket',
+          bracketRoundIndex: ri,
+          matchId: m.matchId ?? m.id,
+        };
+      }
+    }
+  }
+
+  const groups = tournamentData.groups?.length ? tournamentData.groups : tournamentGroups;
+  const group = Array.isArray(groups)
+    ? groups.find(
+        (gr) => Array.isArray(gr.boards) && gr.boards.some((x) => String(x).trim() === b)
+      )
+    : null;
+  if (!group) return null;
+
+  const gms = (tournamentMatches || [])
+    .filter((m) => (m.groupId ?? m.group) === group.groupId)
+    .slice()
+    .sort((a, c) => (a.round ?? 0) - (c.round ?? 0));
+
+  for (let i = 0; i < gms.length; i++) {
+    const m = gms[i];
+    if (isTabletPickupCandidate(m)) {
+      return {
+        ...m,
+        matchType: 'group',
+        matchId: m.matchId ?? m.id,
+        groupId: m.groupId ?? group.groupId,
+      };
+    }
+  }
+
+  return null;
+}
+
+/** Rozpis zápasů na terči pro tablet (skupina nebo pavouk). */
+function buildTabletBoardSchedule({
+  tournamentData,
+  tournamentMatches,
+  tournamentBracket,
+  tournamentGroups,
+  tabletBoardStr,
+}) {
+  const b = String(tabletBoardStr ?? '').trim();
+  if (!b || !tournamentData) return [];
+
+  const boardMatches = (m) => {
+    if (!m || m.isBye) return false;
+    const mb = m.board != null ? String(m.board).trim() : '';
+    return mb === b && m.player1Id && m.player2Id;
+  };
+
+  const groupsList = tournamentData.groups?.length ? tournamentData.groups : tournamentGroups;
+  const allGroupsFinished =
+    !Array.isArray(groupsList) ||
+    groupsList.length === 0 ||
+    groupsList.every((g) => {
+      const gm = (tournamentMatches || []).filter((m) => (m.groupId ?? m.group) === g.groupId);
+      return gm.length > 0 && gm.every((m) => m.status === 'completed' || m.status === 'walkover');
+    });
+
+  const groups = tournamentData.groups?.length ? tournamentData.groups : tournamentGroups;
+  const groupOnBoard = Array.isArray(groups)
+    ? groups.find(
+        (gr) => Array.isArray(gr.boards) && gr.boards.some((x) => String(x).trim() === b)
+      )
+    : null;
+
+  const playersOf = (gid) => {
+    const grp =
+      tournamentGroups.find((g) => g.groupId === gid) ||
+      tournamentData?.groups?.find((g) => g.groupId === gid);
+    return grp?.players || [];
+  };
+
+  const nameFor = (m, p1, players) => {
+    const id = p1 ? m.player1Id : m.player2Id;
+    const fromMatch = p1
+      ? (m.player1Name && String(m.player1Name).trim()) || m.p1Name
+      : (m.player2Name && String(m.player2Name).trim()) || m.p2Name;
+    if (fromMatch) return String(fromMatch);
+    const fromGroup = players?.find((p) => p.id === id)?.name;
+    if (fromGroup) return fromGroup;
+    const fromTd = resolveTournamentPlayerName(id, tournamentData);
+    if (fromTd) return fromTd;
+    return id != null ? String(id) : '—';
+  };
+
+  const refereeForBracket = (m) => m.referee?.name ?? '—';
+  const refereeForGroup = (m, players) => {
+    if (m.referee?.name) return m.referee.name;
+    if (m.chalkerId) return players.find((p) => p.id === m.chalkerId)?.name ?? '—';
+    return '—';
+  };
+
+  const rows = [];
+
+  if (Array.isArray(tournamentBracket) && tournamentBracket.length > 0 && allGroupsFinished) {
+    for (let ri = 0; ri < tournamentBracket.length; ri++) {
+      const matches = tournamentBracket[ri]?.matches || [];
+      for (let mi = 0; mi < matches.length; mi++) {
+        const m = matches[mi];
+        if (!boardMatches(m)) continue;
+        rows.push({
+          key: `br-${ri}-${m.id ?? mi}`,
+          matchType: 'bracket',
+          roundIndex: ri,
+          match: m,
+          player1Name: nameFor(m, true, []),
+          player2Name: nameFor(m, false, []),
+          refereeName: refereeForBracket(m),
+          status: m.status,
+          tabletStatus: m.tabletStatus,
+          scoreDisplay: formatCompletedMatchScoreForSchedule(m),
+        });
+      }
+    }
+    return rows;
+  }
+
+  if (!groupOnBoard) return [];
+
+  const players = playersOf(groupOnBoard.groupId);
+  const gms = (tournamentMatches || [])
+    .filter((m) => (m.groupId ?? m.group) === groupOnBoard.groupId)
+    .slice()
+    .sort((a, c) => (a.round ?? 0) - (c.round ?? 0));
+
+  for (let i = 0; i < gms.length; i++) {
+    const m = gms[i];
+    rows.push({
+      key: `g-${m.matchId ?? m.id ?? i}`,
+      matchType: 'group',
+      roundIndex: m.round,
+      match: m,
+      player1Name: nameFor(m, true, players),
+      player2Name: nameFor(m, false, players),
+      refereeName: refereeForGroup(m, players),
+      status: m.status,
+      tabletStatus: m.tabletStatus,
+      scoreDisplay: formatCompletedMatchScoreForSchedule(m),
+    });
+  }
+
+  return rows;
+}
 
 // --- POMOCNÉ FUNKCE ---
 const getTranslatedName = (name, isPlayer1, currentLang) => {
@@ -169,7 +609,7 @@ const VirtualKeyboard = ({ onChar, onDelete, onClose, lang }) => {
     );
 };
 
-const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch }) => {
+const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch, isTournamentMode, onTournamentMatchComplete, onUndoAndResume }) => {
     const t = (k) => translations[lang]?.[k] || k;
     const [isMicRematch, setIsMicRematch] = useState(false);
     const isMicRematchRef = useRef(false);
@@ -329,20 +769,63 @@ const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch }) =>
                         </>
                     )}
                     
-                    {/* ODVETA + hlas (stejný slovník jako GameX01) */}
+                    {/* Tlačítka: turnajový režim vs. běžná hra */}
                     <div className="flex flex-col gap-2 mt-6">
-                        <button
-                            type="button"
-                            onClick={() => setIsMicRematch((v) => !v)}
-                            className={`flex items-center justify-center gap-2 w-full py-2 text-sm font-bold uppercase tracking-widest rounded-xl border transition-all ${isMicRematch ? 'bg-emerald-900/40 border-emerald-500 text-emerald-300' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
-                            title="Hlasová odveta (rematch)"
-                        >
-                            {isMicRematch ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-                            {isMicRematch ? (t('micOn') || 'Mikrofon zapnutý') : (t('micOff') || 'Hlasová odveta')}
-                        </button>
-                        <button onClick={onStartMatch} className="flex items-center justify-center w-full gap-3 py-4 text-lg font-black text-white transition-all shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-xl active:scale-95">
-                            <RotateCcw className="w-6 h-6" /> {t('rematch')}
-                        </button>
+                        {isTournamentMode ? (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                      const fr = data?.finalResult;
+                                      const p1Legs = Number(fr?.player1?.legsWon ?? data?.p1Legs) || 0;
+                                      const p2Legs = Number(fr?.player2?.legsWon ?? data?.p2Legs) || 0;
+
+                                      const statsPayload =
+                                        stats && data?.gameType !== 'cricket'
+                                          ? {
+                                              p1Avg: stats.p1Avg,
+                                              p2Avg: stats.p2Avg,
+                                              p1DartsTotal: stats.p1DartsTotal,
+                                              p2DartsTotal: stats.p2DartsTotal,
+                                              p1High: stats.p1High,
+                                              p2High: stats.p2High,
+                                              p1HighCheckout: stats.p1HighCheckout,
+                                              p2HighCheckout: stats.p2HighCheckout,
+                                              legDetails: stats.legDetails,
+                                            }
+                                          : {};
+
+                                      const resultData = { p1Legs, p2Legs, ...statsPayload };
+                                      onTournamentMatchComplete?.(data?.tournamentMatchId ?? data?.id, resultData);
+                                    }}
+                                    className="flex items-center justify-center w-full gap-3 py-4 text-lg font-black text-white transition-all shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-xl active:scale-95"
+                                >
+                                    <CheckCircle className="w-6 h-6" /> {t('tournSaveMatch') || 'ULOŽIT ZÁPAS'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onUndoAndResume}
+                                    className="flex items-center justify-center w-full gap-3 py-4 text-lg font-black transition-all rounded-xl border-2 bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500 active:scale-95"
+                                >
+                                    <Undo2 className="w-6 h-6" /> {t('tournBackToGame') || 'ZPĚT DO HRY / OPRAVIT'}
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMicRematch((v) => !v)}
+                                    className={`flex items-center justify-center gap-2 w-full py-2 text-sm font-bold uppercase tracking-widest rounded-xl border transition-all ${isMicRematch ? 'bg-emerald-900/40 border-emerald-500 text-emerald-300' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
+                                    title="Hlasová odveta (rematch)"
+                                >
+                                    {isMicRematch ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                                    {isMicRematch ? (t('micOn') || 'Mikrofon zapnutý') : (t('micOff') || 'Hlasová odveta')}
+                                </button>
+                                <button onClick={onStartMatch} className="flex items-center justify-center w-full gap-3 py-4 text-lg font-black text-white transition-all shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-xl active:scale-95">
+                                    <RotateCcw className="w-6 h-6" /> {t('rematch')}
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
@@ -602,7 +1085,7 @@ export default function App() {
     startPlayer: 'p1'
   });
 
-  const [matchHistory, setMatchHistory] = useState(() => { try { const saved = safeStorage.getItem('dartsMatchHistory'); return saved ? JSON.parse(saved) : []; } catch(e){ return []; } });
+  const [matchHistory, setMatchHistory] = useState(() => loadSafeMatchHistory());
   const [selectedMatchDetail, setSelectedMatchDetail] = useState(null); 
   const [activeKeyboardInput, setActiveKeyboardInput] = useState(null);
   const [isLandscape, setIsLandscape] = useState(false);
@@ -614,6 +1097,900 @@ export default function App() {
   const [customSetsValue, setCustomSetsValue] = useState(1);
   const [customLegsValue, setCustomLegsValue] = useState(3);
   const [matchFinishRestoreState, setMatchFinishRestoreState] = useState(null);
+  const [tournamentMatchContext, setTournamentMatchContext] = useState(null);
+  const tournamentMatchContextRef = useRef(null);
+  useEffect(() => {
+    tournamentMatchContextRef.current = tournamentMatchContext;
+  }, [tournamentMatchContext]);
+  const [tournamentMatches, setTournamentMatches] = useState([]);
+  const [startupStorageError, setStartupStorageError] = useState(() => {
+    const loaded = getInitialTournamentBootstrapOnce();
+    return loaded.hadError ? 'Předchozí turnaj byl poškozen nebo je ze staré verze. Začínáme čistý turnaj.' : null;
+  });
+  const [tournamentData, setTournamentData] = useState(() => getInitialTournamentBootstrapOnce().td ?? null);
+  const [tournamentDraft, setTournamentDraft] = useState(() => createDefaultTournamentDraft());
+  const [tournamentSetupStep, setTournamentSetupStep] = useState(1);
+  const [tournamentBracket, setTournamentBracket] = useState(
+    () => getInitialTournamentBootstrapOnce().bracket ?? []
+  );
+  const hasBracketGenerated = Array.isArray(tournamentBracket) && (tournamentBracket?.length ?? 0) > 0;
+  /** Režim přístupu k turnaji (cloud rozcestník); null = zatím nevybráno v hubu */
+  const [userRole, setUserRole] = useState(null);
+  /** PIN zadaný při připojení tabletu / diváka (Firebase později) */
+  const [activePin, setActivePin] = useState('');
+  const userRoleRef = useRef(userRole);
+  userRoleRef.current = userRole;
+
+  /** Po přijetí sloučených dat z tabletu přes onSnapshot: přeruší jedno debounced odeslání, aby se neposlal starý stav zpět (echo loop). */
+  const isIncomingCloudUpdate = useRef(false);
+  /** Vždy nejnovější payload pro sync do cloudu (žádné stale closure v debounced setTimeout). */
+  const tournamentSyncPayloadRef = useRef({
+    tournamentData: null,
+    groups: [],
+    groupMatches: [],
+    tournamentBracket: [],
+  });
+
+  /** JIT: detekce navýšení počtu terčů v pavouku (aby se hned zaplnily čekající zápasy). */
+  const prevBracketBoardsRef = useRef(null);
+
+  /** Obnova relace diváka / tabletu po F5 (localStorage). */
+  useEffect(() => {
+    const role = safeStorage.getItem(SESSION_ROLE_KEY);
+    const pin = safeStorage.getItem(SESSION_PIN_KEY);
+    if (!role || !pin) return;
+    if (role !== 'viewer' && role !== 'tablet') {
+      clearSpectatorSession();
+      return;
+    }
+    const p = String(pin).trim();
+    if (!/^\d{4}$/.test(p)) {
+      clearSpectatorSession();
+      return;
+    }
+    setTournamentData(null);
+    setTournamentMatches([]);
+    setTournamentBracket([]);
+    setTournamentMatchContext(null);
+    setUserRole(role);
+    setActivePin(p);
+    if (role === 'tablet') {
+      const b = safeStorage.getItem(SESSION_BOARD_KEY) ?? '';
+      setTournamentDraft((prev) => ({ ...prev, hubTabletBoard: String(b).trim() }));
+      setAppState('tournament_tablet');
+    } else {
+      setAppState('tournament_groups');
+    }
+  }, []);
+
+  // Globální toast notifikace (nahrazuje alert)
+  const [notification, setNotification] = useState(null); // { message: string, type: 'error'|'success' }
+  const showNotification = (message, type = 'error') => {
+    setNotification({ message: String(message ?? ''), type });
+    setTimeout(() => {
+      setNotification(null);
+    }, 4000);
+  };
+  const showNotificationRef = useRef(showNotification);
+  showNotificationRef.current = showNotification;
+  const tRef = useRef(t);
+  tRef.current = t;
+  useEffect(() => {
+    if (!startupStorageError) return;
+    showNotification(startupStorageError, 'error');
+    setStartupStorageError(null);
+  }, [startupStorageError]);
+
+  // Globální confirm modal (nahrazuje window.confirm)
+  const [confirmState, setConfirmState] = useState(null); // { message: string, onConfirm: () => void, confirmLabel?: string, cancelLabel?: string }
+  const requestConfirm = (message, onConfirm, opts = {}) => {
+    setConfirmState({
+      message: String(message ?? ''),
+      onConfirm: typeof onConfirm === 'function' ? onConfirm : () => {},
+      confirmLabel: opts.confirmLabel,
+      cancelLabel: opts.cancelLabel,
+    });
+  };
+
+  const handleHardResetApp = () => {
+    requestConfirm(
+      'Resetovat aplikaci? Smažou se všechna lokální data a stránka se znovu načte.',
+      () => {
+        safeStorage.clear();
+        window.location.reload();
+      },
+      { confirmLabel: 'Resetovat', cancelLabel: t('cancel') || 'Zrušit' }
+    );
+  };
+
+  const tournamentGroups = React.useMemo(() => {
+    if (!tournamentData) return [];
+    if (isTournamentBracketOnlyFormat(tournamentData.tournamentFormat)) return [];
+    if (tournamentData?.groups?.length) return tournamentData.groups;
+    if (!tournamentData?.players?.length) return [];
+    const playersWithIds = tournamentData.players.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}` }));
+    const numGroups = tournamentData.numGroups ?? Math.max(1, Math.ceil(playersWithIds.length / 4));
+    return distributePlayersToFixedGroups(playersWithIds, numGroups).map((g) => ({ ...g, boards: g.boards ?? [] }));
+  }, [tournamentData?.players, tournamentData?.groups, tournamentData?.numGroups, tournamentData?.tournamentFormat]);
+
+  tournamentSyncPayloadRef.current = {
+    tournamentData: tournamentData ?? null,
+    groups: tournamentGroups ?? [],
+    groupMatches: tournamentMatches ?? [],
+    tournamentBracket: tournamentBracket ?? [],
+  };
+
+  /** Pravidelná synchronizace turnaje do Firestore (admin + platný PIN), debounce kvůli šetření zápisů. */
+  useEffect(() => {
+    if (userRole !== 'admin') return;
+    if (!tournamentData?.cloudEnabled || !user || user.isAnonymous || !db) return;
+    const pin = String(activePin ?? '').trim();
+    if (!/^\d{4}$/.test(pin)) return;
+
+    const timer = setTimeout(() => {
+      if (isIncomingCloudUpdate.current) {
+        isIncomingCloudUpdate.current = false;
+        return;
+      }
+      const snap = tournamentSyncPayloadRef.current;
+      syncTournamentToCloud(pin, {
+        tournamentData: snap.tournamentData,
+        groups: snap.groups,
+        groupMatches: snap.groupMatches,
+        tournamentBracket: snap.tournamentBracket,
+      }).catch((err) => {
+        console.warn('Tournament cloud sync failed:', err);
+      });
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [
+    userRole,
+    user,
+    activePin,
+    tournamentData,
+    tournamentGroups,
+    tournamentMatches,
+    tournamentBracket,
+  ]);
+
+  /** Admin: poslech cloudu jen pro sloučení změn z tabletu (check-in, výsledek), bez přepsání celého turnaje. */
+  useEffect(() => {
+    if (userRole !== 'admin') return;
+    if (!tournamentData?.cloudEnabled || !user || user.isAnonymous) return;
+    if (!db) return;
+    const pin = String(activePin ?? '').trim();
+    if (!/^\d{4}$/.test(pin)) return;
+    const ref = doc(db, ACTIVE_TOURNAMENTS_COLL, pin);
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        const exists = typeof snap.exists === 'function' ? snap.exists() : snap.exists;
+        if (!exists) return;
+        const d = snap.data();
+        if (!d || typeof d !== 'object') return;
+        isIncomingCloudUpdate.current = false;
+        setTournamentMatches((prev) => {
+          const next = mergeAdminGroupMatchesFromTabletCloud(
+            prev,
+            Array.isArray(d.groupMatches) ? d.groupMatches : []
+          );
+          if (next !== prev) isIncomingCloudUpdate.current = true;
+          return next;
+        });
+        setTournamentBracket((prev) => {
+          const cloudBr = Array.isArray(d.tournamentBracket) ? d.tournamentBracket : [];
+          const merged = mergeAdminBracketFromTabletCloud(prev, cloudBr);
+          if (merged === prev) return prev;
+          isIncomingCloudUpdate.current = true;
+          return propagateBracketWinners(merged);
+        });
+      },
+      (err) => console.warn('Admin tournament listener:', err)
+    );
+    return () => unsub();
+  }, [userRole, activePin]);
+
+  /** Přímý pavouk: uložit pavouk do stejného JSON jako turnaj (F5). */
+  useEffect(() => {
+    if (!tournamentData || !isTournamentBracketOnlyFormat(tournamentData.tournamentFormat)) return;
+    try {
+      safeStorage.setItem(
+        'dartsTournamentData',
+        JSON.stringify({ ...tournamentData, tournamentBracket: tournamentBracket ?? [] })
+      );
+    } catch (e) {}
+  }, [tournamentData, tournamentBracket]);
+
+  /** Živá synchronizace z Firestore pro diváka a tablet. */
+  useEffect(() => {
+    if (userRole !== 'viewer' && userRole !== 'tablet') return;
+    const pin = String(activePin ?? '').trim();
+    if (!/^\d{4}$/.test(pin)) return;
+
+    const unsub = listenToCloudTournament(pin, (cloudData) => {
+      if (cloudData == null) {
+        clearSpectatorSession();
+        showNotificationRef.current(
+          tRef.current('tournament.ended') || 'Turnaj byl ukončen.',
+          'error'
+        );
+        setActivePin('');
+        setUserRole(null);
+        setTournamentData(null);
+        setTournamentMatches([]);
+        setTournamentBracket([]);
+        setTournamentMatchContext(null);
+        try {
+          safeStorage.removeItem('dartsTournamentData');
+        } catch (e) {}
+        setAppState('home');
+        return;
+      }
+
+      const td = cloudData.tournamentData ?? null;
+      const groupsRaw = cloudData.groups;
+      const hasCloudGroups = Array.isArray(groupsRaw) && groupsRaw.length > 0;
+      const nextTd = td && hasCloudGroups ? { ...td, groups: groupsRaw } : td;
+
+      setTournamentData(nextTd);
+      setTournamentMatches(
+        Array.isArray(cloudData.groupMatches) ? cloudData.groupMatches : []
+      );
+      setTournamentBracket(
+        Array.isArray(cloudData.tournamentBracket) ? cloudData.tournamentBracket : []
+      );
+
+      setAppState((prev) => {
+        if (
+          userRoleRef.current === 'viewer' &&
+          prev === 'tournament_viewer_preparing' &&
+          nextTd
+        ) {
+          return 'tournament_groups';
+        }
+        return prev;
+      });
+    });
+
+    return () => unsub();
+  }, [userRole, activePin, tournamentData?.cloudEnabled, user]);
+
+  /** Na kroku Pavouk průběžně srovná terče 1…N podle aktuálního stavu (postupy, předkolo → L16). */
+  useEffect(() => {
+    if (userRole !== 'admin') return;
+    if (appState !== 'tournament_bracket' || !tournamentData) return;
+    if (!Array.isArray(tournamentBracket) || tournamentBracket?.length === 0) return;
+    const defBoards =
+      Number(tournamentData.boardsCount ?? tournamentData.totalBoards ?? tournamentData.numBoards) || 1;
+    const bracketWithBoards = tournamentBracket.map((round) => {
+      const nb =
+        round.boardsCount != null && Number(round.boardsCount) >= 1
+          ? Math.max(1, Math.floor(Number(round.boardsCount)))
+          : defBoards;
+      return {
+        ...round,
+        matches: autoAssignSequentialBoardsToRound(round.matches, nb),
+      };
+    });
+    const activeBoards =
+      Number(tournamentData.boardsCount ?? tournamentData.totalBoards ?? tournamentData.numBoards) || 1;
+    const regForDirectKo =
+      isTournamentBracketOnlyFormat(tournamentData.tournamentFormat) && tournamentData.players?.length
+        ? tournamentData.players.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}` }))
+        : null;
+    const bracketWithRefs = updateBracketReferees(
+      bracketWithBoards,
+      tournamentGroups,
+      tournamentDraft.promotersCount,
+      activeBoards,
+      tournamentMatches,
+      regForDirectKo
+    );
+    if (JSON.stringify(bracketWithRefs) !== JSON.stringify(tournamentBracket)) {
+      setTournamentBracket(bracketWithRefs);
+    }
+  }, [
+    userRole,
+    appState,
+    tournamentData,
+    tournamentBracket,
+    tournamentGroups,
+    tournamentDraft.promotersCount,
+    tournamentMatches,
+  ]);
+
+    /** JIT: průběžně zaplňuje volné terče kompletními pending zápasy napříč pavoukem (always-on). */
+  useEffect(() => {
+    if (userRole !== 'admin') return;
+    if (appState !== 'tournament_bracket' || !tournamentData) return;
+    if (!Array.isArray(tournamentBracket) || tournamentBracket.length === 0) return;
+
+    const availableBoards =
+      Number(tournamentData.boardsCount ?? tournamentData.totalBoards ?? tournamentData.numBoards) || 1;
+    prevBracketBoardsRef.current = availableBoards;
+
+    const regForDirectKo =
+      isTournamentBracketOnlyFormat(tournamentData.tournamentFormat) && tournamentData.players?.length
+        ? tournamentData.players.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}` }))
+        : null;
+
+    const updatedBracket = JSON.parse(JSON.stringify(tournamentBracket));
+
+    const isReadyMatch = (m) => {
+      if (!m) return false;
+      if (m.isBye === true) return false;
+      const isPending = m.status === 'pending';
+      if (!isPending) return false;
+      if (m.board !== null && m.board !== undefined && m.board !== '') return false;
+      const p1 = m.player1Id ?? m.p1Id;
+      const p2 = m.player2Id ?? m.p2Id;
+      if (p1 === null || p1 === undefined || p1 === '') return false;
+      if (p2 === null || p2 === undefined || p2 === '') return false;
+      return isRealPendingBracketMatch({
+        status: 'pending',
+        player1Id: p1,
+        player2Id: p2,
+        player1Name: m.player1Name,
+        player2Name: m.player2Name,
+      });
+    };
+
+    // Terče 1..availableBoards, které jsou kdekoliv obsazené.
+    const occupied = new Set();
+    for (const round of updatedBracket) {
+      const matches = round?.matches || [];
+      for (const m of matches) {
+        if (!m || m.isBye) continue;
+        const b = Number(m.board);
+        if (!(Number.isFinite(b) && b >= 1 && b <= availableBoards)) continue;
+        const tabletBusy = m.tabletStatus === 'checked_in' || m.tabletStatus === 'ready_to_play';
+        const pendingHasBoard = m.status === 'pending' && m.board != null;
+        if (m.status === 'playing' || tabletBusy || pendingHasBoard) occupied.add(b);
+      }
+    }
+
+    const freeBoards = [];
+    for (let b = 1; b <= availableBoards; b++) {
+      if (!occupied.has(b)) freeBoards.push(b);
+    }
+    if (freeBoards.length === 0) return;
+
+    const allReadyMatches = [];
+    for (const round of updatedBracket) {
+      const matches = round?.matches || [];
+      for (const m of matches) {
+        if (!isReadyMatch(m)) continue; // nekompletní zápasy (čekající na feeder) se jen přeskočí
+        allReadyMatches.push(m);
+      }
+    }
+    if (allReadyMatches.length === 0) return;
+
+    // Pouze přiřazení terčů — bez updateBracketReferees uvnitř smyčky (jedna dávka na konci).
+    let assigned = 0;
+    for (let i = 0; i < allReadyMatches.length && freeBoards.length > 0; i++) {
+      const m = allReadyMatches[i];
+      if (!isReadyMatch(m)) continue;
+      m.board = freeBoards.shift();
+      assigned += 1;
+    }
+
+    if (assigned === 0) return;
+
+    const withRefs = updateBracketReferees(
+      updatedBracket,
+      tournamentGroups,
+      tournamentDraft.promotersCount,
+      availableBoards,
+      tournamentMatches,
+      regForDirectKo
+    );
+
+    if (JSON.stringify(withRefs) !== JSON.stringify(tournamentBracket)) {
+      setTournamentBracket(withRefs);
+    }
+  }, [
+    userRole,
+    appState,
+    tournamentData,
+    tournamentBracket,
+    tournamentGroups,
+    tournamentDraft.promotersCount,
+    tournamentMatches,
+  ]);
+
+  const tabletBoardStr = String(tournamentDraft?.hubTabletBoard ?? '').trim();
+  const pinBarTitle =
+    tournamentData?.name ??
+    tournamentMatchContext?.tabletTitle ??
+    (String(tournamentDraft?.name ?? '').trim() || null) ??
+    'Turnaj';
+  const pinBarDisplayCode =
+    tournamentData?.pin ??
+    tournamentData?.tournamentId ??
+    activePin ??
+    (String(tournamentDraft?.pin ?? '').trim() || undefined) ??
+    tournamentMatchContext?.tabletPin ??
+    '';
+
+  const showTournamentPinBar =
+    !!pinBarDisplayCode &&
+    ((userRole === 'admin' && appState === 'tournament_setup') ||
+      (tournamentData &&
+        (tournamentData?.pin || tournamentData?.tournamentId) &&
+        (['tournament_board_assignment', 'tournament_groups', 'tournament_bracket', 'tournament_stats'].includes(
+          appState
+        ) ||
+          (appState === 'playing' && tournamentMatchContext && tournamentMatchContext.type !== 'tablet'))) ||
+      (userRole === 'viewer' &&
+        !!activePin &&
+        [
+          'tournament_viewer_preparing',
+          'tournament_groups',
+          'tournament_bracket',
+          'tournament_stats',
+        ].includes(appState)) ||
+      (userRole === 'tablet' && appState === 'tournament_tablet') ||
+      (appState === 'playing' && tournamentMatchContext?.type === 'tablet'));
+
+  const tabletWaitingStandings = React.useMemo(() => {
+    if (!tournamentData?.groups?.length || !tabletBoardStr) return null;
+    const g = tournamentData.groups.find(
+      (gr) => Array.isArray(gr.boards) && gr.boards.some((b) => String(b) === tabletBoardStr)
+    );
+    if (!g) return null;
+    const gm = tournamentMatches.filter((m) => (m.groupId ?? m.group) === g.groupId);
+    return calculateGroupStandings(g.players || [], gm);
+  }, [tournamentData, tournamentMatches, tabletBoardStr]);
+
+  const tabletAssignedMatch = React.useMemo(() => {
+    const raw = pickTabletMatchForBoard({
+      tournamentData,
+      tournamentMatches,
+      tournamentBracket,
+      tournamentGroups,
+      tabletBoardStr,
+    });
+    if (!raw) return null;
+    let refereeName = raw.referee?.name;
+    if (raw.matchType === 'group' && !refereeName) {
+      const gid = raw.groupId;
+      const grp =
+        tournamentGroups.find((g) => g.groupId === gid) ||
+        tournamentData?.groups?.find((g) => g.groupId === gid);
+      const chalkerId = raw.chalkerId;
+      if (grp?.players && chalkerId) {
+        refereeName = grp.players.find((p) => p.id === chalkerId)?.name ?? refereeName;
+      }
+    }
+    if (!refereeName) refereeName = '—';
+    return enrichTabletMatchPlayerNames({ ...raw, refereeName }, tournamentData, tournamentGroups);
+  }, [tournamentData, tournamentMatches, tournamentBracket, tournamentGroups, tabletBoardStr]);
+
+  const tabletAssignedMatchRef = useRef(null);
+  tabletAssignedMatchRef.current = tabletAssignedMatch;
+
+  const tabletBoardSchedule = React.useMemo(
+    () =>
+      buildTabletBoardSchedule({
+        tournamentData,
+        tournamentMatches,
+        tournamentBracket,
+        tournamentGroups,
+        tabletBoardStr,
+      }),
+    [tournamentData, tournamentMatches, tournamentBracket, tournamentGroups, tabletBoardStr]
+  );
+
+  const tabletPinBarGameSegment = React.useMemo(() => {
+    if (userRole !== 'tablet') return '';
+    if (
+      appState !== 'tournament_tablet' &&
+      !(appState === 'playing' && tournamentMatchContext?.type === 'tablet')
+    ) {
+      return '';
+    }
+    const playingCtx = tournamentMatchContext?.type === 'tablet' ? tournamentMatchContext : null;
+    return formatTabletPinBarGameSegment(
+      tournamentData,
+      tournamentDraft,
+      tabletAssignedMatch,
+      playingCtx
+    );
+  }, [
+    userRole,
+    appState,
+    tournamentData,
+    tournamentDraft,
+    tabletAssignedMatch,
+    tournamentMatchContext,
+  ]);
+
+  const isTournamentLive = tournamentMatches?.some((m) => m.status !== 'pending') ?? false;
+  const viewerTournamentNavStates = ['tournament_groups', 'tournament_bracket', 'tournament_stats'];
+  const adminTournamentStepperStates = [
+    'tournament_setup',
+    'tournament_board_assignment',
+    'tournament_groups',
+    'tournament_bracket',
+    'tournament_stats',
+  ];
+  const showTournamentStepper =
+    (userRole === 'admin' && adminTournamentStepperStates.includes(appState)) ||
+    (userRole === 'viewer' && viewerTournamentNavStates.includes(appState));
+  const currentStepperStep =
+    appState === 'tournament_setup' ? tournamentSetupStep
+    : appState === 'tournament_board_assignment' ? 4
+    : appState === 'tournament_groups' ? 5
+    : appState === 'tournament_bracket' ? 6
+    : appState === 'tournament_stats' ? 7
+    : 1;
+  const canNavigateToStep = (s) => {
+    if (userRole === 'viewer') {
+      if (![5, 6, 7].includes(s)) return false;
+      return !!tournamentData;
+    }
+    if (userRole !== 'admin') return false;
+    if (s === 7) return !!tournamentData;
+    if (s <= 3) return !isTournamentLive; // Kroky 1–3 zamčené při live turnaji
+    if (hasBracketGenerated && s === 4) return false; // Po pavouku zpět jen ne na přiřazení terčů; skupiny (5) zůstávají
+    if (s === 4) return !!tournamentData;
+    if (s === 5 && hasBracketGenerated && tournamentData) return true; // Review skupin i s existujícím pavoukem
+    if (s === 6 && hasBracketGenerated && tournamentData) return true; // Pavouk vždy dostupný po vygenerování
+    return s <= currentStepperStep && !!tournamentData;
+  };
+  const handleStepperClick = (s) => {
+    if (userRole === 'viewer') {
+      if (!canNavigateToStep(s)) return;
+      if (s === 5) setAppState('tournament_groups');
+      else if (s === 6) setAppState('tournament_bracket');
+      else if (s === 7) setAppState('tournament_stats');
+      return;
+    }
+    if (userRole !== 'admin') return;
+    if (!canNavigateToStep(s)) return;
+    if (s === 7) { setAppState('tournament_stats'); return; }
+    if (s <= 3) {
+      setAppState('tournament_setup');
+      setTournamentSetupStep(s);
+      return;
+    }
+    if (s === 4) setAppState('tournament_board_assignment');
+    else if (s === 5) setAppState('tournament_groups');
+    else if (s === 6) setAppState('tournament_bracket');
+  };
+
+  const handleEndTournament = () => {
+    requestConfirm(
+      t('tournEndConfirm') ||
+        'Opravdu chcete ukončit tento turnaj? Neuložená data budou ztracena.',
+      async () => {
+        const pinToDelete = String(
+          activePin || tournamentData?.pin || tournamentDraft?.pin || ''
+        ).trim();
+        const snap = tournamentSyncPayloadRef.current;
+        const fullSnapshot = {
+          tournamentData: snap.tournamentData ?? null,
+          groups: snap.groups ?? [],
+          groupMatches: snap.groupMatches ?? [],
+          tournamentBracket: snap.tournamentBracket ?? [],
+        };
+        const td = fullSnapshot.tournamentData;
+        const name = String(td?.name ?? '').trim();
+        const pinOk = /^\d{4}$/.test(pinToDelete);
+        const wasCloudTournament = !!td?.cloudEnabled && pinOk && !!db;
+        const isCloudArchive = wasCloudTournament && user && !user.isAnonymous;
+
+        if (wasCloudTournament && (!user || user.isAnonymous)) {
+          showNotification(
+            t('tournamentHub.loginRequiredForCloud') ||
+              'Pro připojení tabletů a síťovou hru se musíte přihlásit.',
+            'error'
+          );
+          return;
+        }
+
+        if (isCloudArchive) {
+          try {
+            await archivePastTournamentAndDeleteActive(user.uid, pinToDelete, name, fullSnapshot);
+            showNotification(
+              t('archiveSuccess') || 'Turnaj byl úspěšně uložen do historie.',
+              'success'
+            );
+          } catch (err) {
+            console.warn('archivePastTournamentAndDeleteActive failed:', err);
+            showNotification(
+              t('tournamentHub.syncError') || 'Chyba při ukládání dokončeného turnaje do cloudu.',
+              'error'
+            );
+            return;
+          }
+        } else {
+          try {
+            const id =
+              typeof crypto !== 'undefined' && crypto.randomUUID
+                ? crypto.randomUUID()
+                : `loc-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+            appendLocalTournamentHistory({
+              id,
+              date: new Date().toISOString(),
+              name: name || '(bez názvu)',
+              data: fullSnapshot,
+            });
+            showNotification(
+              t('archiveSuccess') || 'Turnaj byl úspěšně uložen do historie.',
+              'success'
+            );
+          } catch (err) {
+            console.warn('appendLocalTournamentHistory failed:', err);
+          }
+          try {
+            await deleteCloudTournament(pinToDelete);
+          } catch (err) {
+            console.warn('deleteCloudTournament failed:', err);
+          }
+        }
+
+        setTournamentDraft(createDefaultTournamentDraft());
+        setTournamentData(null);
+        setTournamentMatches([]);
+        setTournamentBracket([]);
+        setTournamentMatchContext(null);
+        setUserRole(null);
+        setActivePin('');
+        clearTournamentWip();
+        try {
+          safeStorage.removeItem('dartsTournamentData');
+        } catch (e) {}
+        setAppState('home');
+      }
+    );
+  };
+
+  const handleOpenTournamentEntry = () => {
+    if (userRole === null) {
+      setAppState('tournament_hub');
+      return;
+    }
+    if (userRole === 'admin') {
+      if (tournamentData) {
+        setActivePin(String(tournamentData.pin ?? ''));
+        const goBracket =
+          isTournamentBracketOnlyFormat(tournamentData.tournamentFormat) &&
+          Array.isArray(tournamentBracket) &&
+          tournamentBracket.length > 0;
+        setAppState(goBracket ? 'tournament_bracket' : 'tournament_groups');
+      } else {
+        let pinToUse = '';
+        setTournamentDraft((prev) => {
+          pinToUse =
+            prev.pin && /^\d{4}$/.test(String(prev.pin)) ? String(prev.pin) : generatePin();
+          writeTournamentWip(pinToUse);
+          if (prev.pin === pinToUse) return prev;
+          return { ...prev, pin: pinToUse };
+        });
+        setActivePin(pinToUse);
+        setTournamentSetupStep(1);
+        setAppState('tournament_setup');
+      }
+      return;
+    }
+    if (userRole === 'tablet') {
+      setAppState('tournament_tablet');
+      return;
+    }
+    setAppState('tournament_groups');
+  };
+
+  const handleTournamentHubAdmin = () => {
+    setUserRole('admin');
+    if (tournamentData) {
+      setActivePin(String(tournamentData.pin ?? ''));
+      const goBracket =
+        isTournamentBracketOnlyFormat(tournamentData.tournamentFormat) &&
+        Array.isArray(tournamentBracket) &&
+        tournamentBracket.length > 0;
+      setAppState(goBracket ? 'tournament_bracket' : 'tournament_groups');
+      return;
+    }
+    let pinToUse = '';
+    setTournamentDraft((prev) => {
+      pinToUse =
+        prev.pin && /^\d{4}$/.test(String(prev.pin)) ? String(prev.pin) : generatePin();
+      writeTournamentWip(pinToUse);
+      if (prev.pin === pinToUse) return prev;
+      return { ...prev, pin: pinToUse };
+    });
+    setActivePin(pinToUse);
+    setTournamentSetupStep(1);
+    setAppState('tournament_setup');
+  };
+
+  const handleTournamentHubTabletJoin = async (pin, board) => {
+    if (!pin) {
+      showNotification(
+        translations[lang]?.tournamentHub?.enterPin || 'Zadejte PIN turnaje',
+        'error'
+      );
+      return;
+    }
+    const p = String(pin).trim();
+    const ok = await verifyTournamentPin(p);
+    if (!ok) {
+      showNotification(t('tournamentHub.invalidPin'), 'error');
+      return;
+    }
+    setTournamentData(null);
+    setTournamentMatches([]);
+    setTournamentBracket([]);
+    setActivePin(p);
+    setUserRole('tablet');
+    setTournamentDraft((prev) => ({ ...prev, hubTabletBoard: board || '' }));
+    persistSpectatorSession('tablet', p, board || '');
+    setAppState('tournament_tablet');
+  };
+
+  const handleTournamentHubViewerJoin = async (pin) => {
+    if (!pin) {
+      showNotification(
+        translations[lang]?.tournamentHub?.enterPin || 'Zadejte PIN turnaje',
+        'error'
+      );
+      return;
+    }
+    const p = String(pin).trim();
+    const ok = await verifyTournamentPin(p);
+    if (!ok) {
+      showNotification(t('tournamentHub.invalidPin'), 'error');
+      return;
+    }
+    setTournamentData(null);
+    setTournamentMatches([]);
+    setTournamentBracket([]);
+    setActivePin(p);
+    setUserRole('viewer');
+    persistSpectatorSession('viewer', p);
+    setAppState('tournament_viewer_preparing');
+  };
+
+  const handleSpectatorDisconnect = () => {
+    clearSpectatorSession();
+    setUserRole(null);
+    setActivePin('');
+    setTournamentData(null);
+    setTournamentMatches([]);
+    setTournamentBracket([]);
+    setTournamentMatchContext(null);
+    setAppState('tournament_hub');
+  };
+
+  const handleTournamentHubHistory = () => {
+    setAppState('tournament_history');
+  };
+
+  useEffect(() => {
+    if (!tournamentGroups?.length) return;
+    setTournamentMatches((prevMatches) => {
+      const allMatches = [];
+      const prevByKey = new Map();
+      for (const m of prevMatches) {
+        const key = m.matchId ?? m.id ?? `${m.groupId ?? m.group}-${m.player1Id}-${m.player2Id}-${m.round ?? 'x'}`;
+        prevByKey.set(key, m);
+      }
+      for (const g of tournamentGroups) {
+        const schedule = generateGroupMatches(g.players, g.groupId);
+        for (let i = 0; i < schedule.length; i++) {
+          const m = schedule[i];
+          const key = m.id ?? `${g.groupId}-${m.player1Id}-${m.player2Id}-${m.round ?? 'x'}`;
+          const existing = prevByKey.get(key);
+          allMatches.push({
+            ...m,
+            matchId: existing?.matchId ?? m.id ?? `${g.groupId}-m${i + 1}`,
+            status: existing?.status ?? m.status ?? 'pending',
+            result: existing?.result,
+            completedAt: existing?.completedAt,
+            chalkerId: existing?.chalkerId ?? m.chalkerId,
+          });
+        }
+      }
+      return allMatches;
+    });
+  }, [tournamentGroups]);
+
+  // Chytrá fronta terčů: při dokončení skupiny automaticky přiřaď terč první čekající
+  useEffect(() => {
+    if (userRole !== 'admin') return;
+    if (!tournamentData?.groups?.length || !tournamentMatches.length) return;
+    const groups = tournamentData.groups;
+    const matches = tournamentMatches;
+
+    const isGroupFullyCompleted = (groupId) => {
+      const groupMatches = matches.filter((m) => (m.groupId ?? m.group) === groupId);
+      if (groupMatches.length === 0) return false;
+      return groupMatches.every((m) => m.status === 'completed');
+    };
+
+    const completedWithBoard = groups.find(
+      (g) =>
+        isGroupFullyCompleted(g.groupId) &&
+        g.boards?.length > 0 &&
+        g.boards[0] !== 'Dohráno' &&
+        !g.boardReleased
+    );
+    const firstWaiting = groups.find(
+      (g) =>
+        (!g.boards || g.boards.length === 0) &&
+        !isGroupFullyCompleted(g.groupId)
+    );
+
+    if (completedWithBoard && firstWaiting) {
+      const boardNum = completedWithBoard.boards[0];
+      const completedId = completedWithBoard.groupId;
+      const waitingId = firstWaiting.groupId;
+
+      setTournamentData((prev) => {
+        if (!prev?.groups) return prev;
+        const nextGroups = prev.groups.map((g) => {
+          if (g.groupId === completedId) {
+            return { ...g, boards: [], boardReleased: true };
+          }
+          if (g.groupId === waitingId) {
+            return { ...g, boards: [boardNum] };
+          }
+          return g;
+        });
+        const next = { ...prev, groups: nextGroups };
+        try {
+          safeStorage.setItem('dartsTournamentData', JSON.stringify(next));
+        } catch (e) {}
+        return next;
+      });
+
+      setTournamentDraft((prev) => ({
+        ...prev,
+        boardAssignments: {
+          ...(prev.boardAssignments || {}),
+          [completedId]: 'Dohráno',
+          [waitingId]: String(boardNum),
+        },
+      }));
+
+      const msg =
+        (translations[lang]?.tournBoardReassigned || 'Systém: Skupina {X} dohrála. Terč {Y} byl automaticky přiřazen Skupině {Z}.')
+          .replace('{X}', completedId)
+          .replace('{Y}', String(boardNum))
+          .replace('{Z}', waitingId);
+      showNotification(msg, 'success');
+    }
+  }, [userRole, tournamentData?.groups, tournamentMatches, lang]);
+
+  useEffect(() => {
+    if (userRole !== 'admin') return;
+    if (!tournamentData) return;
+    const needsId = !tournamentData.tournamentId;
+    const needsPin = !tournamentData.pin;
+    if (!needsId && !needsPin) return;
+    const id =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `t-${Date.now()}`;
+    // TODO: KIOSKOVÝ TABLET se bude přihlašovat pomocí tohoto PINu. Kiosk po přihlášení a zadání čísla terče zobrazí pouze zápasy přiřazené danému terči.
+    const pin = Math.floor(1000 + Math.random() * 9000).toString();
+    setTournamentData((prev) => {
+      if (!prev) return prev;
+      if (prev.tournamentId && prev.pin) return prev;
+      const next = {
+        ...prev,
+        ...(needsId && !prev.tournamentId ? { tournamentId: id } : {}),
+        ...(needsPin && !prev.pin ? { pin } : {}),
+      };
+      try {
+        safeStorage.setItem('dartsTournamentData', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  }, [userRole, tournamentData]);
+
   const isKeyboardOpen = Boolean(activeKeyboardInput);
 
   useEffect(() => {
@@ -717,11 +2094,514 @@ export default function App() {
 
   const handleMatchComplete = async (record, restorePayload = null) => {
       const fullRecord = { ...record, gameType: settings.gameType, startScore: settings.startScore, outMode: settings.outMode };
-      setMatchHistory(prev => [fullRecord, ...prev]);
-      if(db && user && !user.isAnonymous) { try { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'matches'), fullRecord); } catch(err) {} }
-      setSelectedMatchDetail(fullRecord);
-      setMatchFinishRestoreState(restorePayload);
-      setAppState('match_finished');
+      if (tournamentMatchContext) {
+        fullRecord.tournamentMatchId = tournamentMatchContext.match?.matchId;
+        fullRecord.tournamentGroupId = tournamentMatchContext.match?.groupId;
+        setSelectedMatchDetail(fullRecord);
+        setMatchFinishRestoreState(restorePayload);
+        setAppState('match_finished');
+      } else {
+        setMatchHistory(prev => [fullRecord, ...prev]);
+        if(db && user && !user.isAnonymous) { try { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'matches'), fullRecord); } catch(err) {} }
+        setSelectedMatchDetail(fullRecord);
+        setMatchFinishRestoreState(restorePayload);
+        setAppState('match_finished');
+      }
+  };
+
+  const handleStartTournamentMatch = (match, group) => {
+    if (!match || !group) return;
+    const p1 = group.players.find(p => p.id === match.player1Id);
+    const p2 = group.players.find(p => p.id === match.player2Id);
+    const legsToWin = tournamentData?.groupsLegs ?? 3;
+    setTournamentMatchContext({ match, group, tournamentData });
+    setSettings(prev => ({
+      ...prev,
+      p1Name: p1?.name ?? match.player1Id ?? 'P1',
+      p2Name: p2?.name ?? match.player2Id ?? 'P2',
+      matchMode: 'first_to',
+      matchTarget: legsToWin,
+      matchSets: 1,
+      isBot: false,
+      gameType: 'x01',
+      startScore: tournamentData?.startScore ?? 501,
+      outMode: tournamentData?.outMode ?? 'double',
+    }));
+    setAppState('playing');
+  };
+
+  const handleStartBracketMatch = (match, roundIndex) => {
+    if (!match || !tournamentData) return;
+    const baseLegs =
+      tournamentData?.bracketKoLegs ?? tournamentData?.bracketLegs ?? tournamentData?.groupsLegs ?? 3;
+    const legsToWin =
+      match.winLegs != null && Number.isFinite(Number(match.winLegs))
+        ? Math.max(1, Math.floor(Number(match.winLegs)))
+        : getBracketWinLegsForRound(roundIndex, baseLegs, tournamentData?.prelimLegs);
+    setTournamentMatchContext({ match, type: 'bracket', roundIndex, tournamentData });
+    setSettings((prev) => ({
+      ...prev,
+      p1Name: match.player1Name ?? match.player1Id ?? 'P1',
+      p2Name: match.player2Name ?? match.player2Id ?? 'P2',
+      matchMode: 'first_to',
+      matchTarget: legsToWin,
+      matchSets: 1,
+      isBot: false,
+      gameType: 'x01',
+      startScore: tournamentData?.startScore ?? 501,
+      outMode: tournamentData?.outMode ?? 'double',
+    }));
+    setAppState('playing');
+  };
+
+  const handleTabletCheckInComplete = async () => {
+    const am = tabletAssignedMatchRef.current;
+    const pin = String(activePin ?? '').trim();
+    if (!am || !/^\d{4}$/.test(pin)) return;
+    try {
+      await updateCloudMatchFromTablet(pin, am.matchType, am.matchId ?? am.id, {
+        tabletStatus: 'checked_in',
+      });
+    } catch (err) {
+      console.warn('Tablet check-in cloud sync:', err);
+      showNotification(
+        translations[lang]?.tournamentHub?.syncError || 'Chyba synchronizace s cloudem.',
+        'error'
+      );
+    }
+  };
+
+  const handleTabletTimeoutWarning = async (matchType, matchId) => {
+    const pin = String(activePin ?? '').trim();
+    if (!/^\d{4}$/.test(pin) || !matchId) return;
+    try {
+      await updateCloudMatchFromTablet(pin, matchType, matchId, {
+        tabletStatus: 'timeout_warning',
+      });
+    } catch (err) {
+      console.warn('Tablet timeout_warning cloud sync:', err);
+    }
+  };
+
+  const handleTabletStartGame = async (matchId, startingPlayerId) => {
+    const am = tabletAssignedMatchRef.current;
+    const pin = String(activePin ?? '').trim();
+    if (!am || !(am.matchId || am.id)) {
+      showNotification(
+        translations[lang]?.tablet?.noMatchOnBoard || 'Na tomto terči není aktivní zápas.',
+        'error'
+      );
+      return;
+    }
+    const mid = am.matchId ?? am.id;
+    if (/^\d{4}$/.test(pin)) {
+      try {
+        await updateCloudMatchFromTablet(pin, am.matchType, mid, {
+          whoStarts: startingPlayerId,
+          tabletStatus: 'ready_to_play',
+        });
+      } catch (err) {
+        console.warn('Tablet whoStarts cloud sync:', err);
+      }
+    }
+
+    const td =
+      tournamentData ??
+      ({
+        name: pinBarTitle,
+        groupsLegs: tournamentDraft?.groupLegs ?? 3,
+        startScore: tournamentDraft?.startScore ?? 501,
+        outMode: tournamentDraft?.outMode ?? 'double',
+      });
+
+    const legsToWin =
+      am.matchType === 'bracket'
+        ? (() => {
+            const baseLegs =
+              td?.bracketKoLegs ??
+              td?.bracketLegs ??
+              td?.groupsLegs ??
+              tournamentDraft?.groupLegs ??
+              3;
+            const ri = am.bracketRoundIndex ?? 0;
+            return am.winLegs != null && Number.isFinite(Number(am.winLegs))
+              ? Math.max(1, Math.floor(Number(am.winLegs)))
+              : getBracketWinLegsForRound(ri, baseLegs, td?.prelimLegs);
+          })()
+        : td.groupsLegs ?? tournamentDraft?.groupLegs ?? 3;
+
+    if (am.matchType === 'bracket') {
+      setTournamentMatchContext({
+        type: 'tablet',
+        tabletMatchType: 'bracket',
+        match: am,
+        roundIndex: am.bracketRoundIndex ?? 0,
+        tournamentData: td,
+        tabletTitle: td.name ?? pinBarTitle,
+        tabletPin: activePin,
+      });
+      setSettings((prev) => ({
+        ...prev,
+        p1Name: am.player1Name ?? am.player1Id ?? 'P1',
+        p2Name: am.player2Name ?? am.player2Id ?? 'P2',
+        matchMode: 'first_to',
+        matchTarget: legsToWin,
+        matchSets: 1,
+        isBot: false,
+        gameType: 'x01',
+        startScore: td.startScore ?? 501,
+        outMode: td.outMode ?? 'double',
+        startPlayer: startingPlayerId === am.player2Id ? 'p2' : 'p1',
+      }));
+    } else {
+      const group =
+        tournamentGroups.find((g) => g.groupId === am.groupId) ||
+        td?.groups?.find((g) => g.groupId === am.groupId);
+      if (!group) {
+        showNotification('Skupina pro zápas nenalezena.', 'error');
+        return;
+      }
+      const p1 = group.players.find((p) => p.id === am.player1Id);
+      const p2 = group.players.find((p) => p.id === am.player2Id);
+      setTournamentMatchContext({
+        type: 'tablet',
+        tabletMatchType: 'group',
+        match: am,
+        group,
+        tournamentData: td,
+        tabletTitle: td.name ?? pinBarTitle,
+        tabletPin: activePin,
+      });
+      setSettings((prev) => ({
+        ...prev,
+        p1Name: p1?.name ?? am.player1Name ?? am.player1Id ?? 'P1',
+        p2Name: p2?.name ?? am.player2Name ?? am.player2Id ?? 'P2',
+        matchMode: 'first_to',
+        matchTarget: legsToWin,
+        matchSets: 1,
+        isBot: false,
+        gameType: 'x01',
+        startScore: td.startScore ?? 501,
+        outMode: td.outMode ?? 'double',
+        startPlayer: startingPlayerId === am.player2Id ? 'p2' : 'p1',
+      }));
+    }
+    setAppState('playing');
+  };
+
+  const handleUpdateRoundSettings = (roundIndex, newLegs, newBoards) => {
+    const legs = Math.max(1, Math.floor(Number(newLegs)));
+    const boards = Math.max(1, Math.floor(Number(newBoards)) || 1);
+    setTournamentBracket((prev) => {
+      if (!Array.isArray(prev) || !prev[roundIndex]?.matches) return prev;
+      return prev.map((round, ri) => {
+        if (ri !== roundIndex) return round;
+        const withLegs = round.matches.map((m) =>
+          m.status === 'pending' ? { ...m, winLegs: legs } : m
+        );
+        const roundWithMeta = { ...round, boardsCount: boards, matches: withLegs };
+        return {
+          ...roundWithMeta,
+          matches: autoAssignSequentialBoardsToRound(roundWithMeta.matches, boards),
+        };
+      });
+    });
+  };
+
+  const handleUpdateMatchBoard = (roundIndex, matchId, newBoard) => {
+    const n = Math.max(1, Math.floor(Number(newBoard)) || 1);
+    setTournamentBracket((prev) => {
+      if (!Array.isArray(prev) || !prev[roundIndex]?.matches) return prev;
+      return prev.map((round, ri) => {
+        if (ri !== roundIndex) return round;
+        return {
+          ...round,
+          matches: round.matches.map((m) =>
+            m.id === matchId ? { ...m, board: n, boardLocked: true } : m
+          ),
+        };
+      });
+    });
+  };
+
+  const handleToggleMatchBoardLock = (roundIndex, matchId) => {
+    setTournamentBracket((prev) => {
+      if (!Array.isArray(prev) || !prev[roundIndex]?.matches) return prev;
+      return prev.map((round, ri) => {
+        if (ri !== roundIndex) return round;
+        return {
+          ...round,
+          matches: round.matches.map((m) => {
+            if (m.id !== matchId) return m;
+            const nextLocked = !m.boardLocked;
+            return { ...m, boardLocked: nextLocked };
+          }),
+        };
+      });
+    });
+  };
+
+  const handleSetMatchBoardAuto = (roundIndex, matchId) => {
+    setTournamentBracket((prev) => {
+      if (!Array.isArray(prev) || !prev[roundIndex]?.matches) return prev;
+      return prev.map((round, ri) => {
+        if (ri !== roundIndex) return round;
+        return {
+          ...round,
+          matches: round.matches.map((m) =>
+            m.id === matchId ? { ...m, boardLocked: false } : m
+          ),
+        };
+      });
+    });
+  };
+
+  const handleManualRefereeChange = (roundIndex, matchIndex, newReferee) => {
+    if (!newReferee?.id) return;
+    setTournamentBracket((prev) => {
+      if (!Array.isArray(prev) || !prev[roundIndex]?.matches?.[matchIndex]) return prev;
+      return prev.map((round, ri) => {
+        if (ri !== roundIndex) return round;
+        return {
+          ...round,
+          matches: round.matches.map((m, mi) =>
+            mi === matchIndex
+              ? {
+                  ...m,
+                  referee: { id: newReferee.id, name: newReferee.name ?? newReferee.id },
+                }
+              : m
+          ),
+        };
+      });
+    });
+  };
+
+  const handleBracketDataCommit = (nextBracket) => {
+    setTournamentBracket(propagateBracketWinners(nextBracket));
+  };
+
+  const handleBracketWalkover = (roundIndex, matchIndex, winnerId) => {
+    if (!tournamentData || winnerId == null) return;
+    setTournamentBracket((prev) => {
+      if (!Array.isArray(prev) || !prev[roundIndex]?.matches?.[matchIndex]) return prev;
+      const m = prev[roundIndex].matches[matchIndex];
+      if (
+        m.status !== 'pending' &&
+        m.status !== 'playing' &&
+        m.status !== 'in_progress'
+      ) {
+        return prev;
+      }
+      if (!m.player1Id || !m.player2Id) return prev;
+      if (winnerId !== m.player1Id && winnerId !== m.player2Id) return prev;
+
+      const baseLegs =
+        tournamentData?.legs ??
+        tournamentData?.bracketKoLegs ??
+        tournamentData?.bracketLegs ??
+        tournamentData?.groupsLegs ??
+        3;
+      const winLegs =
+        m.winLegs != null && Number.isFinite(Number(m.winLegs))
+          ? Math.max(1, Math.floor(Number(m.winLegs)))
+          : getBracketWinLegsForRound(roundIndex, baseLegs, tournamentData?.prelimLegs);
+
+      const p1Wins = winnerId === m.player1Id;
+      const p1Legs = p1Wins ? winLegs : 0;
+      const p2Legs = p1Wins ? 0 : winLegs;
+
+      const {
+        p1Avg: _a1,
+        p2Avg: _a2,
+        p1DartsTotal: _d1,
+        p2DartsTotal: _d2,
+        p1High: _h1,
+        p2High: _h2,
+        p1HighCheckout: _c1,
+        p2HighCheckout: _c2,
+        legDetails: _ld,
+        stats: _st,
+        p1Average: _av1,
+        p2Average: _av2,
+        result: _prevRes,
+        ...matchRest
+      } = m;
+
+      const updatedMatch = {
+        ...matchRest,
+        status: 'completed',
+        winnerId,
+        isWalkover: true,
+        score: { p1: p1Legs, p2: p2Legs },
+        result: { p1Legs, p2Legs },
+        completedAt: Date.now(),
+      };
+
+      const updated = prev.map((round, ri) => ({
+        ...round,
+        matches: round.matches.map((match, mi) =>
+          ri === roundIndex && mi === matchIndex ? updatedMatch : match
+        ),
+      }));
+      return propagateBracketWinners(updated);
+    });
+  };
+
+  const handleBracketWithdrawPlayer = (playerId) => {
+    if (!tournamentData || !playerId) return;
+    const pId = String(playerId);
+    requestConfirm(
+      t('tournWithdrawConfirm') ||
+        'Opravdu chcete hráče odhlásit z turnaje? Jeho zbývající zápasy budou zkontumovány (0:W).',
+      () => {
+        setTournamentData((prev) => {
+          if (!prev) return prev;
+          const players = Array.isArray(prev.players) ? prev.players : null;
+          if (!players) return prev;
+          const nextPlayers = players.map((p) => {
+            const id = p?.id ?? p?.name;
+            if (id == null) return p;
+            return String(id) === pId ? { ...p, isWithdrawn: true } : p;
+          });
+          const next = { ...prev, players: nextPlayers };
+          try {
+            safeStorage.setItem('dartsTournamentData', JSON.stringify(next));
+          } catch (e) {}
+          return next;
+        });
+
+        setTournamentBracket((prev) => {
+          if (!Array.isArray(prev) || prev.length === 0) return prev;
+          const baseLegs =
+            tournamentData?.legs ??
+            tournamentData?.bracketKoLegs ??
+            tournamentData?.bracketLegs ??
+            tournamentData?.groupsLegs ??
+            3;
+
+          const updated = prev.map((round, ri) => {
+            const matches = (round?.matches || []).map((m) => {
+              if (!m) return m;
+              if (m.status === 'completed') return m;
+              if (m.isBye) return m;
+              if (!m.player1Id || !m.player2Id) return m;
+              const isP1 = String(m.player1Id) === pId;
+              const isP2 = String(m.player2Id) === pId;
+              if (!isP1 && !isP2) return m;
+
+              const winnerId = isP1 ? m.player2Id : m.player1Id;
+              const winLegs =
+                m.winLegs != null && Number.isFinite(Number(m.winLegs))
+                  ? Math.max(1, Math.floor(Number(m.winLegs)))
+                  : getBracketWinLegsForRound(ri, baseLegs, tournamentData?.prelimLegs);
+              const p1Legs = String(winnerId) === String(m.player1Id) ? winLegs : 0;
+              const p2Legs = String(winnerId) === String(m.player2Id) ? winLegs : 0;
+
+              return {
+                ...m,
+                status: 'completed',
+                winnerId,
+                isWalkover: true,
+                withdrawnPlayerId: pId,
+                score: { p1: p1Legs, p2: p2Legs },
+                result: { ...(m.result || {}), p1Legs, p2Legs },
+                completedAt: m.completedAt ?? Date.now(),
+              };
+            });
+            return { ...round, matches };
+          });
+
+          return propagateBracketWinners(updated);
+        });
+      }
+    );
+  };
+
+  const handleResetMatch = (matchId, groupId) => {
+    if (!matchId || !groupId) return;
+    setTournamentMatches((prev) =>
+      prev.map((m) =>
+        (m.matchId ?? m.id) === matchId && (m.groupId ?? m.group) === groupId
+          ? {
+              ...m,
+              status: 'pending',
+              score: { p1: 0, p2: 0 },
+              result: null,
+              winnerId: null,
+              completedAt: null,
+            }
+          : m
+      )
+    );
+
+    const group = tournamentGroups.find((g) => g.groupId === groupId);
+    const resetMatch = tournamentMatches.find((m) => (m.matchId ?? m.id) === matchId && (m.groupId ?? m.group) === groupId);
+    if (group && resetMatch) {
+      const reopened = {
+        ...resetMatch,
+        status: 'pending',
+        score: { p1: 0, p2: 0 },
+        result: null,
+        winnerId: null,
+        completedAt: null,
+      };
+      handleStartTournamentMatch(reopened, group);
+    }
+  };
+
+  const handleWithdrawPlayer = (groupId, playerId) => {
+    if (!groupId || !playerId) return;
+    const winLegs = Math.max(
+      1,
+      Number(tournamentData?.legsGroup ?? tournamentData?.groupsLegs ?? 2) || 2
+    );
+    setTournamentData((prev) => {
+      if (!prev?.groups) return prev;
+      const nextGroups = prev.groups.map((g) => {
+        if ((g.groupId ?? g.id) !== groupId) return g;
+        return {
+          ...g,
+          players: (g.players || []).map((p) =>
+            (p.id ?? p.name) === playerId ? { ...p, isWithdrawn: true } : p
+          ),
+        };
+      });
+      const next = { ...prev, groups: nextGroups };
+      try { safeStorage.setItem('dartsTournamentData', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+
+    setTournamentMatches((prev) =>
+      (prev || []).map((m) => {
+        const mGroup = m.groupId ?? m.group;
+        if (mGroup !== groupId) return m;
+        if (m.player1Id !== playerId && m.player2Id !== playerId) return m;
+
+        const withdrawnIsP1 = m.player1Id === playerId;
+        const winnerId = withdrawnIsP1 ? m.player2Id : m.player1Id;
+        const p1Legs = withdrawnIsP1 ? 0 : winLegs;
+        const p2Legs = withdrawnIsP1 ? winLegs : 0;
+
+        return {
+          ...m,
+          status: 'completed',
+          winnerId,
+          isWalkover: true,
+          withdrawnPlayerId: playerId,
+          score1: p1Legs,
+          score2: p2Legs,
+          legsP1: p1Legs,
+          legsP2: p2Legs,
+          result: {
+            ...(m.result || {}),
+            p1Legs,
+            p2Legs,
+          },
+          completedAt: m.completedAt ?? Date.now(),
+        };
+      })
+    );
   };
 
   const handleKeyboardInput = (char) => { if (!activeKeyboardInput) return; setSettings(s => ({ ...s, [activeKeyboardInput]: s[activeKeyboardInput] + char })); };
@@ -765,8 +2645,15 @@ export default function App() {
   const handleNameFieldClick = (fieldKey) => {
       if (fieldKey === 'p2Name' && settings.isBot) return;
       if (user && !user.isAnonymous) {
-          const confirmed = window.confirm(t('renameConfirm'));
-          if (!confirmed) return;
+          requestConfirm(t('renameConfirm'), () => {
+            setSettings(prev => {
+              if (fieldKey === 'p1Name' && p1Defaults.includes(prev.p1Name)) return { ...prev, p1Name: '' };
+              if (fieldKey === 'p2Name' && p2Defaults.includes(prev.p2Name)) return { ...prev, p2Name: '' };
+              return prev;
+            });
+            setActiveKeyboardInput(fieldKey);
+          });
+          return;
       }
       setSettings(prev => {
           if (fieldKey === 'p1Name' && p1Defaults.includes(prev.p1Name)) return { ...prev, p1Name: '' };
@@ -785,28 +2672,309 @@ export default function App() {
   if (!isReady) return <div className="w-full h-full bg-slate-950"></div>;
 
   if (appState === 'match_finished' || selectedMatchDetail) {
+      const isTournament = !!tournamentMatchContext;
       return (
           <div className="flex flex-col bg-slate-950 text-slate-100 font-sans relative overflow-hidden w-full h-[100dvh]">
               <MatchStatsView
                 data={selectedMatchDetail}
                 title={t('matchStats')}
                 lang={lang}
+                isTournamentMode={isTournament}
+                onTournamentMatchComplete={isTournament ? async (matchId, resultData) => {
+                  const p1Legs = Number(resultData?.p1Legs) || 0;
+                  const p2Legs = Number(resultData?.p2Legs) || 0;
+                  const ctx = tournamentMatchContextRef.current;
+                  if (ctx?.type === 'tablet') {
+                    const pin = String(ctx.tabletPin ?? activePin ?? '').trim();
+                    const tmt = ctx.tabletMatchType ?? 'group';
+                    const bm = ctx.match;
+                    const mid = bm?.matchId ?? bm?.id ?? matchId;
+                    const winnerId =
+                      p1Legs > p2Legs ? bm?.player1Id : p2Legs > p1Legs ? bm?.player2Id : null;
+
+                    const completedPatch = {
+                      status: 'completed',
+                      winnerId,
+                      score: { p1: p1Legs, p2: p2Legs },
+                      score1: p1Legs,
+                      score2: p2Legs,
+                      legsP1: p1Legs,
+                      legsP2: p2Legs,
+                      p1Avg: resultData?.p1Avg,
+                      p2Avg: resultData?.p2Avg,
+                      p1DartsTotal: resultData?.p1DartsTotal,
+                      p2DartsTotal: resultData?.p2DartsTotal,
+                      p1High: resultData?.p1High,
+                      p2High: resultData?.p2High,
+                      p1HighCheckout: resultData?.p1HighCheckout,
+                      p2HighCheckout: resultData?.p2HighCheckout,
+                      legDetails: resultData?.legDetails,
+                      result: {
+                        p1Legs,
+                        p2Legs,
+                        p1Avg: resultData?.p1Avg,
+                        p2Avg: resultData?.p2Avg,
+                        p1DartsTotal: resultData?.p1DartsTotal,
+                        p2DartsTotal: resultData?.p2DartsTotal,
+                        p1High: resultData?.p1High,
+                        p2High: resultData?.p2High,
+                        p1HighCheckout: resultData?.p1HighCheckout,
+                        p2HighCheckout: resultData?.p2HighCheckout,
+                        legDetails: resultData?.legDetails,
+                      },
+                      completedAt: Date.now(),
+                      tabletStatus: 'completed',
+                    };
+
+                    if (/^\d{4}$/.test(pin)) {
+                      try {
+                        await updateCloudMatchFromTablet(
+                          pin,
+                          tmt === 'bracket' ? 'bracket' : 'group',
+                          mid,
+                          completedPatch
+                        );
+                      } catch (e) {
+                        console.warn('Tablet match result cloud sync:', e);
+                      }
+                    }
+
+                    if (tmt === 'bracket' && ctx.roundIndex != null && bm?.id != null) {
+                      const ri = ctx.roundIndex;
+                      const midBracket = bm.id;
+                      const freedBoard = bm?.board != null && bm?.board !== '' ? Number(bm.board) : null;
+                      const loserId =
+                        p1Legs > p2Legs ? bm?.player2Id : p2Legs > p1Legs ? bm?.player1Id : null;
+                      const loserName =
+                        loserId === bm?.player1Id
+                          ? (bm?.player1Name ?? loserId)
+                          : loserId === bm?.player2Id
+                            ? (bm?.player2Name ?? loserId)
+                            : loserId;
+                      const loserRef =
+                        loserId != null ? { id: loserId, name: String(loserName ?? loserId) } : null;
+                      setTournamentBracket((prev) => {
+                        const updated = prev.map((round, rIdx) => ({
+                          ...round,
+                          matches: round.matches.map((m) =>
+                            rIdx === ri && m.id === midBracket ? { ...m, ...completedPatch } : m
+                          ),
+                        }));
+                        const propagated = propagateBracketWinners(updated);
+                        const roundMatches = propagated?.[ri]?.matches || [];
+                        const waiting = roundMatches.find(
+                          (m) =>
+                            m &&
+                            m.status === 'pending' &&
+                            m.board == null &&
+                            m.referee == null &&
+                            !m.isBye &&
+                            m.player1Id != null &&
+                            m.player2Id != null
+                        );
+                        if (waiting && freedBoard != null && Number.isFinite(freedBoard) && freedBoard >= 1) {
+                          waiting.board = freedBoard;
+                          if (loserRef) waiting.referee = loserRef;
+                        }
+                        return propagated;
+                      });
+                    } else {
+                      setTournamentMatches((prev) =>
+                        prev.map((m) =>
+                          (m.matchId && String(m.matchId) === String(mid)) ||
+                          (!m.matchId &&
+                            m.groupId === bm?.groupId &&
+                            m.player1Id === bm?.player1Id &&
+                            m.player2Id === bm?.player2Id)
+                            ? { ...m, ...completedPatch }
+                            : m
+                        )
+                      );
+                    }
+
+                    if (typeof window.__onTournamentMatchComplete === 'function') {
+                      window.__onTournamentMatchComplete(matchId, resultData);
+                    }
+                    setTournamentMatchContext(null);
+                    setMatchFinishRestoreState(null);
+                    setSelectedMatchDetail(null);
+                    setAppState('tournament_tablet');
+                    return;
+                  }
+                  if (ctx?.type === 'bracket' && ctx.match?.id != null && ctx.roundIndex != null) {
+                    const ri = ctx.roundIndex;
+                    const mid = ctx.match.id;
+                    const bm = ctx.match;
+                    let winnerId = null;
+                    if (p1Legs > p2Legs) winnerId = bm.player1Id;
+                    else if (p2Legs > p1Legs) winnerId = bm.player2Id;
+                    const freedBoard =
+                      bm?.board != null && bm?.board !== '' ? Number(bm.board) : null;
+                    const loserId =
+                      p1Legs > p2Legs ? bm?.player2Id : p2Legs > p1Legs ? bm?.player1Id : null;
+                    const loserName =
+                      loserId === bm?.player1Id
+                        ? (bm?.player1Name ?? loserId)
+                        : loserId === bm?.player2Id
+                          ? (bm?.player2Name ?? loserId)
+                          : loserId;
+                    const loserRef =
+                      loserId != null ? { id: loserId, name: String(loserName ?? loserId) } : null;
+                    setTournamentBracket((prev) => {
+                      const updated = prev.map((round, rIdx) => ({
+                        ...round,
+                        matches: round.matches.map((m) =>
+                          rIdx === ri && m.id === mid
+                            ? {
+                                ...m,
+                                status: 'completed',
+                                winnerId,
+                                score: { p1: p1Legs, p2: p2Legs },
+                                p1Avg: resultData?.p1Avg,
+                                p2Avg: resultData?.p2Avg,
+                                p1DartsTotal: resultData?.p1DartsTotal,
+                                p2DartsTotal: resultData?.p2DartsTotal,
+                                p1High: resultData?.p1High,
+                                p2High: resultData?.p2High,
+                                p1HighCheckout: resultData?.p1HighCheckout,
+                                p2HighCheckout: resultData?.p2HighCheckout,
+                                legDetails: resultData?.legDetails,
+                                result: {
+                                  p1Legs,
+                                  p2Legs,
+                                  p1Avg: resultData?.p1Avg,
+                                  p2Avg: resultData?.p2Avg,
+                                  p1DartsTotal: resultData?.p1DartsTotal,
+                                  p2DartsTotal: resultData?.p2DartsTotal,
+                                  p1High: resultData?.p1High,
+                                  p2High: resultData?.p2High,
+                                  p1HighCheckout: resultData?.p1HighCheckout,
+                                  p2HighCheckout: resultData?.p2HighCheckout,
+                                  legDetails: resultData?.legDetails,
+                                },
+                              }
+                            : m
+                        ),
+                      }));
+                      const propagated = propagateBracketWinners(updated);
+                      const roundMatches = propagated?.[ri]?.matches || [];
+                      const waiting = roundMatches.find(
+                        (m) =>
+                          m &&
+                          m.status === 'pending' &&
+                          m.board == null &&
+                          m.referee == null &&
+                          !m.isBye &&
+                          m.player1Id != null &&
+                          m.player2Id != null
+                      );
+                      if (waiting && freedBoard != null && Number.isFinite(freedBoard) && freedBoard >= 1) {
+                        waiting.board = freedBoard;
+                        if (loserRef) waiting.referee = loserRef;
+                      }
+                      return propagated;
+                    });
+                    if (typeof window.__onTournamentMatchComplete === 'function') {
+                      window.__onTournamentMatchComplete(matchId, resultData);
+                    }
+                    setTournamentMatchContext(null);
+                    setMatchFinishRestoreState(null);
+                    setSelectedMatchDetail(null);
+                    setAppState('tournament_bracket');
+                    return;
+                  }
+                  setTournamentMatches((prev) =>
+                    prev.map((m) =>
+                      (
+                        (m.matchId && m.matchId === matchId) ||
+                        (!m.matchId &&
+                          m.groupId === tournamentMatchContext?.match?.groupId &&
+                          m.player1Id === tournamentMatchContext?.match?.player1Id &&
+                          m.player2Id === tournamentMatchContext?.match?.player2Id)
+                      )
+                        ? {
+                            ...m,
+                            status: 'completed',
+                            p1Avg: resultData?.p1Avg,
+                            p2Avg: resultData?.p2Avg,
+                            p1DartsTotal: resultData?.p1DartsTotal,
+                            p2DartsTotal: resultData?.p2DartsTotal,
+                            p1High: resultData?.p1High,
+                            p2High: resultData?.p2High,
+                            p1HighCheckout: resultData?.p1HighCheckout,
+                            p2HighCheckout: resultData?.p2HighCheckout,
+                            legDetails: resultData?.legDetails,
+                            result: {
+                              p1Legs,
+                              p2Legs,
+                              p1Avg: resultData?.p1Avg,
+                              p2Avg: resultData?.p2Avg,
+                              p1DartsTotal: resultData?.p1DartsTotal,
+                              p2DartsTotal: resultData?.p2DartsTotal,
+                              p1High: resultData?.p1High,
+                              p2High: resultData?.p2High,
+                              p1HighCheckout: resultData?.p1HighCheckout,
+                              p2HighCheckout: resultData?.p2HighCheckout,
+                              legDetails: resultData?.legDetails,
+                            },
+                            completedAt: Date.now(),
+                          }
+                        : m
+                    )
+                  );
+                  if (typeof window.__onTournamentMatchComplete === 'function') {
+                    window.__onTournamentMatchComplete(matchId, resultData);
+                  }
+                  setTournamentMatchContext(null);
+                  setMatchFinishRestoreState(null);
+                  setSelectedMatchDetail(null);
+                  setAppState('tournament_groups');
+                } : undefined}
+                onUndoAndResume={isTournament ? () => {
+                  setSelectedMatchDetail(null);
+                  setAppState('playing');
+                } : undefined}
                 onStartMatch={() => {
                   setMatchFinishRestoreState(null);
                   setSelectedMatchDetail(null);
+                  setTournamentMatchContext(null);
                   setAppState('playing');
                 }}
                 onBack={() => {
-                  if (matchFinishRestoreState && selectedMatchDetail?.id) {
+                  if (matchFinishRestoreState && selectedMatchDetail?.id && !isTournament) {
                     setMatchHistory(prev => prev.filter(m => m.id !== selectedMatchDetail.id));
                   }
+                  const wasBracket = tournamentMatchContextRef.current?.type === 'bracket';
+                  const wasTablet = tournamentMatchContextRef.current?.type === 'tablet';
                   setSelectedMatchDetail(null);
-                  setAppState(matchFinishRestoreState ? 'playing' : 'setup');
+                  setTournamentMatchContext(null);
+                  setAppState(
+                    matchFinishRestoreState
+                      ? 'playing'
+                      : isTournament
+                        ? wasTablet
+                          ? 'tournament_tablet'
+                          : wasBracket
+                            ? 'tournament_bracket'
+                            : 'tournament_groups'
+                        : 'setup'
+                  );
                 }}
                 onClose={() => {
+                  const wasBracket = tournamentMatchContextRef.current?.type === 'bracket';
+                  const wasTablet = tournamentMatchContextRef.current?.type === 'tablet';
                   setMatchFinishRestoreState(null);
                   setSelectedMatchDetail(null);
-                  setAppState('setup');
+                  setTournamentMatchContext(null);
+                  setAppState(
+                    isTournament
+                      ? wasTablet
+                        ? 'tournament_tablet'
+                        : wasBracket
+                          ? 'tournament_bracket'
+                          : 'tournament_groups'
+                      : 'setup'
+                  );
                 }}
               />
           </div>
@@ -814,12 +2982,90 @@ export default function App() {
   }
 
   if (appState === 'playing') {
+      const isTournamentPlaying = !!tournamentMatchContext;
       return (
-          <div className="bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden">
+          <div className={`bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden ${showTournamentPinBar ? 'pt-10' : ''}`}>
+              {showTournamentPinBar && (
+                  <div className="fixed top-0 left-0 right-0 z-[5000] bg-slate-950 border-b border-slate-800 text-slate-300 p-2 flex justify-between items-center text-sm gap-2">
+                      {userRole === 'tablet' && tournamentMatchContext?.type === 'tablet' ? (
+                        <div className="min-w-0 flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-x-2 text-[11px] sm:text-sm leading-tight pr-1">
+                          <span className="truncate font-semibold text-slate-200">{pinBarTitle}</span>
+                          <span className="hidden sm:inline text-slate-600 shrink-0">|</span>
+                          <span className="truncate text-slate-400">
+                            {t('tournBoard') || 'Terč'} {String(tabletBoardStr || '—').trim() || '—'}
+                            {tabletPinBarGameSegment ? (
+                              <span className="text-slate-500 font-mono tabular-nums">
+                                {' '}
+                                {tabletPinBarGameSegment}
+                              </span>
+                            ) : null}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="truncate pr-2 min-w-0">🏆 {pinBarTitle}</span>
+                      )}
+                      <div className="shrink-0 flex items-center gap-2">
+                        <span className="text-slate-500 hidden sm:inline">PIN:</span>
+                        <span className="text-2xl font-black text-yellow-400 tracking-widest font-mono tabular-nums">
+                          {pinBarDisplayCode}
+                        </span>
+                        {userRole === 'admin' && (
+                        <button
+                          type="button"
+                          onClick={handleEndTournament}
+                          className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-red-400 hover:text-red-300 px-2 py-1.5 rounded-lg border border-red-500/40 hover:bg-red-950/60 whitespace-nowrap"
+                        >
+                          {t('tournEndTournament') || 'Ukončit turnaj'}
+                        </button>
+                        )}
+                        {(userRole === 'viewer' || userRole === 'tablet') && (
+                          <button
+                            type="button"
+                            onClick={handleSpectatorDisconnect}
+                            title={t('tournamentHub.disconnect') || 'Odpojit'}
+                            className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white px-2 py-1.5 rounded-lg border border-slate-600 hover:bg-slate-800 whitespace-nowrap"
+                          >
+                            <Unplug className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                            <span className="hidden sm:inline">{t('tournamentHub.disconnect') || 'Odpojit'}</span>
+                          </button>
+                        )}
+                      </div>
+                  </div>
+              )}
               <header className="flex items-center justify-between px-4 py-3 border-b bg-slate-900 border-slate-800 shrink-0">
-                  <button onClick={() => setAppState('setup')} className="p-2 transition-colors rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isTournamentPlaying) {
+                          const ctx = tournamentMatchContextRef.current;
+                          setTournamentMatchContext(null);
+                          setAppState(
+                            ctx?.type === 'tablet'
+                              ? 'tournament_tablet'
+                              : ctx?.type === 'bracket'
+                                ? 'tournament_bracket'
+                                : 'tournament_groups'
+                          );
+                        } else {
+                          setAppState('setup');
+                        }
+                      }}
+                      className="p-2 transition-colors rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+                      aria-label="Home"
+                    >
                       <Home className="w-5 h-5" />
-                  </button>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleHardResetApp}
+                      title={t('headerHardResetTitle')}
+                      aria-label={t('headerHardResetAria')}
+                      className="p-2 transition-colors rounded-lg hover:bg-red-950/60 text-red-400/90 hover:text-red-300 border border-transparent hover:border-red-500/35"
+                    >
+                      <RotateCcw className="w-5 h-5" />
+                    </button>
+                  </div>
                   <div className="flex flex-col items-center">
                       <div className="flex items-center gap-2 text-[10px] sm:text-xs font-black tracking-[0.3em] uppercase">
                           <span className="text-slate-500">
@@ -854,7 +3100,21 @@ export default function App() {
                     lang={lang}
                     isLandscape={isLandscape}
                     isPC={isPC}
-                    onAbort={() => setAppState('setup')}
+                    onAbort={
+                      isTournamentPlaying
+                        ? () => {
+                            const ctx = tournamentMatchContextRef.current;
+                            setTournamentMatchContext(null);
+                            setAppState(
+                              ctx?.type === 'bracket'
+                                ? 'tournament_bracket'
+                                : ctx?.type === 'tablet'
+                                  ? 'tournament_tablet'
+                                  : 'tournament_groups'
+                            );
+                          }
+                        : () => setAppState('setup')
+                    }
                     onMatchComplete={handleMatchComplete}
                     restoredGameState={matchFinishRestoreState}
                     onRestoredConsumed={() => setMatchFinishRestoreState(null)}
@@ -867,17 +3127,79 @@ export default function App() {
   }
 
   return (
-    <div className="bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden">
-      
+    <div className={`bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden ${showTournamentPinBar ? 'pt-10' : ''}`}>
+      {showTournamentPinBar && (
+        <div className="fixed top-0 left-0 right-0 z-[5000] bg-slate-950 border-b border-slate-800 text-slate-300 p-2 flex justify-between items-center text-sm gap-2">
+          {userRole === 'tablet' && appState === 'tournament_tablet' ? (
+            <div className="min-w-0 flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-x-2 text-[11px] sm:text-sm leading-tight pr-1">
+              <span className="truncate font-semibold text-slate-200">{pinBarTitle}</span>
+              <span className="hidden sm:inline text-slate-600 shrink-0">|</span>
+              <span className="truncate text-slate-400">
+                {t('tournBoard') || 'Terč'} {String(tabletBoardStr || '—').trim() || '—'}
+                {tabletPinBarGameSegment ? (
+                  <span className="text-slate-500 font-mono tabular-nums">
+                    {' '}
+                    {tabletPinBarGameSegment}
+                  </span>
+                ) : null}
+              </span>
+            </div>
+          ) : (
+            <span className="truncate pr-2 min-w-0">🏆 {pinBarTitle}</span>
+          )}
+          <div className="shrink-0 flex items-center gap-2">
+            <span className="text-slate-500 hidden sm:inline">PIN:</span>
+            <span className="text-2xl font-black text-yellow-400 tracking-widest font-mono tabular-nums">
+              {pinBarDisplayCode}
+            </span>
+            {userRole === 'admin' && (
+            <button
+              type="button"
+              onClick={handleEndTournament}
+              className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-red-400 hover:text-red-300 px-2 py-1.5 rounded-lg border border-red-500/40 hover:bg-red-950/60 whitespace-nowrap"
+            >
+              {t('tournEndTournament') || 'Ukončit turnaj'}
+            </button>
+            )}
+            {(userRole === 'viewer' || userRole === 'tablet') && (
+              <button
+                type="button"
+                onClick={handleSpectatorDisconnect}
+                title={t('tournamentHub.disconnect') || 'Odpojit'}
+                className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white px-2 py-1.5 rounded-lg border border-slate-600 hover:bg-slate-800 whitespace-nowrap"
+              >
+                <Unplug className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="hidden sm:inline">{t('tournamentHub.disconnect') || 'Odpojit'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       {activeKeyboardInput && <VirtualKeyboard onChar={handleKeyboardInput} onDelete={() => setSettings(s => ({...s, [activeKeyboardInput]: s[activeKeyboardInput].slice(0,-1)}))} onClose={handleKeyboardClose} lang={lang} />}
 
       <header className="relative z-20 flex items-center justify-between p-2 border-b h-14 bg-slate-900 border-slate-800 shrink-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
             {appState === 'home' ? (
                 <div className="text-[10px] font-mono text-slate-500 border border-slate-800 rounded px-1.5 py-0.5">{APP_VERSION}</div>
             ) : (
-                <button onClick={() => setAppState('home')} className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"><Home className="w-6 h-6" /></button>
+                <button
+                  type="button"
+                  onClick={() => setAppState('home')}
+                  className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+                  aria-label="Home"
+                >
+                  <Home className="w-6 h-6" />
+                </button>
             )}
+            <button
+              type="button"
+              onClick={handleHardResetApp}
+              title={t('headerHardResetTitle')}
+              aria-label={t('headerHardResetAria')}
+              className="p-2 rounded-lg hover:bg-red-950/60 text-red-400/90 hover:text-red-300 border border-transparent hover:border-red-500/35"
+            >
+              <RotateCcw className="w-6 h-6" />
+            </button>
         </div>
         <div className="flex items-center gap-2">
             <button onClick={toggleFullscreen} className="p-2 transition-colors rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700">
@@ -886,6 +3208,51 @@ export default function App() {
             <div className="flex p-1 border rounded-lg bg-slate-800 border-slate-700">{['cs','en','pl'].map(l=><button key={l} onClick={()=>setLang(l)} className={`p-1 rounded transition-all ${lang===l?'bg-slate-600 opacity-100 shadow-sm':'opacity-40 grayscale'}`}><FlagIcon lang={l} /></button>)}</div>
         </div>
       </header>
+      {showTournamentStepper && (
+        <nav className="flex overflow-x-auto whitespace-nowrap bg-slate-900 p-3 text-sm font-semibold border-b border-slate-800 shrink-0">
+          {(userRole === 'viewer'
+            ? [
+                [5, t('stepperSkupiny') || '5. Skupiny'],
+                [6, t('stepperPavouk') || '6. Pavouk'],
+                [7, t('stepperStatistiky') || '7. Statistiky'],
+              ]
+            : [
+                [1, t('stepperTurnaj') || '1. Turnaj'],
+                [2, t('stepperHraci') || '2. Hráči'],
+                [3, t('stepperFormat') || '3. Formát'],
+                [4, t('stepperTerce') || '4. Terče'],
+                [5, t('stepperSkupiny') || '5. Skupiny'],
+                [6, t('stepperPavouk') || '6. Pavouk'],
+                [7, t('stepperStatistiky') || '7. Statistiky'],
+              ]
+          ).map(([num, label]) => {
+            const n = Number(num);
+            const isCurrent = n === currentStepperStep;
+            const isLocked = userRole === 'admin' && n <= 3 && isTournamentLive;
+            const clickable = canNavigateToStep(n) && !isLocked;
+            let stepClass =
+              'mx-1 first:ml-0 last:mr-0 px-2 py-1 rounded transition-colors shrink-0 ';
+            if (!clickable) {
+              stepClass += 'text-slate-500 cursor-not-allowed';
+            } else if (isCurrent) {
+              stepClass += 'text-green-500 cursor-pointer';
+            } else {
+              stepClass += 'text-white cursor-pointer hover:text-white';
+            }
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() => handleStepperClick(n)}
+                disabled={!clickable}
+                className={stepClass}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </nav>
+      )}
       {showSyncPrompt && (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
         <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-sm w-full shadow-2xl text-center">
@@ -967,6 +3334,12 @@ export default function App() {
                     >
                       <Play className="fill-current w-7 h-7" /> {t('newGame')}
                     </button>
+                    <button
+                      onClick={handleHardResetApp}
+                      className="w-full py-2.5 text-[11px] font-bold tracking-widest uppercase rounded-xl border border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-300 transition-colors"
+                    >
+                      Resetovat aplikaci
+                    </button>
 
                     {(!user || user.isAnonymous) ? (
                         <button onClick={handleLogin} className="flex items-center justify-center w-full gap-3 p-3 mt-2 transition-transform border shadow-md bg-slate-900 hover:bg-slate-800 border-slate-700 rounded-xl active:scale-95 md:mt-0">
@@ -1002,10 +3375,289 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-3 w-full">
                     <button onClick={() => setAppState('tutorial')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><FileText className="w-7 h-7 text-emerald-400" /><span className="text-sm font-bold text-white">{t('tutorial')}</span></button>
                     <button onClick={() => setAppState('history')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><History className="text-blue-400 w-7 h-7" /><span className="text-sm font-bold text-white">{t('matchHistory')}</span></button>
+                    <button onClick={handleOpenTournamentEntry} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><Swords className="w-7 h-7 text-amber-400" /><span className="text-sm font-bold text-white">{t('tournament')}</span></button>
                     <button onClick={() => setAppState('profile')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><BarChart2 className="text-purple-400 w-7 h-7" /><span className="text-sm">{t('statsPersonal')}</span></button>
-                    <button onClick={() => setAppState('about')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><Info className="text-yellow-400 w-7 h-7" /><span className="text-sm font-bold text-white">{t('aboutApp')}</span></button>
+                    <button onClick={() => setAppState('about')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95 col-span-2"><Info className="text-yellow-400 w-7 h-7" /><span className="text-sm font-bold text-white">{t('aboutApp')}</span></button>
                 </div>
         </main>
+      )}
+
+      {/* --- TOURNAMENT SETUP --- */}
+      {appState === 'tournament_hub' && (
+        <TournamentHub
+          lang={lang}
+          onChooseAdmin={handleTournamentHubAdmin}
+          onTabletJoin={handleTournamentHubTabletJoin}
+          onViewerJoin={handleTournamentHubViewerJoin}
+          onOpenHistory={handleTournamentHubHistory}
+          onBack={() => setAppState('home')}
+        />
+      )}
+
+      {appState === 'tournament_tablet' && userRole === 'tablet' && (
+        <div className="flex flex-1 flex-col min-h-0 w-full overflow-hidden">
+        <TabletWaitingRoom
+          lang={lang}
+          hasGroupSchedule={!!tournamentData?.groups?.length}
+          groupStandings={tabletWaitingStandings}
+          boardSchedule={tabletBoardSchedule}
+          activeMatch={tabletAssignedMatch}
+          showDemoAssignButton={false}
+          onCheckInComplete={handleTabletCheckInComplete}
+          onTabletTimeoutWarning={handleTabletTimeoutWarning}
+          onStartGame={handleTabletStartGame}
+          onBack={handleSpectatorDisconnect}
+        />
+        </div>
+      )}
+
+      {appState === 'tournament_history' && (
+        <TournamentHistory
+          lang={lang}
+          user={user}
+          onBack={() => setAppState('tournament_hub')}
+        />
+      )}
+
+      {appState === 'tournament_viewer_preparing' && userRole === 'viewer' && (
+        <main className="flex flex-col flex-1 w-full max-w-lg mx-auto overflow-y-auto bg-slate-950 p-4 pb-24 justify-center min-h-[50vh]">
+          <p className="text-center text-lg sm:text-xl font-bold text-slate-200 px-4">
+            {t('tournament.preparing')}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setUserRole(null);
+              setActivePin('');
+              setAppState('tournament_hub');
+            }}
+            className="mt-10 w-full py-4 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
+          >
+            {translations[lang]?.tournBack ?? 'Zpět'}
+          </button>
+        </main>
+      )}
+
+      {appState === 'tournament_setup' && (
+        <TournamentSetup
+          lang={lang}
+          step={tournamentSetupStep}
+          onStepChange={setTournamentSetupStep}
+          tournamentDraft={tournamentDraft}
+          setTournamentDraft={setTournamentDraft}
+          user={user}
+          onGoogleLogin={handleLogin}
+          onComplete={(data) => {
+            clearTournamentWip();
+            const generatedPin = String(data.pin || activePin || generatePin()).trim();
+            const playersWithIds = (data.players || []).map((p, i) => ({
+              ...p,
+              id: p.id ?? `p${i + 1}`,
+            }));
+            const tournamentId =
+              data.tournamentId ||
+              (typeof crypto !== 'undefined' && crypto.randomUUID
+                ? crypto.randomUUID()
+                : `t-${Date.now()}`);
+
+            if (isTournamentBracketOnlyFormat(data.tournamentFormat)) {
+              const syntheticGroups = [
+                { groupId: 'direct-ko', name: 'A', players: playersWithIds },
+              ];
+              const baseLegs = data.bracketKoLegs ?? data.bracketLegs ?? 3;
+              const rawBracket = generateBracketStructure(
+                syntheticGroups,
+                'all',
+                baseLegs,
+                [],
+                data.prelimLegs ?? null
+              );
+              const withId = {
+                ...data,
+                players: playersWithIds,
+                pin: generatedPin,
+                tournamentId,
+                tournamentFormat: 'bracket_only',
+                groups: [],
+                groupsLegs: null,
+                numGroups: null,
+                advancePerGroup: 'all',
+                promotersCount: 'all',
+                status: 'bracket',
+              };
+              setActivePin(generatedPin);
+              setTournamentData(withId);
+              setTournamentMatches([]);
+              setTournamentBracket(rawBracket);
+              try {
+                safeStorage.setItem(
+                  'dartsTournamentData',
+                  JSON.stringify({ ...withId, tournamentBracket: rawBracket })
+                );
+              } catch (e) {}
+              setTournamentDraft((prev) => ({ ...prev, boardAssignments: {} }));
+              setAppState('tournament_bracket');
+              return;
+            }
+
+            const withId = {
+              ...data,
+              players: playersWithIds,
+              pin: generatedPin,
+              tournamentId,
+            };
+            setActivePin(generatedPin);
+            setTournamentData(withId);
+            try {
+              safeStorage.setItem('dartsTournamentData', JSON.stringify(withId));
+            } catch (e) {}
+            setTournamentDraft((prev) => ({ ...prev, boardAssignments: {} }));
+            setAppState('tournament_board_assignment');
+          }}
+          onBack={() => {
+            setUserRole(null);
+            setAppState('tournament_hub');
+          }}
+        />
+      )}
+
+      {/* --- TOURNAMENT BOARD ASSIGNMENT --- */}
+      {appState === 'tournament_board_assignment' && tournamentData && (
+        <TournamentBoardAssignment
+          tournamentData={tournamentData}
+          tournamentDraft={tournamentDraft}
+          setTournamentDraft={setTournamentDraft}
+          tournamentMatches={tournamentMatches}
+          onUpdateGroupBoard={(groupId, boards) => {
+            const groupMatches = tournamentMatches.filter((m) => (m.groupId ?? m.group) === groupId);
+            const isPlaying = groupMatches.some((m) => m.status === 'playing');
+            if (isPlaying) {
+              const msg = (translations[lang]?.tournBoardChangeConfirm) ||
+                '⚠️ Tato skupina právě hraje zápas na terči. Opravdu chcete změnit její přiřazený terč?';
+              requestConfirm(msg, () => {
+                setTournamentData((prev) => {
+                  if (!prev?.groups) return prev;
+                  const nextGroups = prev.groups.map((g) =>
+                    g.groupId === groupId ? { ...g, boards } : g
+                  );
+                  const next = { ...prev, groups: nextGroups };
+                  try { safeStorage.setItem('dartsTournamentData', JSON.stringify(next)); } catch (e) {}
+                  return next;
+                });
+              });
+              return;
+            }
+            setTournamentData((prev) => {
+              if (!prev?.groups) return prev;
+              const nextGroups = prev.groups.map((g) =>
+                g.groupId === groupId ? { ...g, boards } : g
+              );
+              const next = { ...prev, groups: nextGroups };
+              try { safeStorage.setItem('dartsTournamentData', JSON.stringify(next)); } catch (e) {}
+              return next;
+            });
+          }}
+          lang={lang}
+          onComplete={(data) => {
+            setTournamentData(data);
+            const boardAssignments = {};
+            for (const g of data?.groups ?? []) {
+              boardAssignments[g.groupId] = Array.isArray(g.boards) && g.boards.length > 0 ? g.boards.join(', ') : '';
+            }
+            setTournamentDraft((prev) => ({ ...prev, boardAssignments }));
+            try { safeStorage.setItem('dartsTournamentData', JSON.stringify(data)); } catch (e) {}
+            setAppState('tournament_groups');
+          }}
+          onBack={() => setAppState('tournament_setup')}
+        />
+      )}
+
+      {/* --- TOURNAMENT GROUPS --- */}
+      {appState === 'tournament_groups' && (
+        <TournamentGroupsView
+          tournamentData={tournamentData}
+          tournamentMatches={tournamentMatches}
+          tournamentGroups={tournamentGroups}
+          lang={lang}
+          userRole={userRole}
+          hasBracket={hasBracketGenerated}
+          onBack={() => setAppState('home')}
+          onFinishGroups={() => setAppState('tournament_bracket')}
+          onDevFillMatches={(nextMatches) => setTournamentMatches(nextMatches)}
+          onGenerateBracket={() => {
+            const promotersCount =
+              tournamentData?.promotersCount ??
+              tournamentData?.promotersPerGroup ??
+              tournamentData?.advancePerGroup ??
+              2;
+            const baseLegs =
+              tournamentDraft?.bracketLegs ??
+              tournamentData?.bracketKoLegs ??
+              tournamentData?.bracketLegs ??
+              3;
+            const rawBracket = generateBracketStructure(
+              tournamentGroups,
+              promotersCount,
+              baseLegs,
+              tournamentMatches,
+              tournamentData?.prelimLegs ?? null
+            );
+            setTournamentBracket(rawBracket);
+            setAppState('tournament_bracket');
+          }}
+          onResumeBracket={() => setAppState('tournament_bracket')}
+          onStartMatch={handleStartTournamentMatch}
+          onResetMatch={handleResetMatch}
+          onWithdrawPlayer={handleWithdrawPlayer}
+        />
+      )}
+
+      {appState === 'tournament_bracket' && tournamentData && (
+        <main className="flex flex-col flex-1 w-full overflow-y-auto bg-slate-950 p-4 pb-24">
+          <TournamentBracketView
+            bracketData={tournamentBracket}
+            tournamentData={tournamentData}
+            userRole={userRole}
+            onStartMatch={handleStartBracketMatch}
+            onUpdateRoundSettings={handleUpdateRoundSettings}
+            onUpdateMatchBoard={handleUpdateMatchBoard}
+            onToggleMatchBoardLock={handleToggleMatchBoardLock}
+            onSetMatchBoardAuto={handleSetMatchBoardAuto}
+            onManualRefereeChange={handleManualRefereeChange}
+            onBracketWalkover={handleBracketWalkover}
+            onBracketWithdrawPlayer={handleBracketWithdrawPlayer}
+            onBracketDataCommit={handleBracketDataCommit}
+            lang={lang}
+          />
+          <div className="w-full max-w-[98vw] mx-auto px-2 sm:px-4 mt-4">
+            <button
+              type="button"
+              onClick={() =>
+                setAppState(
+                  isTournamentBracketOnlyFormat(tournamentData?.tournamentFormat)
+                    ? 'home'
+                    : 'tournament_groups'
+                )
+              }
+              className="w-full py-4 rounded-xl font-bold bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700"
+            >
+              {isTournamentBracketOnlyFormat(tournamentData?.tournamentFormat)
+                ? t('backMenu') || 'Zpět do menu'
+                : t('tournBackToGroups') || 'Zpět ke skupinám'}
+            </button>
+          </div>
+        </main>
+      )}
+
+      {/* --- TOURNAMENT STATISTICS --- */}
+      {appState === 'tournament_stats' && tournamentData && (
+        <TournamentStatisticsView
+          tournamentData={tournamentData}
+          tournamentGroups={tournamentGroups}
+          tournamentMatches={tournamentMatches}
+          tournamentBracket={tournamentBracket}
+          lang={lang}
+        />
       )}
 
       {/* --- SETUP --- */}
@@ -1278,7 +3930,9 @@ export default function App() {
               
               // Komplexní smazání účtu včetně historie zápasů
               onDeleteAccount={async () => { 
-                if(window.confirm(t('deleteAccountConfirm') || 'Opravdu chcete nenávratně smazat účet a veškerou historii zápasů?')) { 
+                requestConfirm(
+                  t('deleteAccountConfirm') || 'Opravdu chcete nenávratně smazat účet a veškerou historii zápasů?',
+                  async () => {
                     try { 
                         // 1. Smazání z Firebase DB (pokud je online a přihlášen)
                         if (db && !offlineMode && !user.isAnonymous) {
@@ -1299,15 +3953,76 @@ export default function App() {
                         // 3. Smazání samotného uživatelského účtu
                         await deleteUser(user); 
                         setAppState('home'); 
+                        showNotification(t('presetSaved') || 'Uloženo!', 'success');
                     } catch(e) {
                         console.error('Chyba při mazání:', e);
-                        alert('Chyba. Z bezpečnostních důvodů vyžaduje Google před smazáním účtu čerstvé přihlášení. Odhlaste se, znovu se přihlaste a akci opakujte.');
+                        showNotification(
+                          'Chyba. Z bezpečnostních důvodů vyžaduje Google před smazáním účtu čerstvé přihlášení. Odhlaste se, znovu se přihlaste a akci opakujte.',
+                          'error'
+                        );
                     } 
-                } 
+                  }
+                );
               }} 
               lang={lang}
               currentP1Name={settings.p1Name}
           />
+      )}
+
+      {/* --- GLOBAL CONFIRM MODAL --- */}
+      {confirmState && (
+        <div
+          className="fixed inset-0 z-[3000] flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setConfirmState(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl shadow-black/50 p-4 sm:p-5 animate-in zoom-in-95 fade-in duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-black text-white tracking-tight mb-2">
+              {t('confirm') || 'Potvrzení'}
+            </h3>
+            <p className="text-sm text-slate-300">{confirmState.message}</p>
+            <div className="flex gap-2 mt-5">
+              <button
+                type="button"
+                onClick={() => setConfirmState(null)}
+                className="flex-1 py-3 rounded-xl font-bold text-slate-300 bg-slate-800 border border-slate-600 hover:bg-slate-700 transition-colors"
+              >
+                {confirmState.cancelLabel || t('cancel') || 'Zrušit'}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const fn = confirmState.onConfirm;
+                  setConfirmState(null);
+                  try {
+                    await fn?.();
+                  } catch (e) {
+                    showNotification(String(e?.message ?? e ?? 'Chyba'), 'error');
+                  }
+                }}
+                className="flex-1 py-3 rounded-xl font-black text-white bg-emerald-600 hover:bg-emerald-500 transition-colors"
+              >
+                {confirmState.confirmLabel || t('confirm') || 'Potvrdit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- GLOBAL TOAST --- */}
+      {notification && notification.message && (
+        <div
+          className={`fixed bottom-4 left-1/2 -translate-x-1/2 p-4 rounded-lg shadow-2xl z-50 flex items-center gap-3 animate-slide-in border text-white bg-slate-800 ${
+            notification.type === 'error' ? 'border-red-600' : 'border-green-600'
+          }`}
+        >
+          <span>{notification.type === 'error' ? '❌' : '✅'}</span>
+          <p>{notification.message}</p>
+        </div>
       )}
 
     </div>
