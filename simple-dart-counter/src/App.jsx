@@ -13,7 +13,7 @@ import {
   mergeAdminBracketFromTabletCloud,
 } from './services/tournamentSync';
 import { 
-  AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, Delete, 
+  AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, 
   DownloadCloud, FileText, History, Home, Info, Keyboard as KeyboardIcon, 
   Maximize, Minimize, Mic, MicOff, MousePointer2, Play, RefreshCw, RotateCcw, 
   Target, Trash2, Trophy, Undo2, Unplug, User, Cloud, X, BarChart2, List, Swords
@@ -43,6 +43,7 @@ import {
   calculateGroupStandings,
   isTournamentBracketOnlyFormat,
 } from './utils/tournamentLogic';
+import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
 
 const APP_VERSION = "v1.9.6";
 
@@ -538,77 +539,6 @@ const FlagIcon = ({ lang }) => {
     return null;
 };
 
-const VirtualKeyboard = ({ onChar, onDelete, onClose, lang }) => {
-    const t = (k) => translations[lang]?.[k] || k;
-    const [popup, setPopup] = useState(null);
-    const timerRef = useRef(null);
-    const pressedRef = useRef(false);
-    const specialCharsByLang = {
-        cs: {
-            'A': ['Á'], 'C': ['Č'], 'D': ['Ď'], 'E': ['É', 'Ě'], 'I': ['Í'], 'N': ['Ň'],
-            'O': ['Ó'], 'R': ['Ř'], 'S': ['Š'], 'T': ['Ť'], 'U': ['Ú', 'Ů'], 'Y': ['Ý'], 'Z': ['Ž']
-        },
-        pl: {
-            'A': ['Ą'], 'C': ['Ć'], 'E': ['Ę'], 'L': ['Ł'], 'N': ['Ń'], 'O': ['Ó'], 'S': ['Ś'], 'Z': ['Ź', 'Ż']
-        },
-        en: {}
-    };
-    const specialChars = specialCharsByLang[lang] || {};
-    
-    const rows = [['1','2','3','4','5','6','7','8','9','0'], ['Q','W','E','R','T','Z','U','I','O','P'], ['A','S','D','F','G','H','J','K','L'], ['Y','X','C','V','B','N','M']];
-    if (lang === 'en' || lang === 'pl') { rows[1][5] = 'Y'; rows[3][0] = 'Z'; }
-
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            if (e.key === 'Backspace') { e.preventDefault(); onDelete(); }
-            else if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); onClose(); }
-            else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) onChar(e.key.toUpperCase());
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onChar, onDelete, onClose]);
-
-    const handleDown = (char) => {
-        if (popup) return;
-        pressedRef.current = true;
-        if (specialChars[char]) { timerRef.current = setTimeout(() => { if (pressedRef.current) { setPopup({ char, variants: specialChars[char] }); pressedRef.current = false; } }, 400); }
-    };
-
-    const handleUp = (char) => { clearTimeout(timerRef.current); if (pressedRef.current) { onChar(char); pressedRef.current = false; } };
-
-    return (
-        <>
-            {popup && <div className="fixed inset-0 z-[600]" onClick={() => setPopup(null)}></div>}
-            <div className="fixed bottom-0 left-0 w-full bg-slate-900 border-t border-slate-700 p-1.5 sm:p-2 pb-4 sm:pb-6 landscape:pb-2 z-[600] shadow-2xl animate-in slide-in-from-bottom duration-200 select-none">
-                <div className="flex items-center justify-between max-w-lg p-2 landscape:p-1.5 mx-auto mb-2 landscape:mb-1 border-b rounded-t-lg shadow-sm bg-slate-800 border-slate-700">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase ml-2 tracking-widest">{t('players')}</span>
-                    <button onClick={onClose} className="px-5 py-1.5 landscape:px-4 landscape:py-1 bg-slate-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-black transition-colors shadow-sm">{t('kbdDone')}</button>
-                </div>
-                <div className="flex flex-col gap-1 landscape:gap-0.5 max-w-lg mx-auto relative z-[610]">
-                    {rows.map((row, i) => (
-                        <div key={i} className="flex justify-center gap-1 landscape:gap-0.5">
-                            {row.map(char => (
-                                <div key={char} className="relative flex-1 max-w-[40px] landscape:max-w-[36px]">
-                                    {popup && popup.char === char && (
-                                        <div className="absolute flex p-1 mb-2 duration-100 -translate-x-1/2 border rounded-lg shadow-xl bottom-full left-1/2 bg-slate-800 border-slate-600 animate-in zoom-in">
-                                            {popup.variants.map(v => (<button key={v} onClick={(e) => { e.stopPropagation(); onChar(v); setPopup(null); }} className="w-10 h-10 landscape:w-9 landscape:h-9 text-lg landscape:text-base font-bold text-white rounded sm:h-12 hover:bg-emerald-600">{v}</button>))}
-                                        </div>
-                                    )}
-                                    <button onPointerDown={(e) => { e.preventDefault(); handleDown(char); }} onPointerUp={(e) => { e.preventDefault(); handleUp(char); }} onPointerLeave={() => { clearTimeout(timerRef.current); pressedRef.current = false; }} className={`w-full h-9 sm:h-12 landscape:h-8 bg-slate-800 text-white font-bold rounded shadow border-b-2 border-slate-950 active:translate-y-0.5 active:border-b-0 active:bg-slate-700 transition-all text-xs sm:text-base landscape:text-[11px] ${popup && popup.char === char ? 'bg-slate-700' : ''}`}>{char}</button>
-                                </div>
-                            ))}
-                        </div>
-                    ))}
-                    <div className="flex justify-center gap-1 mt-1">
-                        <button onClick={() => onChar(' ')} className="flex-1 max-w-[280px] bg-slate-800 text-slate-400 font-bold rounded shadow border-b-2 border-slate-950 active:translate-y-0.5 active:border-b-0 active:bg-slate-700 py-2 sm:py-3 landscape:py-1.5 text-xs uppercase tracking-widest">{t('kbdSpace')}</button>
-                        <button onClick={onDelete} className="flex-1 max-w-[80px] bg-red-900/30 text-red-400 font-bold rounded shadow border-b-2 border-slate-950 active:translate-y-0.5 active:border-b-0 active:bg-red-900/50 flex items-center justify-center"><Delete className="w-5 h-5 sm:w-6 sm:h-6"/></button>
-                    </div>
-                </div>
-            </div>
-        </>
-    );
-};
-
 const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch, isTournamentMode, onTournamentMatchComplete, onUndoAndResume }) => {
     const t = (k) => translations[lang]?.[k] || k;
     const [isMicRematch, setIsMicRematch] = useState(false);
@@ -1065,13 +995,13 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, onLogin, lang, 
 };
 
 // --- HLAVNÍ KOMPONENTA (ROUTER) ---
-export default function App() {
+function AppMain({ lang, setLang }) {
+  const { openKeyboard, isKeyboardOpen } = useAdminVirtualKeyboard();
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [offlineMode, setOfflineMode] = useState(false);
   const [isReady, setIsReady] = useState(true);
   const [appState, setAppState] = useState('home');
-  const [lang, setLang] = useState('cs'); 
   const t = (k) => translations[lang]?.[k] || k;
 
   const [settings, setSettings] = useState({
@@ -1087,7 +1017,6 @@ export default function App() {
 
   const [matchHistory, setMatchHistory] = useState(() => loadSafeMatchHistory());
   const [selectedMatchDetail, setSelectedMatchDetail] = useState(null); 
-  const [activeKeyboardInput, setActiveKeyboardInput] = useState(null);
   const [isLandscape, setIsLandscape] = useState(false);
   const [isPC, setIsPC] = useState(false);
   const [tutorialTab, setTutorialTab] = useState('x01');
@@ -1385,7 +1314,8 @@ export default function App() {
       tournamentDraft.promotersCount,
       activeBoards,
       tournamentMatches,
-      regForDirectKo
+      regForDirectKo,
+      tournamentData?.prelimLegs ?? null
     );
     if (JSON.stringify(bracketWithRefs) !== JSON.stringify(tournamentBracket)) {
       setTournamentBracket(bracketWithRefs);
@@ -1483,7 +1413,8 @@ export default function App() {
       tournamentDraft.promotersCount,
       availableBoards,
       tournamentMatches,
-      regForDirectKo
+      regForDirectKo,
+      tournamentData?.prelimLegs ?? null
     );
 
     if (JSON.stringify(withRefs) !== JSON.stringify(tournamentBracket)) {
@@ -1991,8 +1922,6 @@ export default function App() {
     });
   }, [userRole, tournamentData]);
 
-  const isKeyboardOpen = Boolean(activeKeyboardInput);
-
   useEffect(() => {
     const check = () => { setIsLandscape(window.innerWidth > window.innerHeight && window.innerWidth > 500); setIsPC(window.matchMedia("(pointer: fine)").matches && window.innerWidth >= 768); };
     window.addEventListener('resize', check); check();
@@ -2357,21 +2286,24 @@ export default function App() {
   };
 
   const handleManualRefereeChange = (roundIndex, matchIndex, newReferee) => {
-    if (!newReferee?.id) return;
+    const refId = newReferee?.id ?? newReferee?.name;
+    if (refId == null || String(refId).trim() === '') return;
     setTournamentBracket((prev) => {
-      if (!Array.isArray(prev) || !prev[roundIndex]?.matches?.[matchIndex]) return prev;
+      if (!Array.isArray(prev)) return prev;
+      const matches = prev[roundIndex]?.matches;
+      if (!Array.isArray(matches) || matchIndex < 0 || matchIndex >= matches.length) return prev;
       return prev.map((round, ri) => {
         if (ri !== roundIndex) return round;
         return {
           ...round,
-          matches: round.matches.map((m, mi) =>
-            mi === matchIndex
-              ? {
-                  ...m,
-                  referee: { id: newReferee.id, name: newReferee.name ?? newReferee.id },
-                }
-              : m
-          ),
+          matches: matches.map((m, mi) => {
+            if (mi !== matchIndex) return m;
+            const { refereeId: _rid, refereeName: _rnm, ...rest } = m ?? {};
+            return {
+              ...rest,
+              referee: { id: refId, name: newReferee?.name ?? refId },
+            };
+          }),
         };
       });
     });
@@ -2604,8 +2536,6 @@ export default function App() {
     );
   };
 
-  const handleKeyboardInput = (char) => { if (!activeKeyboardInput) return; setSettings(s => ({ ...s, [activeKeyboardInput]: s[activeKeyboardInput] + char })); };
-
   const handleLogin = async () => { 
       const provider = new GoogleAuthProvider(); 
       provider.setCustomParameters({ prompt: 'select_account' }); 
@@ -2629,38 +2559,48 @@ export default function App() {
   const p1Defaults = ['Domácí', 'Home', 'Gospodarze', translations?.cs?.p1Default, translations?.en?.p1Default, translations?.pl?.p1Default].filter(Boolean);
   const p2Defaults = ['Hosté', 'Away', 'Goście', translations?.cs?.p2Default, translations?.en?.p2Default, translations?.pl?.p2Default].filter(Boolean);
 
-  const handleKeyboardClose = () => {
-      if (!activeKeyboardInput) return setActiveKeyboardInput(null);
-      setSettings(prev => {
-          const key = activeKeyboardInput;
-          const value = String(prev[key] || '').trim();
+  const openNameKeyboard = (fieldKey) => {
+    openKeyboard({
+      onAppend: (char) =>
+        setSettings((s) => ({ ...s, [fieldKey]: String(s[fieldKey] ?? '') + char })),
+      onDelete: () =>
+        setSettings((s) => ({
+          ...s,
+          [fieldKey]: String(s[fieldKey] ?? '').slice(0, -1),
+        })),
+      onClose: () => {
+        setSettings((prev) => {
+          const value = String(prev[fieldKey] || '').trim();
           if (value !== '') return prev;
-          if (key === 'p1Name') return { ...prev, p1Name: translations[lang]?.p1Default || 'Domácí' };
-          if (key === 'p2Name') return { ...prev, p2Name: (prev.isBot ? (translations[lang]?.botDefault || 'Robot') : (translations[lang]?.p2Default || 'Hosté')) };
+          if (fieldKey === 'p1Name') return { ...prev, p1Name: translations[lang]?.p1Default || 'Domácí' };
+          if (fieldKey === 'p2Name')
+            return {
+              ...prev,
+              p2Name: prev.isBot
+                ? translations[lang]?.botDefault || 'Robot'
+                : translations[lang]?.p2Default || 'Hosté',
+            };
           return prev;
-      });
-      setActiveKeyboardInput(null);
+        });
+      },
+    });
   };
 
   const handleNameFieldClick = (fieldKey) => {
-      if (fieldKey === 'p2Name' && settings.isBot) return;
-      if (user && !user.isAnonymous) {
-          requestConfirm(t('renameConfirm'), () => {
-            setSettings(prev => {
-              if (fieldKey === 'p1Name' && p1Defaults.includes(prev.p1Name)) return { ...prev, p1Name: '' };
-              if (fieldKey === 'p2Name' && p2Defaults.includes(prev.p2Name)) return { ...prev, p2Name: '' };
-              return prev;
-            });
-            setActiveKeyboardInput(fieldKey);
-          });
-          return;
-      }
-      setSettings(prev => {
-          if (fieldKey === 'p1Name' && p1Defaults.includes(prev.p1Name)) return { ...prev, p1Name: '' };
-          if (fieldKey === 'p2Name' && p2Defaults.includes(prev.p2Name)) return { ...prev, p2Name: '' };
-          return prev;
+    if (fieldKey === 'p2Name' && settings.isBot) return;
+    const run = () => {
+      setSettings((prev) => {
+        if (fieldKey === 'p1Name' && p1Defaults.includes(prev.p1Name)) return { ...prev, p1Name: '' };
+        if (fieldKey === 'p2Name' && p2Defaults.includes(prev.p2Name)) return { ...prev, p2Name: '' };
+        return prev;
       });
-      setActiveKeyboardInput(fieldKey);
+      openNameKeyboard(fieldKey);
+    };
+    if (user && !user.isAnonymous) {
+      requestConfirm(t('renameConfirm'), run);
+      return;
+    }
+    run();
   };
 
   useEffect(() => {
@@ -3175,8 +3115,6 @@ export default function App() {
           </div>
         </div>
       )}
-      {activeKeyboardInput && <VirtualKeyboard onChar={handleKeyboardInput} onDelete={() => setSettings(s => ({...s, [activeKeyboardInput]: s[activeKeyboardInput].slice(0,-1)}))} onClose={handleKeyboardClose} lang={lang} />}
-
       <header className="relative z-20 flex items-center justify-between p-2 border-b h-14 bg-slate-900 border-slate-800 shrink-0">
         <div className="flex items-center gap-1 sm:gap-2">
             {appState === 'home' ? (
@@ -4026,5 +3964,14 @@ export default function App() {
       )}
 
     </div>
+  );
+}
+
+export default function App() {
+  const [lang, setLang] = useState('cs');
+  return (
+    <AdminVirtualKeyboardProvider lang={lang}>
+      <AppMain lang={lang} setLang={setLang} />
+    </AdminVirtualKeyboardProvider>
   );
 }

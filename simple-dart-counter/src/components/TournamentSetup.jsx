@@ -3,11 +3,18 @@ import { ArrowLeft, ArrowRight, CheckCircle, Cloud, Edit2, Target, Trash2, UserP
 import { translations } from '../translations';
 import { distributePlayersToFixedGroups } from '../utils/tournamentGenerator';
 import {
+  applyAdvancementPhrase,
+  countPlayersAdvancingFromGroups,
   estimateTotalTournamentTime,
   generateTournamentVariants,
+  getGroupAdvancementPhraseKey,
+  GROUP_SIZE_MIN,
+  isAllowedGroupSplit,
   isTournamentBracketOnlyFormat,
   isTournamentGroupsThenBracketFormat,
+  listValidGroupCounts,
 } from '../utils/tournamentLogic';
+import { AdminTapTextField } from './AdminTapField';
 
 /** Ranking z inputu: prázdné nebo 0 → null */
 function parseRankingFromInput(val) {
@@ -63,8 +70,6 @@ export default function TournamentSetup({
   const [editingIndex, setEditingIndex] = useState(null);
   const [editName, setEditName] = useState('');
   const [editRanking, setEditRanking] = useState('');
-  const nameRef = useRef(null);
-  const rankRef = useRef(null);
 
   const players = tournamentDraft.players || [];
 
@@ -251,7 +256,7 @@ export default function TournamentSetup({
   const customAdvancePerGroup = Math.max(1, Math.min(99, Number(tournamentDraft.customAdvancePerGroup) || 2));
   const selectedVariant = useMemo(() => {
     if (tournamentDraft.selectedVariantId === 'custom') {
-      const totalAdv = customNumGroups * customAdvancePerGroup;
+      const totalAdv = countPlayersAdvancingFromGroups(players.length, customNumGroups, customAdvancePerGroup);
       const isPower2 = (x) => x > 0 && (x & (x - 1)) === 0;
       return {
         id: 'custom',
@@ -266,12 +271,16 @@ export default function TournamentSetup({
       ? variants.find((x) => x.id === tournamentDraft.selectedVariantId)
       : variants[0];
     return v ?? variants[0];
-  }, [variants, tournamentDraft.selectedVariantId, isCustomFormat, customNumGroups, customAdvancePerGroup]);
+  }, [variants, tournamentDraft.selectedVariantId, customNumGroups, customAdvancePerGroup, players.length]);
+
+  const resolvedNumGroups =
+    tournamentDraft.numGroups ?? selectedVariant?.numGroups ?? listValidGroupCounts(players.length)[0] ?? 1;
 
   const groups = useMemo(() => {
-    if (!isTournamentGroupsThenBracketFormat(tournamentDraft.format) || players.length < 4) return [];
+    if (!isTournamentGroupsThenBracketFormat(tournamentDraft.format) || players.length < GROUP_SIZE_MIN) return [];
     const playersWithIds = players.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}` }));
-    const numGroups = tournamentDraft.numGroups ?? selectedVariant?.numGroups ?? Math.max(1, Math.ceil(playersWithIds.length / 4));
+    const numGroups =
+      tournamentDraft.numGroups ?? selectedVariant?.numGroups ?? listValidGroupCounts(playersWithIds.length)[0] ?? 1;
     return distributePlayersToFixedGroups(playersWithIds, numGroups);
   }, [tournamentDraft.format, tournamentDraft.numGroups, selectedVariant, players]);
 
@@ -280,24 +289,23 @@ export default function TournamentSetup({
 
   const grpFmtStep = isTournamentGroupsThenBracketFormat(tournamentDraft.format);
   const fmtBracketOnly = isTournamentBracketOnlyFormat(tournamentDraft.format);
-  const minPlayersRequired = grpFmtStep ? 4 : 2;
+  const minPlayersRequired = grpFmtStep ? GROUP_SIZE_MIN : 2;
 
   const totalAdvancees = useMemo(() => {
-    if (!groups.length) return players.length;
-    if (advancePerGroup === 'all') {
-      return groups.reduce((s, g) => s + (g.players?.length || 0), 0);
-    }
-    return groups.length * (typeof advancePerGroup === 'number' ? advancePerGroup : 2);
-  }, [groups, advancePerGroup, players.length]);
+    if (!grpFmtStep) return players.length;
+    return countPlayersAdvancingFromGroups(players.length, resolvedNumGroups, advancePerGroup);
+  }, [grpFmtStep, players.length, resolvedNumGroups, advancePerGroup]);
 
   const needsPrelim = useMemo(() => {
     if (totalAdvancees < 2) return false;
     return !Number.isInteger(Math.log2(totalAdvancees));
   }, [totalAdvancees]);
   const showByeWarning = needsPrelim;
-  const customAvgPlayers = customNumGroups > 0 ? (players.length / customNumGroups) : 0;
+  const customSplitOk = isAllowedGroupSplit(players.length, customNumGroups);
+  const customMinGroup = customSplitOk ? Math.floor(players.length / customNumGroups) : 0;
+  const customAdvanceOk = customAdvancePerGroup <= customMinGroup;
   const isCustomInvalid =
-    isCustomFormat && isTournamentGroupsThenBracketFormat(tournamentDraft.format) && customAvgPlayers < 3;
+    isCustomFormat && grpFmtStep && (!customSplitOk || !customAdvanceOk);
 
   const timeEstimate = useMemo(() => {
     const fmt = isTournamentBracketOnlyFormat(tournamentDraft.format)
@@ -309,12 +317,24 @@ export default function TournamentSetup({
       groupLegs: tournamentDraft.groupLegs,
       bracketLegs: bracketKoLegs,
     };
+    const numGroupsForEst =
+      tournamentDraft.numGroups ?? selectedVariant?.numGroups ?? listValidGroupCounts(players.length)[0];
     return estimateTotalTournamentTime(opts, {
       advancePerGroup,
       bracketKoLegs,
       numBoards,
+      numGroups: numGroupsForEst,
     });
-  }, [players, tournamentDraft.format, tournamentDraft.groupLegs, advancePerGroup, bracketKoLegs, numBoards]);
+  }, [
+    players,
+    tournamentDraft.format,
+    tournamentDraft.groupLegs,
+    tournamentDraft.numGroups,
+    selectedVariant?.numGroups,
+    advancePerGroup,
+    bracketKoLegs,
+    numBoards,
+  ]);
 
   /** Seřazení hráčů podle rankingu. */
   const getSortedPlayersForTournament = () =>
@@ -339,7 +359,8 @@ export default function TournamentSetup({
         (String(tournamentDraft.pin ?? '').trim() && /^\d{4}$/.test(String(tournamentDraft.pin).trim())
           ? String(tournamentDraft.pin).trim()
           : Math.floor(1000 + Math.random() * 9000).toString());
-      const numGroups = tournamentDraft.numGroups ?? selectedVariant?.numGroups ?? Math.max(1, Math.ceil(players.length / 4));
+      const numGroups =
+        tournamentDraft.numGroups ?? selectedVariant?.numGroups ?? listValidGroupCounts(players.length)[0] ?? 1;
       const advPerGroup = tournamentDraft.advancePerGroup ?? selectedVariant?.advancePerGroup ?? 2;
       const data = {
         name: (tournamentDraft.name || '').trim(),
@@ -369,28 +390,6 @@ export default function TournamentSetup({
         'error'
       );
     }
-  };
-
-  const handleNameKeyDown = (e) => {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    if (editingIndex !== null) {
-      handleSaveEdit();
-      return;
-    }
-    const name = playerName.trim();
-    if (name) rankRef.current?.focus();
-  };
-
-  const handleRankingKeyDown = (e) => {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    if (editingIndex !== null) {
-      handleSaveEdit();
-      return;
-    }
-    handleAddPlayer();
-    nameRef.current?.focus();
   };
 
   const btnBase =
@@ -461,20 +460,9 @@ export default function TournamentSetup({
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
                   {t('tournName') || 'Název turnaje'}
                 </label>
-                <input
-                  type="text"
+                <AdminTapTextField
                   value={tournamentDraft.name}
-                  onChange={(e) => setTournamentDraft((prev) => ({ ...prev, name: e.target.value }))}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      const name = (tournamentDraft.name || '').trim();
-                      if (name) {
-                        setValidationError('');
-                        setStep(2);
-                      }
-                    }
-                  }}
+                  onValueChange={(v) => setTournamentDraft((prev) => ({ ...prev, name: v }))}
                   placeholder={t('tournNamePlaceholder') || 'např. Páteční turnaj'}
                   className={inputBase}
                 />
@@ -602,12 +590,11 @@ export default function TournamentSetup({
                       <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
                         {t('playerName') || 'Jméno hráče'}
                       </label>
-                      <input
-                        ref={nameRef}
-                        type="text"
+                      <AdminTapTextField
                         value={editingIndex !== null ? editName : playerName}
-                        onChange={(e) => (editingIndex !== null ? setEditName(e.target.value) : setPlayerName(e.target.value))}
-                        onKeyDown={handleNameKeyDown}
+                        onValueChange={(v) =>
+                          editingIndex !== null ? setEditName(v) : setPlayerName(v)
+                        }
                         placeholder={t('tournPlayerPlaceholder') || 'Jméno nebo jméno a příjmení'}
                         className={inputBase}
                       />
@@ -616,18 +603,14 @@ export default function TournamentSetup({
                       <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
                         {t('tournRanking') || 'Ranking'}
                       </label>
-                      <input
-                        ref={rankRef}
-                        type="number"
-                        min={1}
-                        step={1}
+                      <AdminTapTextField
                         value={editingIndex !== null ? editRanking : playerRanking}
-                        onChange={(e) =>
-                          editingIndex !== null ? setEditRanking(e.target.value) : setPlayerRanking(e.target.value)
+                        onValueChange={(v) =>
+                          editingIndex !== null ? setEditRanking(v) : setPlayerRanking(v)
                         }
-                        onKeyDown={handleRankingKeyDown}
+                        filterChar={(c) => /^\d$/.test(c)}
                         placeholder="–"
-                        className={`${inputBase} w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                        className={`${inputBase} w-full font-mono`}
                       />
                     </div>
                   </div>
@@ -687,7 +670,7 @@ export default function TournamentSetup({
                     <span className="text-xs text-amber-400">
                       {minPlayersRequired <= 2
                         ? t('tournMinPlayersKo') || 'Min. 2 hráči'
-                        : t('tournMinPlayers') || 'Min. 4 hráči'}
+                        : t('tournMinPlayers') || 'Min. 3 hráči'}
                     </span>
                   )}
                   {hasAnyDuplicates() && (
@@ -857,13 +840,13 @@ export default function TournamentSetup({
                   <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
                     {t('tournNumBoards') || 'Celkový počet dostupných terčů v herně'}
                   </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={99}
-                    value={rawNumBoards ?? 2}
-                    onChange={(e) => {
-                      const text = e.target.value;
+                  <AdminTapTextField
+                    value={
+                      rawNumBoards === '' || rawNumBoards == null
+                        ? ''
+                        : String(rawNumBoards)
+                    }
+                    onValueChange={(text) => {
                       if (text === '') {
                         setTournamentDraft((prev) => ({ ...prev, numBoards: '' }));
                         return;
@@ -874,7 +857,8 @@ export default function TournamentSetup({
                         numBoards: Number.isFinite(v) ? Math.max(1, Math.min(99, v)) : '',
                       }));
                     }}
-                    className={`${inputBase} w-24`}
+                    filterChar={(c) => /^\d$/.test(c)}
+                    className={`${inputBase} w-24 font-mono`}
                   />
                 </div>
                 {grpFmtStep && (
@@ -988,57 +972,64 @@ export default function TournamentSetup({
                         <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
                           {t('tournCustomNumGroups') || 'Počet skupin'}
                         </label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={99}
-                          value={customNumGroups}
-                          onChange={(e) => {
-                            const v = Math.max(1, Math.min(99, parseInt(e.target.value, 10) || 1));
+                        <AdminTapTextField
+                          value={String(customNumGroups)}
+                          onValueChange={(text) => {
+                            const v = Math.max(1, Math.min(99, parseInt(String(text), 10) || 1));
                             setTournamentDraft((prev) => ({
                               ...prev,
                               customNumGroups: v,
                               numGroups: v,
                             }));
                           }}
-                          className={inputBase}
+                          filterChar={(c) => /^\d$/.test(c)}
+                          className={`${inputBase} font-mono`}
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
                           {t('tournCustomAdvancePerGroup') || 'Počet postupujících z každé skupiny'}
                         </label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={99}
-                          value={customAdvancePerGroup}
-                          onChange={(e) => {
-                            const v = Math.max(1, Math.min(99, parseInt(e.target.value, 10) || 1));
+                        <AdminTapTextField
+                          value={String(customAdvancePerGroup)}
+                          onValueChange={(text) => {
+                            const v = Math.max(1, Math.min(99, parseInt(String(text), 10) || 1));
                             setTournamentDraft((prev) => ({
                               ...prev,
                               customAdvancePerGroup: v,
                               advancePerGroup: v,
                             }));
                           }}
-                          className={inputBase}
+                          filterChar={(c) => /^\d$/.test(c)}
+                          className={`${inputBase} font-mono`}
                         />
                       </div>
                       <p className="text-sm text-slate-300">
                         {t('tournAdvanceTotalHint') || 'Celkem postupuje'}:{' '}
-                        <span className="font-mono font-bold text-emerald-400">{customNumGroups * customAdvancePerGroup}</span>
+                        <span className="font-mono font-bold text-emerald-400">
+                          {countPlayersAdvancingFromGroups(players.length, customNumGroups, customAdvancePerGroup)}
+                        </span>
                       </p>
-                      {customAvgPlayers < 3 && (
+                      {!customSplitOk && (
                         <p className="text-sm font-bold text-red-400">
-                          ⚠️ Neplatný formát: Průměrně vychází méně než 3 hráče na skupinu. Zmenšete počet skupin.
+                          ⚠️ {t('tournCustomInvalidGroupSplit')}
+                        </p>
+                      )}
+                      {customSplitOk && !customAdvanceOk && (
+                        <p className="text-sm font-bold text-red-400">
+                          ⚠️ {t('tournCustomInvalidAdvance').replace(/\{max\}/g, String(customMinGroup))}
                         </p>
                       )}
                       <p className="text-sm text-slate-400">
                         {t('tournVariantBracket') || 'Pavouk'}:{' '}
                         {(() => {
-                          const total = customNumGroups * customAdvancePerGroup;
-                          const needsBye = total > 0 && ((total & (total - 1)) !== 0 || total % 2 === 1);
-                          return needsBye ? (
+                          const total = countPlayersAdvancingFromGroups(
+                            players.length,
+                            customNumGroups,
+                            customAdvancePerGroup
+                          );
+                          const needsByeBracket = total > 0 && (total & (total - 1)) !== 0;
+                          return needsByeBracket ? (
                             <span className="text-amber-400 font-bold">
                               {t('tournBracketByeWarning') || 'Bude použito předkolo'}
                             </span>
@@ -1065,9 +1056,10 @@ export default function TournamentSetup({
                 </span>
                 {variants.map((v) => {
                   const isSelected = selectedVariant?.id === v.id && !isCustomFormat;
-                  const perGroup = v.advancePerGroup === 'all'
-                    ? (t('tournAdvanceAll') || 'všichni')
-                    : String(v.advancePerGroup);
+                  const advancePhrase = applyAdvancementPhrase(
+                    t,
+                    getGroupAdvancementPhraseKey(players.length, v.numGroups, v.advancePerGroup)
+                  );
                   const timeEst = estimateTotalTournamentTime(
                     { players, format: 'groups_bracket', groupLegs: tournamentDraft.groupLegs ?? 2, bracketLegs: bracketKoLegs },
                     { advancePerGroup: v.advancePerGroup, bracketKoLegs, numGroups: v.numGroups, numBoards }
@@ -1097,7 +1089,8 @@ export default function TournamentSetup({
                         {t('tournVariantGroups') || 'Rozložení'}: {formatGroupComposition(players.length, v.numGroups, t)}
                       </p>
                       <p className="text-sm text-slate-300">
-                        {t('tournAdvancePerGroup') || 'Postupují'}: {perGroup} {t('tournVariantFromGroup') || 'ze skupiny'}
+                        <span className="text-slate-400">{t('tournAdvanceRule')}: </span>
+                        {advancePhrase}
                       </p>
                       <p className="text-sm text-slate-400 mt-2">
                         {t('tournVariantBracket') || 'Pavouk'}: {t('tournVariantBracketFor') || 'pro'} {v.totalAdvancees} {t('tournPlayersFew') || 'hráčů'}

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Settings, Play, ClipboardList, Lock, Unlock, X, Pencil, Flag, Bell } from 'lucide-react';
 import { translations } from '../translations';
-import { getBracketWinLegsForRound } from '../utils/tournamentLogic';
+import { getBracketWinLegsForRound, isBracketRefereePlaceholder } from '../utils/tournamentLogic';
+import { AdminTapTextField } from './AdminTapField';
 
 const BYE_MARKER = 'Volný los';
 
@@ -93,14 +94,11 @@ function BracketModal({
           </button>
         </div>
         {hint ? <p className="text-xs text-slate-500 mb-3">{hint}</p> : null}
-        <input
-          type={inputMode === 'numeric' ? 'number' : 'text'}
-          min={inputMode === 'numeric' ? 1 : undefined}
-          max={inputMode === 'numeric' ? 99 : undefined}
+        <AdminTapTextField
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onValueChange={onChange}
+          filterChar={inputMode === 'numeric' ? (c) => /^\d$/.test(c) : undefined}
           className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
-          autoFocus
         />
         <div className="flex gap-2 mt-4">
           <button
@@ -406,31 +404,38 @@ export default function TournamentBracketView({
 
   const RefereeRow = ({ match, roundIndex, matchIndex }) => {
     if (isByeMatch(match)) return null;
-    const canManualEdit =
+    const placeholderRef = isBracketRefereePlaceholder(match?.referee, match?.refereeId);
+    const canPickRefereeManually =
       isAdmin &&
       match.status === 'pending' &&
-      !!match.referee &&
       typeof onManualRefereeChange === 'function' &&
       allTournamentPlayers.length > 0;
+    const showRefereeAsButton =
+      canPickRefereeManually && (!match.referee || placeholderRef);
+    const refNameTrim =
+      match.referee?.name != null ? String(match.referee.name).trim() : '';
+    const refereeLabel =
+      refNameTrim ||
+      (placeholderRef ? t('tournBracketScorerPlaceholder') || '⏳ Čeká na proherce...' : '');
     return (
       <div className="text-sm text-slate-400 mt-2 flex items-center gap-2 border-t border-slate-700/50 pt-2">
         <span className="text-xs uppercase tracking-wider">
           {t('tournBracketScorer') || 'Počtář:'}
         </span>
-        {match.referee ? (
-          canManualEdit ? (
-            <button
-              type="button"
-              onClick={() => openRefereeModal(roundIndex, matchIndex, match)}
-              className="inline-flex items-center gap-1 text-amber-500 hover:text-amber-300 font-semibold truncate"
-              title={t('tournEditScorer') || 'Upravit počtáře'}
-            >
-              <span className="truncate">{match.referee.name}</span>
-              <Pencil className="w-3.5 h-3.5 shrink-0" />
-            </button>
-          ) : (
-            <span className="text-amber-500 font-semibold truncate">{match.referee.name}</span>
-          )
+        {showRefereeAsButton ? (
+          <button
+            type="button"
+            onClick={() => openRefereeModal(roundIndex, matchIndex, match)}
+            className="inline-flex items-center gap-1 text-amber-500 hover:text-amber-300 font-semibold truncate max-w-full text-left"
+            title={t('tournEditScorer') || 'Vybrat / upravit počtáře'}
+          >
+            <span className={`truncate ${!match.referee || placeholderRef ? 'italic text-slate-400' : ''}`}>
+              {refereeLabel || t('tournBracketScorerPlaceholder') || '⏳ Čeká na proherce...'}
+            </span>
+            <Pencil className="w-3.5 h-3.5 shrink-0" />
+          </button>
+        ) : match.referee && !placeholderRef ? (
+          <span className="text-amber-500 font-semibold truncate">{match.referee.name}</span>
         ) : (
           <span className="italic text-slate-500">
             {t('tournBracketScorerPlaceholder') || '⏳ Čeká na proherce...'}
@@ -472,12 +477,10 @@ export default function TournamentBracketView({
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
                   {t('tournBracketModalLegsTitle')}
                 </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={99}
+                <AdminTapTextField
                   value={editLegsValue}
-                  onChange={(e) => setEditLegsValue(e.target.value)}
+                  onValueChange={setEditLegsValue}
+                  filterChar={(c) => /^\d$/.test(c)}
                   className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
                 />
                 <p className="text-[10px] text-slate-500 mt-1">{t('tournBracketModalLegsHint')}</p>
@@ -486,12 +489,10 @@ export default function TournamentBracketView({
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
                   {t('tournBracketModalRoundBoardsLabel')}
                 </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={99}
+                <AdminTapTextField
                   value={editBoardsValue}
-                  onChange={(e) => setEditBoardsValue(e.target.value)}
+                  onValueChange={setEditBoardsValue}
+                  filterChar={(c) => /^\d$/.test(c)}
                   className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
                 />
                 <p className="text-[10px] text-slate-500 mt-1">{t('tournBracketModalRoundBoardsHint')}</p>
@@ -564,6 +565,7 @@ export default function TournamentBracketView({
               }
               className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
             >
+              <option value="">{t('tournSelectScorer') || '— Vyberte počtáře —'}</option>
               {allTournamentPlayers.map((p) => (
                 <option key={p.id} value={String(p.id)}>
                   {p.name}

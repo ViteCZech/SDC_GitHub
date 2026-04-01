@@ -86,38 +86,62 @@ export function distributePlayersToFixedGroups(players, numGroups) {
 }
 
 /**
- * Vygeneruje Round Robin zápasy pro jednu skupinu. Počtář (chalker) je vždy jen z hráčů této skupiny,
- * s rotací podle počtu odpočítaných zápasů (tie-break: horší nasazení = vyšší index v poli).
- *
- * @param {Array<{id?: string, name?: string, ranking?: number}>} groupPlayers - pořadí pole = nasazení (0 = jednička)
- * @param {string} groupId - ID skupiny (např. 'A')
- * @returns {Array<object>} zápasy s player1Id, player2Id, chalkerId, groupId, id, round, status
+ * Předepsané pořadí zápasů ve skupině (round robin).
+ * Index hráče 0 = nasazení 1 (nejlepší), …, n-1 = nasazení n.
+ * Každý záznam: { i1, i2, ref } = zápas i1+1 vs i2+1, počtář hráč ref+1.
  */
-export function generateGroupMatches(groupPlayers, groupId) {
-  if (!groupPlayers || groupPlayers.length < 2) return [];
+const GROUP_ROUND_ROBIN_SCHEDULE = {
+  3: [
+    { i1: 0, i2: 2, ref: 1 },
+    { i1: 1, i2: 2, ref: 0 },
+    { i1: 0, i2: 1, ref: 2 },
+  ],
+  4: [
+    { i1: 0, i2: 3, ref: 2 },
+    { i1: 1, i2: 2, ref: 3 },
+    { i1: 0, i2: 2, ref: 1 },
+    { i1: 1, i2: 3, ref: 2 },
+    { i1: 0, i2: 1, ref: 3 },
+    { i1: 2, i2: 3, ref: 0 },
+  ],
+  5: [
+    { i1: 0, i2: 4, ref: 2 },
+    { i1: 1, i2: 3, ref: 0 },
+    { i1: 2, i2: 4, ref: 1 },
+    { i1: 0, i2: 3, ref: 4 },
+    { i1: 1, i2: 2, ref: 3 },
+    { i1: 3, i2: 4, ref: 1 },
+    { i1: 0, i2: 2, ref: 3 },
+    { i1: 1, i2: 4, ref: 0 },
+    { i1: 2, i2: 3, ref: 4 },
+    { i1: 0, i2: 1, ref: 2 },
+  ],
+  6: [
+    { i1: 0, i2: 5, ref: 2 },
+    { i1: 1, i2: 4, ref: 3 },
+    { i1: 2, i2: 3, ref: 1 },
+    { i1: 0, i2: 4, ref: 5 },
+    { i1: 1, i2: 3, ref: 0 },
+    { i1: 2, i2: 4, ref: 5 },
+    { i1: 3, i2: 5, ref: 1 },
+    { i1: 0, i2: 2, ref: 4 },
+    { i1: 1, i2: 5, ref: 2 },
+    { i1: 3, i2: 4, ref: 0 },
+    { i1: 1, i2: 2, ref: 5 },
+    { i1: 0, i2: 3, ref: 4 },
+    { i1: 2, i2: 5, ref: 3 },
+    { i1: 0, i2: 1, ref: 4 },
+    { i1: 4, i2: 5, ref: 3 },
+  ],
+};
 
+/** Fallback pro skupiny > 6 hráčů: stejné pořadí párů jako dřív + rotace počtáře podle zátěže. */
+function generateGroupMatchesFallback(groupPlayers, groupId) {
   const players = groupPlayers.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}` }));
-
-  if (players.length === 2) {
-    const [a, b] = players;
-    return [
-      {
-        player1Id: a.id,
-        player2Id: b.id,
-        chalkerId: null,
-        groupId,
-        id: `${groupId}-r1-${a.id}-${b.id}`,
-        round: 1,
-        status: 'pending',
-      },
-    ];
-  }
-
   const refereeCounts = {};
   players.forEach((p) => {
     refereeCounts[p.id] = 0;
   });
-
   const indexById = new Map(players.map((p, idx) => [p.id, idx]));
 
   const pairs = [];
@@ -162,7 +186,8 @@ export function generateGroupMatches(groupPlayers, groupId) {
     });
     const chosen = eligible[0];
     refereeCounts[chosen.id] += 1;
-    const name = chosen.name != null && String(chosen.name).trim() !== '' ? String(chosen.name) : String(chosen.id);
+    const name =
+      chosen.name != null && String(chosen.name).trim() !== '' ? String(chosen.name) : String(chosen.id);
     return {
       player1Id: p1Id,
       player2Id: p2Id,
@@ -179,4 +204,66 @@ export function generateGroupMatches(groupPlayers, groupId) {
     round: idx + 1,
     status: 'pending',
   }));
+}
+
+/**
+ * Vygeneruje Round Robin zápasy pro jednu skupinu v přesném pořadí (3–6 hráčů dle turnajového manuálu).
+ * Počtář je vždy určený slotem v rozvrhu (nasazení 1 = nejlepší podle vstupního pole).
+ *
+ * @param {Array<{id?: string, name?: string, ranking?: number}>} groupPlayers - pořadí pole = nasazení (0 = jednička)
+ * @param {string} groupId - ID skupiny (např. 'A')
+ * @returns {Array<object>} zápasy s player1Id, player2Id, chalkerId, groupId, id, round, status
+ */
+export function generateGroupMatches(groupPlayers, groupId) {
+  if (!groupPlayers || groupPlayers.length < 2) return [];
+
+  const players = groupPlayers.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}` }));
+  const n = players.length;
+
+  if (n === 2) {
+    const [a, b] = players;
+    const chalkerId = null;
+    return [
+      {
+        player1Id: a.id,
+        player2Id: b.id,
+        chalkerId,
+        refereeId: chalkerId,
+        referee: null,
+        groupId,
+        id: `${groupId}-r1-${a.id}-${b.id}`,
+        round: 1,
+        status: 'pending',
+      },
+    ];
+  }
+
+  const schedule = GROUP_ROUND_ROBIN_SCHEDULE[n];
+  if (!schedule) {
+    return generateGroupMatchesFallback(groupPlayers, groupId);
+  }
+
+  const matches = schedule.map((row, idx) => {
+    const p1 = players[row.i1];
+    const p2 = players[row.i2];
+    const refP = players[row.ref];
+    if (!p1 || !p2 || !refP) {
+      return null;
+    }
+    const name =
+      refP.name != null && String(refP.name).trim() !== '' ? String(refP.name) : String(refP.id);
+    return {
+      player1Id: p1.id,
+      player2Id: p2.id,
+      chalkerId: refP.id,
+      refereeId: refP.id,
+      referee: { id: refP.id, name },
+      groupId,
+      id: `${groupId}-r${idx + 1}-${p1.id}-${p2.id}`,
+      round: idx + 1,
+      status: 'pending',
+    };
+  });
+
+  return matches.filter(Boolean);
 }

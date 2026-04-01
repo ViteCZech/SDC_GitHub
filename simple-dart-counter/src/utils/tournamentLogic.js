@@ -685,6 +685,42 @@ export function isRealPendingBracketMatch(m) {
   return true;
 }
 
+/**
+ * Zástupný počtář (čeká na neexistujícího „proherce“ z BYE apod.) — musí se nahradit reálným hráčem z poolu nebo ručně.
+ * Podporuje i legacy `match.refereeId === 'waiting'`.
+ */
+export function isBracketRefereePlaceholder(ref, refereeIdLegacy) {
+  const legId = refereeIdLegacy ?? ref?.id;
+  if (legId != null && String(legId).trim() !== '') {
+    const low = String(legId).toLowerCase();
+    if (low === 'waiting' || low === 'pending') return true;
+  }
+  const nm = String(ref?.name ?? '').trim();
+  if (!nm) return false;
+  if (/čeká\s+na\s+proherce/i.test(nm)) return true;
+  if (/waiting\s+for\s+loser/i.test(nm)) return true;
+  if (/oczekiwanie\s+na\s+przegranego/i.test(nm)) return true;
+  return false;
+}
+
+/** Dokončený feeder zápas, ze kterého nelze vzít „proherce“ (BYE / volný los — žádný reálný soupeř). */
+function isBracketFeederWithoutPlayableLoser(feeder) {
+  if (!feeder) return true;
+  if (feeder.isBye === true) return true;
+  if (feeder.player1Id === 'BYE' || feeder.player2Id === 'BYE') return true;
+  if (feeder.status !== 'completed') return false;
+  const p1Real =
+    feeder.player1Id != null &&
+    feeder.player1Id !== '' &&
+    !isBracketByeName(feeder.player1Name);
+  const p2Real =
+    feeder.player2Id != null &&
+    feeder.player2Id !== '' &&
+    !isBracketByeName(feeder.player2Name);
+  if (!p1Real || !p2Real) return true;
+  return false;
+}
+
 function winnerFromBracketMatch(m) {
   if (m.status !== 'completed' || m.winnerId == null) return null;
   const id = m.winnerId;
@@ -1055,46 +1091,127 @@ export function generateBracketStructure(groups, promotersCount, baseLegs = 3, m
   return rounds;
 }
 
+/** Min / max hráčů ve skupině (turnajové pravidlo). */
+export const GROUP_SIZE_MIN = 3;
+export const GROUP_SIZE_MAX = 6;
+
 /**
- * Vygeneruje 3 varianty turnaje podle počtu hráčů.
+ * Rozdělení hráčů do g skupin: část skupin má ⌊n/g⌋+1, zbytek ⌊n/g⌋ (max. rozdíl 1).
+ */
+export function getGroupSplit(playerCount, numGroups) {
+  const n = Math.max(0, Math.floor(Number(playerCount) || 0));
+  const g = Math.max(1, Math.floor(Number(numGroups) || 1));
+  const base = Math.floor(n / g);
+  const rem = n % g;
+  const minSize = base;
+  const maxSize = rem === 0 ? base : base + 1;
+  return { n, g, base, rem, minSize, maxSize };
+}
+
+/** Platné rozdělení: žádná skupina pod 3 ani nad 6, rozdíl velikostí nejvýše 1. */
+export function isAllowedGroupSplit(playerCount, numGroups) {
+  const s = getGroupSplit(playerCount, numGroups);
+  if (s.n < GROUP_SIZE_MIN) return false;
+  if (s.minSize < GROUP_SIZE_MIN) return false;
+  if (s.maxSize > GROUP_SIZE_MAX) return false;
+  if (s.maxSize - s.minSize > 1) return false;
+  return true;
+}
+
+/** Všechny počty skupin, které u daného n splní pravidla velikosti skupin. */
+export function listValidGroupCounts(playerCount) {
+  const n = Math.max(0, Math.floor(Number(playerCount) || 0));
+  const out = [];
+  for (let g = 1; g <= Math.max(1, n); g++) {
+    if (isAllowedGroupSplit(n, g)) out.push(g);
+  }
+  return out;
+}
+
+/**
+ * Textace postupu do pavouka při smíšených velikostech skupin (např. část po 4, část po 3).
+ * @returns {{ key: string, params?: Record<string, string|number> }}
+ */
+export function getGroupAdvancementPhraseKey(playerCount, numGroups, advancePerGroup) {
+  const n = Math.max(0, Number(playerCount) || 0);
+  const g = Math.max(1, Number(numGroups) || 1);
+  if (advancePerGroup === 'all') return { key: 'tournAdvancePhraseAll' };
+  const adv = Number(advancePerGroup);
+  if (!Number.isFinite(adv)) return { key: 'tournAdvancePhraseUniform', params: { adv: '?', size: '?' } };
+  const { base, rem, minSize, maxSize } = getGroupSplit(n, g);
+  if (rem === 0) {
+    if (adv >= minSize) return { key: 'tournAdvancePhraseEveryoneSize', params: { size: minSize } };
+    return { key: 'tournAdvancePhraseUniform', params: { adv, size: minSize } };
+  }
+  const big = maxSize;
+  const small = minSize;
+  if (adv === small) {
+    return { key: 'tournAdvancePhraseSplitSmallAll', params: { adv, big, small } };
+  }
+  return { key: 'tournAdvancePhraseMixed', params: { adv, big, small } };
+}
+
+export function applyAdvancementPhrase(t, phrase) {
+  const { key, params = {} } = phrase;
+  let s = t(key) || key;
+  for (const [k, v] of Object.entries(params)) {
+    s = s.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+  }
+  return s;
+}
+
+/** Kolik hráčů celkem postoupí do pavouka (číslo ≤ velikost nejmenší skupiny). */
+export function countPlayersAdvancingFromGroups(playerCount, numGroups, advancePerGroup) {
+  const n = Math.max(0, Number(playerCount) || 0);
+  const g = Math.max(1, Number(numGroups) || 1);
+  if (advancePerGroup === 'all') return n;
+  const adv = Number(advancePerGroup);
+  if (!Number.isFinite(adv) || adv < 1) return 0;
+  const { minSize } = getGroupSplit(n, g);
+  const capped = Math.min(adv, minSize);
+  return g * capped;
+}
+
+/**
+ * Vygeneruje až 3 varianty turnaje — pouze rozdělení, kde každá skupina má 3–6 hráčů
+ * a rozdíl velikostí skupin je nejvýše 1. Postup „ze skupiny“ nikdy nepřesáhne velikost nejmenší skupiny.
  * @param {number} playerCount
  * @returns {Array<{id: string, labelKey: string, numGroups: number, advancePerGroup: number|'all', totalAdvancees: number, needsBye: boolean}>}
  */
 export function generateTournamentVariants(playerCount, totalBoards = null) {
   const n = Math.max(0, Number(playerCount) || 0);
-  if (n <= 1) return [];
+  if (n < GROUP_SIZE_MIN) return [];
+
+  const validGs = listValidGroupCounts(n);
+  if (validGs.length === 0) return [];
+
   const isPower2 = (x) => x > 0 && (x & (x - 1)) === 0;
-  const preferredGroups = [4, 8];
   const boardGroups = Number(totalBoards);
-  const hasValidBoardGroups = Number.isFinite(boardGroups) && boardGroups >= 1 && n / boardGroups >= 3;
+  const boardG = Number.isFinite(boardGroups) && boardGroups >= 1 ? Math.floor(boardGroups) : null;
+  const hasValidBoardGroups = boardG != null && validGs.includes(boardG);
+
+  const preferredGroups = [4, 8];
+  const minGroupsForMaxSize = Math.ceil(n / GROUP_SIZE_MAX);
+
   const candidates = [];
 
-  const addCandidate = (numGroups) => {
-    if (!Number.isFinite(numGroups) || numGroups < 1) return;
-    if (n / numGroups < 3) return; // min. průměr 3 hráči na skupinu
-    if (n / numGroups > 6) return; // max logická velikost skupiny
-    const groupSize = Math.ceil(n / numGroups);
-    if (groupSize > 6) return;
-    const maxAdvance = Math.max(1, Math.min(groupSize, 4));
-    const advOptions = [...new Set([2, Math.min(3, maxAdvance), Math.min(4, maxAdvance)])]
-      .filter((a) => a >= 1 && a <= maxAdvance);
-    for (const adv of advOptions) {
-      candidates.push({
-        numGroups,
-        advancePerGroup: adv,
-        totalAdvancees: numGroups * adv,
-      });
+  for (const g of validGs) {
+    const minSz = Math.floor(n / g);
+    for (const adv of [2, 3, 4]) {
+      if (adv <= minSz) {
+        candidates.push({
+          numGroups: g,
+          advancePerGroup: adv,
+          totalAdvancees: g * adv,
+        });
+      }
     }
     candidates.push({
-      numGroups,
+      numGroups: g,
       advancePerGroup: 'all',
       totalAdvancees: n,
     });
-  };
-
-  if (hasValidBoardGroups) addCandidate(Math.floor(boardGroups));
-  for (const g of preferredGroups) addCandidate(g);
-  addCandidate(Math.max(1, Math.ceil(n / 6)));
+  }
 
   const unique = [];
   const seen = new Set();
@@ -1105,16 +1222,33 @@ export function generateTournamentVariants(playerCount, totalBoards = null) {
     unique.push({ ...c, needsBye: !isPower2(c.totalAdvancees) });
   }
 
-  const withScore = unique
-    .map((c) => {
-      const groupSize = Math.ceil(n / c.numGroups);
-      const boardBonus = hasValidBoardGroups && c.numGroups === Math.floor(boardGroups) ? -2 : 0;
-      const preferredPenalty = preferredGroups.includes(c.numGroups) ? 0 : 2;
-      const byePenalty = c.needsBye ? 1 : 0;
-      const allPenalty = c.advancePerGroup === 'all' ? 2 : 0;
-      return { ...c, score: preferredPenalty + byePenalty + allPenalty + Math.max(0, groupSize - 4) + boardBonus };
-    })
-    .sort((a, b) => a.score - b.score || a.numGroups - b.numGroups || a.totalAdvancees - b.totalAdvancees);
+  const withScore = unique.map((c) => {
+    const split = getGroupSplit(n, c.numGroups);
+    const boardBonus = hasValidBoardGroups && c.numGroups === boardG ? -3 : 0;
+    const preferredPenalty = preferredGroups.includes(c.numGroups) ? 0 : 1.5;
+    const minGPenalty = c.numGroups === minGroupsForMaxSize ? -0.5 : 0;
+    const byePenalty = c.needsBye ? 1 : 0;
+    const allPenalty = c.advancePerGroup === 'all' ? 1.5 : 0;
+    const sizeCenter = (split.minSize + split.maxSize) / 2;
+    const sizePenalty = Math.abs(sizeCenter - 4) * 0.35;
+    return {
+      ...c,
+      score:
+        preferredPenalty +
+        byePenalty +
+        allPenalty +
+        sizePenalty +
+        boardBonus +
+        minGPenalty,
+    };
+  });
+
+  withScore.sort(
+    (a, b) =>
+      a.score - b.score ||
+      a.numGroups - b.numGroups ||
+      String(a.advancePerGroup).localeCompare(String(b.advancePerGroup))
+  );
 
   const picked = withScore.slice(0, Math.min(3, withScore.length));
   const labels = ['tournVariantFast', 'tournVariantStandard', 'tournVariantLong'];
@@ -1150,25 +1284,29 @@ export function estimateTotalTournamentTime(opts, bracketOpts = {}) {
   let groupsMs = 0;
   let bracketMs = 0;
 
-  if (isTournamentGroupsThenBracketFormat(format) && players.length >= 4) {
+  if (isTournamentGroupsThenBracketFormat(format) && players.length >= GROUP_SIZE_MIN) {
     const playersWithIds = players.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}` }));
-    const numGroups = bracketOpts?.numGroups ?? Math.max(1, Math.ceil(playersWithIds.length / 4));
-    const groups = distributePlayersToFixedGroups(playersWithIds, numGroups);
-    let totalGroupMatches = 0;
-    for (const g of groups) {
-      const n = (g.players || []).length;
-      totalGroupMatches += (n * (n - 1)) / 2;
+    const nTot = playersWithIds.length;
+    let numGroups = bracketOpts?.numGroups;
+    if (!isAllowedGroupSplit(nTot, numGroups)) {
+      const valid = listValidGroupCounts(nTot);
+      numGroups = valid[0] ?? Math.max(1, Math.ceil(nTot / GROUP_SIZE_MAX));
     }
-    const baseGroupsMs = totalGroupMatches * maxLegsGroup * avgLegMs;
-    const boardFactor = numBoards > 0 ? Math.max(1, Math.ceil(numGroups / numBoards)) : 1;
-    groupsMs = baseGroupsMs * boardFactor;
+    if (isAllowedGroupSplit(nTot, numGroups)) {
+      const groups = distributePlayersToFixedGroups(playersWithIds, numGroups);
+      let totalGroupMatches = 0;
+      for (const g of groups) {
+        const n = (g.players || []).length;
+        totalGroupMatches += (n * (n - 1)) / 2;
+      }
+      const baseGroupsMs = totalGroupMatches * maxLegsGroup * avgLegMs;
+      const boardFactor = numBoards > 0 ? Math.max(1, Math.ceil(numGroups / numBoards)) : 1;
+      groupsMs = baseGroupsMs * boardFactor;
 
-    const totalAdvancees =
-      advancePerGroup === 'all'
-        ? groups.reduce((s, g) => s + (g.players?.length || 0), 0)
-        : groups.length * (typeof advancePerGroup === 'number' ? advancePerGroup : 2);
-    const bracketMatches = Math.max(0, totalAdvancees - 1);
-    bracketMs = bracketMatches * maxLegsBracket * avgLegMs;
+      const totalAdvancees = countPlayersAdvancingFromGroups(nTot, numGroups, advancePerGroup);
+      const bracketMatches = Math.max(0, totalAdvancees - 1);
+      bracketMs = bracketMatches * maxLegsBracket * avgLegMs;
+    }
   } else if (isTournamentBracketOnlyFormat(format) && players.length >= 2) {
     bracketMs = (players.length - 1) * maxLegsBracket * avgLegMs;
   }
@@ -1191,9 +1329,21 @@ function getRoundBusyPlayerIds(bracketRounds, roundIndex) {
     for (const m of matches) {
       if (!m || m.isBye) continue;
       const st = m.status;
+      // Hotové zápasy nesmí držet hráče jako „obsazené“ — jinak poraženci z QF apod.
+      // nemohou být přiřazeni jako počtáři v dalším kole (terč zůstává v datech).
+      if (st === 'completed' || st === 'walkover') continue;
       const tabletCheckedIn = m.tabletStatus === 'checked_in';
       const hasBoard = m.board !== null && m.board !== undefined && m.board !== '';
-      if (!(st === 'playing' || tabletCheckedIn || hasBoard)) continue;
+      if (
+        !(
+          st === 'playing' ||
+          st === 'in_progress' ||
+          tabletCheckedIn ||
+          (st === 'pending' && hasBoard)
+        )
+      ) {
+        continue;
+      }
       const p1 = m.player1Id ?? m.p1Id;
       const p2 = m.player2Id ?? m.p2Id;
       if (p1 && !isBracketByeName(m.player1Name)) s.add(p1);
@@ -1302,6 +1452,7 @@ function getPlayerRefereeCount(playerId, bracketRounds) {
   for (const r of bracketRounds) {
     for (const m of r?.matches || []) {
       if (!m) continue;
+      if (isBracketRefereePlaceholder(m.referee, m.refereeId)) continue;
       const rid = m.refereeId ?? (m.referee?.id ?? m.referee?.name);
       if (rid == null || rid === '') continue;
       if (rid === playerId) n += 1;
@@ -1353,10 +1504,16 @@ export const updateBracketReferees = (
   promotersCount,
   availableBoards = 1,
   groupMatchesAll = [],
-  registeredPlayersForDirectKo = null
+  registeredPlayersForDirectKo = null,
+  prelimLegs = null
 ) => {
   if (!bracket || bracket.length === 0) return bracket;
   const newBracket = JSON.parse(JSON.stringify(bracket));
+
+  const hasPrelimBracketRound =
+    prelimLegs != null && Number.isFinite(Number(prelimLegs)) && Number(prelimLegs) > 0;
+  /** Široký pool (skupiny, všichni vyřazení, …) jen v předkole + max prvním kole hlavního pavouka. */
+  const broadRefPoolThroughRound = hasPrelimBracketRound ? 1 : 0;
 
   const playerStats = {};
   const withdrawnIds = new Set();
@@ -1382,8 +1539,11 @@ export const updateBracketReferees = (
       !match ||
       match.status !== 'completed' ||
       match.isBye ||
+      isBracketFeederWithoutPlayableLoser(match) ||
       !match.player1Id ||
       !match.player2Id ||
+      match.player1Id === 'BYE' ||
+      match.player2Id === 'BYE' ||
       isBracketByeName(match.player1Name) ||
       isBracketByeName(match.player2Name)
     ) {
@@ -1480,6 +1640,7 @@ export const updateBracketReferees = (
   for (let ri = 0; ri < newBracket.length; ri++) {
     const roundMatches = newBracket[ri]?.matches || [];
     for (const m of roundMatches) {
+      if (!m || m.isBye || isBracketFeederWithoutPlayableLoser(m)) continue;
       const loserData = getLoserScore(m);
       const lid = loserData?.loser?.id ?? loserData?.loser?.name;
       if (lid != null) eliminatedIds.add(lid);
@@ -1532,6 +1693,8 @@ export const updateBracketReferees = (
     return { id: viable[0].id, name: viable[0].name };
   };
 
+  const selectBestRefereeFromPool = pickFairRefereeFromPool;
+
   const registerPickedReferee = (chosenRef) => {
     const rid = chosenRef?.id ?? chosenRef?.name;
     if (rid == null || rid === '') return;
@@ -1545,7 +1708,9 @@ export const updateBracketReferees = (
       if (match?.status === 'playing' && !match.isBye) {
         if (match.player1Id) currentlyPlayingIds.add(match.player1Id);
         if (match.player2Id) currentlyPlayingIds.add(match.player2Id);
-        if (match.referee) usedReferees.add(match.referee.id || match.referee.name);
+        if (match.referee && !isBracketRefereePlaceholder(match.referee, match.refereeId)) {
+          usedReferees.add(match.referee.id || match.referee.name);
+        }
         activeBoardsUsed++;
       }
     });
@@ -1582,6 +1747,12 @@ export const updateBracketReferees = (
 
       if (!isPlayablePending(match)) return;
 
+      if (isBracketRefereePlaceholder(match?.referee, match?.refereeId)) {
+        match.referee = null;
+        delete match.refereeId;
+        delete match.refereeName;
+      }
+
       // Pokud je počtář předvyplněný (např. JIT), ale guard neprojde, uvolni a vyber fallback.
       if (match.referee) {
         const refId = match.referee.id ?? match.referee.name;
@@ -1597,7 +1768,10 @@ export const updateBracketReferees = (
       // Fyzický limit terčů
       if (activeBoardsUsed >= boardCap) return;
 
-      // Globální férovost: široký bazén kandidátů + workload (celý turnaj) + seed.
+      const useBroadRefPool = roundIndex <= broadRefPoolThroughRound;
+
+      // Bazén kandidátů: v pozdějších kolech přednostně proherci z předchozího kola (feeder),
+      // širší pool jen v předkole + prvním kole hlavního draw.
       const poolIds = new Set();
       const feederLoserIds = new Set();
 
@@ -1606,8 +1780,10 @@ export const updateBracketReferees = (
         const prevRoundMatches = newBracket[roundIndex - 1]?.matches || [];
         const feeder1 = prevRoundMatches[matchIndex * 2];
         const feeder2 = prevRoundMatches[matchIndex * 2 + 1];
-        const l1 = getLoserScore(feeder1);
-        const l2 = getLoserScore(feeder2);
+        const l1 =
+          feeder1 && !isBracketFeederWithoutPlayableLoser(feeder1) ? getLoserScore(feeder1) : null;
+        const l2 =
+          feeder2 && !isBracketFeederWithoutPlayableLoser(feeder2) ? getLoserScore(feeder2) : null;
         const lid1 = l1?.loser?.id ?? l1?.loser?.name;
         const lid2 = l2?.loser?.id ?? l2?.loser?.name;
         if (lid1 != null) {
@@ -1618,35 +1794,53 @@ export const updateBracketReferees = (
           poolIds.add(lid2);
           feederLoserIds.add(lid2);
         }
+        const prevByeWinners = collectByeRoundCandidateIds(roundIndex - 1);
+        for (const id of prevByeWinners) poolIds.add(id);
       }
 
-      // (b) Všichni, kteří už vypadli (eliminated pool).
-      for (const id of eliminatedIds) poolIds.add(id);
-
-      // (c) Hráči s BYE v aktuálním kole.
+      // (b)(c) + nepostupující ze skupin: ve „širokém“ režimu hned; jinak jen BYE v aktuálním kole zde.
       for (const id of byeRoundIds) poolIds.add(id);
 
-      // Speciálně pro 1. kolo po skupinách: přidej nepostupující (vypadli po skupinách).
-      if (roundIndex === 0) {
-        for (const p of nonAdvPoolR0) {
-          const id = p?.id ?? p?.name;
-          if (id != null) poolIds.add(id);
-        }
-        // A také kandidáti z BYE v 1. kole (přímý pavouk).
-        const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
-        for (const c of byeRefCandidates || []) {
-          if (c?.id != null) poolIds.add(c.id);
+      if (useBroadRefPool) {
+        for (const id of eliminatedIds) poolIds.add(id);
+        if (roundIndex === 0) {
+          for (const p of nonAdvPoolR0) {
+            const id = p?.id ?? p?.name;
+            if (id != null) poolIds.add(id);
+          }
+          const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
+          for (const c of byeRefCandidates || []) {
+            if (c?.id != null) poolIds.add(c.id);
+          }
         }
       }
 
-      const chosenRef = pickFairRefereeFromPool({
-        poolIds,
-        feederLoserIds,
-        match,
-        roundBusyIds: roundIndex === 0 ? roundBusyIds : roundBusyIds,
-        usedRefereesLocal: usedReferees,
-        assignedRefsInThisRunLocal: assignedRefsInThisRun,
-      });
+      const pickRef = () =>
+        selectBestRefereeFromPool({
+          poolIds,
+          feederLoserIds,
+          match,
+          roundBusyIds,
+          usedRefereesLocal: usedReferees,
+          assignedRefsInThisRunLocal: assignedRefsInThisRun,
+        });
+
+      let chosenRef = pickRef();
+
+      if (!chosenRef && !useBroadRefPool) {
+        for (const id of eliminatedIds) poolIds.add(id);
+        if (roundIndex === 0) {
+          for (const p of nonAdvPoolR0) {
+            const id = p?.id ?? p?.name;
+            if (id != null) poolIds.add(id);
+          }
+          const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
+          for (const c of byeRefCandidates || []) {
+            if (c?.id != null) poolIds.add(c.id);
+          }
+        }
+        chosenRef = pickRef();
+      }
 
       if (chosenRef) {
         match.referee = chosenRef;

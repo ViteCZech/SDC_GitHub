@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { distributePlayersToFixedGroups } from '../utils/tournamentGenerator';
 import { isTournamentBracketOnlyFormat } from '../utils/tournamentLogic';
 import { translations } from '../translations';
+import { AdminTapTextField } from './AdminTapField';
 
 const EMPTY_BOARD_ASSIGNMENTS = {};
 
@@ -163,18 +164,6 @@ export default function TournamentBoardAssignment({
 
   if (!groups.length) return null;
 
-  const handleBoardKeyDown = (e, index) => {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    const nextIndex = index + 1;
-    if (nextIndex < groups.length) {
-      const nextInput = document.querySelector(`input[name="boardInput"][data-group-index="${nextIndex}"]`);
-      nextInput?.focus();
-    } else {
-      validateAndSubmit();
-    }
-  };
-
   const btnBase =
     'flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold transition-all active:scale-95 border border-slate-700';
 
@@ -239,10 +228,9 @@ export default function TournamentBoardAssignment({
                   <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
                     {t('tournBoardNumbers') || 'Čísla terčů'}
                   </label>
-                  <input
+                  <AdminTapTextField
                     name="boardInput"
-                    data-group-index={index}
-                    type="text"
+                    id={`board-input-${group.groupId}`}
                     value={(
                       draftBoards[group.groupId] ??
                       draftBoards[String(group.groupId)] ??
@@ -250,10 +238,10 @@ export default function TournamentBoardAssignment({
                       persistedBoards[String(group.groupId)] ??
                       ''
                     )}
-                    onChange={(e) => handleBoardChange(group.groupId, e.target.value)}
-                    onKeyDown={(e) => handleBoardKeyDown(e, index)}
+                    onValueChange={(v) => handleBoardChange(group.groupId, v)}
+                    filterChar={(c) => /[\d,;\s]/.test(c)}
                     placeholder={t('tournBoardPlaceholderQueue') || "např. 1 (prázdné = fronta)"}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 font-mono"
                   />
                   {boardInputErrors[group.groupId] && (
                     <p className="mt-1 text-xs text-amber-400 font-bold">

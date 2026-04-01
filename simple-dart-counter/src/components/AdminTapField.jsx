@@ -1,0 +1,73 @@
+import React, { useContext } from 'react';
+import { AdminVirtualKeyboardContext } from '../context/AdminVirtualKeyboardContext';
+
+/**
+ * Textové pole pro administrátora: otevře interní klávesnici (bez systémové na mobilu).
+ * Mimo AdminVirtualKeyboardProvider spadne zpět na běžný <input>.
+ */
+export function AdminTapTextField({
+  value,
+  onValueChange,
+  placeholder,
+  className = '',
+  disabled,
+  filterChar,
+  readOnly,
+  type = 'text',
+  min,
+  max,
+  name,
+  id,
+}) {
+  const vk = useContext(AdminVirtualKeyboardContext);
+
+  const open = () => {
+    if (disabled || readOnly || !vk?.openKeyboard) return;
+    let buf = String(value ?? '');
+    vk.openKeyboard({
+      onAppend: (c) => {
+        if (filterChar && !filterChar(c)) return;
+        buf += c;
+        onValueChange(buf);
+      },
+      onDelete: () => {
+        buf = buf.slice(0, -1);
+        onValueChange(buf);
+      },
+      onClose: () => {},
+    });
+  };
+
+  if (!vk?.openKeyboard) {
+    return (
+      <input
+        id={id}
+        name={name}
+        type={type}
+        min={min}
+        max={max}
+        value={value ?? ''}
+        onChange={(e) => onValueChange(e.target.value)}
+        placeholder={placeholder}
+        className={className}
+        disabled={disabled}
+        readOnly={readOnly}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      id={id}
+      name={name}
+      disabled={disabled}
+      onClick={open}
+      className={`${className} cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
+    >
+      <span className={`block w-full truncate text-left ${value ? '' : 'text-slate-500'}`}>
+        {value !== '' && value != null ? value : placeholder || '\u00a0'}
+      </span>
+    </button>
+  );
+}
