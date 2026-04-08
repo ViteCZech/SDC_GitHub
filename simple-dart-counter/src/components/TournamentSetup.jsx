@@ -83,7 +83,7 @@ export default function TournamentSetup({
     if (step !== 2 || editingIndex !== null) return;
     const t = window.setTimeout(() => {
       try {
-        nameRef.current?.focus();
+        document.getElementById('tournament-player-name')?.focus?.();
       } catch (e) {}
     }, 0);
     return () => clearTimeout(t);
@@ -591,6 +591,7 @@ export default function TournamentSetup({
                         {t('playerName') || 'Jméno hráče'}
                       </label>
                       <AdminTapTextField
+                        id="tournament-player-name"
                         value={editingIndex !== null ? editName : playerName}
                         onValueChange={(v) =>
                           editingIndex !== null ? setEditName(v) : setPlayerName(v)
