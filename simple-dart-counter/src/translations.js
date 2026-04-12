@@ -123,6 +123,13 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     tournCustomInvalidGroupSplit:
       'Skupiny musí mít 3–6 hráčů a velikosti se smí lišit nejvýše o 1. Upravte počet skupin.',
     tournCustomInvalidAdvance: 'Postup nesmí být větší než nejmenší skupina (max. {max}).',
+    tournChalkerShortageEmpty:
+      'Nelze automaticky obsadit počtáře v 1. kole pavouku: žádní kandidáti z posledních míst skupin. Zvolte počtáře ručně (i mezi hráči, kteří ještě budou hrát).',
+    tournChalkerShortagePartial:
+      'Kandidátů z posledních míst skupin je méně než zápasů bez počtáře v 1. kole. Zbytek doplňte ručně.',
+    tournRefereePickTierBadge: 'V{n}',
+    tournRefereePickTierHint:
+      'Vlna výběru počtáře {n}: 1 = poslední místa ve skupinách / BYE, 2 = prohraní v tomto kole pavouku, 3 = rozšířený pool (nouze)',
     tournBracketByeWarning:
       'Bude použito nasazení s předkolem (vítězové skupin budou mít v 1. kole volný los).',
     tournBracketKoLegs: 'Počet vítězných legů pro KO fázi',
@@ -377,6 +384,13 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     tournCustomInvalidGroupSplit:
       'Each group must have 3–6 players and sizes may differ by at most 1. Adjust the number of groups.',
     tournCustomInvalidAdvance: 'Advancing count cannot exceed the smallest group (max. {max}).',
+    tournChalkerShortageEmpty:
+      'Cannot auto-assign scorers in round 1: no candidates from last place in each group. Assign scorers manually (including players who still compete).',
+    tournChalkerShortagePartial:
+      'Fewer last-place group candidates than bracket matches still missing a scorer in round 1. Assign the rest manually.',
+    tournRefereePickTierBadge: 'W{n}',
+    tournRefereePickTierHint:
+      'Scorer pick wave {n}: 1 = last in each group / BYE, 2 = losers from this bracket round, 3 = expanded pool (fallback)',
     tournBracketByeWarning:
       'Byes will be used (group winners get a first-round bye where needed).',
     tournBracketKoLegs: 'Legs to win (KO phase)',
@@ -625,6 +639,13 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
     tournCustomInvalidGroupSplit:
       'Grupy muszą mieć 3–6 graczy, a rozmiary mogą różnić się co najwyżej o 1. Popraw liczbę grup.',
     tournCustomInvalidAdvance: 'Awans nie może być większy niż najmniejsza grupa (maks. {max}).',
+    tournChalkerShortageEmpty:
+      'Nie można automatycznie przydzielić zapisujących w 1. rundzie: brak kandydatów z ostatnich miejsc w grupach. Wybierz ręcznie (także graczy, którzy jeszcze grają).',
+    tournChalkerShortagePartial:
+      'Mniej kandydatów z ostatnich miejsc w grupach niż meczów bez zapisującego w 1. rundzie. Dokończ ręcznie.',
+    tournRefereePickTierBadge: 'F{n}',
+    tournRefereePickTierHint:
+      'Fala wyboru zapisującego {n}: 1 = ostatnie miejsca w grupach / BYE, 2 = przegrani w tej rundzie drabinki, 3 = rozszerzony pul (awaryjnie)',
     tournBracketByeWarning:
       'Zostaną użyte wolne losy (zwycięzcy grup mają w 1. rundzie wolny los).',
     tournBracketKoLegs: 'Legi do wygranej (faza KO)',

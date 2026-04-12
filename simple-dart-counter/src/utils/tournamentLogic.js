@@ -308,7 +308,11 @@ export function calculateGroupStandings(groupPlayers, groupMatches) {
     const h2hWinner = findHeadToHeadWinner(a.id, b.id);
     if (h2hWinner === b.id) return 1;
     if (h2hWinner === a.id) return -1;
-    return 0;
+    // Stejné jako u postupu: vyšší průměr = lepší umístění; při shodě deterministický „los“ (id).
+    const avgA = Number(a.average) || 0;
+    const avgB = Number(b.average) || 0;
+    if (Math.abs(avgB - avgA) > 1e-6) return avgB - avgA;
+    return String(a.id).localeCompare(String(b.id), undefined, { sensitivity: 'base', numeric: true });
   });
 }
 
@@ -1391,25 +1395,73 @@ function getLastPlaceGroupPlayer(group, groupMatchesAll) {
   return null;
 }
 
-/** Hráči, kteří v dané skupině nepostoupili (od indexu advance výše v tabulce). */
-function buildNonAdvancerPool(groups, promotersCount, groupMatchesAll) {
+/**
+ * Po jednom kandidátovi na počtáře z každé skupiny: nejhorší aktivní hráč v tabulce (po tie-breacích).
+ * Skupiny, kde postupují všichni (`promotersCount === 'all'` nebo advN ≥ počet neodstoupivších), přeskočí.
+ */
+export function buildLastPlaceGroupChalkerPool(groups, promotersCount, groupMatchesAll) {
   const pool = [];
+  const seen = new Set();
   for (const g of groups || []) {
     const players = g.players || [];
+    if (!players.length) continue;
+    const gm = (groupMatchesAll || []).filter((m) => (m.groupId ?? m.group) === g.groupId);
+    const standings = calculateGroupStandings(players, gm);
+    const activeStandings = standings.filter((s) => !s?.isWithdrawn);
+    if (activeStandings.length === 0) continue;
     const gs = players.length;
     const advN =
       promotersCount === 'all'
         ? gs
         : Math.max(0, Math.min(gs, Number(promotersCount) || 2));
-    const gm = (groupMatchesAll || []).filter((m) => (m.groupId ?? m.group) === g.groupId);
-    const standings = calculateGroupStandings(players, gm);
-    for (let i = advN; i < standings.length; i++) {
-      const p = standings[i];
-      if (p.isWithdrawn) continue;
-      pool.push({ id: p.id, name: p.name ?? p.id });
-    }
+    if (promotersCount === 'all' || advN >= activeStandings.length) continue;
+    const last = activeStandings[activeStandings.length - 1];
+    const id = last?.id ?? last?.name;
+    if (id == null || id === '') continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    pool.push({
+      id,
+      name: last.name ?? id,
+      groupId: g.groupId ?? g.id,
+    });
   }
   return pool;
+}
+
+/**
+ * Detekce nedostatku kandidátů na počtáře v 1. kole pavouku (předkolo nebo první uložené kolo).
+ * Pouze turnaj se skupinami; zápasy = pending, terč, dva reální hráči, bez platného počtáře.
+ */
+export function getBracketFirstRoundChalkerShortage(
+  bracket,
+  groups,
+  promotersCount,
+  groupMatchesAll
+) {
+  if (!Array.isArray(bracket) || bracket.length === 0) return null;
+  if (!groups?.length) return null;
+  const pool = buildLastPlaceGroupChalkerPool(groups, promotersCount, groupMatchesAll);
+  const r0 = bracket[0]?.matches || [];
+  let missingRef = 0;
+  for (const m of r0) {
+    if (!m || m.isBye) continue;
+    if (m.status !== 'pending') continue;
+    if (!m.player1Id || !m.player2Id) continue;
+    if (isBracketByeName(m.player1Name) || isBracketByeName(m.player2Name)) continue;
+    if (m.board == null || m.board === '') continue;
+    if (!Number.isFinite(Number(m.board))) continue;
+    const hasRef =
+      m.referee &&
+      !isBracketRefereePlaceholder(m.referee, m.refereeId) &&
+      (m.referee.id != null || m.referee.name != null);
+    if (hasRef) continue;
+    missingRef += 1;
+  }
+  if (missingRef === 0) return null;
+  if (pool.length === 0) return { kind: 'empty_pool', need: missingRef, pool: 0 };
+  if (missingRef > pool.length) return { kind: 'shortage', need: missingRef, pool: pool.length };
+  return null;
 }
 
 /** Všichni účastníci zápasu (pavouk + případné cloud aliasy). */
@@ -1498,6 +1550,11 @@ function getPlayerPendingRound0Match(playerId, roundMatches) {
   return null;
 }
 
+/**
+ * Přiřadí počtáře k pending zápasům s terčem.
+ * U turnaje se skupinami v kole 0 (předkolo / první kolo) používá vlny: 1) poslední místa ve skupinách + BYE,
+ * 2) proherci z dokončených zápasů téhož kola, 3) rozšířený pool. U zápasu může nastavit `refereePickTier` 1–3.
+ */
 export const updateBracketReferees = (
   bracket,
   groups,
@@ -1661,6 +1718,18 @@ export const updateBracketReferees = (
     return out;
   };
 
+  /** Proherci z dokončených zápasů v daném kole pavouku (pro 2. vlnu počtářů v rámci stejného kola). */
+  const collectLosersFromBracketRoundIndex = (ri) => {
+    const s = new Set();
+    const matches = newBracket[ri]?.matches || [];
+    for (const m of matches) {
+      const d = getLoserScore(m);
+      const lid = d?.loser?.id ?? d?.loser?.name;
+      if (lid != null) s.add(lid);
+    }
+    return s;
+  };
+
   const pickFairRefereeFromPool = ({
     poolIds,
     feederLoserIds,
@@ -1721,13 +1790,14 @@ export const updateBracketReferees = (
     const roundMatches = round?.matches || [];
     const roundBusyIds = getRoundBusyPlayerIds(newBracket, roundIndex);
     const roundPlayingOnlyIds = getRoundPlayingOnlyPlayerIds(newBracket, roundIndex);
-    const nonAdvPoolR0 =
-      roundIndex === 0 ? buildNonAdvancerPool(groups, promotersCount, groupMatchesAll) : [];
+    const lastPlaceChalkerPoolR0 =
+      roundIndex === 0 ? buildLastPlaceGroupChalkerPool(groups, promotersCount, groupMatchesAll) : [];
     const byeRoundIds = collectByeRoundCandidateIds(roundIndex);
 
     roundMatches.forEach((match, matchIndex) => {
       if (roundIndex === 0 && isRoundZeroNonPhysicalBracketMatch(match)) {
         match.referee = null;
+        delete match.refereePickTier;
         match.board = null;
         return;
       }
@@ -1736,12 +1806,14 @@ export const updateBracketReferees = (
       // (Zápasy ve frontě zůstávají čisté a nevyčerpávají usedReferees; BYE zápasy jsou řešené výše.)
       if (match?.status === 'pending' && (!match.board || match.board === null)) {
         match.referee = null;
+        delete match.refereePickTier;
         return;
       }
 
       // Striktní fronta: pokud zápas nemá terč, nesmí mít ani počtáře.
       if (match?.status === 'pending' && (match.board == null || match.board === '')) {
         match.referee = null;
+        delete match.refereePickTier;
         return;
       }
 
@@ -1749,6 +1821,7 @@ export const updateBracketReferees = (
 
       if (isBracketRefereePlaceholder(match?.referee, match?.refereeId)) {
         match.referee = null;
+        delete match.refereePickTier;
         delete match.refereeId;
         delete match.refereeName;
       }
@@ -1758,6 +1831,7 @@ export const updateBracketReferees = (
         const refId = match.referee.id ?? match.referee.name;
         if (!refereePassesRoundGuard(refId, match, roundBusyIds, withdrawnIds, usedReferees)) {
           match.referee = null;
+          delete match.refereePickTier;
         } else {
           // Už přiřazený validní počtář musí blokovat další přiřazení v tomto běhu.
           if (refId != null) assignedRefsInThisRun.add(refId);
@@ -1770,8 +1844,7 @@ export const updateBracketReferees = (
 
       const useBroadRefPool = roundIndex <= broadRefPoolThroughRound;
 
-      // Bazén kandidátů: v pozdějších kolech přednostně proherci z předchozího kola (feeder),
-      // širší pool jen v předkole + prvním kole hlavního draw.
+      // Bazén kandidátů: v pozdějších kolech přednostně proherci z předchozího kola (feeder).
       const poolIds = new Set();
       const feederLoserIds = new Set();
 
@@ -1798,24 +1871,9 @@ export const updateBracketReferees = (
         for (const id of prevByeWinners) poolIds.add(id);
       }
 
-      // (b)(c) + nepostupující ze skupin: ve „širokém“ režimu hned; jinak jen BYE v aktuálním kole zde.
       for (const id of byeRoundIds) poolIds.add(id);
 
-      if (useBroadRefPool) {
-        for (const id of eliminatedIds) poolIds.add(id);
-        if (roundIndex === 0) {
-          for (const p of nonAdvPoolR0) {
-            const id = p?.id ?? p?.name;
-            if (id != null) poolIds.add(id);
-          }
-          const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
-          for (const c of byeRefCandidates || []) {
-            if (c?.id != null) poolIds.add(c.id);
-          }
-        }
-      }
-
-      const pickRef = () =>
+      const pickRefStandard = () =>
         selectBestRefereeFromPool({
           poolIds,
           feederLoserIds,
@@ -1825,25 +1883,114 @@ export const updateBracketReferees = (
           assignedRefsInThisRunLocal: assignedRefsInThisRun,
         });
 
-      let chosenRef = pickRef();
+      let chosenRef = null;
+      let pickTier = 0;
 
-      if (!chosenRef && !useBroadRefPool) {
-        for (const id of eliminatedIds) poolIds.add(id);
-        if (roundIndex === 0) {
-          for (const p of nonAdvPoolR0) {
+      const hasGroups = (groups || []).length > 0;
+      const useRoundZeroGroupWaves = roundIndex === 0 && hasGroups;
+
+      if (useRoundZeroGroupWaves) {
+        // Vlna 1: poslední místa ve skupinách + BYE / walkover kandidáti z kola 0
+        const poolTier1 = new Set();
+        for (const p of lastPlaceChalkerPoolR0) {
+          const id = p?.id ?? p?.name;
+          if (id != null) poolTier1.add(id);
+        }
+        for (const id of byeRoundIds) poolTier1.add(id);
+        const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
+        for (const c of byeRefCandidates || []) {
+          if (c?.id != null) poolTier1.add(c.id);
+        }
+
+        chosenRef = selectBestRefereeFromPool({
+          poolIds: poolTier1,
+          feederLoserIds: new Set(),
+          match,
+          roundBusyIds,
+          usedRefereesLocal: usedReferees,
+          assignedRefsInThisRunLocal: assignedRefsInThisRun,
+        });
+        if (chosenRef) pickTier = 1;
+
+        // Vlna 2: proherci z dokončených zápasů téhož kola (např. 2. vlna předkola)
+        const r0Losers = collectLosersFromBracketRoundIndex(0);
+        if (!chosenRef && r0Losers.size > 0) {
+          chosenRef = selectBestRefereeFromPool({
+            poolIds: r0Losers,
+            feederLoserIds: r0Losers,
+            match,
+            roundBusyIds,
+            usedRefereesLocal: usedReferees,
+            assignedRefsInThisRunLocal: assignedRefsInThisRun,
+          });
+          if (chosenRef) pickTier = 2;
+        }
+
+        // Vlna 3: záložní sloučení (všichni vyřazení v pavouku + vlny 1–2) — nouzový fallback
+        if (!chosenRef && useBroadRefPool) {
+          const poolTier3 = new Set(eliminatedIds);
+          for (const id of poolTier1) poolTier3.add(id);
+          for (const id of r0Losers) poolTier3.add(id);
+          chosenRef = selectBestRefereeFromPool({
+            poolIds: poolTier3,
+            feederLoserIds: r0Losers,
+            match,
+            roundBusyIds,
+            usedRefereesLocal: usedReferees,
+            assignedRefsInThisRunLocal: assignedRefsInThisRun,
+          });
+          if (chosenRef) pickTier = 3;
+        }
+
+        if (!chosenRef && !useBroadRefPool) {
+          for (const id of eliminatedIds) poolIds.add(id);
+          for (const p of lastPlaceChalkerPoolR0) {
             const id = p?.id ?? p?.name;
             if (id != null) poolIds.add(id);
           }
-          const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
-          for (const c of byeRefCandidates || []) {
+          const byeRefCandidatesFallback = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
+          for (const c of byeRefCandidatesFallback || []) {
             if (c?.id != null) poolIds.add(c.id);
           }
+          chosenRef = pickRefStandard();
         }
-        chosenRef = pickRef();
+      } else {
+        if (useBroadRefPool) {
+          for (const id of eliminatedIds) poolIds.add(id);
+          if (roundIndex === 0) {
+            for (const p of lastPlaceChalkerPoolR0) {
+              const id = p?.id ?? p?.name;
+              if (id != null) poolIds.add(id);
+            }
+            const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
+            for (const c of byeRefCandidates || []) {
+              if (c?.id != null) poolIds.add(c.id);
+            }
+          }
+        }
+
+        chosenRef = pickRefStandard();
+
+        if (!chosenRef && !useBroadRefPool) {
+          for (const id of eliminatedIds) poolIds.add(id);
+          if (roundIndex === 0) {
+            for (const p of lastPlaceChalkerPoolR0) {
+              const id = p?.id ?? p?.name;
+              if (id != null) poolIds.add(id);
+            }
+            const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
+            for (const c of byeRefCandidates || []) {
+              if (c?.id != null) poolIds.add(c.id);
+            }
+          }
+          chosenRef = pickRefStandard();
+        }
       }
 
       if (chosenRef) {
         match.referee = chosenRef;
+        if (pickTier > 0) match.refereePickTier = pickTier;
+        else delete match.refereePickTier;
         assignedRefsInThisRun.add(chosenRef.id);
         registerPickedReferee(chosenRef);
         currentlyPlayingIds.add(match.player1Id);

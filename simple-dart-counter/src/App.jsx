@@ -38,6 +38,7 @@ import {
   getBracketWinLegsForRound,
   autoAssignSequentialBoardsToRound,
   updateBracketReferees,
+  getBracketFirstRoundChalkerShortage,
   propagateBracketWinners,
   isRealPendingBracketMatch,
   calculateGroupStandings,
@@ -1142,6 +1143,18 @@ function AppMain({ lang, setLang }) {
     return distributePlayersToFixedGroups(playersWithIds, numGroups).map((g) => ({ ...g, boards: g.boards ?? [] }));
   }, [tournamentData?.players, tournamentData?.groups, tournamentData?.numGroups, tournamentData?.tournamentFormat]);
 
+  /** Postup pro engine počtářů: vždy z uloženého turnaje, ne ze zastaralého draftu. */
+  const promotersForRefereeEngine = React.useMemo(
+    () =>
+      tournamentData?.promotersCount ??
+      tournamentData?.advancePerGroup ??
+      tournamentDraft.promotersCount ??
+      2,
+    [tournamentData?.promotersCount, tournamentData?.advancePerGroup, tournamentDraft.promotersCount]
+  );
+
+  const chalkerShortageNotifiedRef = useRef('');
+
   tournamentSyncPayloadRef.current = {
     tournamentData: tournamentData ?? null,
     groups: tournamentGroups ?? [],
@@ -1311,7 +1324,7 @@ function AppMain({ lang, setLang }) {
     const bracketWithRefs = updateBracketReferees(
       bracketWithBoards,
       tournamentGroups,
-      tournamentDraft.promotersCount,
+      promotersForRefereeEngine,
       activeBoards,
       tournamentMatches,
       regForDirectKo,
@@ -1326,7 +1339,7 @@ function AppMain({ lang, setLang }) {
     tournamentData,
     tournamentBracket,
     tournamentGroups,
-    tournamentDraft.promotersCount,
+    promotersForRefereeEngine,
     tournamentMatches,
   ]);
 
@@ -1410,7 +1423,7 @@ function AppMain({ lang, setLang }) {
     const withRefs = updateBracketReferees(
       updatedBracket,
       tournamentGroups,
-      tournamentDraft.promotersCount,
+      promotersForRefereeEngine,
       availableBoards,
       tournamentMatches,
       regForDirectKo,
@@ -1426,8 +1439,46 @@ function AppMain({ lang, setLang }) {
     tournamentData,
     tournamentBracket,
     tournamentGroups,
-    tournamentDraft.promotersCount,
+    promotersForRefereeEngine,
     tournamentMatches,
+  ]);
+
+  /** Upozornění adminovi: nedostatek kandidátů z posledních míst skupin oproti zápasům bez počtáře v 1. kole. */
+  useEffect(() => {
+    if (userRole !== 'admin' || appState !== 'tournament_bracket' || !tournamentData) return;
+    if (isTournamentBracketOnlyFormat(tournamentData.tournamentFormat)) return;
+    if (!Array.isArray(tournamentBracket) || tournamentBracket.length === 0) return;
+
+    const shortage = getBracketFirstRoundChalkerShortage(
+      tournamentBracket,
+      tournamentGroups,
+      promotersForRefereeEngine,
+      tournamentMatches
+    );
+    if (!shortage) {
+      chalkerShortageNotifiedRef.current = '';
+      return;
+    }
+    const sig = `${shortage.kind}-${shortage.need}-${shortage.pool}`;
+    if (chalkerShortageNotifiedRef.current === sig) return;
+    chalkerShortageNotifiedRef.current = sig;
+    const tmap = translations[lang] || {};
+    const msg =
+      shortage.kind === 'empty_pool'
+        ? (tmap.tournChalkerShortageEmpty ??
+          `Nelze automaticky obsadit počtáře (${shortage.need} zápasů v 1. kole čeká na počtáře): žádní kandidáti z posledních míst skupin. Zvolte počtáře ručně (i mezi hráči, kteří ještě budou hrát).`)
+        : (tmap.tournChalkerShortagePartial ??
+          `Kandidátů z posledních míst skupin je ${shortage.pool}, ale ${shortage.need} zápasů v 1. kole stále nemá počtáře. Zbytek doplňte ručně.`);
+    showNotification(msg, 'error');
+  }, [
+    userRole,
+    appState,
+    tournamentData,
+    tournamentBracket,
+    tournamentGroups,
+    promotersForRefereeEngine,
+    tournamentMatches,
+    lang,
   ]);
 
   const tabletBoardStr = String(tournamentDraft?.hubTabletBoard ?? '').trim();
@@ -2298,7 +2349,7 @@ function AppMain({ lang, setLang }) {
           ...round,
           matches: matches.map((m, mi) => {
             if (mi !== matchIndex) return m;
-            const { refereeId: _rid, refereeName: _rnm, ...rest } = m ?? {};
+            const { refereeId: _rid, refereeName: _rnm, refereePickTier: _rt, ...rest } = m ?? {};
             return {
               ...rest,
               referee: { id: refId, name: newReferee?.name ?? refId },
@@ -3449,7 +3500,12 @@ function AppMain({ lang, setLang }) {
             try {
               safeStorage.setItem('dartsTournamentData', JSON.stringify(withId));
             } catch (e) {}
-            setTournamentDraft((prev) => ({ ...prev, boardAssignments: {} }));
+            setTournamentDraft((prev) => ({
+              ...prev,
+              boardAssignments: {},
+              advancePerGroup: data.advancePerGroup ?? prev.advancePerGroup,
+              promotersCount: data.promotersCount ?? data.advancePerGroup ?? prev.promotersCount,
+            }));
             setAppState('tournament_board_assignment');
           }}
           onBack={() => {

@@ -422,6 +422,17 @@ export default function TournamentBracketView({
         <span className="text-xs uppercase tracking-wider">
           {t('tournBracketScorer') || 'Počtář:'}
         </span>
+        {isAdmin && match.refereePickTier != null && Number(match.refereePickTier) >= 1 && (
+          <span
+            className="text-[9px] font-mono text-slate-500 shrink-0"
+            title={String(t('tournRefereePickTierHint')).replace(
+              /\{n\}/g,
+              String(match.refereePickTier)
+            )}
+          >
+            {String(t('tournRefereePickTierBadge')).replace(/\{n\}/g, String(match.refereePickTier))}
+          </span>
+        )}
         {showRefereeAsButton ? (
           <button
             type="button"

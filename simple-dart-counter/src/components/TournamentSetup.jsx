@@ -369,6 +369,7 @@ export default function TournamentSetup({
         bracketLegs: bracketKoLegs,
         bracketKoLegs,
         advancePerGroup: fmtBracketOnly ? 'all' : advPerGroup === 'all' ? 'all' : Number(advPerGroup),
+        promotersCount: fmtBracketOnly ? 'all' : advPerGroup === 'all' ? 'all' : Number(advPerGroup),
         numGroups: grpFmtStep ? numGroups : null,
         startScore: tournamentDraft.startScore ?? 501,
         outMode:
@@ -951,6 +952,7 @@ export default function TournamentSetup({
                         customAdvancePerGroup: prev.customAdvancePerGroup ?? 2,
                         numGroups: prev.customNumGroups ?? 4,
                         advancePerGroup: prev.customAdvancePerGroup ?? 2,
+                        promotersCount: prev.customAdvancePerGroup ?? 2,
                       }))
                     }
                     className={`p-4 rounded-xl border-2 text-left transition-all w-full ${
@@ -998,6 +1000,7 @@ export default function TournamentSetup({
                               ...prev,
                               customAdvancePerGroup: v,
                               advancePerGroup: v,
+                              promotersCount: v,
                             }));
                           }}
                           filterChar={(c) => /^\d$/.test(c)}
@@ -1074,6 +1077,7 @@ export default function TournamentSetup({
                           selectedVariantId: v.id,
                           numGroups: v.numGroups,
                           advancePerGroup: v.advancePerGroup,
+                          promotersCount: v.advancePerGroup === 'all' ? 'all' : v.advancePerGroup,
                         }))
                       }
                       className={`p-4 rounded-xl border-2 text-left transition-all ${
