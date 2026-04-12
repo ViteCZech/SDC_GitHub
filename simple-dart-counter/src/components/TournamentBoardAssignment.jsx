@@ -15,11 +15,30 @@ function parseBoardInput(value) {
     .filter((n) => !Number.isNaN(n) && n > 0);
 }
 
+/** Různá čísla terčů napříč skupinami (po validním rozsahu 1…totalBoards). */
+function distinctBoardNumbers(boardInputs, groups, totalBoardsCap) {
+  const set = new Set();
+  for (const g of groups) {
+    const raw = boardInputs[g.groupId] ?? '';
+    for (const b of parseBoardInput(raw)) {
+      if (totalBoardsCap > 0 && b > totalBoardsCap) continue;
+      set.add(b);
+    }
+  }
+  return set;
+}
+
+function groupInputIsEmpty(boardInputs, groupId) {
+  const raw = String(boardInputs[groupId] ?? '').trim();
+  if (raw === '') return true;
+  return parseBoardInput(raw).length === 0;
+}
+
 export default function TournamentBoardAssignment({
   tournamentData,
   tournamentDraft,
   setTournamentDraft,
-  tournamentMatches = [],
+  tournamentMatches: _tournamentMatches = [],
   onUpdateGroupBoard,
   lang = 'cs',
   onComplete,
@@ -49,15 +68,15 @@ export default function TournamentBoardAssignment({
   const [validationError, setValidationError] = useState('');
   const [boardInputErrors, setBoardInputErrors] = useState({});
   const totalBoards = Number(tournamentData?.totalBoards ?? tournamentData?.numBoards ?? 0) || 0;
-  const assignedCount = useMemo(() => {
-    const set = new Set();
-    for (const raw of Object.values(boardInputs)) {
-      for (const b of parseBoardInput(raw)) {
-        if (totalBoards <= 0 || b <= totalBoards) set.add(b);
-      }
-    }
-    return set.size;
-  }, [boardInputs, totalBoards]);
+
+  const distinctUsed = useMemo(
+    () => distinctBoardNumbers(boardInputs, groups, totalBoards),
+    [boardInputs, groups, totalBoards]
+  );
+  const distinctCount = distinctUsed.size;
+
+  const capacityReached =
+    totalBoards > 0 && distinctCount >= totalBoards && groups.some((g) => groupInputIsEmpty(boardInputs, g.groupId));
 
   useEffect(() => {
     if (groups.length === 0) return;
@@ -88,11 +107,29 @@ export default function TournamentBoardAssignment({
         ...prev,
         [groupId]: (t('tournBoardErrMax') || 'Zadané číslo terče je vyšší než celkový počet dostupných terčů.'),
       }));
-    } else {
-      setBoardInputErrors((prev) => ({ ...prev, [groupId]: '' }));
+      setValidationError('');
+      return;
     }
-    setBoardInputs((prev) => ({ ...prev, [groupId]: value }));
+
+    const nextInputs = { ...boardInputs, [groupId]: value };
+    const proposedDistinct = distinctBoardNumbers(nextInputs, groups, totalBoards);
+    if (totalBoards > 0 && proposedDistinct.size > totalBoards) {
+      setBoardInputErrors((prev) => ({
+        ...prev,
+        [groupId]: (t('tournBoardErrTooManyDistinct') || 'Překročen počet různých aktivních terčů oproti nastavení turnaje.'),
+      }));
+      setValidationError(
+        String(
+          t('tournBoardErrTooManyDistinctGlobal') ||
+            'Nelze použít více než {n} různých terčů současně. Uvolněte terč (smažte přiřazení u skupiny), nebo počkejte ve frontě.'
+        ).replace(/\{n\}/g, String(totalBoards))
+      );
+      return;
+    }
+
+    setBoardInputErrors((prev) => ({ ...prev, [groupId]: '' }));
     setValidationError('');
+    setBoardInputs(nextInputs);
     setTournamentDraft?.((d) => ({
       ...d,
       boardAssignments: {
@@ -101,8 +138,7 @@ export default function TournamentBoardAssignment({
       },
     }));
 
-    // Propis do live tournamentData – vždy (včetně prázdné hodnoty pro frontu)
-    if (!hasOutOfRange && typeof onUpdateGroupBoard === 'function' && tournamentData?.groups?.length) {
+    if (typeof onUpdateGroupBoard === 'function' && tournamentData?.groups?.length) {
       const boards = value.trim() === '' ? [] : parseBoardInput(value);
       onUpdateGroupBoard(groupId, boards);
     }
@@ -113,6 +149,15 @@ export default function TournamentBoardAssignment({
     const hasInputErrors = Object.values(boardInputErrors).some(Boolean);
     if (hasInputErrors) {
       setValidationError(t('tournBoardErrFixRange') || 'Opravte neplatná čísla terčů před pokračováním.');
+      return;
+    }
+    if (totalBoards > 0 && distinctCount > totalBoards) {
+      setValidationError(
+        String(
+          t('tournBoardErrTooManyDistinctGlobal') ||
+            'Současně je použito více než {n} různých terčů. Upravte přiřazení.'
+        ).replace(/\{n\}/g, String(totalBoards))
+      );
       return;
     }
     const groupBoards = {};
@@ -175,17 +220,23 @@ export default function TournamentBoardAssignment({
             <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400">
               {t('tournBoardAssignmentStepTitle') || 'Krok 4 - Přiřazení terčů'}{' '}
               <span className="text-sm font-bold normal-case text-slate-300">
-                ({t('tournBoardsCounter') || 'Terče celkem'}: {totalBoards} / {t('tournBoardsAssigned') || 'Přiřazeno'}: {assignedCount})
+                ({t('tournBoardsCounter') || 'Terče celkem'}: {totalBoards} / {t('tournBoardsDistinctUsed') || 'Aktivních různých'}: {distinctCount})
               </span>
             </h2>
             <p className="text-slate-400 text-sm mt-1">
               {t('tournBoardAssignmentDescExtended') || 'Přiřaďte každé skupině čísla terčů (např. 1 nebo 1, 2). Prázdné = skupina čeká ve frontě. Jedné skupině můžete přiřadit i více terčů najednou (např. "1, 2"). Zápasy se mezi ně rozdělí.'}
             </p>
-            {totalBoards > 0 && assignedCount === totalBoards && (
-              <div className="mt-2 p-3 rounded-lg bg-emerald-900/30 border border-emerald-500/40 text-emerald-300 text-sm font-bold">
-                {t('tournBoardsAllAssignedInfo') || '✅ Rozdělili jste všechny dostupné terče. Dalším skupinám nechte pole prázdné (zařadí se do fronty), nebo jim přiřaďte již použité číslo terče pro střídání zápasů.'}
+            {capacityReached ? (
+              <div
+                className="mt-2 p-3 rounded-lg bg-amber-900/35 border border-amber-500/50 text-amber-200 text-sm font-bold"
+                role="alert"
+              >
+                {String(
+                  t('tournBoardsCapReachedQueue') ||
+                    'Je obsazeno všech {n} různých terčů z nastavení turnaje. Skupiny bez přiřazení čekají na uvolnění — jejich pole jsou zablokována.'
+                ).replace(/\{n\}/g, String(totalBoards))}
               </div>
-            )}
+            ) : null}
           </div>
           <div className="hidden md:flex items-center gap-2 shrink-0">
             <button
@@ -205,15 +256,22 @@ export default function TournamentBoardAssignment({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {groups.map((group, index) => (
+          {groups.map((group) => {
+            const gid = group.groupId;
+            const fieldLocked =
+              totalBoards > 0 &&
+              distinctCount >= totalBoards &&
+              groupInputIsEmpty(boardInputs, gid);
+            const displayValue = boardInputs[gid] ?? '';
+            return (
             <div
-              key={group.groupId}
+              key={gid}
               className="p-4 rounded-xl bg-slate-800 border border-slate-700"
             >
               <div className="flex flex-col gap-3">
                 <div>
                   <h3 className="font-bold text-slate-100">
-                    {t('tournGroup') || 'Skupina'} {group.groupId} – {group.players.length}{' '}
+                    {t('tournGroup') || 'Skupina'} {gid} – {group.players.length}{' '}
                     {group.players.length === 1
                       ? (t('tournPlayerSingular') || 'hráč')
                       : group.players.length < 5
@@ -230,28 +288,30 @@ export default function TournamentBoardAssignment({
                   </label>
                   <AdminTapTextField
                     name="boardInput"
-                    id={`board-input-${group.groupId}`}
-                    value={(
-                      draftBoards[group.groupId] ??
-                      draftBoards[String(group.groupId)] ??
-                      persistedBoards[group.groupId] ??
-                      persistedBoards[String(group.groupId)] ??
-                      ''
-                    )}
-                    onValueChange={(v) => handleBoardChange(group.groupId, v)}
+                    id={`board-input-${gid}`}
+                    value={displayValue}
+                    onValueChange={(v) => handleBoardChange(gid, v)}
+                    onEnterPress={() => validateAndSubmit()}
                     filterChar={(c) => /[\d,;\s]/.test(c)}
                     placeholder={t('tournBoardPlaceholderQueue') || "např. 1 (prázdné = fronta)"}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 font-mono"
+                    disabled={fieldLocked}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                   />
-                  {boardInputErrors[group.groupId] && (
+                  {fieldLocked ? (
                     <p className="mt-1 text-xs text-amber-400 font-bold">
-                      {boardInputErrors[group.groupId]}
+                      {t('tournBoardFieldLockedQueue') || 'Čeká na uvolněný terč — nejdřív uvolněte číslo u jiné skupiny.'}
+                    </p>
+                  ) : null}
+                  {boardInputErrors[gid] && (
+                    <p className="mt-1 text-xs text-amber-400 font-bold">
+                      {boardInputErrors[gid]}
                     </p>
                   )}
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {validationError && (

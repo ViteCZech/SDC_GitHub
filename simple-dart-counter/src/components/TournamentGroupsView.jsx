@@ -321,6 +321,7 @@ export default function TournamentGroupsView({
   tournamentData,
   tournamentMatches = [],
   tournamentGroups = [],
+  estimatedTournamentEnd = null,
   lang = 'cs',
   userRole = null,
   hasBracket = false,
@@ -623,6 +624,12 @@ export default function TournamentGroupsView({
                 {t('tournEstEndGroups') || 'Odhadovaný konec skupin'}:{' '}
                 <span className="text-emerald-400">{formatTime(timePrediction.estimatedEnd)}</span>
               </p>
+              {estimatedTournamentEnd instanceof Date && !Number.isNaN(estimatedTournamentEnd.getTime()) ? (
+                <p className="text-base font-bold text-slate-200 mt-2">
+                  {t('tournEstTournamentEnd') || 'Odhad konec celého turnaje'}:{' '}
+                  <span className="text-emerald-400">{formatTime(estimatedTournamentEnd)}</span>
+                </p>
+              ) : null}
               <p className="text-sm text-slate-400 mt-1">
                 {t('tournAvgMatchTime') || 'Průměrný čas zápasu'}:{' '}
                 {Math.round(timePrediction.avgMatchDurationMs / 60000)} {t('tournMinutes') || 'minut'}

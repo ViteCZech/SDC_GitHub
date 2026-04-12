@@ -18,6 +18,8 @@ export function AdminTapTextField({
   max,
   name,
   id,
+  /** Při systémové klávesnici: Enter = potvrzení (volitelně uložení); výchozí je blur pole. */
+  onEnterPress,
 }) {
   const vk = useContext(AdminVirtualKeyboardContext);
   const useInternalVk = vk?.internalKeyboardEnabled !== false && typeof vk?.openKeyboard === 'function';
@@ -49,6 +51,15 @@ export function AdminTapTextField({
         max={max}
         value={value ?? ''}
         onChange={(e) => onValueChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          if (typeof onEnterPress === 'function') {
+            onEnterPress(e);
+          } else {
+            e.currentTarget.blur();
+          }
+        }}
         placeholder={placeholder}
         className={className}
         disabled={disabled}

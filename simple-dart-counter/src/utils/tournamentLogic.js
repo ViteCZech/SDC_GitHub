@@ -44,6 +44,10 @@ function getBracketSeedingTemplate(bracketSize) {
 const DEFAULT_MATCH_DURATION_MS = 15 * 60 * 1000; // 15 minut
 const DEFAULT_LEG_TIME_MS = 3.5 * 60 * 1000; // 3.5 minuty
 
+/** Minimální pozorovaná délka zápasu při výpočtu průměru z timestampů (odfiltruje chyby). */
+const OBSERVED_MATCH_MS_MIN = 45 * 1000;
+const OBSERVED_MATCH_MS_MAX = 4 * 60 * 60 * 1000;
+
 /** Oficiální šablony ČŠO: [Hráč 1, Hráč 2, Zapisovatel] – čísla jsou nasazení (1-based). */
 const MATCH_TEMPLATES = {
   3: [
@@ -155,6 +159,244 @@ function getLegsInMatch(m) {
   return (Number(s1) || 0) + (Number(s2) || 0);
 }
 
+function isGroupMatchTerminal(m) {
+  const s = m?.status;
+  return s === 'completed' || s === 'walkover';
+}
+
+function observedDurationMs(m) {
+  const start = Number(m?.startedAt);
+  const end = Number(m?.completedAt);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+  const d = end - start;
+  if (d < OBSERVED_MATCH_MS_MIN || d > OBSERVED_MATCH_MS_MAX) return null;
+  return d;
+}
+
+function defaultAvgMatchMsFromLegs(legsToWin, legTimeMs = DEFAULT_LEG_TIME_MS) {
+  const averageLegsPerMatch = Math.max(1, legsToWin * 2 - 0.5);
+  return averageLegsPerMatch * legTimeMs;
+}
+
+/**
+ * Průměrná délka zápasu z odehraných záznamů (startedAt + completedAt), jinak null.
+ */
+export function inferAverageMatchDurationMsFromCompleted(matches) {
+  const durs = (matches || [])
+    .filter(isGroupMatchTerminal)
+    .map(observedDurationMs)
+    .filter((d) => d != null);
+  if (durs.length === 0) return null;
+  return durs.reduce((a, b) => a + b, 0) / durs.length;
+}
+
+/**
+ * Odhad zbývajícího času jednoho zápasu (pending / playing s částečně uběhlým časem).
+ */
+function estimateRemainingMsForMatch(m, avgFullMatchMs, now) {
+  const s = m?.status;
+  if (isGroupMatchTerminal(m)) return 0;
+  const playing = s === 'playing' || s === 'in_progress';
+  const started = Number(m?.startedAt);
+  if (playing && Number.isFinite(started) && started > 0) {
+    const elapsed = Math.max(0, now - started);
+    const floorLeft = 60 * 1000;
+    return Math.max(floorLeft, avgFullMatchMs - elapsed);
+  }
+  return avgFullMatchMs;
+}
+
+/**
+ * Efektivní paralelita: min(strop z nastavení, počet skutečně přiřazených různých terčů ve skupinách).
+ * Bez přiřazených terčů použije strop z nastavení.
+ */
+function resolveAvailableBoards(groups, settings) {
+  const cap = Number(settings?.totalBoards);
+  const capOk = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : 0;
+  const uniqueBoards = new Set();
+  for (const g of groups || []) {
+    for (const b of g?.boards || []) {
+      const n = Number(b);
+      if (Number.isFinite(n) && n > 0) uniqueBoards.add(n);
+    }
+  }
+  const active = uniqueBoards.size;
+  if (capOk > 0) {
+    if (active > 0) return Math.max(1, Math.min(capOk, active));
+    return Math.max(1, capOk);
+  }
+  if (active > 0) return Math.max(1, active);
+  return 1;
+}
+
+/**
+ * Zbývající „stěnový“ čas skupin: kombinace paralelizace napříč terči a nejpomalejší skupiny.
+ * Lepší než čistý (počet zápasů / terče), který ignoruje nevyváženost skupin.
+ */
+function estimateGroupsPhaseRemainingMs(groups, matches, settings, now) {
+  const legsToWin = settings?.groupsLegs ?? 3;
+  const observed = inferAverageMatchDurationMsFromCompleted(matches);
+  const avgFullMatchMs = observed ?? defaultAvgMatchMsFromLegs(legsToWin);
+  const boards = resolveAvailableBoards(groups, settings);
+
+  const list = groups || [];
+  if (list.length === 0) return { remainingMs: 0, avgMatchDurationMs: avgFullMatchMs };
+
+  let sumSerial = 0;
+  let maxSerial = 0;
+  for (const g of list) {
+    const gid = g.groupId ?? g.id;
+    const gm = (matches || []).filter((m) => (m.groupId ?? m.group) === gid);
+    let serial = 0;
+    for (const m of gm) {
+      serial += estimateRemainingMsForMatch(m, avgFullMatchMs, now);
+    }
+    sumSerial += serial;
+    if (serial > maxSerial) maxSerial = serial;
+  }
+
+  const parallelBlend = Math.max(maxSerial, sumSerial / boards);
+  return { remainingMs: parallelBlend, avgMatchDurationMs: avgFullMatchMs };
+}
+
+function allGroupsPhaseComplete(groups, matches) {
+  const list = groups || [];
+  if (list.length === 0) return true;
+  for (const g of list) {
+    const gid = g.groupId ?? g.id;
+    const gm = (matches || []).filter((m) => (m.groupId ?? m.group) === gid);
+    if (gm.length === 0) return false;
+    if (!gm.every((m) => isGroupMatchTerminal(m))) return false;
+  }
+  return true;
+}
+
+function bracketMatchTerminal(m) {
+  const s = m?.status;
+  return s === 'completed' || s === 'walkover';
+}
+
+function inferBracketAvgMatchMsFromCompleted(bracketRounds) {
+  const durs = [];
+  for (const round of bracketRounds || []) {
+    for (const m of round?.matches || []) {
+      if (!bracketMatchTerminal(m)) continue;
+      const d = observedDurationMs(m);
+      if (d != null) durs.push(d);
+    }
+  }
+  if (durs.length === 0) return null;
+  return durs.reduce((a, b) => a + b, 0) / durs.length;
+}
+
+function countDistinctBracketBoards(bracketRounds) {
+  const set = new Set();
+  for (const round of bracketRounds || []) {
+    for (const m of round?.matches || []) {
+      if (!m || m.isBye) continue;
+      if (bracketMatchTerminal(m)) continue;
+      const raw = m.board;
+      if (raw == null || raw === '') continue;
+      set.add(String(raw).trim());
+    }
+  }
+  return set.size;
+}
+
+/**
+ * Živý odhad konce turnaje (skupiny + KO), s ohledem na paralelní terče a změřené délky zápasů.
+ *
+ * @returns {{
+ *   estimatedTournamentEnd: Date,
+ *   estimatedGroupsPhaseEnd: Date,
+ *   avgGroupMatchDurationMs: number,
+ *   avgBracketMatchDurationMs: number,
+ *   remainingGroupsMs: number,
+ *   remainingBracketMs: number,
+ * }}
+ */
+export function calculateLiveTournamentEndPrediction({
+  format,
+  groups = [],
+  groupMatches = [],
+  bracketRounds = [],
+  groupsLegs = 3,
+  bracketLegs = 3,
+  totalBoards = 0,
+  now = Date.now(),
+} = {}) {
+  const settings = { groupsLegs, totalBoards };
+  const hasGroups = isTournamentGroupsThenBracketFormat(format) && (groups || []).length > 0;
+  const koOnly = isTournamentBracketOnlyFormat(format);
+
+  const { remainingMs: remGroups, avgMatchDurationMs: avgG } = hasGroups
+    ? estimateGroupsPhaseRemainingMs(groups, groupMatches, settings, now)
+    : { remainingMs: 0, avgMatchDurationMs: defaultAvgMatchMsFromLegs(groupsLegs) };
+
+  const groupsDone = !hasGroups || allGroupsPhaseComplete(groups, groupMatches);
+  const bracket = Array.isArray(bracketRounds) ? bracketRounds : [];
+
+  let remBracket = 0;
+  let avgB = defaultAvgMatchMsFromLegs(bracketLegs);
+
+  if ((groupsDone || koOnly) && bracket.length > 0) {
+    const observedB = inferBracketAvgMatchMsFromCompleted(bracket);
+    if (observedB != null) avgB = observedB;
+
+    const distinctBoards = countDistinctBracketBoards(bracket);
+    const capB = Number(totalBoards) > 0 ? Math.floor(Number(totalBoards)) : 0;
+    let boardsBracket =
+      distinctBoards > 0 ? distinctBoards : capB > 0 ? capB : 1;
+    if (capB > 0) boardsBracket = Math.min(capB, boardsBracket);
+    boardsBracket = Math.max(1, boardsBracket);
+
+    for (let ri = 0; ri < bracket.length; ri++) {
+      let earlierIncomplete = false;
+      for (let j = 0; j < ri; j++) {
+        const prevMatches = bracket[j]?.matches || [];
+        for (const pm of prevMatches) {
+          if (!pm || pm.isBye) continue;
+          if (!pm.player1Id || !pm.player2Id) continue;
+          if (!bracketMatchTerminal(pm)) {
+            earlierIncomplete = true;
+            break;
+          }
+        }
+        if (earlierIncomplete) break;
+      }
+      if (earlierIncomplete) continue;
+
+      const round = bracket[ri];
+      const matches = round?.matches || [];
+      let roundSum = 0;
+      let roundUnfinished = 0;
+      for (const m of matches) {
+        if (!m || m.isBye) continue;
+        if (!m.player1Id || !m.player2Id) continue;
+        if (bracketMatchTerminal(m)) continue;
+        roundSum += estimateRemainingMsForMatch(m, avgB, now);
+        roundUnfinished += 1;
+      }
+      if (roundUnfinished === 0) continue;
+      const parallelInRound = Math.max(1, Math.min(boardsBracket, roundUnfinished));
+      remBracket += roundSum / parallelInRound;
+    }
+  }
+
+  const totalRemaining = remGroups + remBracket;
+  const end = new Date(now + totalRemaining);
+  const endGroups = new Date(now + remGroups);
+
+  return {
+    estimatedTournamentEnd: end,
+    estimatedGroupsPhaseEnd: endGroups,
+    avgGroupMatchDurationMs: avgG,
+    avgBracketMatchDurationMs: avgB,
+    remainingGroupsMs: remGroups,
+    remainingBracketMs: remBracket,
+  };
+}
+
 /**
  * Vypočítá odhadovaný čas konce skupinové fáze podle legů a terčů (kritická cesta).
  *
@@ -165,28 +407,11 @@ function getLegsInMatch(m) {
  */
 export function calculateTournamentTimePrediction(groups, matches, settings = {}) {
   const now = Date.now();
-  const legsToWin = settings?.groupsLegs ?? 3;
-  const averageLegTimeMs = DEFAULT_LEG_TIME_MS;
-  const averageLegsPerMatch = Math.max(1, (legsToWin * 2) - 0.5);
-  const avgMatchDurationMs = averageLegsPerMatch * averageLegTimeMs;
-  const unfinishedCount = (matches || []).filter((m) => m.status !== 'completed').length;
-
-  const explicitBoards = Number(settings?.totalBoards);
-  const fromSettings = Number.isFinite(explicitBoards) && explicitBoards > 0 ? explicitBoards : 0;
-  const uniqueBoards = new Set();
-  for (const g of groups || []) {
-    for (const b of (g?.boards || [])) {
-      const n = Number(b);
-      if (Number.isFinite(n) && n > 0) uniqueBoards.add(n);
-    }
-  }
-  const availableBoards = Math.max(1, fromSettings || uniqueBoards.size || 1);
-  const remainingMs = (unfinishedCount * avgMatchDurationMs) / availableBoards;
-
+  const { remainingMs, avgMatchDurationMs } = estimateGroupsPhaseRemainingMs(groups, matches, settings, now);
   return {
     estimatedEnd: new Date(now + remainingMs),
     avgMatchDurationMs,
-    averageLegTimeMs,
+    averageLegTimeMs: DEFAULT_LEG_TIME_MS,
   };
 }
 
@@ -1676,10 +1901,27 @@ function collectRefereeIdsInBracketRound(bracketRounds, roundIndex) {
   return s;
 }
 
+/** Počtáři z dokončených zápasů (napříč celým pavoukem) — zabrání opakované nominaci po dalším běhu engine. */
+function collectRefereeIdsFromCompletedMatches(bracketRounds) {
+  const s = new Set();
+  for (const round of bracketRounds || []) {
+    for (const m of round?.matches || []) {
+      if (!m || m.status !== 'completed' || m.isBye) continue;
+      if (isBracketRefereePlaceholder(m.referee, m.refereeId)) continue;
+      const rid = m.refereeId ?? m.referee?.id ?? m.referee?.name;
+      if (rid != null && rid !== '') s.add(rid);
+    }
+  }
+  return s;
+}
+
 /**
  * Přiřadí počtáře k pending zápasům s terčem.
- * Turnaj se skupinami: předkolo = jen nepostupující (nejhorší první); první KO kolo = vlna 1 zbývající nepostupující
- * (bez těch z předkola) + BYE doplnění, vlna 2 = proherci z téhož kola; pozdější kola = jen proherci z předchozího kola.
+ * Turnaj se skupinami + předkolo: kolo 0 = předkolo — vlna 1 z poolu nepostupujících, vlna 2 z proherců téhož kola;
+ * kdo už v předkole počítal, do dalších kol už nemůže. První hlavní KO kolo po předkole: primárně vždy pool z 2. vlny předkola
+ * (proherci zápasů předkola, které počítal někdo, kdo sám prohrál jiný zápas předkola); dokud takové výsledky nejsou, fallback
+ * na všechny proherce kola 0. Pak proherci z tohoto kola; pak BYE kandidáti (bez opakování předkolových počtářů u BYE).
+ * Bez předkola: první kolo jako dřív (nepostupující + BYE, druhá vlna proherci z kola). Pozdější kola = proherci z předchozího kola.
  * Přímý KO bez skupin: automat nepřiřazuje (admin). Limit terčů: max tolik přiřazení jako `availableBoards` mínus už hrající.
  */
 export const updateBracketReferees = (
@@ -1769,7 +2011,8 @@ export const updateBracketReferees = (
     };
   };
 
-  const usedReferees = new Set();
+  // Počtáři z už dohraných zápasů — bez toho by při dalším běhu engine mohli být znovu nominováni (např. předkolo).
+  const usedReferees = collectRefereeIdsFromCompletedMatches(newBracket);
   // Intra-loop lock: zabrání přiřazení stejného počtáře více zápasům v rámci jednoho běhu/smyčky.
   const assignedRefsInThisRun = new Set();
   const currentlyPlayingIds = new Set();
@@ -1849,6 +2092,53 @@ export const updateBracketReferees = (
       if (lid != null) s.add(lid);
     }
     return s;
+  };
+
+  /** Pro mapování proherce → zápas (pro řazení počtářů podle legů / skupiny). */
+  const buildBracketRoundLoserFeederMap = (ri) => {
+    const map = new Map();
+    for (const m of newBracket[ri]?.matches || []) {
+      const d = getLoserScore(m);
+      const lid = d?.loser?.id ?? d?.loser?.name;
+      if (lid != null && m) map.set(lid, m);
+    }
+    return map;
+  };
+
+  /**
+   * Proherci „2. vlny“ předkola: dokončený zápas kola 0, jehož platný počtář je zároveň prohraným hráčem
+   * v jiném dokončeném zápasu kola 0 (typicky 1. vlna → počítá → 2. vlna → prohraný jde do poolu pro další KO kolo).
+   */
+  const collectWave2PrelimLoserIds = () => {
+    const out = new Set();
+    const r0 = newBracket[0]?.matches || [];
+    const completed = [];
+    for (const m of r0) {
+      if (!m || m.status !== 'completed' || m.isBye) continue;
+      if (isRoundZeroNonPhysicalBracketMatch(m)) continue;
+      if (getLoserScore(m) == null) continue;
+      completed.push(m);
+    }
+    const refLostInOtherR0Match = (refId, exceptMatch) => {
+      if (refId == null || refId === '') return false;
+      for (const other of completed) {
+        if (other === exceptMatch) continue;
+        const d = getLoserScore(other);
+        const lid = d?.loser?.id ?? d?.loser?.name;
+        if (lid != null && String(lid) === String(refId)) return true;
+      }
+      return false;
+    };
+    for (const m of completed) {
+      if (isBracketRefereePlaceholder(m.referee, m.refereeId)) continue;
+      const refId = m.refereeId ?? m.referee?.id ?? m.referee?.name;
+      if (refId == null || refId === '') continue;
+      if (!refLostInOtherR0Match(refId, m)) continue;
+      const dM = getLoserScore(m);
+      const loserId = dM?.loser?.id ?? dM?.loser?.name;
+      if (loserId != null) out.add(loserId);
+    }
+    return out;
   };
 
   const pickFairRefereeFromPool = ({
@@ -2002,7 +2292,13 @@ export const updateBracketReferees = (
           delete match.refereePickTier;
         } else {
           // Už přiřazený validní počtář musí blokovat další přiřazení v tomto běhu.
-          if (refId != null) assignedRefsInThisRun.add(refId);
+          if (refId != null) {
+            assignedRefsInThisRun.add(refId);
+            registerPickedReferee({
+              id: match.referee.id ?? refId,
+              name: match.referee.name ?? refId,
+            });
+          }
           return;
         }
       }
@@ -2035,43 +2331,110 @@ export const updateBracketReferees = (
           feederMatchByLoserId: null,
         });
         if (chosenRef) pickTier = 1;
-      } else if (isFirstMainRound) {
-        const wave1Base = new Set(nonAdvEntries.map((e) => e.id));
-        if (hasPrelimBracketRound) {
-          for (const rid of collectRefereeIdsInBracketRound(newBracket, 0)) wave1Base.delete(rid);
-        }
-        const poolPriority = new Map(nonAdvPriority);
-        let nextRank = nonAdvEntries.length;
-        const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
-        for (const c of byeRefCandidates || []) {
-          if (c?.id == null) continue;
-          poolPriority.set(c.id, nextRank++);
-        }
-        for (const id of byeRoundIds) {
-          poolPriority.set(id, nextRank++);
-        }
-        const poolTier1 = new Set(wave1Base);
-        for (const c of byeRefCandidates || []) {
-          if (c?.id != null) poolTier1.add(c.id);
-        }
-        for (const id of byeRoundIds) poolTier1.add(id);
-
-        chosenRef = selectFromPool({
-          poolIds: poolTier1,
-          poolPriorityRank: poolPriority,
-          feederLoserIds: new Set(),
-          feederMatchByLoserId: null,
-        });
-        if (chosenRef) pickTier = 1;
-
         if (!chosenRef) {
-          const rLosers = collectLosersFromBracketRoundIndex(roundIndex);
+          const r0Losers = collectLosersFromBracketRoundIndex(0);
+          const feederMap0 = buildBracketRoundLoserFeederMap(0);
           chosenRef = selectFromPool({
-            poolIds: rLosers,
-            feederLoserIds: rLosers,
-            feederMatchByLoserId: null,
+            poolIds: r0Losers,
+            poolPriorityRank: nonAdvPriority,
+            feederLoserIds: r0Losers,
+            feederMatchByLoserId: feederMap0.size > 0 ? feederMap0 : null,
           });
           if (chosenRef) pickTier = 2;
+        }
+      } else if (isFirstMainRound) {
+        if (hasPrelimBracketRound) {
+          const prelimRefIds = collectRefereeIdsInBracketRound(newBracket, 0);
+          const r0AllLosers = collectLosersFromBracketRoundIndex(0);
+          const wave2PrelimLosers = collectWave2PrelimLoserIds();
+          const poolFromWave2Prelim =
+            wave2PrelimLosers.size > 0 ? wave2PrelimLosers : r0AllLosers;
+          const poolPriorityMain = new Map();
+          let rankFallback = nonAdvEntries.length;
+          for (const id of poolFromWave2Prelim) {
+            if (nonAdvPriority.has(id)) poolPriorityMain.set(id, nonAdvPriority.get(id));
+            else poolPriorityMain.set(id, rankFallback++);
+          }
+          const feederMap0 = buildBracketRoundLoserFeederMap(0);
+          chosenRef = selectFromPool({
+            poolIds: poolFromWave2Prelim,
+            poolPriorityRank: poolPriorityMain,
+            feederLoserIds: poolFromWave2Prelim,
+            feederMatchByLoserId: feederMap0.size > 0 ? feederMap0 : null,
+          });
+          if (chosenRef) pickTier = 1;
+
+          if (!chosenRef) {
+            const r1Losers = collectLosersFromBracketRoundIndex(roundIndex);
+            const feederMap1 = buildBracketRoundLoserFeederMap(roundIndex);
+            chosenRef = selectFromPool({
+              poolIds: r1Losers,
+              poolPriorityRank: poolPriorityMain,
+              feederLoserIds: r1Losers,
+              feederMatchByLoserId: feederMap1.size > 0 ? feederMap1 : null,
+            });
+            if (chosenRef) pickTier = 2;
+          }
+
+          if (!chosenRef) {
+            const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
+            const byePool = new Set();
+            for (const c of byeRefCandidates || []) {
+              if (c?.id != null && !prelimRefIds.has(c.id)) byePool.add(c.id);
+            }
+            for (const id of byeRoundIds) {
+              if (!prelimRefIds.has(id)) byePool.add(id);
+            }
+            let nextRank = rankFallback;
+            const poolPriorityBye = new Map(poolPriorityMain);
+            for (const id of byePool) {
+              if (!poolPriorityBye.has(id)) poolPriorityBye.set(id, nextRank++);
+            }
+            chosenRef = selectFromPool({
+              poolIds: byePool,
+              poolPriorityRank: poolPriorityBye,
+              feederLoserIds: new Set(),
+              feederMatchByLoserId: null,
+            });
+            if (chosenRef) pickTier = 3;
+          }
+        } else {
+          const wave1Base = new Set(nonAdvEntries.map((e) => e.id));
+          const poolPriority = new Map(nonAdvPriority);
+          let nextRank = nonAdvEntries.length;
+          const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
+          for (const c of byeRefCandidates || []) {
+            if (c?.id == null) continue;
+            poolPriority.set(c.id, nextRank++);
+          }
+          for (const id of byeRoundIds) {
+            poolPriority.set(id, nextRank++);
+          }
+          const poolTier1 = new Set(wave1Base);
+          for (const c of byeRefCandidates || []) {
+            if (c?.id != null) poolTier1.add(c.id);
+          }
+          for (const id of byeRoundIds) poolTier1.add(id);
+
+          chosenRef = selectFromPool({
+            poolIds: poolTier1,
+            poolPriorityRank: poolPriority,
+            feederLoserIds: new Set(),
+            feederMatchByLoserId: null,
+          });
+          if (chosenRef) pickTier = 1;
+
+          if (!chosenRef) {
+            const rLosers = collectLosersFromBracketRoundIndex(roundIndex);
+            const feederMap = buildBracketRoundLoserFeederMap(roundIndex);
+            chosenRef = selectFromPool({
+              poolIds: rLosers,
+              poolPriorityRank: poolPriority,
+              feederLoserIds: rLosers,
+              feederMatchByLoserId: feederMap.size > 0 ? feederMap : null,
+            });
+            if (chosenRef) pickTier = 2;
+          }
         }
       } else if (isLaterKoRound) {
         const poolIds = new Set();

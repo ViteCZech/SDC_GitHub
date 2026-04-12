@@ -44,6 +44,7 @@ import {
   calculateGroupStandings,
   isTournamentBracketOnlyFormat,
   sortPlayersForBracketSeeding,
+  calculateLiveTournamentEndPrediction,
 } from './utils/tournamentLogic';
 import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
 
@@ -1619,7 +1620,101 @@ function AppMain({ lang, setLang }) {
     tournamentMatchContext,
   ]);
 
-  const isTournamentLive = tournamentMatches?.some((m) => m.status !== 'pending') ?? false;
+  const isTournamentLive =
+    (tournamentMatches?.some((m) => m.status !== 'pending') ?? false) ||
+    (Array.isArray(tournamentBracket) &&
+      tournamentBracket.some((round) =>
+        (round?.matches || []).some((m) => {
+          if (!m || m.isBye) return false;
+          const s = m.status;
+          return s && s !== 'pending';
+        })
+      ));
+
+  const [tournamentEndEstimateTick, setTournamentEndEstimateTick] = useState(0);
+  useEffect(() => {
+    const hasTourney = !!(tournamentData?.pin || tournamentData?.tournamentId);
+    if (!hasTourney) return undefined;
+    const ms = isTournamentLive ? 15000 : 60000;
+    const id = window.setInterval(() => setTournamentEndEstimateTick((n) => n + 1), ms);
+    return () => window.clearInterval(id);
+  }, [tournamentData?.pin, tournamentData?.tournamentId, isTournamentLive]);
+
+  const liveTournamentEndPrediction = React.useMemo(() => {
+    if (!tournamentData) return null;
+    return calculateLiveTournamentEndPrediction({
+      format: tournamentData.tournamentFormat || 'groups_bracket',
+      groups: tournamentData.groups?.length ? tournamentData.groups : tournamentGroups,
+      groupMatches: tournamentMatches ?? [],
+      bracketRounds: tournamentBracket ?? [],
+      groupsLegs: Number(tournamentData.groupsLegs ?? tournamentData.legsGroup ?? 3) || 3,
+      bracketLegs: Number(tournamentData.bracketKoLegs ?? tournamentData.bracketLegs ?? 3) || 3,
+      totalBoards: Number(tournamentData.numBoards ?? tournamentData.totalBoards ?? 0) || 0,
+      now: Date.now(),
+    });
+  }, [
+    tournamentData,
+    tournamentMatches,
+    tournamentBracket,
+    tournamentGroups,
+    tournamentEndEstimateTick,
+  ]);
+
+  const formatTournamentEndClock = React.useCallback(
+    (d) =>
+      d.toLocaleTimeString(lang === 'cs' ? 'cs-CZ' : lang === 'pl' ? 'pl-PL' : 'en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    [lang]
+  );
+
+  const tournamentPinEndEstimate =
+    liveTournamentEndPrediction &&
+    ((tournamentMatches?.length ?? 0) > 0 || (tournamentBracket?.length ?? 0) > 0) ? (
+      <span className="text-emerald-400/95 font-bold text-[10px] sm:text-xs tabular-nums whitespace-nowrap shrink-0">
+        {t('tournEstTournamentEnd') || 'Konec turnaje (odhad)'}:{' '}
+        {formatTournamentEndClock(liveTournamentEndPrediction.estimatedTournamentEnd)}
+      </span>
+    ) : null;
+
+  const clearPlayingTournamentMatchWithoutResult = React.useCallback(() => {
+    const ctx = tournamentMatchContextRef.current;
+    if (!ctx || ctx.type === 'tablet') return;
+    if (ctx.type === 'bracket' && ctx.roundIndex != null && ctx.match?.id != null) {
+      const ri = ctx.roundIndex;
+      const mid = ctx.match.id;
+      setTournamentBracket((prev) =>
+        Array.isArray(prev)
+          ? prev.map((round, rIdx) => ({
+              ...round,
+              matches: (round.matches || []).map((m) =>
+                rIdx === ri &&
+                m.id === mid &&
+                (m.status === 'playing' || m.status === 'in_progress')
+                  ? { ...m, status: 'pending', startedAt: null }
+                  : m
+              ),
+            }))
+          : prev
+      );
+      return;
+    }
+    const m = ctx.match;
+    if (!m) return;
+    const mid = m.matchId ?? m.id;
+    const gid = m.groupId ?? m.group;
+    setTournamentMatches((prev) =>
+      (prev || []).map((x) => {
+        const xid = x.matchId ?? x.id;
+        const xg = x.groupId ?? x.group;
+        return xid === mid && xg === gid && (x.status === 'playing' || x.status === 'in_progress')
+          ? { ...x, status: 'pending', startedAt: null }
+          : x;
+      })
+    );
+  }, []);
+
   const viewerTournamentNavStates = ['tournament_groups', 'tournament_bracket', 'tournament_stats'];
   const adminTournamentStepperStates = [
     'tournament_setup',
@@ -1902,6 +1997,7 @@ function AppMain({ lang, setLang }) {
             status: existing?.status ?? m.status ?? 'pending',
             result: existing?.result,
             completedAt: existing?.completedAt,
+            startedAt: existing?.startedAt,
             chalkerId: existing?.chalkerId ?? m.chalkerId,
           });
         }
@@ -2125,6 +2221,16 @@ function AppMain({ lang, setLang }) {
     const p1 = group.players.find(p => p.id === match.player1Id);
     const p2 = group.players.find(p => p.id === match.player2Id);
     const legsToWin = tournamentData?.groupsLegs ?? 3;
+    const mid = match.matchId ?? match.id;
+    const gid = match.groupId ?? match.group;
+    const t0 = Date.now();
+    setTournamentMatches((prev) =>
+      (prev || []).map((m) => {
+        const xid = m.matchId ?? m.id;
+        const xg = m.groupId ?? m.group;
+        return xid === mid && xg === gid ? { ...m, status: 'playing', startedAt: t0 } : m;
+      })
+    );
     setTournamentMatchContext({ match, group, tournamentData });
     setSettings(prev => ({
       ...prev,
@@ -2149,6 +2255,20 @@ function AppMain({ lang, setLang }) {
       match.winLegs != null && Number.isFinite(Number(match.winLegs))
         ? Math.max(1, Math.floor(Number(match.winLegs)))
         : getBracketWinLegsForRound(roundIndex, baseLegs, tournamentData?.prelimLegs);
+    const t0 = Date.now();
+    const mid = match.id;
+    if (mid != null) {
+      setTournamentBracket((prev) =>
+        Array.isArray(prev)
+          ? prev.map((round, rIdx) => ({
+              ...round,
+              matches: (round.matches || []).map((m) =>
+                rIdx === roundIndex && m.id === mid ? { ...m, status: 'playing', startedAt: t0 } : m
+              ),
+            }))
+          : prev
+      );
+    }
     setTournamentMatchContext({ match, type: 'bracket', roundIndex, tournamentData });
     setSettings((prev) => ({
       ...prev,
@@ -2544,6 +2664,7 @@ function AppMain({ lang, setLang }) {
               result: null,
               winnerId: null,
               completedAt: null,
+              startedAt: null,
             }
           : m
       )
@@ -2559,6 +2680,7 @@ function AppMain({ lang, setLang }) {
         result: null,
         winnerId: null,
         completedAt: null,
+        startedAt: null,
       };
       handleStartTournamentMatch(reopened, group);
     }
@@ -3014,7 +3136,8 @@ function AppMain({ lang, setLang }) {
       return (
           <div className={`bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden ${showTournamentPinBar ? 'pt-10' : ''}`}>
               {showTournamentPinBar && (
-                  <div className="fixed top-0 left-0 right-0 z-[5000] bg-slate-950 border-b border-slate-800 text-slate-300 p-2 flex justify-between items-center text-sm gap-2">
+                  <div className="fixed top-0 left-0 right-0 z-[5000] bg-slate-950 border-b border-slate-800 text-slate-300 p-2 flex flex-wrap justify-between items-center text-sm gap-x-2 gap-y-1">
+                      <div className="min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 flex-1">
                       {userRole === 'tablet' && tournamentMatchContext?.type === 'tablet' ? (
                         <div className="min-w-0 flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-x-2 text-[11px] sm:text-sm leading-tight pr-1">
                           <span className="truncate font-semibold text-slate-200">{pinBarTitle}</span>
@@ -3032,6 +3155,8 @@ function AppMain({ lang, setLang }) {
                       ) : (
                         <span className="truncate pr-2 min-w-0">🏆 {pinBarTitle}</span>
                       )}
+                      {tournamentPinEndEstimate}
+                      </div>
                       <div className="shrink-0 flex items-center gap-2">
                         <span className="text-slate-500 hidden sm:inline">PIN:</span>
                         <span className="text-2xl font-black text-yellow-400 tracking-widest font-mono tabular-nums">
@@ -3067,6 +3192,7 @@ function AppMain({ lang, setLang }) {
                       onClick={() => {
                         if (isTournamentPlaying) {
                           const ctx = tournamentMatchContextRef.current;
+                          clearPlayingTournamentMatchWithoutResult();
                           setTournamentMatchContext(null);
                           setAppState(
                             ctx?.type === 'tablet'
@@ -3132,6 +3258,7 @@ function AppMain({ lang, setLang }) {
                       isTournamentPlaying
                         ? () => {
                             const ctx = tournamentMatchContextRef.current;
+                            clearPlayingTournamentMatchWithoutResult();
                             setTournamentMatchContext(null);
                             setAppState(
                               ctx?.type === 'bracket'
@@ -3148,7 +3275,29 @@ function AppMain({ lang, setLang }) {
                     onRestoredConsumed={() => setMatchFinishRestoreState(null)}
                   />
               ) : (
-                  <GameCricket settings={settings} lang={lang} isLandscape={isLandscape} isPC={isPC} onAbort={() => setAppState('setup')} onMatchComplete={handleMatchComplete} />
+                  <GameCricket
+                    settings={settings}
+                    lang={lang}
+                    isLandscape={isLandscape}
+                    isPC={isPC}
+                    onAbort={
+                      isTournamentPlaying
+                        ? () => {
+                            const ctx = tournamentMatchContextRef.current;
+                            clearPlayingTournamentMatchWithoutResult();
+                            setTournamentMatchContext(null);
+                            setAppState(
+                              ctx?.type === 'bracket'
+                                ? 'tournament_bracket'
+                                : ctx?.type === 'tablet'
+                                  ? 'tournament_tablet'
+                                  : 'tournament_groups'
+                            );
+                          }
+                        : () => setAppState('setup')
+                    }
+                    onMatchComplete={handleMatchComplete}
+                  />
               )}
           </div>
       );
@@ -3157,7 +3306,8 @@ function AppMain({ lang, setLang }) {
   return (
     <div className={`bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden ${showTournamentPinBar ? 'pt-10' : ''}`}>
       {showTournamentPinBar && (
-        <div className="fixed top-0 left-0 right-0 z-[5000] bg-slate-950 border-b border-slate-800 text-slate-300 p-2 flex justify-between items-center text-sm gap-2">
+        <div className="fixed top-0 left-0 right-0 z-[5000] bg-slate-950 border-b border-slate-800 text-slate-300 p-2 flex flex-wrap justify-between items-center text-sm gap-x-2 gap-y-1">
+          <div className="min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 flex-1">
           {userRole === 'tablet' && appState === 'tournament_tablet' ? (
             <div className="min-w-0 flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-x-2 text-[11px] sm:text-sm leading-tight pr-1">
               <span className="truncate font-semibold text-slate-200">{pinBarTitle}</span>
@@ -3175,6 +3325,8 @@ function AppMain({ lang, setLang }) {
           ) : (
             <span className="truncate pr-2 min-w-0">🏆 {pinBarTitle}</span>
           )}
+          {tournamentPinEndEstimate}
+          </div>
           <div className="shrink-0 flex items-center gap-2">
             <span className="text-slate-500 hidden sm:inline">PIN:</span>
             <span className="text-2xl font-black text-yellow-400 tracking-widest font-mono tabular-nums">
@@ -3610,6 +3762,7 @@ function AppMain({ lang, setLang }) {
           tournamentData={tournamentData}
           tournamentMatches={tournamentMatches}
           tournamentGroups={tournamentGroups}
+          estimatedTournamentEnd={liveTournamentEndPrediction?.estimatedTournamentEnd ?? null}
           lang={lang}
           userRole={userRole}
           hasBracket={hasBracketGenerated}

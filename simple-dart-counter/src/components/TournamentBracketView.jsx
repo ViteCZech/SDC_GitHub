@@ -97,6 +97,7 @@ function BracketModal({
         <AdminTapTextField
           value={value}
           onValueChange={onChange}
+          onEnterPress={() => onSave()}
           filterChar={inputMode === 'numeric' ? (c) => /^\d$/.test(c) : undefined}
           className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
         />
@@ -251,10 +252,12 @@ export default function TournamentBracketView({
   }, [tournamentData?.players, tournamentData?.groups]);
 
   const openRefereeModal = (roundIndex, matchIndex, match) => {
+    const nm = match?.referee?.name != null ? String(match.referee.name) : '';
     setRefereeModal({
       roundIndex,
       matchIndex,
       selectedId: String(match?.referee?.id ?? ''),
+      customName: nm,
     });
   };
 
@@ -262,7 +265,11 @@ export default function TournamentBracketView({
     if (!refereeModal) return;
     const picked = allTournamentPlayers.find((p) => String(p.id) === String(refereeModal.selectedId));
     if (!picked) return;
-    onManualRefereeChange?.(refereeModal.roundIndex, refereeModal.matchIndex, picked);
+    const custom = String(refereeModal.customName ?? '').trim();
+    onManualRefereeChange?.(refereeModal.roundIndex, refereeModal.matchIndex, {
+      id: picked.id,
+      name: custom || picked.name,
+    });
     setRefereeModal(null);
   };
 
@@ -410,8 +417,7 @@ export default function TournamentBracketView({
       match.status === 'pending' &&
       typeof onManualRefereeChange === 'function' &&
       allTournamentPlayers.length > 0;
-    const showRefereeAsButton =
-      canPickRefereeManually && (!match.referee || placeholderRef);
+    const showRefereeAsButton = canPickRefereeManually;
     const refNameTrim =
       match.referee?.name != null ? String(match.referee.name).trim() : '';
     const refereeLabel =
@@ -491,6 +497,7 @@ export default function TournamentBracketView({
                 <AdminTapTextField
                   value={editLegsValue}
                   onValueChange={setEditLegsValue}
+                  onEnterPress={saveRoundSettingsModal}
                   filterChar={(c) => /^\d$/.test(c)}
                   className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
                 />
@@ -503,6 +510,7 @@ export default function TournamentBracketView({
                 <AdminTapTextField
                   value={editBoardsValue}
                   onValueChange={setEditBoardsValue}
+                  onEnterPress={saveRoundSettingsModal}
                   filterChar={(c) => /^\d$/.test(c)}
                   className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
                 />
@@ -571,9 +579,19 @@ export default function TournamentBracketView({
             </p>
             <select
               value={refereeModal.selectedId}
-              onChange={(e) =>
-                setRefereeModal((prev) => (prev ? { ...prev, selectedId: e.target.value } : null))
-              }
+              onChange={(e) => {
+                const id = e.target.value;
+                const p = allTournamentPlayers.find((x) => String(x.id) === id);
+                setRefereeModal((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        selectedId: id,
+                        customName: p ? String(p.name) : '',
+                      }
+                    : null
+                );
+              }}
               className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
             >
               <option value="">{t('tournSelectScorer') || '— Vyberte počtáře —'}</option>
@@ -583,6 +601,20 @@ export default function TournamentBracketView({
                 </option>
               ))}
             </select>
+            <div className="mt-4">
+              <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
+                {t('tournRefereeDisplayName') || 'Jméno u zápasu (úprava)'}
+              </label>
+              <AdminTapTextField
+                value={refereeModal.customName ?? ''}
+                onValueChange={(v) =>
+                  setRefereeModal((prev) => (prev ? { ...prev, customName: v } : null))
+                }
+                onEnterPress={saveRefereeModal}
+                placeholder={t('tournRefereeNamePlaceholder') || 'Volitelně upravte zobrazené jméno'}
+                className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
+              />
+            </div>
             <div className="flex gap-2 mt-5">
               <button
                 type="button"
