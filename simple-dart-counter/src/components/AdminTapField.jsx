@@ -20,9 +20,10 @@ export function AdminTapTextField({
   id,
 }) {
   const vk = useContext(AdminVirtualKeyboardContext);
+  const useInternalVk = vk?.internalKeyboardEnabled !== false && typeof vk?.openKeyboard === 'function';
 
   const open = () => {
-    if (disabled || readOnly || !vk?.openKeyboard) return;
+    if (disabled || readOnly || !useInternalVk) return;
     let buf = String(value ?? '');
     vk.openKeyboard({
       onAppend: (c) => {
@@ -38,7 +39,7 @@ export function AdminTapTextField({
     });
   };
 
-  if (!vk?.openKeyboard) {
+  if (!useInternalVk) {
     return (
       <input
         id={id}

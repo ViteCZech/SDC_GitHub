@@ -997,7 +997,7 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, onLogin, lang, 
 
 // --- HLAVNÍ KOMPONENTA (ROUTER) ---
 function AppMain({ lang, setLang }) {
-  const { openKeyboard, isKeyboardOpen } = useAdminVirtualKeyboard();
+  const { openKeyboard, isKeyboardOpen, internalKeyboardEnabled } = useAdminVirtualKeyboard();
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [offlineMode, setOfflineMode] = useState(false);
@@ -2610,6 +2610,22 @@ function AppMain({ lang, setLang }) {
   const p1Defaults = ['Domácí', 'Home', 'Gospodarze', translations?.cs?.p1Default, translations?.en?.p1Default, translations?.pl?.p1Default].filter(Boolean);
   const p2Defaults = ['Hosté', 'Away', 'Goście', translations?.cs?.p2Default, translations?.en?.p2Default, translations?.pl?.p2Default].filter(Boolean);
 
+  const restoreDefaultNameIfEmpty = (fieldKey) => {
+    setSettings((prev) => {
+      const value = String(prev[fieldKey] || '').trim();
+      if (value !== '') return prev;
+      if (fieldKey === 'p1Name') return { ...prev, p1Name: translations[lang]?.p1Default || 'Domácí' };
+      if (fieldKey === 'p2Name')
+        return {
+          ...prev,
+          p2Name: prev.isBot
+            ? translations[lang]?.botDefault || 'Robot'
+            : translations[lang]?.p2Default || 'Hosté',
+        };
+      return prev;
+    });
+  };
+
   const openNameKeyboard = (fieldKey) => {
     openKeyboard({
       onAppend: (char) =>
@@ -2619,25 +2635,11 @@ function AppMain({ lang, setLang }) {
           ...s,
           [fieldKey]: String(s[fieldKey] ?? '').slice(0, -1),
         })),
-      onClose: () => {
-        setSettings((prev) => {
-          const value = String(prev[fieldKey] || '').trim();
-          if (value !== '') return prev;
-          if (fieldKey === 'p1Name') return { ...prev, p1Name: translations[lang]?.p1Default || 'Domácí' };
-          if (fieldKey === 'p2Name')
-            return {
-              ...prev,
-              p2Name: prev.isBot
-                ? translations[lang]?.botDefault || 'Robot'
-                : translations[lang]?.p2Default || 'Hosté',
-            };
-          return prev;
-        });
-      },
+      onClose: () => restoreDefaultNameIfEmpty(fieldKey),
     });
   };
 
-  const handleNameFieldClick = (fieldKey) => {
+  const beginNameEdit = (fieldKey, afterClear) => {
     if (fieldKey === 'p2Name' && settings.isBot) return;
     const run = () => {
       setSettings((prev) => {
@@ -2645,13 +2647,17 @@ function AppMain({ lang, setLang }) {
         if (fieldKey === 'p2Name' && p2Defaults.includes(prev.p2Name)) return { ...prev, p2Name: '' };
         return prev;
       });
-      openNameKeyboard(fieldKey);
+      queueMicrotask(() => afterClear?.());
     };
     if (user && !user.isAnonymous) {
       requestConfirm(t('renameConfirm'), run);
       return;
     }
     run();
+  };
+
+  const handleNameFieldClick = (fieldKey) => {
+    beginNameEdit(fieldKey, () => openNameKeyboard(fieldKey));
   };
 
   useEffect(() => {
@@ -3674,20 +3680,57 @@ function AppMain({ lang, setLang }) {
                     </div>
                 </div>
                 <div className="flex items-stretch gap-2">
+                    {internalKeyboardEnabled ? (
                     <div onClick={() => handleNameFieldClick('p1Name')} className="flex items-center flex-1 gap-3 px-4 py-3 text-sm text-white border rounded-lg shadow-inner cursor-pointer bg-slate-800 border-slate-700">
                         <User className="w-5 h-5 text-slate-400 shrink-0" />
                         <span className="font-bold truncate">{settings.p1Name || t('p1Placeholder')}</span>
                     </div>
+                    ) : (
+                    <div className="flex items-center flex-1 gap-3 px-4 py-3 text-sm text-white border rounded-lg shadow-inner bg-slate-800 border-slate-700">
+                        <User className="w-5 h-5 text-slate-400 shrink-0" />
+                        <input
+                          type="text"
+                          autoComplete="name"
+                          className="flex-1 min-w-0 bg-transparent font-bold text-white outline-none placeholder:text-slate-500"
+                          placeholder={t('p1Placeholder')}
+                          value={settings.p1Name}
+                          onChange={(e) => setSettings((s) => ({ ...s, p1Name: e.target.value }))}
+                          onFocus={() => beginNameEdit('p1Name')}
+                          onBlur={() => restoreDefaultNameIfEmpty('p1Name')}
+                        />
+                    </div>
+                    )}
                     <button onClick={() => setSettings({...settings, startPlayer: 'p1'})} className={`w-14 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all ${settings.startPlayer === 'p1' ? 'bg-emerald-600/20 border-emerald-500 text-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]' : 'bg-slate-800 border-slate-700 text-slate-600 hover:text-slate-400'}`}>
                         <Target className="w-6 h-6" />
                     </button>
                 </div>
                 
                 <div className="flex items-stretch gap-2">
-                    <div onClick={() => handleNameFieldClick('p2Name')} className={`flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-sm flex items-center gap-3 ${settings.isBot ? 'text-emerald-400 bg-emerald-900/10 border-emerald-900/50' : 'text-white cursor-pointer shadow-inner'}`}>
-                        {settings.isBot ? <Cpu className="w-5 h-5 shrink-0" /> : <User className="w-5 h-5 text-slate-400 shrink-0" />}
-                        <span className="font-bold truncate">{settings.isBot ? getTranslatedName(settings.p2Name, false, lang) : (settings.p2Name || t('p2Placeholder'))}</span>
+                    {settings.isBot ? (
+                    <div className="flex-1 rounded-lg px-4 py-3 text-sm flex items-center gap-3 text-emerald-400 bg-emerald-900/10 border border-emerald-900/50">
+                        <Cpu className="w-5 h-5 shrink-0" />
+                        <span className="font-bold truncate">{getTranslatedName(settings.p2Name, false, lang)}</span>
                     </div>
+                    ) : internalKeyboardEnabled ? (
+                    <div onClick={() => handleNameFieldClick('p2Name')} className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-sm flex items-center gap-3 text-white cursor-pointer shadow-inner">
+                        <User className="w-5 h-5 text-slate-400 shrink-0" />
+                        <span className="font-bold truncate">{settings.p2Name || t('p2Placeholder')}</span>
+                    </div>
+                    ) : (
+                    <div className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-sm flex items-center gap-3 text-white shadow-inner">
+                        <User className="w-5 h-5 text-slate-400 shrink-0" />
+                        <input
+                          type="text"
+                          autoComplete="name"
+                          className="flex-1 min-w-0 bg-transparent font-bold text-white outline-none placeholder:text-slate-500"
+                          placeholder={t('p2Placeholder')}
+                          value={settings.p2Name}
+                          onChange={(e) => setSettings((s) => ({ ...s, p2Name: e.target.value }))}
+                          onFocus={() => beginNameEdit('p2Name')}
+                          onBlur={() => restoreDefaultNameIfEmpty('p2Name')}
+                        />
+                    </div>
+                    )}
                     
                     <button 
                         onClick={() => {

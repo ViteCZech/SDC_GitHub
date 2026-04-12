@@ -60,7 +60,7 @@ export default function VirtualKeyboard({ onChar, onDelete, onClose, lang }) {
         e.preventDefault();
         onClose();
       } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        if (e.key === ',' || e.key === ';') onChar(e.key);
+        if (e.key === ',' || e.key === ';' || e.key === '!') onChar(e.key);
         else onChar(e.key.toUpperCase());
       }
     };
@@ -93,10 +93,7 @@ export default function VirtualKeyboard({ onChar, onDelete, onClose, lang }) {
     <>
       {popup && <div className="fixed inset-0 z-[5600]" onClick={() => setPopup(null)} />}
       <div className="fixed bottom-0 left-0 w-full bg-slate-900 border-t border-slate-700 p-1.5 sm:p-2 pb-4 sm:pb-6 landscape:pb-2 z-[5500] shadow-2xl animate-in slide-in-from-bottom duration-200 select-none">
-        <div className="flex items-center justify-between max-w-lg p-2 landscape:p-1.5 mx-auto mb-2 landscape:mb-1 border-b rounded-t-lg shadow-sm bg-slate-800 border-slate-700">
-          <span className="text-[10px] text-slate-500 font-bold uppercase ml-2 tracking-widest">
-            {t('players')}
-          </span>
+        <div className="flex items-center justify-end max-w-lg p-2 landscape:p-1.5 mx-auto mb-2 landscape:mb-1 border-b rounded-t-lg shadow-sm bg-slate-800 border-slate-700">
           <button
             type="button"
             onClick={onClose}
@@ -166,6 +163,13 @@ export default function VirtualKeyboard({ onChar, onDelete, onClose, lang }) {
               className="w-11 sm:w-12 bg-slate-800 text-slate-300 font-bold rounded shadow border-b-2 border-slate-950 active:translate-y-0.5 py-2 landscape:py-1.5 text-sm"
             >
               ;
+            </button>
+            <button
+              type="button"
+              onClick={() => onChar('!')}
+              className="w-11 sm:w-12 bg-slate-800 text-slate-300 font-bold rounded shadow border-b-2 border-slate-950 active:translate-y-0.5 py-2 landscape:py-1.5 text-sm"
+            >
+              !
             </button>
             <button
               type="button"
