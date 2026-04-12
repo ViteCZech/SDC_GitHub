@@ -1550,6 +1550,65 @@ function getPlayerPendingRound0Match(playerId, roundMatches) {
   return null;
 }
 
+/** Počet legů, které daný poražený odehrál v dokončeném zápase pavouka. */
+function getLoserLegsWonInBracketMatch(match, loserId) {
+  if (!match || loserId == null) return -1;
+  const p1 = Number(match.score?.p1 ?? match.score1 ?? match.legsP1 ?? 0) || 0;
+  const p2 = Number(match.score?.p2 ?? match.score2 ?? match.legsP2 ?? 0) || 0;
+  let wid = match.winnerId;
+  if (wid == null) {
+    if (p1 > p2) wid = match.player1Id;
+    else if (p2 > p1) wid = match.player2Id;
+  }
+  if (wid === match.player1Id && String(loserId) === String(match.player2Id)) return p2;
+  if (wid === match.player2Id && String(loserId) === String(match.player1Id)) return p1;
+  return -1;
+}
+
+/** Řádek v tabulce skupiny (0 = nejlepší mezi neodstoupivšími), průměr z dohraných zápasů. */
+function getGroupStandingRowForPlayer(playerId, groups, groupMatchesAll) {
+  const pid = String(playerId);
+  for (const g of groups || []) {
+    const players = g.players || [];
+    const inGroup = players.some((p) => String(p.id ?? p.name) === pid);
+    if (!inGroup) continue;
+    const gm = (groupMatchesAll || []).filter((m) => (m.groupId ?? m.group) === g.groupId);
+    const standings = calculateGroupStandings(players, gm);
+    const active = standings.filter((s) => !s.isWithdrawn);
+    const idx = active.findIndex((s) => String(s.id) === pid);
+    if (idx < 0) return null;
+    const row = active[idx];
+    return { rank: idx, average: Number(row.average) || 0 };
+  }
+  return null;
+}
+
+/**
+ * Kdo z dvou proherců „feedujících“ zápasů má spíš počítat: méně legů v KO zápase → pak lepší umístění ve skupině,
+ * pak lepší průměr, pak los (id). Vrací záporné číslo, pokud má být upřednostněn aId před bId.
+ */
+function compareFeederLosersForChalkOrder(aId, bId, feederMatchByLoserId, groups, groupMatchesAll) {
+  const ma = feederMatchByLoserId.get(aId);
+  const mb = feederMatchByLoserId.get(bId);
+  const la = getLoserLegsWonInBracketMatch(ma, aId);
+  const lb = getLoserLegsWonInBracketMatch(mb, bId);
+  if (la >= 0 && lb >= 0 && la !== lb) return la - lb;
+  if (la >= 0 && lb < 0) return -1;
+  if (la < 0 && lb >= 0) return 1;
+
+  const ra = getGroupStandingRowForPlayer(aId, groups, groupMatchesAll);
+  const rb = getGroupStandingRowForPlayer(bId, groups, groupMatchesAll);
+  const rankA = ra?.rank ?? 999;
+  const rankB = rb?.rank ?? 999;
+  if (rankA !== rankB) return rankA - rankB;
+
+  const avgA = ra?.average ?? 0;
+  const avgB = rb?.average ?? 0;
+  if (Math.abs(avgA - avgB) > 1e-6) return avgB - avgA;
+
+  return String(aId).localeCompare(String(bId), undefined, { sensitivity: 'base', numeric: true });
+}
+
 /**
  * Přiřadí počtáře k pending zápasům s terčem.
  * U turnaje se skupinami v kole 0 (předkolo / první kolo) používá vlny: 1) poslední místa ve skupinách + BYE,
@@ -1733,6 +1792,7 @@ export const updateBracketReferees = (
   const pickFairRefereeFromPool = ({
     poolIds,
     feederLoserIds,
+    feederMatchByLoserId,
     match,
     roundBusyIds,
     usedRefereesLocal,
@@ -1752,10 +1812,32 @@ export const updateBracketReferees = (
       }));
 
     if (!viable.length) return null;
+    const map = feederMatchByLoserId;
     viable.sort((a, b) => {
       if (a.workload !== b.workload) return a.workload - b.workload;
-      // Tie-breaker: může preferovat feeder-poraženého nebo horší nasazení.
-      if (a.isFeederLoser !== b.isFeederLoser) return a.isFeederLoser ? -1 : 1;
+
+      const aFeed = a.isFeederLoser;
+      const bFeed = b.isFeederLoser;
+      if (
+        map &&
+        map.size >= 2 &&
+        aFeed &&
+        bFeed &&
+        map.has(a.id) &&
+        map.has(b.id) &&
+        (groups || []).length > 0
+      ) {
+        const c = compareFeederLosersForChalkOrder(
+          a.id,
+          b.id,
+          map,
+          groups,
+          groupMatchesAll
+        );
+        if (c !== 0) return c;
+      }
+
+      if (aFeed !== bFeed) return aFeed ? -1 : 1;
       if (a.seedIdx !== b.seedIdx) return b.seedIdx - a.seedIdx;
       return String(a.id).localeCompare(String(b.id));
     });
@@ -1847,6 +1929,7 @@ export const updateBracketReferees = (
       // Bazén kandidátů: v pozdějších kolech přednostně proherci z předchozího kola (feeder).
       const poolIds = new Set();
       const feederLoserIds = new Set();
+      let feederMatchByLoserId = null;
 
       // (a) Poražený z feeder zápasu / přítoků (pokud existuje).
       if (roundIndex > 0) {
@@ -1859,6 +1942,11 @@ export const updateBracketReferees = (
           feeder2 && !isBracketFeederWithoutPlayableLoser(feeder2) ? getLoserScore(feeder2) : null;
         const lid1 = l1?.loser?.id ?? l1?.loser?.name;
         const lid2 = l2?.loser?.id ?? l2?.loser?.name;
+        const feederSourceMap = new Map();
+        if (lid1 != null && feeder1) feederSourceMap.set(lid1, feeder1);
+        if (lid2 != null && feeder2) feederSourceMap.set(lid2, feeder2);
+        if (feederSourceMap.size > 0) feederMatchByLoserId = feederSourceMap;
+
         if (lid1 != null) {
           poolIds.add(lid1);
           feederLoserIds.add(lid1);
@@ -1877,6 +1965,7 @@ export const updateBracketReferees = (
         selectBestRefereeFromPool({
           poolIds,
           feederLoserIds,
+          feederMatchByLoserId,
           match,
           roundBusyIds,
           usedRefereesLocal: usedReferees,
@@ -1905,6 +1994,7 @@ export const updateBracketReferees = (
         chosenRef = selectBestRefereeFromPool({
           poolIds: poolTier1,
           feederLoserIds: new Set(),
+          feederMatchByLoserId: null,
           match,
           roundBusyIds,
           usedRefereesLocal: usedReferees,
@@ -1918,6 +2008,7 @@ export const updateBracketReferees = (
           chosenRef = selectBestRefereeFromPool({
             poolIds: r0Losers,
             feederLoserIds: r0Losers,
+            feederMatchByLoserId: null,
             match,
             roundBusyIds,
             usedRefereesLocal: usedReferees,
@@ -1934,6 +2025,7 @@ export const updateBracketReferees = (
           chosenRef = selectBestRefereeFromPool({
             poolIds: poolTier3,
             feederLoserIds: r0Losers,
+            feederMatchByLoserId: null,
             match,
             roundBusyIds,
             usedRefereesLocal: usedReferees,
