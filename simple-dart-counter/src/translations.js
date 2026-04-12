@@ -121,7 +121,7 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
       'Ze skupin po {big} hráčích postupují {adv}, ze skupin po {small} postupují všichni.',
     tournAdvancePhraseMixed: 'Ze skupin po {big} i po {small} postupují vždy {adv} hráči.',
     tournCustomInvalidGroupSplit:
-      'Skupiny musí mít 3–6 hráčů a velikosti se smí lišit nejvýše o 1. Upravte počet skupin.',
+      'Skupiny musí mít 3–5 hráčů a velikosti se smí lišit nejvýše o 1. Upravte počet skupin.',
     tournCustomInvalidAdvance: 'Postup nesmí být větší než nejmenší skupina (max. {max}).',
     tournChalkerShortageEmpty:
       'Nelze automaticky obsadit počtáře v 1. kole pavouku: žádní kandidáti z posledních míst skupin. Zvolte počtáře ručně (i mezi hráči, kteří ještě budou hrát).',
@@ -382,7 +382,7 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
       'Groups of {big}: top {adv} advance; groups of {small}: everyone advances.',
     tournAdvancePhraseMixed: '{adv} players advance from each group (mix of groups of {big} and {small}).',
     tournCustomInvalidGroupSplit:
-      'Each group must have 3–6 players and sizes may differ by at most 1. Adjust the number of groups.',
+      'Each group must have 3–5 players and sizes may differ by at most 1. Adjust the number of groups.',
     tournCustomInvalidAdvance: 'Advancing count cannot exceed the smallest group (max. {max}).',
     tournChalkerShortageEmpty:
       'Cannot auto-assign scorers in round 1: no candidates from last place in each group. Assign scorers manually (including players who still compete).',
@@ -637,7 +637,7 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
       'Z grup po {big} awansuje {adv}, z grup po {small} awansują wszyscy.',
     tournAdvancePhraseMixed: 'Z grup po {big} i po {small} zawsze awansuje {adv} graczy.',
     tournCustomInvalidGroupSplit:
-      'Grupy muszą mieć 3–6 graczy, a rozmiary mogą różnić się co najwyżej o 1. Popraw liczbę grup.',
+      'Grupy muszą mieć 3–5 graczy, a rozmiary mogą różnić się co najwyżej o 1. Popraw liczbę grup.',
     tournCustomInvalidAdvance: 'Awans nie może być większy niż najmniejsza grupa (maks. {max}).',
     tournChalkerShortageEmpty:
       'Nie można automatycznie przydzielić zapisujących w 1. rundzie: brak kandydatów z ostatnich miejsc w grupach. Wybierz ręcznie (także graczy, którzy jeszcze grają).',

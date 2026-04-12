@@ -207,7 +207,7 @@ function generateGroupMatchesFallback(groupPlayers, groupId) {
 }
 
 /**
- * Vygeneruje Round Robin zápasy pro jednu skupinu v přesném pořadí (3–6 hráčů dle turnajového manuálu).
+ * Vygeneruje Round Robin zápasy pro jednu skupinu v přesném pořadí (3–5 hráčů dle turnajového manuálu; šablona 6 jen pro kompatibilitu).
  * Počtář je vždy určený slotem v rozvrhu (nasazení 1 = nejlepší podle vstupního pole).
  *
  * @param {Array<{id?: string, name?: string, ranking?: number}>} groupPlayers - pořadí pole = nasazení (0 = jednička)

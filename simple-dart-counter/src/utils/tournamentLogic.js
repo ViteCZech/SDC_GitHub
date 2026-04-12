@@ -198,7 +198,7 @@ export function calculateTournamentTimePrediction(groups, matches, settings = {}
  * @returns {Array<{...player, played: number, wins: number, losses: number, legsWon: number, legsLost: number, legDifference: number, points: number, average: number}>} seřazené pole hráčů se statistikami
  */
 export function calculateGroupStandings(groupPlayers, groupMatches) {
-  const stats = (groupPlayers || []).map((p) => ({
+  const stats = (groupPlayers || []).map((p, i) => ({
     ...p,
     id: p.id ?? p,
     name: p.name ?? p.id ?? p,
@@ -209,6 +209,7 @@ export function calculateGroupStandings(groupPlayers, groupMatches) {
     legDifference: 0,
     _avgSum: 0,
     _avgCount: 0,
+    _seedOrder: i,
   }));
 
   const byId = Object.fromEntries(stats.map((s) => [s.id, s]));
@@ -296,7 +297,7 @@ export function calculateGroupStandings(groupPlayers, groupMatches) {
   // 2) Rozdíl legů
   // 3) Počet vyhraných legů
   // 4) Vzájemný zápas
-  return stats.sort((a, b) => {
+  stats.sort((a, b) => {
     const aWithdrawn = !!a.isWithdrawn;
     const bWithdrawn = !!b.isWithdrawn;
     if (aWithdrawn !== bWithdrawn) return aWithdrawn ? 1 : -1;
@@ -308,12 +309,21 @@ export function calculateGroupStandings(groupPlayers, groupMatches) {
     const h2hWinner = findHeadToHeadWinner(a.id, b.id);
     if (h2hWinner === b.id) return 1;
     if (h2hWinner === a.id) return -1;
+    // Bez odehraných zápasů: pořadí v poli = nasazení (přímý KO / rozvrh před startem).
+    if (a.played === 0 && b.played === 0) {
+      return (a._seedOrder ?? 0) - (b._seedOrder ?? 0);
+    }
     // Stejné jako u postupu: vyšší průměr = lepší umístění; při shodě deterministický „los“ (id).
     const avgA = Number(a.average) || 0;
     const avgB = Number(b.average) || 0;
     if (Math.abs(avgB - avgA) > 1e-6) return avgB - avgA;
     return String(a.id).localeCompare(String(b.id), undefined, { sensitivity: 'base', numeric: true });
   });
+
+  for (const s of stats) {
+    delete s._seedOrder;
+  }
+  return stats;
 }
 
 /**
@@ -1097,7 +1107,22 @@ export function generateBracketStructure(groups, promotersCount, baseLegs = 3, m
 
 /** Min / max hráčů ve skupině (turnajové pravidlo). */
 export const GROUP_SIZE_MIN = 3;
-export const GROUP_SIZE_MAX = 6;
+export const GROUP_SIZE_MAX = 5;
+
+/**
+ * Řazení před přímým KO: nižší číslo rankingu = lepší nasazení (seed 1).
+ * Bez rankingu jdou hráči až za ty s rankingem; u shody stabilně podle id.
+ */
+export function sortPlayersForBracketSeeding(players) {
+  return [...(players || [])].sort((a, b) => {
+    const ra =
+      a.ranking != null && Number.isFinite(Number(a.ranking)) ? Number(a.ranking) : Infinity;
+    const rb =
+      b.ranking != null && Number.isFinite(Number(b.ranking)) ? Number(b.ranking) : Infinity;
+    if (ra !== rb) return ra - rb;
+    return String(a.id ?? '').localeCompare(String(b.id ?? ''), 'cs', { sensitivity: 'base', numeric: true });
+  });
+}
 
 /**
  * Rozdělení hráčů do g skupin: část skupin má ⌊n/g⌋+1, zbytek ⌊n/g⌋ (max. rozdíl 1).
@@ -1112,7 +1137,7 @@ export function getGroupSplit(playerCount, numGroups) {
   return { n, g, base, rem, minSize, maxSize };
 }
 
-/** Platné rozdělení: žádná skupina pod 3 ani nad 6, rozdíl velikostí nejvýše 1. */
+/** Platné rozdělení: žádná skupina pod 3 ani nad 5, rozdíl velikostí nejvýše 1. */
 export function isAllowedGroupSplit(playerCount, numGroups) {
   const s = getGroupSplit(playerCount, numGroups);
   if (s.n < GROUP_SIZE_MIN) return false;
@@ -1177,7 +1202,7 @@ export function countPlayersAdvancingFromGroups(playerCount, numGroups, advanceP
 }
 
 /**
- * Vygeneruje až 3 varianty turnaje — pouze rozdělení, kde každá skupina má 3–6 hráčů
+ * Vygeneruje až 3 varianty turnaje — pouze rozdělení, kde každá skupina má 3–5 hráčů
  * a rozdíl velikostí skupin je nejvýše 1. Postup „ze skupiny“ nikdy nepřesáhne velikost nejmenší skupiny.
  * @param {number} playerCount
  * @returns {Array<{id: string, labelKey: string, numGroups: number, advancePerGroup: number|'all', totalAdvancees: number, needsBye: boolean}>}
@@ -1229,12 +1254,13 @@ export function generateTournamentVariants(playerCount, totalBoards = null) {
   const withScore = unique.map((c) => {
     const split = getGroupSplit(n, c.numGroups);
     const boardBonus = hasValidBoardGroups && c.numGroups === boardG ? -3 : 0;
-    const preferredPenalty = preferredGroups.includes(c.numGroups) ? 0 : 1.5;
-    const minGPenalty = c.numGroups === minGroupsForMaxSize ? -0.5 : 0;
+    const preferredPenalty = preferredGroups.includes(c.numGroups) ? 0 : 0.9;
+    const moreGroupsBonus = -0.55 * Math.max(0, c.numGroups - minGroupsForMaxSize);
     const byePenalty = c.needsBye ? 1 : 0;
     const allPenalty = c.advancePerGroup === 'all' ? 1.5 : 0;
     const sizeCenter = (split.minSize + split.maxSize) / 2;
-    const sizePenalty = Math.abs(sizeCenter - 4) * 0.35;
+    const sizePenalty = Math.abs(sizeCenter - 3.25) * 0.35;
+    const maxSizePenalty = Math.max(0, split.maxSize - 4) * 0.55;
     return {
       ...c,
       score:
@@ -1242,15 +1268,16 @@ export function generateTournamentVariants(playerCount, totalBoards = null) {
         byePenalty +
         allPenalty +
         sizePenalty +
+        maxSizePenalty +
         boardBonus +
-        minGPenalty,
+        moreGroupsBonus,
     };
   });
 
   withScore.sort(
     (a, b) =>
       a.score - b.score ||
-      a.numGroups - b.numGroups ||
+      b.numGroups - a.numGroups ||
       String(a.advancePerGroup).localeCompare(String(b.advancePerGroup))
   );
 
@@ -1396,41 +1423,69 @@ function getLastPlaceGroupPlayer(group, groupMatchesAll) {
 }
 
 /**
- * Po jednom kandidátovi na počtáře z každé skupiny: nejhorší aktivní hráč v tabulce (po tie-breacích).
- * Skupiny, kde postupují všichni (`promotersCount === 'all'` nebo advN ≥ počet neodstoupivších), přeskočí.
+ * Všichni nepostupující ze skupin, seřazení od nejhoršího (nejhorší místo v tabulce skupiny první).
+ * Stejný zdroj jako {@link updateBracketReferees} pro předkolo / první KO vlna 1.
+ * @returns {Array<{id: string, name: string, groupId: string, standingIndex: number}>}
  */
-export function buildLastPlaceGroupChalkerPool(groups, promotersCount, groupMatchesAll) {
-  const pool = [];
-  const seen = new Set();
+export function buildNonAdvancerPoolSortedWorstFirst(groups, promotersCount, groupMatchesAll) {
+  const entries = [];
   for (const g of groups || []) {
     const players = g.players || [];
     if (!players.length) continue;
     const gm = (groupMatchesAll || []).filter((m) => (m.groupId ?? m.group) === g.groupId);
     const standings = calculateGroupStandings(players, gm);
-    const activeStandings = standings.filter((s) => !s?.isWithdrawn);
-    if (activeStandings.length === 0) continue;
-    const gs = players.length;
+    const active = standings.filter((s) => !s?.isWithdrawn);
+    if (active.length === 0) continue;
+    const gs = active.length;
     const advN =
       promotersCount === 'all'
         ? gs
         : Math.max(0, Math.min(gs, Number(promotersCount) || 2));
-    if (promotersCount === 'all' || advN >= activeStandings.length) continue;
-    const last = activeStandings[activeStandings.length - 1];
-    const id = last?.id ?? last?.name;
-    if (id == null || id === '') continue;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    pool.push({
-      id,
-      name: last.name ?? id,
-      groupId: g.groupId ?? g.id,
-    });
+    if (promotersCount === 'all' || advN >= active.length) continue;
+    for (let idx = advN; idx < active.length; idx++) {
+      const row = active[idx];
+      const id = row?.id ?? row?.name;
+      if (id == null || id === '') continue;
+      entries.push({
+        id,
+        name: row.name ?? id,
+        groupId: g.groupId ?? g.id,
+        standingIndex: idx,
+      });
+    }
   }
-  return pool;
+  entries.sort((a, b) => {
+    if (b.standingIndex !== a.standingIndex) return b.standingIndex - a.standingIndex;
+    const ga = String(a.groupId ?? '');
+    const gb = String(b.groupId ?? '');
+    if (ga !== gb) return ga.localeCompare(gb, undefined, { sensitivity: 'base', numeric: true });
+    return String(a.id).localeCompare(String(b.id), undefined, { sensitivity: 'base', numeric: true });
+  });
+  return entries;
+}
+
+/**
+ * Po jednom kandidátovi na počtáře z každé skupiny — nejhorší nepostupující v dané skupině.
+ * Odvozeno z {@link buildNonAdvancerPoolSortedWorstFirst} (stejná pravidla tabulky / postupu).
+ */
+export function buildLastPlaceGroupChalkerPool(groups, promotersCount, groupMatchesAll) {
+  const all = buildNonAdvancerPoolSortedWorstFirst(groups, promotersCount, groupMatchesAll);
+  const worstByGroup = new Map();
+  for (const e of all) {
+    const gid = String(e.groupId ?? '');
+    const cur = worstByGroup.get(gid);
+    if (!cur || e.standingIndex > cur.standingIndex) worstByGroup.set(gid, e);
+  }
+  return Array.from(worstByGroup.values()).map(({ id, name, groupId }) => ({
+    id,
+    name,
+    groupId,
+  }));
 }
 
 /**
  * Detekce nedostatku kandidátů na počtáře v 1. kole pavouku (předkolo nebo první uložené kolo).
+ * Počet dostupných kandidátů = všichni nepostupující ({@link buildNonAdvancerPoolSortedWorstFirst}), stejně jako u automatického přiřazování.
  * Pouze turnaj se skupinami; zápasy = pending, terč, dva reální hráči, bez platného počtáře.
  */
 export function getBracketFirstRoundChalkerShortage(
@@ -1441,7 +1496,7 @@ export function getBracketFirstRoundChalkerShortage(
 ) {
   if (!Array.isArray(bracket) || bracket.length === 0) return null;
   if (!groups?.length) return null;
-  const pool = buildLastPlaceGroupChalkerPool(groups, promotersCount, groupMatchesAll);
+  const pool = buildNonAdvancerPoolSortedWorstFirst(groups, promotersCount, groupMatchesAll);
   const r0 = bracket[0]?.matches || [];
   let missingRef = 0;
   for (const m of r0) {
@@ -1609,11 +1664,23 @@ function compareFeederLosersForChalkOrder(aId, bId, feederMatchByLoserId, groups
   return String(aId).localeCompare(String(bId), undefined, { sensitivity: 'base', numeric: true });
 }
 
+/** ID hráčů, kteří už v daném kole pavouku figurovali jako počtář (platný referee, ne placeholder). */
+function collectRefereeIdsInBracketRound(bracketRounds, roundIndex) {
+  const s = new Set();
+  for (const m of bracketRounds?.[roundIndex]?.matches || []) {
+    if (!m) continue;
+    if (isBracketRefereePlaceholder(m.referee, m.refereeId)) continue;
+    const rid = m.refereeId ?? m.referee?.id ?? m.referee?.name;
+    if (rid != null && rid !== '') s.add(rid);
+  }
+  return s;
+}
+
 /**
  * Přiřadí počtáře k pending zápasům s terčem.
- * U turnaje se skupinami v kole 0 (předkolo / první kolo) používá vlny: 1) poslední místa ve skupinách + BYE
- * (při výběru mají vždy přednost poslední ze skupin před výherci z volného losu při stejné zátěži), 2) proherci
- * z dokončených zápasů téhož kola, 3) rozšířený pool. U zápasu může nastavit `refereePickTier` 1–3.
+ * Turnaj se skupinami: předkolo = jen nepostupující (nejhorší první); první KO kolo = vlna 1 zbývající nepostupující
+ * (bez těch z předkola) + BYE doplnění, vlna 2 = proherci z téhož kola; pozdější kola = jen proherci z předchozího kola.
+ * Přímý KO bez skupin: automat nepřiřazuje (admin). Limit terčů: max tolik přiřazení jako `availableBoards` mínus už hrající.
  */
 export const updateBracketReferees = (
   bracket,
@@ -1627,10 +1694,16 @@ export const updateBracketReferees = (
   if (!bracket || bracket.length === 0) return bracket;
   const newBracket = JSON.parse(JSON.stringify(bracket));
 
+  if (!(groups || []).length) {
+    return newBracket;
+  }
+
   const hasPrelimBracketRound =
     prelimLegs != null && Number.isFinite(Number(prelimLegs)) && Number(prelimLegs) > 0;
-  /** Široký pool (skupiny, všichni vyřazení, …) jen v předkole + max prvním kole hlavního pavouka. */
-  const broadRefPoolThroughRound = hasPrelimBracketRound ? 1 : 0;
+  const firstMainRoundIndex = hasPrelimBracketRound ? 1 : 0;
+  const nonAdvEntries = buildNonAdvancerPoolSortedWorstFirst(groups, promotersCount, groupMatchesAll);
+  const nonAdvPriority = new Map();
+  nonAdvEntries.forEach((e, i) => nonAdvPriority.set(e.id, i));
 
   const playerStats = {};
   const withdrawnIds = new Set();
@@ -1752,18 +1825,6 @@ export const updateBracketReferees = (
     !isBracketByeName(match.player1Name) &&
     !isBracketByeName(match.player2Name);
 
-  // Eliminated pool: všichni hráči, kteří už v pavouku prohráli (single-elim) — kandidáti na počtáře.
-  const eliminatedIds = new Set();
-  for (let ri = 0; ri < newBracket.length; ri++) {
-    const roundMatches = newBracket[ri]?.matches || [];
-    for (const m of roundMatches) {
-      if (!m || m.isBye || isBracketFeederWithoutPlayableLoser(m)) continue;
-      const loserData = getLoserScore(m);
-      const lid = loserData?.loser?.id ?? loserData?.loser?.name;
-      if (lid != null) eliminatedIds.add(lid);
-    }
-  }
-
   const collectByeRoundCandidateIds = (roundIndex) => {
     const out = new Set();
     const roundMatches = newBracket?.[roundIndex]?.matches || [];
@@ -1795,6 +1856,7 @@ export const updateBracketReferees = (
     feederLoserIds,
     feederMatchByLoserId,
     preferLastPlaceGroupIds,
+    poolPriorityRank,
     match,
     roundBusyIds,
     usedRefereesLocal,
@@ -1821,6 +1883,19 @@ export const updateBracketReferees = (
         : null;
     viable.sort((a, b) => {
       if (a.workload !== b.workload) return a.workload - b.workload;
+
+      const pr = poolPriorityRank;
+      if (pr instanceof Map && pr.size > 0) {
+        const ha = pr.has(a.id);
+        const hb = pr.has(b.id);
+        if (ha && hb) {
+          const ra = pr.get(a.id);
+          const rb = pr.get(b.id);
+          if (ra !== rb) return ra - rb;
+        } else if (ha !== hb) {
+          return ha ? -1 : 1;
+        }
+      }
 
       if (lastPlacePref) {
         const aLp = lastPlacePref.has(a.id);
@@ -1879,21 +1954,13 @@ export const updateBracketReferees = (
     });
   });
 
-  // 2. Hlavní přiřazování s dynamickým limitem terčů
+  // 2. Hlavní přiřazování s dynamickým limitem terčů (min(availableBoards, …) přes activeBoardsUsed)
   newBracket.forEach((round, roundIndex) => {
     const roundMatches = round?.matches || [];
     const roundBusyIds = getRoundBusyPlayerIds(newBracket, roundIndex);
-    const roundPlayingOnlyIds = getRoundPlayingOnlyPlayerIds(newBracket, roundIndex);
-    const lastPlaceChalkerPoolR0 =
-      roundIndex === 0 ? buildLastPlaceGroupChalkerPool(groups, promotersCount, groupMatchesAll) : [];
-    const lastPlaceChalkerIdsR0 = new Set();
-    for (const p of lastPlaceChalkerPoolR0) {
-      const lid = p?.id ?? p?.name;
-      if (lid != null) lastPlaceChalkerIdsR0.add(lid);
-    }
-    const preferLastPlaceR0 =
-      lastPlaceChalkerIdsR0.size > 0 ? lastPlaceChalkerIdsR0 : null;
-    const byeRoundIds = collectByeRoundCandidateIds(roundIndex);
+    const isPrelimRound = hasPrelimBracketRound && roundIndex === 0;
+    const isFirstMainRound = roundIndex === firstMainRoundIndex;
+    const isLaterKoRound = roundIndex > firstMainRoundIndex;
 
     roundMatches.forEach((match, matchIndex) => {
       if (roundIndex === 0 && isRoundZeroNonPhysicalBracketMatch(match)) {
@@ -1943,15 +2010,74 @@ export const updateBracketReferees = (
       // Fyzický limit terčů
       if (activeBoardsUsed >= boardCap) return;
 
-      const useBroadRefPool = roundIndex <= broadRefPoolThroughRound;
+      const byeRoundIds = collectByeRoundCandidateIds(roundIndex);
 
-      // Bazén kandidátů: v pozdějších kolech přednostně proherci z předchozího kola (feeder).
-      const poolIds = new Set();
-      const feederLoserIds = new Set();
-      let feederMatchByLoserId = null;
+      const selectFromPool = (opts) =>
+        selectBestRefereeFromPool({
+          match,
+          roundBusyIds,
+          usedRefereesLocal: usedReferees,
+          assignedRefsInThisRunLocal: assignedRefsInThisRun,
+          preferLastPlaceGroupIds: null,
+          poolPriorityRank: null,
+          ...opts,
+        });
 
-      // (a) Poražený z feeder zápasu / přítoků (pokud existuje).
-      if (roundIndex > 0) {
+      let chosenRef = null;
+      let pickTier = 0;
+
+      if (isPrelimRound) {
+        const poolIds = new Set(nonAdvEntries.map((e) => e.id));
+        chosenRef = selectFromPool({
+          poolIds,
+          poolPriorityRank: nonAdvPriority,
+          feederLoserIds: new Set(),
+          feederMatchByLoserId: null,
+        });
+        if (chosenRef) pickTier = 1;
+      } else if (isFirstMainRound) {
+        const wave1Base = new Set(nonAdvEntries.map((e) => e.id));
+        if (hasPrelimBracketRound) {
+          for (const rid of collectRefereeIdsInBracketRound(newBracket, 0)) wave1Base.delete(rid);
+        }
+        const poolPriority = new Map(nonAdvPriority);
+        let nextRank = nonAdvEntries.length;
+        const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
+        for (const c of byeRefCandidates || []) {
+          if (c?.id == null) continue;
+          poolPriority.set(c.id, nextRank++);
+        }
+        for (const id of byeRoundIds) {
+          poolPriority.set(id, nextRank++);
+        }
+        const poolTier1 = new Set(wave1Base);
+        for (const c of byeRefCandidates || []) {
+          if (c?.id != null) poolTier1.add(c.id);
+        }
+        for (const id of byeRoundIds) poolTier1.add(id);
+
+        chosenRef = selectFromPool({
+          poolIds: poolTier1,
+          poolPriorityRank: poolPriority,
+          feederLoserIds: new Set(),
+          feederMatchByLoserId: null,
+        });
+        if (chosenRef) pickTier = 1;
+
+        if (!chosenRef) {
+          const rLosers = collectLosersFromBracketRoundIndex(roundIndex);
+          chosenRef = selectFromPool({
+            poolIds: rLosers,
+            feederLoserIds: rLosers,
+            feederMatchByLoserId: null,
+          });
+          if (chosenRef) pickTier = 2;
+        }
+      } else if (isLaterKoRound) {
+        const poolIds = new Set();
+        const feederLoserIds = new Set();
+        let feederMatchByLoserId = null;
+
         const prevRoundMatches = newBracket[roundIndex - 1]?.matches || [];
         const feeder1 = prevRoundMatches[matchIndex * 2];
         const feeder2 = prevRoundMatches[matchIndex * 2 + 1];
@@ -1976,130 +2102,14 @@ export const updateBracketReferees = (
         }
         const prevByeWinners = collectByeRoundCandidateIds(roundIndex - 1);
         for (const id of prevByeWinners) poolIds.add(id);
-      }
+        for (const id of byeRoundIds) poolIds.add(id);
 
-      for (const id of byeRoundIds) poolIds.add(id);
-
-      const pickRefStandard = () =>
-        selectBestRefereeFromPool({
+        chosenRef = selectFromPool({
           poolIds,
           feederLoserIds,
           feederMatchByLoserId,
-          preferLastPlaceGroupIds: preferLastPlaceR0,
-          match,
-          roundBusyIds,
-          usedRefereesLocal: usedReferees,
-          assignedRefsInThisRunLocal: assignedRefsInThisRun,
-        });
-
-      let chosenRef = null;
-      let pickTier = 0;
-
-      const hasGroups = (groups || []).length > 0;
-      const useRoundZeroGroupWaves = roundIndex === 0 && hasGroups;
-
-      if (useRoundZeroGroupWaves) {
-        // Vlna 1: poslední místa ve skupinách + BYE / walkover kandidáti z kola 0
-        const poolTier1 = new Set();
-        for (const p of lastPlaceChalkerPoolR0) {
-          const id = p?.id ?? p?.name;
-          if (id != null) poolTier1.add(id);
-        }
-        for (const id of byeRoundIds) poolTier1.add(id);
-        const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
-        for (const c of byeRefCandidates || []) {
-          if (c?.id != null) poolTier1.add(c.id);
-        }
-
-        chosenRef = selectBestRefereeFromPool({
-          poolIds: poolTier1,
-          feederLoserIds: new Set(),
-          feederMatchByLoserId: null,
-          preferLastPlaceGroupIds: preferLastPlaceR0,
-          match,
-          roundBusyIds,
-          usedRefereesLocal: usedReferees,
-          assignedRefsInThisRunLocal: assignedRefsInThisRun,
         });
         if (chosenRef) pickTier = 1;
-
-        // Vlna 2: proherci z dokončených zápasů téhož kola (např. 2. vlna předkola)
-        const r0Losers = collectLosersFromBracketRoundIndex(0);
-        if (!chosenRef && r0Losers.size > 0) {
-          chosenRef = selectBestRefereeFromPool({
-            poolIds: r0Losers,
-            feederLoserIds: r0Losers,
-            feederMatchByLoserId: null,
-            preferLastPlaceGroupIds: null,
-            match,
-            roundBusyIds,
-            usedRefereesLocal: usedReferees,
-            assignedRefsInThisRunLocal: assignedRefsInThisRun,
-          });
-          if (chosenRef) pickTier = 2;
-        }
-
-        // Vlna 3: záložní sloučení (všichni vyřazení v pavouku + vlny 1–2) — nouzový fallback
-        if (!chosenRef && useBroadRefPool) {
-          const poolTier3 = new Set(eliminatedIds);
-          for (const id of poolTier1) poolTier3.add(id);
-          for (const id of r0Losers) poolTier3.add(id);
-          chosenRef = selectBestRefereeFromPool({
-            poolIds: poolTier3,
-            feederLoserIds: r0Losers,
-            feederMatchByLoserId: null,
-            preferLastPlaceGroupIds: preferLastPlaceR0,
-            match,
-            roundBusyIds,
-            usedRefereesLocal: usedReferees,
-            assignedRefsInThisRunLocal: assignedRefsInThisRun,
-          });
-          if (chosenRef) pickTier = 3;
-        }
-
-        if (!chosenRef && !useBroadRefPool) {
-          for (const id of eliminatedIds) poolIds.add(id);
-          for (const p of lastPlaceChalkerPoolR0) {
-            const id = p?.id ?? p?.name;
-            if (id != null) poolIds.add(id);
-          }
-          const byeRefCandidatesFallback = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
-          for (const c of byeRefCandidatesFallback || []) {
-            if (c?.id != null) poolIds.add(c.id);
-          }
-          chosenRef = pickRefStandard();
-        }
-      } else {
-        if (useBroadRefPool) {
-          for (const id of eliminatedIds) poolIds.add(id);
-          if (roundIndex === 0) {
-            for (const p of lastPlaceChalkerPoolR0) {
-              const id = p?.id ?? p?.name;
-              if (id != null) poolIds.add(id);
-            }
-            const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
-            for (const c of byeRefCandidates || []) {
-              if (c?.id != null) poolIds.add(c.id);
-            }
-          }
-        }
-
-        chosenRef = pickRefStandard();
-
-        if (!chosenRef && !useBroadRefPool) {
-          for (const id of eliminatedIds) poolIds.add(id);
-          if (roundIndex === 0) {
-            for (const p of lastPlaceChalkerPoolR0) {
-              const id = p?.id ?? p?.name;
-              if (id != null) poolIds.add(id);
-            }
-            const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
-            for (const c of byeRefCandidates || []) {
-              if (c?.id != null) poolIds.add(c.id);
-            }
-          }
-          chosenRef = pickRefStandard();
-        }
       }
 
       if (chosenRef) {

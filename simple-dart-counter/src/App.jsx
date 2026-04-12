@@ -43,6 +43,7 @@ import {
   isRealPendingBracketMatch,
   calculateGroupStandings,
   isTournamentBracketOnlyFormat,
+  sortPlayersForBracketSeeding,
 } from './utils/tournamentLogic';
 import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
 
@@ -1443,14 +1444,44 @@ function AppMain({ lang, setLang }) {
     tournamentMatches,
   ]);
 
-  /** Upozornění adminovi: nedostatek kandidátů z posledních míst skupin oproti zápasům bez počtáře v 1. kole. */
+  /** Upozornění adminovi: nedostatek nepostupujících oproti zápasům bez počtáře v 1. kole pavouku. */
   useEffect(() => {
     if (userRole !== 'admin' || appState !== 'tournament_bracket' || !tournamentData) return;
     if (isTournamentBracketOnlyFormat(tournamentData.tournamentFormat)) return;
     if (!Array.isArray(tournamentBracket) || tournamentBracket.length === 0) return;
 
+    // Stejný výstup jako první efekt „terče + updateBracketReferees“ — ne syrový state, aby shortage
+    // neběžel o frame dřív než spočítané přiřazení počtářů. JIT doplnění terčů se projeví při dalším renderu.
+    const defBoards =
+      Number(tournamentData.boardsCount ?? tournamentData.totalBoards ?? tournamentData.numBoards) || 1;
+    const bracketWithBoards = tournamentBracket.map((round) => {
+      const nb =
+        round.boardsCount != null && Number(round.boardsCount) >= 1
+          ? Math.max(1, Math.floor(Number(round.boardsCount)))
+          : defBoards;
+      return {
+        ...round,
+        matches: autoAssignSequentialBoardsToRound(round.matches, nb),
+      };
+    });
+    const activeBoards =
+      Number(tournamentData.boardsCount ?? tournamentData.totalBoards ?? tournamentData.numBoards) || 1;
+    const regForDirectKoShortage =
+      isTournamentBracketOnlyFormat(tournamentData.tournamentFormat) && tournamentData.players?.length
+        ? tournamentData.players.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}` }))
+        : null;
+    const bracketForShortageCheck = updateBracketReferees(
+      bracketWithBoards,
+      tournamentGroups,
+      promotersForRefereeEngine,
+      activeBoards,
+      tournamentMatches,
+      regForDirectKoShortage,
+      tournamentData?.prelimLegs ?? null
+    );
+
     const shortage = getBracketFirstRoundChalkerShortage(
-      tournamentBracket,
+      bracketForShortageCheck,
       tournamentGroups,
       promotersForRefereeEngine,
       tournamentMatches
@@ -3445,7 +3476,7 @@ function AppMain({ lang, setLang }) {
           onComplete={(data) => {
             clearTournamentWip();
             const generatedPin = String(data.pin || activePin || generatePin()).trim();
-            const playersWithIds = (data.players || []).map((p, i) => ({
+            let playersWithIds = (data.players || []).map((p, i) => ({
               ...p,
               id: p.id ?? `p${i + 1}`,
             }));
@@ -3456,6 +3487,7 @@ function AppMain({ lang, setLang }) {
                 : `t-${Date.now()}`);
 
             if (isTournamentBracketOnlyFormat(data.tournamentFormat)) {
+              playersWithIds = sortPlayersForBracketSeeding(playersWithIds);
               const syntheticGroups = [
                 { groupId: 'direct-ko', name: 'A', players: playersWithIds },
               ];
