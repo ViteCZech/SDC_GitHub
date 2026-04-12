@@ -1611,8 +1611,9 @@ function compareFeederLosersForChalkOrder(aId, bId, feederMatchByLoserId, groups
 
 /**
  * Přiřadí počtáře k pending zápasům s terčem.
- * U turnaje se skupinami v kole 0 (předkolo / první kolo) používá vlny: 1) poslední místa ve skupinách + BYE,
- * 2) proherci z dokončených zápasů téhož kola, 3) rozšířený pool. U zápasu může nastavit `refereePickTier` 1–3.
+ * U turnaje se skupinami v kole 0 (předkolo / první kolo) používá vlny: 1) poslední místa ve skupinách + BYE
+ * (při výběru mají vždy přednost poslední ze skupin před výherci z volného losu při stejné zátěži), 2) proherci
+ * z dokončených zápasů téhož kola, 3) rozšířený pool. U zápasu může nastavit `refereePickTier` 1–3.
  */
 export const updateBracketReferees = (
   bracket,
@@ -1793,6 +1794,7 @@ export const updateBracketReferees = (
     poolIds,
     feederLoserIds,
     feederMatchByLoserId,
+    preferLastPlaceGroupIds,
     match,
     roundBusyIds,
     usedRefereesLocal,
@@ -1813,8 +1815,18 @@ export const updateBracketReferees = (
 
     if (!viable.length) return null;
     const map = feederMatchByLoserId;
+    const lastPlacePref =
+      preferLastPlaceGroupIds instanceof Set && preferLastPlaceGroupIds.size > 0
+        ? preferLastPlaceGroupIds
+        : null;
     viable.sort((a, b) => {
       if (a.workload !== b.workload) return a.workload - b.workload;
+
+      if (lastPlacePref) {
+        const aLp = lastPlacePref.has(a.id);
+        const bLp = lastPlacePref.has(b.id);
+        if (aLp !== bLp) return aLp ? -1 : 1;
+      }
 
       const aFeed = a.isFeederLoser;
       const bFeed = b.isFeederLoser;
@@ -1874,6 +1886,13 @@ export const updateBracketReferees = (
     const roundPlayingOnlyIds = getRoundPlayingOnlyPlayerIds(newBracket, roundIndex);
     const lastPlaceChalkerPoolR0 =
       roundIndex === 0 ? buildLastPlaceGroupChalkerPool(groups, promotersCount, groupMatchesAll) : [];
+    const lastPlaceChalkerIdsR0 = new Set();
+    for (const p of lastPlaceChalkerPoolR0) {
+      const lid = p?.id ?? p?.name;
+      if (lid != null) lastPlaceChalkerIdsR0.add(lid);
+    }
+    const preferLastPlaceR0 =
+      lastPlaceChalkerIdsR0.size > 0 ? lastPlaceChalkerIdsR0 : null;
     const byeRoundIds = collectByeRoundCandidateIds(roundIndex);
 
     roundMatches.forEach((match, matchIndex) => {
@@ -1966,6 +1985,7 @@ export const updateBracketReferees = (
           poolIds,
           feederLoserIds,
           feederMatchByLoserId,
+          preferLastPlaceGroupIds: preferLastPlaceR0,
           match,
           roundBusyIds,
           usedRefereesLocal: usedReferees,
@@ -1995,6 +2015,7 @@ export const updateBracketReferees = (
           poolIds: poolTier1,
           feederLoserIds: new Set(),
           feederMatchByLoserId: null,
+          preferLastPlaceGroupIds: preferLastPlaceR0,
           match,
           roundBusyIds,
           usedRefereesLocal: usedReferees,
@@ -2009,6 +2030,7 @@ export const updateBracketReferees = (
             poolIds: r0Losers,
             feederLoserIds: r0Losers,
             feederMatchByLoserId: null,
+            preferLastPlaceGroupIds: null,
             match,
             roundBusyIds,
             usedRefereesLocal: usedReferees,
@@ -2026,6 +2048,7 @@ export const updateBracketReferees = (
             poolIds: poolTier3,
             feederLoserIds: r0Losers,
             feederMatchByLoserId: null,
+            preferLastPlaceGroupIds: preferLastPlaceR0,
             match,
             roundBusyIds,
             usedRefereesLocal: usedReferees,
