@@ -522,7 +522,9 @@ export default function TournamentGroupsView({
               className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl shadow-black/50 p-4 sm:p-5 animate-in zoom-in-95 fade-in duration-200"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-lg font-black text-white tracking-tight mb-2">Potvrzení</h3>
+              <h3 className="text-lg font-black text-white tracking-tight mb-2">
+                {t('confirmModalTitle') || 'Potvrzení'}
+              </h3>
               <p className="text-sm text-slate-300">{confirmState.message}</p>
               <div className="flex gap-2 mt-5">
                 <button
@@ -541,7 +543,7 @@ export default function TournamentGroupsView({
                   }}
                   className="flex-1 py-3 rounded-xl font-black text-white bg-emerald-600 hover:bg-emerald-500 transition-colors"
                 >
-                  {t('confirm') || 'Potvrdit'}
+                  {t('confirmAction') || 'Potvrdit'}
                 </button>
               </div>
             </div>
@@ -590,7 +592,9 @@ export default function TournamentGroupsView({
             className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl shadow-black/50 p-4 sm:p-5 animate-in zoom-in-95 fade-in duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-black text-white tracking-tight mb-2">Potvrzení</h3>
+            <h3 className="text-lg font-black text-white tracking-tight mb-2">
+              {t('confirmModalTitle') || 'Potvrzení'}
+            </h3>
             <p className="text-sm text-slate-300">{confirmState.message}</p>
             <div className="flex gap-2 mt-5">
               <button
@@ -609,7 +613,7 @@ export default function TournamentGroupsView({
                 }}
                 className="flex-1 py-3 rounded-xl font-black text-white bg-emerald-600 hover:bg-emerald-500 transition-colors"
               >
-                {t('confirm') || 'Potvrdit'}
+                {t('confirmAction') || 'Potvrdit'}
               </button>
             </div>
           </div>

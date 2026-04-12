@@ -146,6 +146,7 @@ export default function TournamentBracketView({
   onToggleMatchBoardLock,
   onSetMatchBoardAuto,
   onManualRefereeChange,
+  onManualBracketPlayerSlot,
   onBracketWalkover,
   onBracketWithdrawPlayer,
   onBracketDataCommit,
@@ -159,6 +160,7 @@ export default function TournamentBracketView({
   const [editBoardsValue, setEditBoardsValue] = useState('');
   const [boardModal, setBoardModal] = useState(null);
   const [refereeModal, setRefereeModal] = useState(null);
+  const [playerSlotModal, setPlayerSlotModal] = useState(null);
   const [walkoverModal, setWalkoverModal] = useState(null);
   const pressTimer = useRef(null);
 
@@ -183,6 +185,7 @@ export default function TournamentBracketView({
     setLegsModalOpen(false);
     setBoardModal(null);
     setRefereeModal(null);
+    setPlayerSlotModal(null);
     setWalkoverModal(null);
   }, [activeRoundIndex]);
 
@@ -271,6 +274,19 @@ export default function TournamentBracketView({
       name: custom || picked.name,
     });
     setRefereeModal(null);
+  };
+
+  const savePlayerSlotModal = () => {
+    if (!playerSlotModal) return;
+    const picked = allTournamentPlayers.find((p) => String(p.id) === String(playerSlotModal.selectedId));
+    if (!picked) return;
+    onManualBracketPlayerSlot?.(
+      playerSlotModal.roundIndex,
+      playerSlotModal.matchIndex,
+      playerSlotModal.slot,
+      picked
+    );
+    setPlayerSlotModal(null);
   };
 
   const handleDevAutoResolveRound = () => {
@@ -549,6 +565,69 @@ export default function TournamentBracketView({
           extraActionLabel={t('tournAutoBoard') || 'AUTO'}
           onExtraAction={setBoardModalAuto}
         />
+      )}
+      {playerSlotModal && (
+        <div
+          className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPlayerSlotModal(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl shadow-black/50 p-4 sm:p-5 animate-in zoom-in-95 fade-in duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <h3 className="text-lg font-black text-white tracking-tight">
+                {playerSlotModal.slot === 1
+                  ? t('tournBracketAssignPlayer1') || 'Doplnit hráče (levý slot)'
+                  : t('tournBracketAssignPlayer2') || 'Doplnit hráče (pravý slot)'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setPlayerSlotModal(null)}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
+                aria-label={t('tournBracketModalCancel')}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mb-3">
+              {t('tournBracketAssignPlayerHint') ||
+                'Použijte při chybějící propagaci z předchozího kola. Po uložení se znovu dopočítají navazující zápasy.'}
+            </p>
+            <select
+              value={playerSlotModal.selectedId}
+              onChange={(e) =>
+                setPlayerSlotModal((prev) => (prev ? { ...prev, selectedId: e.target.value } : null))
+              }
+              className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
+            >
+              <option value="">{t('tournSelectPlayer') || '— Vyberte hráče —'}</option>
+              {allTournamentPlayers.map((p) => (
+                <option key={p.id} value={String(p.id)}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <div className="flex gap-2 mt-5">
+              <button
+                type="button"
+                onClick={() => setPlayerSlotModal(null)}
+                className="flex-1 py-3 rounded-xl font-bold text-slate-300 bg-slate-800 border border-slate-600 hover:bg-slate-700 transition-colors"
+              >
+                {t('tournBracketModalCancel')}
+              </button>
+              <button
+                type="button"
+                onClick={savePlayerSlotModal}
+                className="flex-1 py-3 rounded-xl font-black text-white bg-emerald-600 hover:bg-emerald-500 transition-colors"
+              >
+                {t('tournBracketModalSave') || 'Uložit'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {refereeModal && (
         <div
@@ -849,6 +928,44 @@ export default function TournamentBracketView({
                   <div className="shrink-0 w-[4.5rem]" />
                 </div>
                 <RefereeRow match={match} roundIndex={activeRoundIndex} matchIndex={matchIndex} />
+                {isAdmin &&
+                  typeof onManualBracketPlayerSlot === 'function' &&
+                  allTournamentPlayers.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {match.player1Id == null && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPlayerSlotModal({
+                              roundIndex: activeRoundIndex,
+                              matchIndex,
+                              slot: 1,
+                              selectedId: '',
+                            })
+                          }
+                          className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 border border-slate-600"
+                        >
+                          {t('tournBracketAssignPlayer1') || 'Doplnit hráče 1'}
+                        </button>
+                      )}
+                      {match.player2Id == null && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPlayerSlotModal({
+                              roundIndex: activeRoundIndex,
+                              matchIndex,
+                              slot: 2,
+                              selectedId: '',
+                            })
+                          }
+                          className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 border border-slate-600"
+                        >
+                          {t('tournBracketAssignPlayer2') || 'Doplnit hráče 2'}
+                        </button>
+                      )}
+                    </div>
+                  )}
               </div>
             );
           }

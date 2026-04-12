@@ -1761,11 +1761,21 @@ function isRoundZeroNonPhysicalBracketMatch(m) {
   return !(p1Real && p2Real);
 }
 
-function refereePassesRoundGuard(refId, match, roundBusyIds, withdrawnIds, usedReferees) {
+function refereePassesRoundGuard(
+  refId,
+  match,
+  roundBusyIds,
+  withdrawnIds,
+  usedReferees,
+  opts = {}
+) {
   const id = refId == null ? null : refId;
   if (id == null) return false;
   if (withdrawnIds.has(id)) return false;
-  if (usedReferees.has(id)) return false;
+  // Globální „už počítal v minulém kole“ platí pro pool nepostupujících ze skupin apod.
+  // U kol, kde jsou kandidáti záměrně prohraní z feederů (L16 → QF), už v minulém kole často počítali —
+  // bez výjimky by nezbyl žádný platný počtář.
+  if (!opts.skipHistoricRefereeUsage && usedReferees.has(id)) return false;
   if (roundBusyIds.has(id)) return false;
   if (getBracketMatchParticipantIds(match).has(id)) return false;
   return true;
@@ -1898,7 +1908,11 @@ function collectRefereeIdsInBracketRound(bracketRounds, roundIndex) {
   return s;
 }
 
-/** Počtáři z dokončených zápasů (napříč celým pavoukem) — zabrání opakované nominaci po dalším běhu engine. */
+/**
+ * Počtáři z dokončených zápasů (napříč celým pavoukem).
+ * U pozdějších kol se historická kontrola proti tomuto setu pro výběr z poolu prohraných vypíná
+ * ({@link refereePassesRoundGuard} s skipHistoricRefereeUsage), aby šlo znovu obsadit typicky poražené z feederů.
+ */
 function collectRefereeIdsFromCompletedMatches(bracketRounds) {
   const s = new Set();
   for (const round of bracketRounds || []) {
@@ -2148,11 +2162,14 @@ export const updateBracketReferees = (
     roundBusyIds,
     usedRefereesLocal,
     assignedRefsInThisRunLocal,
+    skipHistoricRefereeUsage = false,
   }) => {
     const viable = Array.from(poolIds)
       .filter((id) => {
         if (assignedRefsInThisRunLocal?.has(id)) return false;
-        return refereePassesRoundGuard(id, match, roundBusyIds, withdrawnIds, usedRefereesLocal);
+        return refereePassesRoundGuard(id, match, roundBusyIds, withdrawnIds, usedRefereesLocal, {
+          skipHistoricRefereeUsage,
+        });
       })
       .map((id) => ({
         id,
@@ -2284,7 +2301,15 @@ export const updateBracketReferees = (
       // Pokud je počtář předvyplněný (např. JIT), ale guard neprojde, uvolni a vyber fallback.
       if (match.referee) {
         const refId = match.referee.id ?? match.referee.name;
-        if (!refereePassesRoundGuard(refId, match, roundBusyIds, withdrawnIds, usedReferees)) {
+        const skipHistoricForPreserve =
+          isLaterKoRound ||
+          (hasPrelimBracketRound && isFirstMainRound) ||
+          (isPrelimRound && Number(match.refereePickTier) === 2);
+        if (
+          !refereePassesRoundGuard(refId, match, roundBusyIds, withdrawnIds, usedReferees, {
+            skipHistoricRefereeUsage: skipHistoricForPreserve,
+          })
+        ) {
           match.referee = null;
           delete match.refereePickTier;
         } else {
@@ -2313,6 +2338,7 @@ export const updateBracketReferees = (
           assignedRefsInThisRunLocal: assignedRefsInThisRun,
           preferLastPlaceGroupIds: null,
           poolPriorityRank: null,
+          skipHistoricRefereeUsage: false,
           ...opts,
         });
 
@@ -2336,6 +2362,7 @@ export const updateBracketReferees = (
             poolPriorityRank: nonAdvPriority,
             feederLoserIds: r0Losers,
             feederMatchByLoserId: feederMap0.size > 0 ? feederMap0 : null,
+            skipHistoricRefereeUsage: true,
           });
           if (chosenRef) pickTier = 2;
         }
@@ -2358,6 +2385,7 @@ export const updateBracketReferees = (
             poolPriorityRank: poolPriorityMain,
             feederLoserIds: poolFromWave2Prelim,
             feederMatchByLoserId: feederMap0.size > 0 ? feederMap0 : null,
+            skipHistoricRefereeUsage: true,
           });
           if (chosenRef) pickTier = 1;
 
@@ -2369,6 +2397,7 @@ export const updateBracketReferees = (
               poolPriorityRank: poolPriorityMain,
               feederLoserIds: r1Losers,
               feederMatchByLoserId: feederMap1.size > 0 ? feederMap1 : null,
+              skipHistoricRefereeUsage: true,
             });
             if (chosenRef) pickTier = 2;
           }
@@ -2429,6 +2458,7 @@ export const updateBracketReferees = (
               poolPriorityRank: poolPriority,
               feederLoserIds: rLosers,
               feederMatchByLoserId: feederMap.size > 0 ? feederMap : null,
+              skipHistoricRefereeUsage: true,
             });
             if (chosenRef) pickTier = 2;
           }
@@ -2468,6 +2498,7 @@ export const updateBracketReferees = (
           poolIds,
           feederLoserIds,
           feederMatchByLoserId,
+          skipHistoricRefereeUsage: true,
         });
         if (chosenRef) pickTier = 1;
       }

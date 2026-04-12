@@ -213,7 +213,7 @@ export default function TournamentHistory({ lang = 'cs', user, onBack }) {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-black text-white tracking-tight mb-2">
-              {t('confirm') || 'Potvrzení'}
+              {t('confirmModalTitle') || 'Potvrzení'}
             </h3>
             <p className="text-sm text-slate-300">
               {t('delete') || 'Smazat'}: {String(confirmDelete.row.name || '').trim() || '(bez názvu)'}?

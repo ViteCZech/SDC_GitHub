@@ -370,6 +370,18 @@ export function mergeAdminBracketFromTabletCloud(prevLocal, cloudBracket) {
       if (cloud.whoStarts != null && cloud.whoStarts !== local.whoStarts) {
         patch.whoStarts = cloud.whoStarts;
       }
+      // Admin / synchronizace: doplnění chybějícího soupeře v čekajícím zápase (např. ruční oprava v cloudu).
+      const mergeMissingSlot = (idKey, nameKey, altIdKey, altNameKey) => {
+        const lid = local[idKey] ?? local[altIdKey];
+        const cid = cloud[idKey] ?? cloud[altIdKey];
+        if ((lid != null && lid !== '') || cid == null || cid === '') return;
+        patch[idKey] = cid;
+        const cn = cloud[nameKey] ?? cloud[altNameKey];
+        if (cn != null && cn !== '') patch[nameKey] = cn;
+      };
+      mergeMissingSlot('player1Id', 'player1Name', 'p1Id', 'p1Name');
+      mergeMissingSlot('player2Id', 'player2Name', 'p2Id', 'p2Name');
+
       if (Object.keys(patch).length === 0) return local;
       roundChanged = true;
       return { ...local, ...patch };

@@ -2487,6 +2487,41 @@ function AppMain({ lang, setLang }) {
     });
   };
 
+  const handleManualBracketPlayerSlot = React.useCallback((roundIndex, matchIndex, slot, player) => {
+    const pid = player?.id;
+    if (pid == null || String(pid).trim() === '') return;
+    setTournamentBracket((prev) => {
+      if (!Array.isArray(prev)) return prev;
+      const matches = prev[roundIndex]?.matches;
+      if (!Array.isArray(matches) || matchIndex < 0 || matchIndex >= matches.length) return prev;
+      const cur = matches[matchIndex];
+      const otherId = slot === 1 ? cur?.player2Id : cur?.player1Id;
+      if (otherId != null && String(otherId) === String(pid)) return prev;
+      const next = prev.map((round, ri) => {
+        if (ri !== roundIndex) return round;
+        return {
+          ...round,
+          matches: matches.map((m, mi) => {
+            if (mi !== matchIndex) return m;
+            if (slot === 1) {
+              return {
+                ...m,
+                player1Id: pid,
+                player1Name: player?.name ?? String(pid),
+              };
+            }
+            return {
+              ...m,
+              player2Id: pid,
+              player2Name: player?.name ?? String(pid),
+            };
+          }),
+        };
+      });
+      return propagateBracketWinners(next);
+    });
+  }, []);
+
   const handleManualRefereeChange = (roundIndex, matchIndex, newReferee) => {
     const refId = newReferee?.id ?? newReferee?.name;
     if (refId == null || String(refId).trim() === '') return;
@@ -3809,6 +3844,7 @@ function AppMain({ lang, setLang }) {
             onToggleMatchBoardLock={handleToggleMatchBoardLock}
             onSetMatchBoardAuto={handleSetMatchBoardAuto}
             onManualRefereeChange={handleManualRefereeChange}
+            onManualBracketPlayerSlot={handleManualBracketPlayerSlot}
             onBracketWalkover={handleBracketWalkover}
             onBracketWithdrawPlayer={handleBracketWithdrawPlayer}
             onBracketDataCommit={handleBracketDataCommit}
@@ -4204,7 +4240,7 @@ function AppMain({ lang, setLang }) {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-black text-white tracking-tight mb-2">
-              {t('confirm') || 'Potvrzení'}
+              {t('confirmModalTitle') || 'Potvrzení'}
             </h3>
             <p className="text-sm text-slate-300">{confirmState.message}</p>
             <div className="flex gap-2 mt-5">
@@ -4228,7 +4264,7 @@ function AppMain({ lang, setLang }) {
                 }}
                 className="flex-1 py-3 rounded-xl font-black text-white bg-emerald-600 hover:bg-emerald-500 transition-colors"
               >
-                {confirmState.confirmLabel || t('confirm') || 'Potvrdit'}
+                {confirmState.confirmLabel || t('confirmAction') || 'Potvrdit'}
               </button>
             </div>
           </div>
