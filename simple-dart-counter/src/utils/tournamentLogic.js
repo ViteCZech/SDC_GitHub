@@ -304,7 +304,8 @@ function countDistinctBracketBoards(bracketRounds) {
 }
 
 /**
- * Živý odhad konce turnaje (skupiny + KO), s ohledem na paralelní terče a změřené délky zápasů.
+ * Živý odhad konce turnaje: sekvenčně zbývající čas skupin + zbývající čas pavouka (součet), i když skupiny
+ * ještě nejsou dohrané. KO sloty bez známých soupeřů bereme jako celý průměrný zápas.
  *
  * @returns {{
  *   estimatedTournamentEnd: Date,
@@ -327,19 +328,17 @@ export function calculateLiveTournamentEndPrediction({
 } = {}) {
   const settings = { groupsLegs, totalBoards };
   const hasGroups = isTournamentGroupsThenBracketFormat(format) && (groups || []).length > 0;
-  const koOnly = isTournamentBracketOnlyFormat(format);
 
   const { remainingMs: remGroups, avgMatchDurationMs: avgG } = hasGroups
     ? estimateGroupsPhaseRemainingMs(groups, groupMatches, settings, now)
     : { remainingMs: 0, avgMatchDurationMs: defaultAvgMatchMsFromLegs(groupsLegs) };
 
-  const groupsDone = !hasGroups || allGroupsPhaseComplete(groups, groupMatches);
   const bracket = Array.isArray(bracketRounds) ? bracketRounds : [];
 
   let remBracket = 0;
   let avgB = defaultAvgMatchMsFromLegs(bracketLegs);
 
-  if ((groupsDone || koOnly) && bracket.length > 0) {
+  if (bracket.length > 0) {
     const observedB = inferBracketAvgMatchMsFromCompleted(bracket);
     if (observedB != null) avgB = observedB;
 
@@ -356,11 +355,9 @@ export function calculateLiveTournamentEndPrediction({
         const prevMatches = bracket[j]?.matches || [];
         for (const pm of prevMatches) {
           if (!pm || pm.isBye) continue;
-          if (!pm.player1Id || !pm.player2Id) continue;
-          if (!bracketMatchTerminal(pm)) {
-            earlierIncomplete = true;
-            break;
-          }
+          if (bracketMatchTerminal(pm)) continue;
+          earlierIncomplete = true;
+          break;
         }
         if (earlierIncomplete) break;
       }
@@ -372,9 +369,9 @@ export function calculateLiveTournamentEndPrediction({
       let roundUnfinished = 0;
       for (const m of matches) {
         if (!m || m.isBye) continue;
-        if (!m.player1Id || !m.player2Id) continue;
         if (bracketMatchTerminal(m)) continue;
-        roundSum += estimateRemainingMsForMatch(m, avgB, now);
+        const hasBoth = m.player1Id && m.player2Id;
+        roundSum += hasBoth ? estimateRemainingMsForMatch(m, avgB, now) : avgB;
         roundUnfinished += 1;
       }
       if (roundUnfinished === 0) continue;
