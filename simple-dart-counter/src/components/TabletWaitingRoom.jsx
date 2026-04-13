@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Minus, Plus } from 'lucide-react';
 import { translations } from '../translations';
 
 const CHECKIN_SECONDS = 180;
@@ -158,7 +159,9 @@ export default function TabletWaitingRoom({
         <table className={`${standingsTableClass} text-left`}>
           <thead>
             <tr className="border-b border-slate-700 text-slate-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-tight">
-              <th className="text-center py-1.5 w-[2.25rem] sm:w-10 px-0.5">{tFlat('tournStandingPos')}</th>
+              <th className="text-center py-1.5 w-9 sm:w-10 px-0.5 text-xs sm:text-sm font-bold tabular-nums normal-case">
+                {tFlat('tournStandingPos')}
+              </th>
               <th className="text-left py-1.5 pr-1 min-w-0">{tFlat('playerName')}</th>
               <th className="text-center py-1.5 w-8 sm:w-9 px-0.5">{tFlat('tournStandingPoints')}</th>
               <th className="text-center py-1.5 w-[3.25rem] sm:w-[4rem] px-0.5 whitespace-pre-line leading-tight">
@@ -167,14 +170,29 @@ export default function TabletWaitingRoom({
               <th className="text-center py-1.5 w-[3.25rem] sm:w-[4rem] px-0.5 whitespace-pre-line leading-tight">
                 {tFlat('tournStandingLegsShort')}
               </th>
-              <th className="text-center py-1.5 w-9 sm:w-10 px-0.5">{tFlat('tournStandingDiff')}</th>
-              <th className="text-center py-1.5 w-11 sm:w-12 px-0.5">{tFlat('tournStandingAvg')}</th>
+              <th
+                className="text-center py-1.5 w-9 sm:w-10 px-0.5 align-middle"
+                title={tFlat('tournStandingDiff')}
+              >
+                <span className="sr-only">{tFlat('tournStandingDiff')}</span>
+                <span className="inline-flex flex-col items-center justify-center gap-0" aria-hidden="true">
+                  <Plus className="w-3.5 h-3.5 mx-auto stroke-[2.5]" />
+                  <Minus className="w-3.5 h-3.5 mx-auto -mt-0.5 stroke-[2.5]" />
+                </span>
+              </th>
+              <th
+                className="text-center py-1.5 w-11 sm:w-12 px-0.5 align-middle font-serif normal-case font-semibold text-[11px] sm:text-xs"
+                title={tFlat('tournStandingAvg')}
+              >
+                <span className="sr-only">{tFlat('tournStandingAvg')}</span>
+                <span aria-hidden="true">x̄</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {groupStandings.map((row, idx) => (
               <tr key={row.id ?? idx} className="border-b border-slate-800 last:border-0">
-                <td className="text-center text-slate-200 text-[10px] sm:text-xs font-bold tabular-nums px-0.5 py-1.5">
+                <td className="text-center text-slate-200 text-xs sm:text-sm font-bold tabular-nums px-0.5 py-1.5">
                   {idx + 1}
                 </td>
                 <td className="text-slate-200 font-medium break-words max-w-[min(100%,14rem)] sm:max-w-xs lg:max-w-none min-w-0 py-1.5 px-1">

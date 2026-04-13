@@ -898,35 +898,35 @@ export default function TournamentSetup({
 
         {/* STEP 3 – Chytrý asistent formátu */}
         {step === 3 && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400">
-                {stepLabels.tournStep3}
-              </h2>
-              <div className="hidden sm:flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setStep(2)}
-                  className={`${btnBase} bg-slate-800 text-slate-300 hover:bg-slate-700`}
-                >
-                  <ArrowLeft className="w-5 h-5" /> {t('tournBack') || 'Zpět'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleGenerate}
-                  disabled={players.length < minPlayersRequired || hasAnyDuplicates() || isCustomInvalid}
-                  className={`${btnBase} bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed`}
-                >
-                  <Target className="w-5 h-5" />
-                  {t('tournGenerate') || 'Vygenerovat turnaj'}
-                </button>
-              </div>
-            </div>
-
+          <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start animate-in fade-in duration-200">
             <div
-              className={`grid grid-cols-1 gap-6 ${fmtBracketOnly ? '' : 'lg:grid-cols-3'}`}
+              className={`space-y-4 ${fmtBracketOnly ? 'lg:col-span-12 max-w-3xl lg:mx-auto w-full' : 'lg:col-span-5'}`}
             >
-              {/* Levý sloupec – nastavení legů, typu hry a ukončení */}
+              <div className="flex justify-between items-center mb-0 lg:mb-0">
+                <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400">
+                  {stepLabels.tournStep3}
+                </h2>
+                <div className="hidden sm:flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className={`${btnBase} bg-slate-800 text-slate-300 hover:bg-slate-700`}
+                  >
+                    <ArrowLeft className="w-5 h-5" /> {t('tournBack') || 'Zpět'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={players.length < minPlayersRequired || hasAnyDuplicates() || isCustomInvalid}
+                    className={`${btnBase} bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed`}
+                  >
+                    <Target className="w-5 h-5" />
+                    {t('tournGenerate') || 'Vygenerovat turnaj'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Levý blok – nastavení legů, typu hry a ukončení */}
               <div className="p-4 border rounded-xl bg-slate-900 border-slate-800 space-y-4">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
@@ -1070,9 +1070,12 @@ export default function TournamentSetup({
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Prostřední sloupec – parametry a vlastní formát */}
-              <div className={`flex flex-col gap-4 ${fmtBracketOnly ? 'hidden' : ''}`}>
+            {/* Pravý blok – přehled hráčů, vlastní formát a návrhy (jako krok 1: širší panel s mřížkou) */}
+            <div className={`lg:col-span-7 min-w-0 ${fmtBracketOnly ? 'hidden' : ''}`}>
+              <div className="grid grid-cols-1 md:grid-cols-2 md:gap-6 gap-6">
+                <div className="flex flex-col gap-4 min-w-0">
                 <div className="p-4 border rounded-xl bg-slate-900 border-slate-800 space-y-4">
                   <p className="text-base font-black text-emerald-400">
                     {t('tournPlayersTotal') || 'Celkem přihlášeno'}: {players.length} {t('tournPlayersMany') || 'hráčů'}
@@ -1187,10 +1190,9 @@ export default function TournamentSetup({
                     </div>
                   )}
                 </div>
-              </div>
+                </div>
 
-              {/* Pravý sloupec – chytré návrhy formátů */}
-              <div className={`flex flex-col gap-4 ${fmtBracketOnly ? 'hidden' : ''}`}>
+                <div className="flex flex-col gap-4 min-w-0">
                 <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
                   {t('tournVariantChoose') || 'Vyberte formát turnaje'}
                 </span>
@@ -1247,19 +1249,20 @@ export default function TournamentSetup({
                     </button>
                   );
                 })}
+                </div>
               </div>
             </div>
 
             {validationError && (
               <div
-                className="p-3 rounded-lg bg-red-900/30 border border-red-500/50 text-red-400 text-sm font-bold"
+                className="lg:col-span-12 p-3 rounded-lg bg-red-900/30 border border-red-500/50 text-red-400 text-sm font-bold"
                 role="alert"
               >
                 {validationError}
               </div>
             )}
 
-            <div className="flex justify-between gap-2 sm:hidden">
+            <div className="lg:col-span-12 flex justify-between gap-2 sm:hidden">
               <button
                 type="button"
                 onClick={() => setStep(2)}

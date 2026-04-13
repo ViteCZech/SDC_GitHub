@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Home, Pencil, Bell } from 'lucide-react';
+import { Home, Pencil, Bell, Minus, Plus } from 'lucide-react';
 import { distributePlayersToFixedGroups } from '../utils/tournamentGenerator';
 import {
   calculateTournamentTimePrediction,
@@ -35,21 +35,21 @@ function standingNameTextClass(name) {
   return 'text-[11px] leading-snug';
 }
 
-/** Tabulka pořadí – P vlevo, No: ~4× menší než zbytek, plná šířka, minimální okraje */
+/** Tabulka pořadí – P vlevo, No menší než zbytek řádku, ale čitelné */
 function GroupStandingsTable({ standings, advanceCount, t }) {
   const cellBase = 'text-[11px] leading-snug';
   const cellMono = `${cellBase} font-mono tabular-nums`;
   const noTh =
-    'text-center py-1 w-5 px-0 align-bottom text-[2.75px] sm:text-[3px] font-bold uppercase tracking-tighter text-slate-500 leading-none';
+    'text-center py-1 w-7 px-0 align-bottom text-[8px] sm:text-[9px] font-bold uppercase tracking-tight text-slate-500 leading-tight';
   const noTd =
-    'py-1 px-0 w-5 text-center align-middle text-[2.75px] sm:text-[3px] font-bold tabular-nums text-slate-300 leading-none';
+    'py-1 px-0 w-7 text-center align-middle text-[8px] sm:text-[9px] font-bold tabular-nums text-slate-300 leading-none';
 
   return (
     <div className="w-full min-w-0 -mx-0.5 sm:mx-0 overflow-x-auto">
       <table className="w-full max-w-full table-fixed border-collapse">
         <colgroup>
           <col className="w-5" />
-          <col className="w-5" />
+          <col className="w-7" />
           <col />
           <col className="w-7" />
           <col className="w-[3.25rem]" />
@@ -73,11 +73,24 @@ function GroupStandingsTable({ standings, advanceCount, t }) {
             <th className={`text-center py-1 w-[3.1rem] px-0.5 align-bottom leading-tight whitespace-pre-line ${cellBase}`}>
               {t('tournStandingLegsShort')}
             </th>
-            <th className={`text-center py-1 w-7 px-0.5 align-bottom ${cellBase}`}>
-              {t('tournStandingDiff') || 'Rozdíl'}
+            <th
+              className={`text-center py-1 w-7 px-0.5 align-bottom ${cellBase}`}
+              title={t('tournStandingDiff') || 'Rozdíl'}
+            >
+              <span className="sr-only">{t('tournStandingDiff') || 'Rozdíl'}</span>
+              <span className="inline-flex flex-col items-center justify-center gap-0 text-slate-400" aria-hidden="true">
+                <Plus className="w-3 h-3 shrink-0 stroke-[2.5]" />
+                <Minus className="w-3 h-3 shrink-0 -mt-0.5 stroke-[2.5]" />
+              </span>
             </th>
-            <th className={`text-center py-1 w-9 px-0.5 align-bottom ${cellBase}`}>
-              {t('tournStandingAvg') || 'Průměr'}
+            <th
+              className={`text-center py-1 w-9 px-0.5 align-bottom ${cellBase}`}
+              title={t('tournStandingAvg') || 'Průměr'}
+            >
+              <span className="sr-only">{t('tournStandingAvg') || 'Průměr'}</span>
+              <span className="font-serif text-[12px] sm:text-[13px] leading-none text-slate-400" aria-hidden="true">
+                x̄
+              </span>
             </th>
           </tr>
         </thead>
