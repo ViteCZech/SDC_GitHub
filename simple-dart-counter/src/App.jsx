@@ -8,6 +8,7 @@ import {
   archivePastTournamentAndDeleteActive,
   listenToCloudTournament,
   verifyTournamentPin,
+  verifyTabletBoardAccess,
   updateCloudMatchFromTablet,
   mergeAdminGroupMatchesFromTabletCloud,
   mergeAdminBracketFromTabletCloud,
@@ -74,6 +75,8 @@ function createDefaultTournamentDraft() {
     pin: '',
     /** Síťová hra / tablety – pouze po přihlášení (Google); ukládá se do tournamentData */
     cloudEnabled: false,
+    /** Heslo pro herní tablety (max. 5 znaků, odlišné od PIN); jen při cloudEnabled */
+    tabletPassword: '',
   };
 }
 
@@ -1053,6 +1056,12 @@ function AppMain({ lang, setLang }) {
   }, []);
 
   // Globální toast notifikace (nahrazuje alert)
+  /** Admin: klepnutím na PIN v horní liště zobrazí heslo pro herní tablety */
+  const [adminPinBarShowTabletPassword, setAdminPinBarShowTabletPassword] = useState(false);
+  useEffect(() => {
+    setAdminPinBarShowTabletPassword(false);
+  }, [activePin, tournamentData?.tournamentId]);
+
   const [notification, setNotification] = useState(null); // { message: string, type: 'error'|'success' }
   const showNotification = (message, type = 'error') => {
     setNotification({ message: String(message ?? ''), type });
@@ -1484,6 +1493,15 @@ function AppMain({ lang, setLang }) {
     tournamentMatchContext?.tabletPin ??
     '';
 
+  const pinBarTabletPw =
+    userRole === 'admin'
+      ? String(tournamentData?.tabletPassword ?? tournamentDraft?.tabletPassword ?? '').trim()
+      : '';
+  const adminPinBarRevealable =
+    userRole === 'admin' &&
+    pinBarTabletPw.length > 0 &&
+    !!(tournamentData?.cloudEnabled || tournamentDraft?.cloudEnabled);
+
   const showTournamentPinBar =
     !!pinBarDisplayCode &&
     ((userRole === 'admin' && appState === 'tournament_setup') ||
@@ -1866,7 +1884,7 @@ function AppMain({ lang, setLang }) {
     setAppState('tournament_setup');
   };
 
-  const handleTournamentHubTabletJoin = async (pin, board) => {
+  const handleTournamentHubTabletJoin = async (pin, board, tabletPassword = '') => {
     if (!pin) {
       showNotification(
         translations[lang]?.tournamentHub?.enterPin || 'Zadejte PIN turnaje',
@@ -1875,9 +1893,14 @@ function AppMain({ lang, setLang }) {
       return;
     }
     const p = String(pin).trim();
-    const ok = await verifyTournamentPin(p);
-    if (!ok) {
-      showNotification(t('tournamentHub.invalidPin'), 'error');
+    const access = await verifyTabletBoardAccess(p, tabletPassword);
+    if (!access.ok) {
+      showNotification(
+        access.reason === 'bad_password'
+          ? t('tournamentHub.invalidTabletPassword')
+          : t('tournamentHub.invalidPin'),
+        'error'
+      );
       return;
     }
     setTournamentData(null);
@@ -3138,11 +3161,28 @@ function AppMain({ lang, setLang }) {
                       )}
                       {tournamentPinEndEstimate}
                       </div>
-                      <div className="shrink-0 flex items-center gap-2">
+                      <div className="shrink-0 flex items-center gap-2 flex-wrap justify-end">
                         <span className="text-slate-500 hidden sm:inline">PIN:</span>
-                        <span className="text-2xl font-black text-yellow-400 tracking-widest font-mono tabular-nums">
-                          {pinBarDisplayCode}
-                        </span>
+                        {adminPinBarRevealable ? (
+                          <button
+                            type="button"
+                            onClick={() => setAdminPinBarShowTabletPassword((v) => !v)}
+                            className="text-2xl font-black text-yellow-400 tracking-widest font-mono tabular-nums rounded-lg px-1 -mx-1 hover:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                            title={t('tournPinTapShowPassword')}
+                            aria-expanded={adminPinBarShowTabletPassword}
+                          >
+                            {pinBarDisplayCode}
+                          </button>
+                        ) : (
+                          <span className="text-2xl font-black text-yellow-400 tracking-widest font-mono tabular-nums">
+                            {pinBarDisplayCode}
+                          </span>
+                        )}
+                        {adminPinBarRevealable && adminPinBarShowTabletPassword && (
+                          <span className="text-xs sm:text-sm font-mono font-bold text-amber-300 tracking-wide max-w-[min(100%,12rem)] break-all">
+                            {t('tournTabletPassword')}: {pinBarTabletPw}
+                          </span>
+                        )}
                         {userRole === 'admin' && (
                         <button
                           type="button"
@@ -3302,11 +3342,28 @@ function AppMain({ lang, setLang }) {
           )}
           {tournamentPinEndEstimate}
           </div>
-          <div className="shrink-0 flex items-center gap-2">
+          <div className="shrink-0 flex items-center gap-2 flex-wrap justify-end">
             <span className="text-slate-500 hidden sm:inline">PIN:</span>
-            <span className="text-2xl font-black text-yellow-400 tracking-widest font-mono tabular-nums">
-              {pinBarDisplayCode}
-            </span>
+            {adminPinBarRevealable ? (
+              <button
+                type="button"
+                onClick={() => setAdminPinBarShowTabletPassword((v) => !v)}
+                className="text-2xl font-black text-yellow-400 tracking-widest font-mono tabular-nums rounded-lg px-1 -mx-1 hover:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                title={t('tournPinTapShowPassword')}
+                aria-expanded={adminPinBarShowTabletPassword}
+              >
+                {pinBarDisplayCode}
+              </button>
+            ) : (
+              <span className="text-2xl font-black text-yellow-400 tracking-widest font-mono tabular-nums">
+                {pinBarDisplayCode}
+              </span>
+            )}
+            {adminPinBarRevealable && adminPinBarShowTabletPassword && (
+              <span className="text-xs sm:text-sm font-mono font-bold text-amber-300 tracking-wide max-w-[min(100%,12rem)] break-all">
+                {t('tournTabletPassword')}: {pinBarTabletPw}
+              </span>
+            )}
             {userRole === 'admin' && (
             <button
               type="button"

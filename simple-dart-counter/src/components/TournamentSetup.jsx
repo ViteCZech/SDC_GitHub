@@ -127,6 +127,23 @@ export default function TournamentSetup({
       setValidationError(t('tournErrName') || 'Název turnaje nesmí být prázdný.');
       return false;
     }
+    if (tournamentDraft.cloudEnabled && isLoggedIn) {
+      const tp = String(tournamentDraft.tabletPassword ?? '').trim();
+      if (!tp || tp.length > 5) {
+        setValidationError(
+          t('tournTabletPasswordInvalid') ||
+            'Zadejte heslo pro herní tablety (1–5 znaků), odlišné od PIN.'
+        );
+        return false;
+      }
+      const pinStr = String(tournamentDraft.pin ?? '').trim();
+      if (/^\d{4}$/.test(pinStr) && tp === pinStr) {
+        setValidationError(
+          t('tournTabletPasswordDistinct') || 'Heslo nesmí být stejné jako PIN turnaje.'
+        );
+        return false;
+      }
+    }
     return true;
   };
 
@@ -368,6 +385,22 @@ export default function TournamentSetup({
         (String(tournamentDraft.pin ?? '').trim() && /^\d{4}$/.test(String(tournamentDraft.pin).trim())
           ? String(tournamentDraft.pin).trim()
           : Math.floor(1000 + Math.random() * 9000).toString());
+      if (tournamentDraft.cloudEnabled && isLoggedIn) {
+        const tp = String(tournamentDraft.tabletPassword ?? '').trim();
+        if (!tp || tp.length > 5) {
+          setValidationError(
+            t('tournTabletPasswordInvalid') ||
+              'Zadejte heslo pro herní tablety (1–5 znaků), odlišné od PIN.'
+          );
+          return;
+        }
+        if (tp === pinToSave) {
+          setValidationError(
+            t('tournTabletPasswordDistinct') || 'Heslo nesmí být stejné jako PIN turnaje.'
+          );
+          return;
+        }
+      }
       const numGroups =
         tournamentDraft.numGroups ?? selectedVariant?.numGroups ?? listValidGroupCounts(players.length)[0] ?? 1;
       const advPerGroup = tournamentDraft.advancePerGroup ?? selectedVariant?.advancePerGroup ?? 2;
@@ -391,6 +424,10 @@ export default function TournamentSetup({
         players: getSortedPlayersForTournament(),
         pin: pinToSave,
         cloudEnabled: !!tournamentDraft.cloudEnabled && isLoggedIn,
+        tabletPassword:
+          tournamentDraft.cloudEnabled && isLoggedIn
+            ? String(tournamentDraft.tabletPassword ?? '').trim().slice(0, 5)
+            : null,
       };
       onComplete?.(data);
     } catch (error) {
@@ -491,7 +528,7 @@ export default function TournamentSetup({
                     </p>
                     <p className="text-xs text-slate-500 leading-snug">
                       {t('tournSetupPinHint') ||
-                        'Pro připojení herních tabletů a diváků.'}
+                        'Diváci: jen PIN. Herní tablety v cloudu: PIN a heslo od administrátora.'}
                     </p>
                   </div>
                   <p
@@ -515,7 +552,8 @@ export default function TournamentSetup({
                       {t('tournamentHub.cloudModeToggle') || 'Síťová hra / Použít tablety'}
                     </p>
                     <p className="text-[11px] text-slate-500 leading-snug">
-                      {t('tournSetupPinHint') || ''}
+                      {t('tournTabletPasswordHint') ||
+                        'Herní tablety zadají PIN i heslo; diváci pouze PIN.'}
                     </p>
                   </div>
                   <button
@@ -525,7 +563,14 @@ export default function TournamentSetup({
                     disabled={!isLoggedIn}
                     onClick={() => {
                       if (!isLoggedIn) return;
-                      setTournamentDraft((prev) => ({ ...prev, cloudEnabled: !prev.cloudEnabled }));
+                      setTournamentDraft((prev) => {
+                        const next = !prev.cloudEnabled;
+                        return {
+                          ...prev,
+                          cloudEnabled: next,
+                          tabletPassword: next ? prev.tabletPassword : '',
+                        };
+                      });
                     }}
                     className={`relative h-8 w-14 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/50 ${
                       tournamentDraft.cloudEnabled && isLoggedIn ? 'bg-emerald-600' : 'bg-slate-700'
@@ -554,6 +599,36 @@ export default function TournamentSetup({
                         {t('loginWithGoogle') || 'Přihlásit se přes Google'}
                       </button>
                     )}
+                  </div>
+                )}
+                {tournamentDraft.cloudEnabled && isLoggedIn && (
+                  <div className="rounded-lg border border-slate-600/80 bg-slate-900/80 px-3 py-3 space-y-2">
+                    <label
+                      className="block text-[10px] font-bold uppercase tracking-widest text-slate-400"
+                      htmlFor="tournament-tablet-password"
+                    >
+                      {t('tournTabletPasswordLabel') || 'Heslo pro herní tablety'}
+                    </label>
+                    <p className="text-[11px] text-slate-500 leading-snug">
+                      {t('tournTabletPasswordHint') ||
+                        'Max. 5 znaků, musí se lišit od PINu. Divácké tablety zadávají pouze PIN.'}
+                    </p>
+                    <input
+                      id="tournament-tablet-password"
+                      type="text"
+                      inputMode="text"
+                      autoComplete="off"
+                      maxLength={5}
+                      value={String(tournamentDraft.tabletPassword ?? '')}
+                      onChange={(e) =>
+                        setTournamentDraft((prev) => ({
+                          ...prev,
+                          tabletPassword: e.target.value.slice(0, 5),
+                        }))
+                      }
+                      placeholder={t('tournTabletPasswordPlaceholder') || 'např. ab12'}
+                      className={inputBase}
+                    />
                   </div>
                 )}
               </div>

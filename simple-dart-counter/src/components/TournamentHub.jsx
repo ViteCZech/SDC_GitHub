@@ -19,10 +19,12 @@ export default function TournamentHub({
   const [panel, setPanel] = useState(null);
   const [pin, setPin] = useState('');
   const [board, setBoard] = useState('');
+  const [tabletPassword, setTabletPassword] = useState('');
 
   const resetForm = () => {
     setPin('');
     setBoard('');
+    setTabletPassword('');
     setPanel(null);
   };
 
@@ -58,12 +60,25 @@ export default function TournamentHub({
           autoComplete="off"
           value={board}
           onChange={(e) => setBoard(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg mb-6 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 [@media(max-height:520px)]:py-2 [@media(max-height:520px)]:mb-3 [@media(max-height:520px)]:text-base"
+          className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg mb-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 [@media(max-height:520px)]:py-2 [@media(max-height:520px)]:mb-2 [@media(max-height:520px)]:text-base"
           placeholder="1"
+        />
+        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
+          {th('enterTabletPassword')}
+        </label>
+        <input
+          type="text"
+          inputMode="text"
+          autoComplete="off"
+          maxLength={5}
+          value={tabletPassword}
+          onChange={(e) => setTabletPassword(e.target.value.slice(0, 5))}
+          className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg mb-6 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 [@media(max-height:520px)]:py-2 [@media(max-height:520px)]:mb-3 [@media(max-height:520px)]:text-base"
+          placeholder="•••"
         />
         <button
           type="button"
-          onClick={() => onTabletJoin?.(pin.trim(), board.trim())}
+          onClick={() => onTabletJoin?.(pin.trim(), board.trim(), tabletPassword.trim())}
           className="w-full py-4 rounded-xl font-black bg-emerald-600 text-white hover:bg-emerald-500 border border-emerald-500 mb-3 [@media(max-height:520px)]:py-3"
         >
           {th('join')}

@@ -415,6 +415,36 @@ export async function verifyTournamentPin(pin) {
 }
 
 /**
+ * Herní tablet: ověří PIN + volitelné heslo z `tournamentData.tabletPassword` ve stejném dokumentu Firestore.
+ * Starší turnaje bez pole `tabletPassword` — stačí platný PIN (zpětná kompatibilita).
+ * @param {string} pin
+ * @param {string} [tabletPassword]
+ * @returns {Promise<{ ok: boolean, reason?: 'not_found'|'bad_password'|'error' }>}
+ */
+export async function verifyTabletBoardAccess(pin, tabletPassword) {
+  if (!db || !pin) return { ok: false, reason: 'error' };
+  const id = String(pin).trim();
+  if (!/^\d{4}$/.test(id)) return { ok: false, reason: 'not_found' };
+  try {
+    const ref = doc(db, COLLECTION, id);
+    const docSnap = await getDoc(ref);
+    const exists = typeof docSnap.exists === 'function' ? docSnap.exists() : docSnap.exists;
+    if (!exists) return { ok: false, reason: 'not_found' };
+    const raw = docSnap.data();
+    const td = raw?.tournamentData;
+    const expected =
+      td && td.tabletPassword != null ? String(td.tabletPassword).trim().slice(0, 5) : '';
+    if (expected === '') return { ok: true };
+    const provided = String(tabletPassword ?? '').trim().slice(0, 5);
+    if (provided !== expected) return { ok: false, reason: 'bad_password' };
+    return { ok: true };
+  } catch (err) {
+    console.warn('verifyTabletBoardAccess:', err);
+    return { ok: false, reason: 'error' };
+  }
+}
+
+/**
  * Živý poslech dokumentu turnaje. Při smazání nebo neexistenci dokumentu volá callback(null).
  * @param {string} pin
  * @param {(data: object|null) => void} callback
