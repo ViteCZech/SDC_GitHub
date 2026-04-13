@@ -62,6 +62,14 @@ export function AdminVirtualKeyboardProvider({ children, lang, onVisibilityChang
     bindingRef.current?.onDelete?.();
   }, []);
 
+  const handlePhysicalEnter = useCallback(() => {
+    if (typeof bindingRef.current?.onEnterPress === 'function') {
+      bindingRef.current.onEnterPress();
+    } else {
+      closeKeyboard();
+    }
+  }, [closeKeyboard]);
+
   const value = {
     openKeyboard,
     closeKeyboard,
@@ -73,7 +81,13 @@ export function AdminVirtualKeyboardProvider({ children, lang, onVisibilityChang
     <AdminVirtualKeyboardContext.Provider value={value}>
       {children}
       {open && internalKeyboardEnabled && (
-        <VirtualKeyboard onChar={onChar} onDelete={onDelete} onClose={closeKeyboard} lang={lang} />
+        <VirtualKeyboard
+          onChar={onChar}
+          onDelete={onDelete}
+          onClose={closeKeyboard}
+          onEnter={handlePhysicalEnter}
+          lang={lang}
+        />
       )}
     </AdminVirtualKeyboardContext.Provider>
   );

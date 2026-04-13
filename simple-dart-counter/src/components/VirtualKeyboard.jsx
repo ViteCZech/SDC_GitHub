@@ -5,7 +5,7 @@ import { translations } from '../translations';
 /**
  * Interní klávesnice (CS/EN/PL + diakritika). Fyzická klávesnice zůstává funkční (keydown handler).
  */
-export default function VirtualKeyboard({ onChar, onDelete, onClose, lang }) {
+export default function VirtualKeyboard({ onChar, onDelete, onClose, onEnter, lang }) {
   const t = (k) => translations[lang]?.[k] || k;
   const [popup, setPopup] = useState(null);
   const timerRef = useRef(null);
@@ -56,7 +56,11 @@ export default function VirtualKeyboard({ onChar, onDelete, onClose, lang }) {
       if (e.key === 'Backspace') {
         e.preventDefault();
         onDelete();
-      } else if (e.key === 'Enter' || e.key === 'Escape') {
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (typeof onEnter === 'function') onEnter();
+        else onClose();
+      } else if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
       } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -66,7 +70,7 @@ export default function VirtualKeyboard({ onChar, onDelete, onClose, lang }) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onChar, onDelete, onClose]);
+  }, [onChar, onDelete, onClose, onEnter]);
 
   const handleDown = (char) => {
     if (popup) return;

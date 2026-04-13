@@ -254,49 +254,6 @@ function formatCompletedMatchScoreForSchedule(m) {
   return `${p1} : ${p2}`;
 }
 
-/** Zkrácený formát zápasu pro lištu tabletu, např. „501 DO/Ft4“ nebo „301 SO/Bo5“. */
-function formatTabletPinBarGameSegment(tournamentData, tournamentDraft, activeMatch, playingTabletContext) {
-  const td = tournamentData || {};
-  const am = activeMatch || playingTabletContext?.match;
-  const isBracket =
-    am?.matchType === 'bracket' || playingTabletContext?.tabletMatchType === 'bracket';
-
-  const startScore = td.startScore ?? tournamentDraft?.startScore ?? 501;
-  const outRaw = td.outMode ?? tournamentDraft?.outMode ?? 'double';
-  const outLabel = outRaw === 'double' || outRaw === 'master' ? 'DO' : 'SO';
-  const x01Part = `${startScore} ${outLabel}`;
-
-  const legsFormat = String(td.legsFormat ?? '').toLowerCase();
-  const legsOverride = Number(td.legs);
-  const baseBracket =
-    td.bracketKoLegs ?? td.bracketLegs ?? td.groupsLegs ?? tournamentDraft?.groupLegs ?? 3;
-  const groupLegs = td.groupsLegs ?? td.legsGroup ?? tournamentDraft?.groupLegs ?? 3;
-
-  let nLegs;
-  if (Number.isFinite(legsOverride) && legsOverride >= 1) {
-    nLegs = Math.floor(legsOverride);
-  } else if (isBracket && am) {
-    const ri = am.bracketRoundIndex ?? playingTabletContext?.roundIndex ?? 0;
-    nLegs =
-      am.winLegs != null && Number.isFinite(Number(am.winLegs))
-        ? Math.max(1, Math.floor(Number(am.winLegs)))
-        : getBracketWinLegsForRound(ri, baseBracket, td.prelimLegs);
-  } else {
-    nLegs = Math.max(1, groupLegs);
-  }
-
-  let fmtLabel;
-  if (legsFormat === 'bo' || legsFormat === 'best_of') {
-    fmtLabel = `Bo${nLegs}`;
-  } else if (legsFormat === 'ft' || legsFormat === 'first_to') {
-    fmtLabel = `Ft${nLegs}`;
-  } else {
-    fmtLabel = `Ft${nLegs}`;
-  }
-
-  return `${x01Part}/${fmtLabel}`;
-}
-
 /** Zápas pro tablet na daném terči: pavouk (stejný board) nebo skupina (board ve skupině). */
 function pickTabletMatchForBoard({
   tournamentData,
@@ -1596,30 +1553,6 @@ function AppMain({ lang, setLang }) {
     [tournamentData, tournamentMatches, tournamentBracket, tournamentGroups, tabletBoardStr]
   );
 
-  const tabletPinBarGameSegment = React.useMemo(() => {
-    if (userRole !== 'tablet') return '';
-    if (
-      appState !== 'tournament_tablet' &&
-      !(appState === 'playing' && tournamentMatchContext?.type === 'tablet')
-    ) {
-      return '';
-    }
-    const playingCtx = tournamentMatchContext?.type === 'tablet' ? tournamentMatchContext : null;
-    return formatTabletPinBarGameSegment(
-      tournamentData,
-      tournamentDraft,
-      tabletAssignedMatch,
-      playingCtx
-    );
-  }, [
-    userRole,
-    appState,
-    tournamentData,
-    tournamentDraft,
-    tabletAssignedMatch,
-    tournamentMatchContext,
-  ]);
-
   const isTournamentLive =
     (tournamentMatches?.some((m) => m.status !== 'pending') ?? false) ||
     (Array.isArray(tournamentBracket) &&
@@ -1642,8 +1575,15 @@ function AppMain({ lang, setLang }) {
 
   const liveTournamentEndPrediction = React.useMemo(() => {
     if (!tournamentData) return null;
+    const fmt = tournamentData.tournamentFormat || 'groups_bracket';
+    const bracketEmpty = !Array.isArray(tournamentBracket) || tournamentBracket.length === 0;
+    const rawAdvance =
+      tournamentData.promotersCount ??
+      tournamentData.promotersPerGroup ??
+      tournamentData.advancePerGroup ??
+      2;
     return calculateLiveTournamentEndPrediction({
-      format: tournamentData.tournamentFormat || 'groups_bracket',
+      format: fmt,
       groups: tournamentData.groups?.length ? tournamentData.groups : tournamentGroups,
       groupMatches: tournamentMatches ?? [],
       bracketRounds: tournamentBracket ?? [],
@@ -1651,6 +1591,18 @@ function AppMain({ lang, setLang }) {
       bracketLegs: Number(tournamentData.bracketKoLegs ?? tournamentData.bracketLegs ?? 3) || 3,
       totalBoards: Number(tournamentData.numBoards ?? tournamentData.totalBoards ?? 0) || 0,
       now: Date.now(),
+      structuralBracketFallback:
+        bracketEmpty && (tournamentData.players?.length ?? 0) >= 2
+          ? {
+              players: tournamentData.players,
+              format: fmt,
+              advancePerGroup: rawAdvance,
+              numGroups: tournamentData.numGroups,
+              numBoards: tournamentData.numBoards ?? tournamentData.totalBoards,
+              bracketKoLegs: Number(tournamentData.bracketKoLegs ?? tournamentData.bracketLegs ?? 3) || 3,
+              groupLegs: Number(tournamentData.groupsLegs ?? tournamentData.legsGroup ?? 3) || 3,
+            }
+          : null,
     });
   }, [
     tournamentData,
@@ -3169,9 +3121,9 @@ function AppMain({ lang, setLang }) {
   if (appState === 'playing') {
       const isTournamentPlaying = !!tournamentMatchContext;
       return (
-          <div className={`bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden ${showTournamentPinBar ? 'pt-10' : ''}`}>
+          <div className="bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden">
               {showTournamentPinBar && (
-                  <div className="fixed top-0 left-0 right-0 z-[5000] bg-slate-950 border-b border-slate-800 text-slate-300 p-2 flex flex-wrap justify-between items-center text-sm gap-x-2 gap-y-1">
+                  <div className="shrink-0 w-full z-[5000] bg-slate-950 border-b border-slate-800 text-slate-300 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] flex flex-wrap justify-between items-center text-sm gap-x-2 gap-y-1">
                       <div className="min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 flex-1">
                       {userRole === 'tablet' && tournamentMatchContext?.type === 'tablet' ? (
                         <div className="min-w-0 flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-x-2 text-[11px] sm:text-sm leading-tight pr-1">
@@ -3179,12 +3131,6 @@ function AppMain({ lang, setLang }) {
                           <span className="hidden sm:inline text-slate-600 shrink-0">|</span>
                           <span className="truncate text-slate-400">
                             {t('tournBoard') || 'Terč'} {String(tabletBoardStr || '—').trim() || '—'}
-                            {tabletPinBarGameSegment ? (
-                              <span className="text-slate-500 font-mono tabular-nums">
-                                {' '}
-                                {tabletPinBarGameSegment}
-                              </span>
-                            ) : null}
                           </span>
                         </div>
                       ) : (
@@ -3220,7 +3166,7 @@ function AppMain({ lang, setLang }) {
                       </div>
                   </div>
               )}
-              <header className="flex items-center justify-between px-4 py-3 border-b bg-slate-900 border-slate-800 shrink-0">
+              <header className="relative z-20 flex items-center justify-between px-4 py-3 border-b bg-slate-900 border-slate-800 shrink-0">
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
@@ -3339,9 +3285,9 @@ function AppMain({ lang, setLang }) {
   }
 
   return (
-    <div className={`bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden ${showTournamentPinBar ? 'pt-10' : ''}`}>
+    <div className="bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden">
       {showTournamentPinBar && (
-        <div className="fixed top-0 left-0 right-0 z-[5000] bg-slate-950 border-b border-slate-800 text-slate-300 p-2 flex flex-wrap justify-between items-center text-sm gap-x-2 gap-y-1">
+        <div className="shrink-0 w-full z-[5000] bg-slate-950 border-b border-slate-800 text-slate-300 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] flex flex-wrap justify-between items-center text-sm gap-x-2 gap-y-1">
           <div className="min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 flex-1">
           {userRole === 'tablet' && appState === 'tournament_tablet' ? (
             <div className="min-w-0 flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-x-2 text-[11px] sm:text-sm leading-tight pr-1">
@@ -3349,12 +3295,6 @@ function AppMain({ lang, setLang }) {
               <span className="hidden sm:inline text-slate-600 shrink-0">|</span>
               <span className="truncate text-slate-400">
                 {t('tournBoard') || 'Terč'} {String(tabletBoardStr || '—').trim() || '—'}
-                {tabletPinBarGameSegment ? (
-                  <span className="text-slate-500 font-mono tabular-nums">
-                    {' '}
-                    {tabletPinBarGameSegment}
-                  </span>
-                ) : null}
               </span>
             </div>
           ) : (
@@ -3798,6 +3738,7 @@ function AppMain({ lang, setLang }) {
           tournamentMatches={tournamentMatches}
           tournamentGroups={tournamentGroups}
           estimatedTournamentEnd={liveTournamentEndPrediction?.estimatedTournamentEnd ?? null}
+          estimatedGroupsPhaseEnd={liveTournamentEndPrediction?.estimatedGroupsPhaseEnd ?? null}
           lang={lang}
           userRole={userRole}
           hasBracket={hasBracketGenerated}

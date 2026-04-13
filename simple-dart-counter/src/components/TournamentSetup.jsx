@@ -15,6 +15,7 @@ import {
   listValidGroupCounts,
 } from '../utils/tournamentLogic';
 import { AdminTapTextField } from './AdminTapField';
+import { useAdminVirtualKeyboardOptional } from '../context/AdminVirtualKeyboardContext';
 
 /** Ranking z inputu: prázdné nebo 0 → null */
 function parseRankingFromInput(val) {
@@ -48,6 +49,7 @@ export default function TournamentSetup({
   onGoogleLogin,
 }) {
   const t = (k) => translations[lang]?.[k] || k;
+  const vkOpt = useAdminVirtualKeyboardOptional();
 
   const step = controlledStep ?? 1;
   const setStep = (s) => { if (typeof onStepChange === 'function') onStepChange(s); };
@@ -70,6 +72,9 @@ export default function TournamentSetup({
   const [editingIndex, setEditingIndex] = useState(null);
   const [editName, setEditName] = useState('');
   const [editRanking, setEditRanking] = useState('');
+  const tournamentNameFieldRef = useRef(null);
+  const playerNameFieldRef = useRef(null);
+  const playerRankingFieldRef = useRef(null);
 
   const players = tournamentDraft.players || [];
 
@@ -83,7 +88,7 @@ export default function TournamentSetup({
     if (step !== 2 || editingIndex !== null) return;
     const t = window.setTimeout(() => {
       try {
-        nameRef.current?.focus();
+        playerNameFieldRef.current?.focus();
       } catch (e) {}
     }, 0);
     return () => clearTimeout(t);
@@ -151,7 +156,7 @@ export default function TournamentSetup({
   const handleAddPlayer = () => {
     setStep2Error('');
     const name = playerName.trim();
-    if (!name) return;
+    if (!name) return false;
 
     // Dev cheat-code: "16!" => vygeneruje 16 testovacích hráčů
     const match = name.match(/^(\d+)!$/);
@@ -188,14 +193,14 @@ export default function TournamentSetup({
         }));
         setPlayerName('');
         setPlayerRanking('');
-        return;
+        return true;
       }
     }
 
     const finalRanking = parseRankingFromInput(playerRanking);
     if (isDuplicateName(name, -1)) {
       setStep2Error(t('tournErrDupName') || 'Toto jméno je již přihlášeno.');
-      return;
+      return false;
     }
     setTournamentDraft((prev) => ({
       ...prev,
@@ -205,6 +210,7 @@ export default function TournamentSetup({
     setPlayerRanking('');
     setAddConfirm(true);
     setTimeout(() => setAddConfirm(false), 1800);
+    return true;
   };
 
   const handleDeletePlayer = (idx) => {
@@ -223,20 +229,23 @@ export default function TournamentSetup({
   };
 
   const handleSaveEdit = () => {
-    if (editingIndex === null) return;
+    if (editingIndex === null) return false;
     setStep2Error('');
     const name = editName.trim();
-    if (!name) return;
+    if (!name) return false;
     const finalRanking = parseRankingFromInput(editRanking);
     if (isDuplicateName(name, editingIndex)) {
       setStep2Error(t('tournErrDupName') || 'Toto jméno je již přihlášeno.');
-      return;
+      return false;
     }
     setTournamentDraft((prev) => ({
       ...prev,
       players: (prev.players || []).map((p, i) => (i === editingIndex ? { name, ranking: finalRanking } : p)),
     }));
     setEditingIndex(null);
+    setEditName('');
+    setEditRanking('');
+    return true;
   };
 
   const advancePerGroup =
@@ -462,8 +471,14 @@ export default function TournamentSetup({
                   {t('tournName') || 'Název turnaje'}
                 </label>
                 <AdminTapTextField
+                  fieldRef={tournamentNameFieldRef}
+                  id="tournament-setup-tournament-name"
                   value={tournamentDraft.name}
                   onValueChange={(v) => setTournamentDraft((prev) => ({ ...prev, name: v }))}
+                  onEnterPress={() => {
+                    vkOpt?.closeKeyboard?.();
+                    handleStep1Continue();
+                  }}
                   placeholder={t('tournNamePlaceholder') || 'např. Páteční turnaj'}
                   className={inputBase}
                 />
@@ -592,10 +607,19 @@ export default function TournamentSetup({
                         {t('playerName') || 'Jméno hráče'}
                       </label>
                       <AdminTapTextField
+                        fieldRef={playerNameFieldRef}
+                        id="tournament-setup-player-name"
                         value={editingIndex !== null ? editName : playerName}
                         onValueChange={(v) =>
                           editingIndex !== null ? setEditName(v) : setPlayerName(v)
                         }
+                        onEnterPress={() => {
+                          vkOpt?.closeKeyboard?.();
+                          requestAnimationFrame(() => {
+                            playerRankingFieldRef.current?.focus();
+                            playerRankingFieldRef.current?.click();
+                          });
+                        }}
                         placeholder={t('tournPlayerPlaceholder') || 'Jméno nebo jméno a příjmení'}
                         className={inputBase}
                       />
@@ -605,10 +629,23 @@ export default function TournamentSetup({
                         {t('tournRanking') || 'Ranking'}
                       </label>
                       <AdminTapTextField
+                        fieldRef={playerRankingFieldRef}
+                        id="tournament-setup-player-ranking"
                         value={editingIndex !== null ? editRanking : playerRanking}
                         onValueChange={(v) =>
                           editingIndex !== null ? setEditRanking(v) : setPlayerRanking(v)
                         }
+                        onEnterPress={() => {
+                          vkOpt?.closeKeyboard?.();
+                          const ok =
+                            editingIndex !== null ? handleSaveEdit() : handleAddPlayer();
+                          if (ok) {
+                            requestAnimationFrame(() => {
+                              playerNameFieldRef.current?.focus();
+                              playerNameFieldRef.current?.click();
+                            });
+                          }
+                        }}
                         filterChar={(c) => /^\d$/.test(c)}
                         placeholder="–"
                         className={`${inputBase} w-full font-mono`}

@@ -304,8 +304,12 @@ function countDistinctBracketBoards(bracketRounds) {
 }
 
 /**
- * Živý odhad konce turnaje: sekvenčně zbývající čas skupin + zbývající čas pavouka (součet), i když skupiny
- * ještě nejsou dohrané. KO sloty bez známých soupeřů bereme jako celý průměrný zápas.
+ * Živý odhad konce turnaje: zbývající čas skupin + součet „stěnových“ časů všech kol pavouka (kola za sebou).
+ * Dříve se omylem započítávalo jen první neukončené kolo → konec turnaje byl téměř totožný s koncem skupin.
+ * KO sloty bez známých soupeřů bereme jako celý průměrný zápas.
+ *
+ * Pokud je `bracketRounds` prázdný a je předán `structuralBracketFallback`, použije se odhad délky KO z parametrů
+ * turnaje (počet hráčů, skupin, postupujících, legů) přes {@link estimateTotalTournamentTime}.
  *
  * @returns {{
  *   estimatedTournamentEnd: Date,
@@ -325,6 +329,8 @@ export function calculateLiveTournamentEndPrediction({
   bracketLegs = 3,
   totalBoards = 0,
   now = Date.now(),
+  /** Když ještě není vygenerovaný pavouk — odhad zbývající KO fáze z nastavení turnaje */
+  structuralBracketFallback = null,
 } = {}) {
   const settings = { groupsLegs, totalBoards };
   const hasGroups = isTournamentGroupsThenBracketFormat(format) && (groups || []).length > 0;
@@ -350,19 +356,6 @@ export function calculateLiveTournamentEndPrediction({
     boardsBracket = Math.max(1, boardsBracket);
 
     for (let ri = 0; ri < bracket.length; ri++) {
-      let earlierIncomplete = false;
-      for (let j = 0; j < ri; j++) {
-        const prevMatches = bracket[j]?.matches || [];
-        for (const pm of prevMatches) {
-          if (!pm || pm.isBye) continue;
-          if (bracketMatchTerminal(pm)) continue;
-          earlierIncomplete = true;
-          break;
-        }
-        if (earlierIncomplete) break;
-      }
-      if (earlierIncomplete) continue;
-
       const round = bracket[ri];
       const matches = round?.matches || [];
       let roundSum = 0;
@@ -377,6 +370,26 @@ export function calculateLiveTournamentEndPrediction({
       if (roundUnfinished === 0) continue;
       const parallelInRound = Math.max(1, Math.min(boardsBracket, roundUnfinished));
       remBracket += roundSum / parallelInRound;
+    }
+  } else if (structuralBracketFallback && Array.isArray(structuralBracketFallback.players)) {
+    const players = structuralBracketFallback.players;
+    const fmt = structuralBracketFallback.format ?? format ?? 'groups_bracket';
+    const adv = structuralBracketFallback.advancePerGroup ?? 2;
+    const nGr = structuralBracketFallback.numGroups;
+    const nBoards = Number(structuralBracketFallback.numBoards ?? totalBoards ?? 0) || 0;
+    const bLegs = Number(structuralBracketFallback.bracketKoLegs ?? bracketLegs) || 3;
+    const gLegs = Number(structuralBracketFallback.groupLegs ?? groupsLegs) || 3;
+    if (players.length >= 2) {
+      const { bracketMs } = estimateTotalTournamentTime(
+        { players, format: fmt, groupLegs: gLegs },
+        {
+          advancePerGroup: adv,
+          bracketKoLegs: bLegs,
+          numGroups: nGr,
+          numBoards: nBoards > 0 ? nBoards : 99,
+        }
+      );
+      remBracket = bracketMs;
     }
   }
 
@@ -1517,6 +1530,33 @@ export function generateTournamentVariants(playerCount, totalBoards = null) {
 }
 
 /**
+ * Stěnový čas single-eliminace bez konkrétního rozvrhu zápasů (symetrický model s byty).
+ * V každém kole: m = floor(R/2) zápasů, paralelita = min(počet terčů, m), příspěvek = m × avgMatch / paralelita.
+ * Stejná myšlenka jako u živého odhadu v {@link calculateLiveTournamentEndPrediction} (součet přes kola).
+ *
+ * @param {number} playerCount kolik hráčů vstupuje do KO (≥ 2)
+ * @param {number} avgMatchDurationMs průměrná délka jednoho zápasu v ms
+ * @param {number} numBoardsRaw počet terčů (>0); jinak 99 = bez praktického stropu
+ */
+export function estimateSingleEliminationWallMs(playerCount, avgMatchDurationMs, numBoardsRaw) {
+  const avg = Math.max(0, Number(avgMatchDurationMs) || 0);
+  if (avg <= 0) return 0;
+  let R = Math.max(0, Math.floor(Number(playerCount) || 0));
+  if (R < 2) return 0;
+  const cap = Number(numBoardsRaw);
+  const B = Number.isFinite(cap) && cap > 0 ? Math.max(1, Math.floor(cap)) : 99;
+  let total = 0;
+  while (R > 1) {
+    const m = Math.floor(R / 2);
+    if (m < 1) break;
+    const parallel = Math.max(1, Math.min(B, m));
+    total += (m * avg) / parallel;
+    R -= m;
+  }
+  return total;
+}
+
+/**
  * Odhad celkového času turnaje (skupiny + KO pavouk).
  * @param {{ players: Array, format: string, groupLegs?: number, groups?: Array }} opts
  * @param {{ advancePerGroup: number|'all', bracketKoLegs?: number, numGroups?: number, numBoards?: number }} bracketOpts
@@ -1557,11 +1597,12 @@ export function estimateTotalTournamentTime(opts, bracketOpts = {}) {
       groupsMs = baseGroupsMs * boardFactor;
 
       const totalAdvancees = countPlayersAdvancingFromGroups(nTot, numGroups, advancePerGroup);
-      const bracketMatches = Math.max(0, totalAdvancees - 1);
-      bracketMs = bracketMatches * maxLegsBracket * avgLegMs;
+      const avgBracketMatchMs = maxLegsBracket * avgLegMs;
+      bracketMs = estimateSingleEliminationWallMs(totalAdvancees, avgBracketMatchMs, numBoards);
     }
   } else if (isTournamentBracketOnlyFormat(format) && players.length >= 2) {
-    bracketMs = (players.length - 1) * maxLegsBracket * avgLegMs;
+    const avgBracketMatchMs = maxLegsBracket * avgLegMs;
+    bracketMs = estimateSingleEliminationWallMs(players.length, avgBracketMatchMs, numBoards);
   }
 
   return {

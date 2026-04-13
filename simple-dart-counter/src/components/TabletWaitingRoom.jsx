@@ -157,25 +157,27 @@ export default function TabletWaitingRoom({
       <div className="w-full overflow-x-auto max-lg:flex-1 max-lg:min-h-0 max-lg:overflow-y-auto lg:overflow-y-visible">
         <table className={`${standingsTableClass} text-left`}>
           <thead>
-            <tr className="border-b border-slate-700 text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
-              <th className="text-center py-2 w-10">{tFlat('tournStandingPos')}</th>
-              <th className="text-left py-2 pr-2">{tFlat('playerName')}</th>
-              <th className="text-center py-2 w-10">{tFlat('tournStandingPoints')}</th>
-              <th className="text-center py-2 w-[4.5rem] whitespace-pre-line leading-tight">
+            <tr className="border-b border-slate-700 text-slate-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-tight">
+              <th className="text-center py-1.5 w-[2.25rem] sm:w-10 px-0.5">{tFlat('tournStandingPos')}</th>
+              <th className="text-left py-1.5 pr-1 min-w-0">{tFlat('playerName')}</th>
+              <th className="text-center py-1.5 w-8 sm:w-9 px-0.5">{tFlat('tournStandingPoints')}</th>
+              <th className="text-center py-1.5 w-[3.25rem] sm:w-[4rem] px-0.5 whitespace-pre-line leading-tight">
                 {tFlat('tournStandingMatchesShort')}
               </th>
-              <th className="text-center py-2 w-[4.5rem] whitespace-pre-line leading-tight">
+              <th className="text-center py-1.5 w-[3.25rem] sm:w-[4rem] px-0.5 whitespace-pre-line leading-tight">
                 {tFlat('tournStandingLegsShort')}
               </th>
-              <th className="text-center py-2 w-12">{tFlat('tournStandingDiff')}</th>
-              <th className="text-center py-2 w-14">{tFlat('tournStandingAvg')}</th>
+              <th className="text-center py-1.5 w-9 sm:w-10 px-0.5">{tFlat('tournStandingDiff')}</th>
+              <th className="text-center py-1.5 w-11 sm:w-12 px-0.5">{tFlat('tournStandingAvg')}</th>
             </tr>
           </thead>
           <tbody>
             {groupStandings.map((row, idx) => (
               <tr key={row.id ?? idx} className="border-b border-slate-800 last:border-0">
-                <td className="text-center text-slate-200 font-black">{idx + 1}</td>
-                <td className="text-slate-200 font-medium break-words max-w-[min(100%,14rem)] sm:max-w-xs lg:max-w-none">
+                <td className="text-center text-slate-200 text-[10px] sm:text-xs font-bold tabular-nums px-0.5 py-1.5">
+                  {idx + 1}
+                </td>
+                <td className="text-slate-200 font-medium break-words max-w-[min(100%,14rem)] sm:max-w-xs lg:max-w-none min-w-0 py-1.5 px-1">
                   {row.name}
                 </td>
                 <td className="text-center text-slate-200 font-mono text-xs font-bold">

@@ -12,21 +12,29 @@ import { translations } from '../translations';
 /** Tabulka pořadí – profesionální s všemi detaily */
 function GroupStandingsTable({ standings, advanceCount, t }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+    <div className="w-full min-w-0 overflow-x-auto">
+      <table className="w-full max-w-full text-xs sm:text-sm table-fixed">
         <thead>
-          <tr className="border-b border-slate-700 text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider leading-tight">
-            <th className="text-center py-2 w-10 align-bottom">{t('tournStandingPos') || 'Pořadí'}</th>
-            <th className="text-left py-2 pr-2 align-bottom">{t('playerName') || 'Hráč'}</th>
-            <th className="text-center py-2 w-10 align-bottom">{t('tournStandingPoints') || 'Body'}</th>
-            <th className="text-center py-2 w-[4.5rem] align-bottom leading-tight whitespace-pre-line">
+          <tr className="border-b border-slate-700 text-slate-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-tight leading-tight">
+            <th className="text-center py-1.5 w-[2.25rem] sm:w-10 px-0.5 align-bottom">
+              {t('tournStandingPos') || 'No:'}
+            </th>
+            <th className="text-left py-1.5 pr-1 min-w-0 align-bottom">{t('playerName') || 'Hráč'}</th>
+            <th className="text-center py-1.5 w-8 sm:w-9 px-0.5 align-bottom">
+              {t('tournStandingPoints') || 'Body'}
+            </th>
+            <th className="text-center py-1.5 w-[3.25rem] sm:w-[4rem] px-0.5 align-bottom leading-tight whitespace-pre-line">
               {t('tournStandingMatchesShort')}
             </th>
-            <th className="text-center py-2 w-[4.5rem] align-bottom leading-tight whitespace-pre-line">
+            <th className="text-center py-1.5 w-[3.25rem] sm:w-[4rem] px-0.5 align-bottom leading-tight whitespace-pre-line">
               {t('tournStandingLegsShort')}
             </th>
-            <th className="text-center py-2 w-12 align-bottom">{t('tournStandingDiff') || 'Rozdíl'}</th>
-            <th className="text-center py-2 w-14 align-bottom">{t('tournStandingAvg') || 'Průměr'}</th>
+            <th className="text-center py-1.5 w-9 sm:w-10 px-0.5 align-bottom">
+              {t('tournStandingDiff') || 'Rozdíl'}
+            </th>
+            <th className="text-center py-1.5 w-11 sm:w-12 px-0.5 align-bottom">
+              {t('tournStandingAvg') || 'Průměr'}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -42,13 +50,13 @@ function GroupStandingsTable({ standings, advanceCount, t }) {
             >
               {/* border-l na <tr> u collapse tabulek často mizí — okraj jen na první buňce */}
               <td
-                className={`py-2 text-center font-black text-slate-200 ${
+                className={`py-1.5 px-0.5 text-center text-[10px] sm:text-xs font-bold tabular-nums text-slate-200 ${
                   isAdvancing ? 'border-l-2 border-l-emerald-500/60' : ''
                 }`}
               >
                 {idx + 1}
               </td>
-              <td className="whitespace-nowrap px-2 py-2 font-medium max-w-[180px] truncate text-slate-100">
+              <td className="min-w-0 px-1 py-1.5 font-medium truncate text-slate-100">
                 <div className="flex items-center gap-2">
                   <span className="truncate">{row.name}</span>
                   {isAdvancing && (
@@ -58,19 +66,19 @@ function GroupStandingsTable({ standings, advanceCount, t }) {
                   )}
                 </div>
               </td>
-              <td className="py-2 text-center text-slate-200 font-mono text-xs font-bold">
+              <td className="py-1.5 px-0.5 text-center text-slate-200 font-mono text-[10px] sm:text-xs font-bold">
                 {row.points ?? row.matchesWon}
               </td>
-              <td className="py-2 text-center text-slate-300 font-mono text-xs">
+              <td className="py-1.5 px-0.5 text-center text-slate-300 font-mono text-[10px] sm:text-xs">
                 {row.matchesWon}:{row.matchesLost}
               </td>
-              <td className="py-2 text-center text-slate-400 font-mono text-xs">
+              <td className="py-1.5 px-0.5 text-center text-slate-400 font-mono text-[10px] sm:text-xs">
                 {row.legsWon}:{row.legsLost}
               </td>
-              <td className="py-2 text-center text-slate-300 font-mono text-xs">
+              <td className="py-1.5 px-0.5 text-center text-slate-300 font-mono text-[10px] sm:text-xs">
                 {row.legDifference > 0 ? '+' : ''}{row.legDifference}
               </td>
-              <td className="py-2 text-center text-slate-300 font-mono text-xs">
+              <td className="py-1.5 px-0.5 text-center text-slate-300 font-mono text-[10px] sm:text-xs">
                 {Number(row.average ?? 0).toFixed(2)}
               </td>
             </tr>
@@ -322,6 +330,7 @@ export default function TournamentGroupsView({
   tournamentMatches = [],
   tournamentGroups = [],
   estimatedTournamentEnd = null,
+  estimatedGroupsPhaseEnd = null,
   lang = 'cs',
   userRole = null,
   hasBracket = false,
@@ -414,6 +423,11 @@ export default function TournamentGroupsView({
       hour: '2-digit',
       minute: '2-digit',
     });
+
+  const groupsEndForBanner =
+    estimatedGroupsPhaseEnd instanceof Date && !Number.isNaN(estimatedGroupsPhaseEnd.getTime())
+      ? estimatedGroupsPhaseEnd
+      : timePrediction.estimatedEnd;
 
   const handleStartMatch = (match, group) => {
     const p1 = group.players.find((p) => p.id === match.player1Id);
@@ -626,7 +640,7 @@ export default function TournamentGroupsView({
             <div className="mb-6 p-4 rounded-xl bg-slate-900 border border-slate-800">
               <p className="text-lg font-bold text-slate-100">
                 {t('tournEstEndGroups') || 'Odhadovaný konec skupin'}:{' '}
-                <span className="text-emerald-400">{formatTime(timePrediction.estimatedEnd)}</span>
+                <span className="text-emerald-400">{formatTime(groupsEndForBanner)}</span>
               </p>
               {estimatedTournamentEnd instanceof Date && !Number.isNaN(estimatedTournamentEnd.getTime()) ? (
                 <p className="text-base font-bold text-slate-200 mt-2">

@@ -4,6 +4,7 @@ import { distributePlayersToFixedGroups } from '../utils/tournamentGenerator';
 import { isTournamentBracketOnlyFormat } from '../utils/tournamentLogic';
 import { translations } from '../translations';
 import { AdminTapTextField } from './AdminTapField';
+import { useAdminVirtualKeyboardOptional } from '../context/AdminVirtualKeyboardContext';
 
 const EMPTY_BOARD_ASSIGNMENTS = {};
 
@@ -45,6 +46,7 @@ export default function TournamentBoardAssignment({
   onBack,
 }) {
   const t = (k) => translations[lang]?.[k] ?? k;
+  const vkOpt = useAdminVirtualKeyboardOptional();
 
   const draftBoards = tournamentDraft?.boardAssignments ?? EMPTY_BOARD_ASSIGNMENTS;
   const persistedBoards = tournamentData?.boardAssignments ?? EMPTY_BOARD_ASSIGNMENTS;
@@ -291,7 +293,19 @@ export default function TournamentBoardAssignment({
                     id={`board-input-${gid}`}
                     value={displayValue}
                     onValueChange={(v) => handleBoardChange(gid, v)}
-                    onEnterPress={() => validateAndSubmit()}
+                    onEnterPress={() => {
+                      const idx = groups.findIndex((g) => g.groupId === gid);
+                      const next = idx >= 0 ? groups[idx + 1] : null;
+                      if (!next) return;
+                      vkOpt?.closeKeyboard?.();
+                      requestAnimationFrame(() => {
+                        const el = document.getElementById(`board-input-${next.groupId}`);
+                        if (el) {
+                          el.focus();
+                          el.click();
+                        }
+                      });
+                    }}
                     filterChar={(c) => /[\d,;\s]/.test(c)}
                     placeholder={t('tournBoardPlaceholderQueue') || "např. 1 (prázdné = fronta)"}
                     disabled={fieldLocked}
