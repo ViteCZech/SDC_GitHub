@@ -88,8 +88,8 @@ function GroupStandingsTable({ standings, advanceCount, t }) {
               title={t('tournStandingAvg') || 'Průměr'}
             >
               <span className="sr-only">{t('tournStandingAvg') || 'Průměr'}</span>
-              <span className="font-serif text-[12px] sm:text-[13px] leading-none text-slate-400" aria-hidden="true">
-                x̄
+              <span className="text-[12px] sm:text-[13px] leading-none text-slate-400 font-semibold" aria-hidden="true">
+                Ø
               </span>
             </th>
           </tr>

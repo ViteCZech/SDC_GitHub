@@ -181,11 +181,11 @@ export default function TabletWaitingRoom({
                 </span>
               </th>
               <th
-                className="text-center py-1.5 w-11 sm:w-12 px-0.5 align-middle font-serif normal-case font-semibold text-[11px] sm:text-xs"
+                className="text-center py-1.5 w-11 sm:w-12 px-0.5 align-middle normal-case font-semibold text-[11px] sm:text-xs"
                 title={tFlat('tournStandingAvg')}
               >
                 <span className="sr-only">{tFlat('tournStandingAvg')}</span>
-                <span aria-hidden="true">x̄</span>
+                <span aria-hidden="true">Ø</span>
               </th>
             </tr>
           </thead>
