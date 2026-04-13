@@ -64,17 +64,18 @@ export default function TournamentBracketSetup({
 
   return (
     <main className="flex flex-col flex-1 w-full overflow-y-auto bg-slate-950">
-      <div className="w-full max-w-2xl mx-auto p-4 pb-24 space-y-6">
+      <div className="w-full max-w-2xl lg:max-w-5xl xl:max-w-6xl mx-auto p-4 pb-24 space-y-6">
         <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400">
           {t('tournBracketSetupTitle') || 'Nastavení vyřazovacího pavouka'}
         </h2>
 
-        <div className="p-4 border rounded-xl bg-slate-900 border-slate-800 space-y-4">
+        <div className="p-4 border rounded-xl bg-slate-900 border-slate-800 space-y-6 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-8 lg:items-start">
+          <div className="space-y-4 min-w-0">
           <div>
             <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
               {t('tournAdvancePerGroup') || 'Počet postupujících z každé skupiny'}
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-2">
               {['2', '3', '4'].map((v) => (
                 <button
                   key={v}
@@ -114,8 +115,9 @@ export default function TournamentBracketSetup({
             {t('tournAdvanceTotalHint') || 'Celkem postupujících do pavouka:'}{' '}
             <span className="font-mono font-bold text-slate-300">{totalAdvancees}</span>
           </p>
+          </div>
 
-          <div>
+          <div className="space-y-4 min-w-0 lg:pt-0 pt-2 border-t lg:border-t-0 lg:border-l border-slate-800 lg:pl-8">
             <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
               {t('tournBracketKoLegs') || 'Počet vítězných legů pro KO fázi'}
             </label>

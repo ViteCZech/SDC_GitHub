@@ -216,7 +216,7 @@ export default function TournamentBoardAssignment({
 
   return (
     <main className="flex flex-col flex-1 w-full overflow-y-auto bg-slate-950">
-      <div className="w-full max-w-[98vw] mx-auto px-2 sm:px-4 py-4 pb-24">
+      <div className="w-full max-w-[98vw] xl:max-w-7xl mx-auto px-2 sm:px-4 py-4 pb-24">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400">

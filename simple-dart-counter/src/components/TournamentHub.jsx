@@ -29,71 +29,84 @@ export default function TournamentHub({
   };
 
   const shellMain =
-    'flex flex-col flex-1 w-full max-w-md md:max-w-4xl mx-auto overflow-y-auto bg-slate-950 px-3 pt-3 pb-20 sm:px-6 sm:pt-4 sm:pb-24 min-h-0';
+    'flex flex-col flex-1 w-full max-w-md md:max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto overflow-y-auto bg-slate-950 px-3 pt-3 pb-20 sm:px-6 sm:pt-4 sm:pb-24 min-h-0';
   const shortH =
     '[@media(max-height:520px)]:px-2 [@media(max-height:520px)]:pt-2 [@media(max-height:520px)]:pb-16 [@media(max-height:520px)]:sm:px-4 [@media(max-height:520px)]:sm:pt-3';
+
+  const fieldInput =
+    'w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/60 [@media(max-height:520px)]:py-2 [@media(max-height:520px)]:text-base';
 
   if (panel === 'tablet') {
     return (
       <main className={`${shellMain} ${shortH}`}>
-        <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400 mb-6 [@media(max-height:520px)]:text-base [@media(max-height:520px)]:mb-3 [@media(max-height:520px)]:tracking-wide">
+        <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400 mb-4 md:mb-6 [@media(max-height:520px)]:text-base [@media(max-height:520px)]:mb-3 [@media(max-height:520px)]:tracking-wide">
           {th('tabletMode')}
         </h2>
-        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
-          {th('enterPin')}
-        </label>
-        <input
-          type="text"
-          inputMode="numeric"
-          autoComplete="off"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg mb-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 [@media(max-height:520px)]:py-2 [@media(max-height:520px)]:mb-2 [@media(max-height:520px)]:text-base"
-          placeholder="0000"
-        />
-        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
-          {th('enterBoard')}
-        </label>
-        <input
-          type="text"
-          inputMode="numeric"
-          autoComplete="off"
-          value={board}
-          onChange={(e) => setBoard(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg mb-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 [@media(max-height:520px)]:py-2 [@media(max-height:520px)]:mb-2 [@media(max-height:520px)]:text-base"
-          placeholder="1"
-        />
-        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
-          {th('enterTabletPassword')}
-        </label>
-        <input
-          type="text"
-          inputMode="text"
-          autoComplete="off"
-          maxLength={5}
-          value={tabletPassword}
-          onChange={(e) => setTabletPassword(e.target.value.slice(0, 5))}
-          className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg mb-6 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 [@media(max-height:520px)]:py-2 [@media(max-height:520px)]:mb-3 [@media(max-height:520px)]:text-base"
-          placeholder="•••"
-        />
-        <button
-          type="button"
-          onClick={() => onTabletJoin?.(pin.trim(), board.trim(), tabletPassword.trim())}
-          className="w-full py-4 rounded-xl font-black bg-emerald-600 text-white hover:bg-emerald-500 border border-emerald-500 mb-3 [@media(max-height:520px)]:py-3"
-        >
-          {th('join')}
-        </button>
-        <button
-          type="button"
-          onClick={resetForm}
-          className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 [@media(max-height:520px)]:py-2.5"
-        >
-          {translations[lang]?.tournBack ?? 'Zpět'}
-        </button>
+        <div className="grid w-full grid-cols-1 md:grid-cols-3 gap-4 md:gap-4 mb-4 md:mb-6">
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
+              {th('enterPin')}
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              className={fieldInput}
+              placeholder="0000"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
+              {th('enterBoard')}
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              value={board}
+              onChange={(e) => setBoard(e.target.value)}
+              className={fieldInput}
+              placeholder="1"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
+              {th('enterTabletPassword')}
+            </label>
+            <input
+              type="text"
+              inputMode="text"
+              autoComplete="off"
+              maxLength={5}
+              value={tabletPassword}
+              onChange={(e) => setTabletPassword(e.target.value.slice(0, 5))}
+              className={fieldInput}
+              placeholder="•••"
+            />
+          </div>
+        </div>
+        <div className="grid w-full grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <button
+            type="button"
+            onClick={() => onTabletJoin?.(pin.trim(), board.trim(), tabletPassword.trim())}
+            className="w-full py-4 rounded-xl font-black bg-emerald-600 text-white hover:bg-emerald-500 border border-emerald-500 [@media(max-height:520px)]:py-3"
+          >
+            {th('join')}
+          </button>
+          <button
+            type="button"
+            onClick={resetForm}
+            className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 [@media(max-height:520px)]:py-2.5"
+          >
+            {translations[lang]?.tournBack ?? 'Zpět'}
+          </button>
+        </div>
         <button
           type="button"
           onClick={onBack}
-          className="mt-6 flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 [@media(max-height:520px)]:mt-3 [@media(max-height:520px)]:py-3"
+          className="mt-2 md:mt-4 flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 [@media(max-height:520px)]:mt-2 [@media(max-height:520px)]:py-3"
         >
           <Home className="w-5 h-5 [@media(max-height:520px)]:w-4 [@media(max-height:520px)]:h-4" /> {translations[lang]?.backMenu ?? 'Zpět do menu'}
         </button>
@@ -104,39 +117,45 @@ export default function TournamentHub({
   if (panel === 'viewer') {
     return (
       <main className={`${shellMain} ${shortH}`}>
-        <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400 mb-6 [@media(max-height:520px)]:text-base [@media(max-height:520px)]:mb-3 [@media(max-height:520px)]:tracking-wide">
+        <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400 mb-4 md:mb-6 [@media(max-height:520px)]:text-base [@media(max-height:520px)]:mb-3 [@media(max-height:520px)]:tracking-wide">
           {th('viewerMode')}
         </h2>
-        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
-          {th('enterPin')}
-        </label>
-        <input
-          type="text"
-          inputMode="numeric"
-          autoComplete="off"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg mb-6 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 [@media(max-height:520px)]:py-2 [@media(max-height:520px)]:mb-3 [@media(max-height:520px)]:text-base"
-          placeholder="0000"
-        />
-        <button
-          type="button"
-          onClick={() => onViewerJoin?.(pin.trim())}
-          className="w-full py-4 rounded-xl font-black bg-emerald-600 text-white hover:bg-emerald-500 border border-emerald-500 mb-3 [@media(max-height:520px)]:py-3"
-        >
-          {th('join')}
-        </button>
-        <button
-          type="button"
-          onClick={resetForm}
-          className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 [@media(max-height:520px)]:py-2.5"
-        >
-          {translations[lang]?.tournBack ?? 'Zpět'}
-        </button>
+        <div className="grid w-full grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 md:items-end mb-4">
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
+              {th('enterPin')}
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              className={fieldInput}
+              placeholder="0000"
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => onViewerJoin?.(pin.trim())}
+              className="w-full py-4 rounded-xl font-black bg-emerald-600 text-white hover:bg-emerald-500 border border-emerald-500 [@media(max-height:520px)]:py-3"
+            >
+              {th('join')}
+            </button>
+            <button
+              type="button"
+              onClick={resetForm}
+              className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 [@media(max-height:520px)]:py-2.5"
+            >
+              {translations[lang]?.tournBack ?? 'Zpět'}
+            </button>
+          </div>
+        </div>
         <button
           type="button"
           onClick={onBack}
-          className="mt-6 flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 [@media(max-height:520px)]:mt-3 [@media(max-height:520px)]:py-3"
+          className="mt-2 flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 [@media(max-height:520px)]:mt-2 [@media(max-height:520px)]:py-3"
         >
           <Home className="w-5 h-5 [@media(max-height:520px)]:w-4 [@media(max-height:520px)]:h-4" /> {translations[lang]?.backMenu ?? 'Zpět do menu'}
         </button>
@@ -158,8 +177,8 @@ export default function TournamentHub({
         {translations[lang]?.tournament ?? 'Turnaj'}
       </h2>
 
-      {/* Stejný princip jako hlavní menu: mřížka na šířku, více sloupců = méně vertikální scroll */}
-      <div className="grid w-full grid-cols-2 gap-2 sm:gap-3 landscape:gap-2 [@media(max-height:520px)]:gap-2">
+      {/* Na šířku: 2×2 na mobilu, jeden řádek na velkých obrazovkách */}
+      <div className="grid w-full grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 landscape:gap-2 [@media(max-height:520px)]:gap-2">
         <button
           type="button"
           onClick={() => onChooseAdmin?.()}

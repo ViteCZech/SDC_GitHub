@@ -474,10 +474,11 @@ export default function TournamentSetup({
           <span className="text-sm font-medium">{notification.message}</span>
         </div>
       )}
-      <div className="w-full max-w-[98vw] mx-auto px-2 sm:px-4 py-4 pb-20">
+      <div className="w-full max-w-[98vw] xl:max-w-7xl mx-auto px-2 sm:px-4 py-4 pb-20">
         {/* STEP 1 */}
         {step === 1 && (
-          <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start animate-in fade-in duration-200">
+            <div className="lg:col-span-5 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button
                 type="button"
@@ -502,7 +503,7 @@ export default function TournamentSetup({
                 {t('formatBracketOnly') || t('tournFormatKoOnly')}
               </button>
             </div>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-6 lg:mb-0">
               <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400">{stepLabels.tournStep1}</h2>
               <div className="hidden sm:flex items-center gap-2">
                 {onBack && (
@@ -516,7 +517,10 @@ export default function TournamentSetup({
                 </button>
               </div>
             </div>
-            <div className="p-4 border rounded-xl bg-slate-900 border-slate-800 space-y-4">
+            </div>
+            <div className="lg:col-span-7">
+            <div className="p-4 border rounded-xl bg-slate-900 border-slate-800 space-y-4 md:grid md:grid-cols-2 md:gap-6 md:space-y-0">
+              <div className="space-y-4 min-w-0">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
                   {t('tournName') || 'Název turnaje'}
@@ -553,6 +557,8 @@ export default function TournamentSetup({
                   </p>
                 </div>
               )}
+              </div>
+              <div className="space-y-4 min-w-0">
               <div className="rounded-xl border border-slate-700/80 bg-slate-950/60 p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -649,8 +655,10 @@ export default function TournamentSetup({
                   {validationError}
                 </div>
               )}
+              </div>
             </div>
-            <div className="flex justify-between gap-2 sm:hidden">
+            </div>
+            <div className="flex justify-between gap-2 sm:hidden lg:col-span-12">
               {onBack && (
                 <button onClick={onBack} className={`${btnBase} bg-slate-800 text-slate-300 hover:bg-slate-700`}>
                   <ArrowLeft className="w-5 h-5" /> {t('tournBack') || 'Zpět'}

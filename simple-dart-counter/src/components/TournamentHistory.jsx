@@ -196,7 +196,7 @@ export default function TournamentHistory({ lang = 'cs', user, onBack }) {
   }
 
   return (
-    <main className="flex flex-col flex-1 w-full max-w-lg mx-auto overflow-y-auto bg-slate-950 p-4 pb-24">
+    <main className="flex flex-col flex-1 w-full max-w-lg md:max-w-4xl lg:max-w-6xl mx-auto overflow-y-auto bg-slate-950 p-4 pb-24">
       <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400 mb-4">
         {t('tournamentHistoryTitle')}
       </h2>
@@ -243,7 +243,7 @@ export default function TournamentHistory({ lang = 'cs', user, onBack }) {
       ) : rows.length === 0 ? (
         <p className="text-sm text-slate-500 mb-10">{t('tournamentHistoryPlaceholder')}</p>
       ) : (
-        <ul className="space-y-3 mb-10">
+        <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-10">
           {rows.map((row) => {
             const key = row.id ?? `${row.source}-${sortMs(row)}-${row.name}`;
             const title = String(row.name || '').trim() || '(bez názvu)';

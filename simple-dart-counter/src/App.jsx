@@ -839,7 +839,7 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, onLogin, lang, 
 
     return (
         <main className="relative z-10 flex-1 w-full overflow-y-auto bg-slate-950">
-            <div className="flex flex-col w-full max-w-4xl gap-4 p-4 pb-24 mx-auto sm:p-6">
+            <div className="flex flex-col w-full max-w-4xl xl:max-w-7xl gap-4 p-4 pb-24 mx-auto sm:p-6">
                 
                 <div className="flex items-center justify-between p-3 border shadow-md bg-slate-900 border-slate-800 rounded-xl sm:p-4">
                     <div className="flex items-center min-w-0 gap-2 sm:gap-3">
@@ -865,15 +865,17 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, onLogin, lang, 
                     )}
                 </div>
 
-                <div className="flex p-1 border rounded-lg bg-slate-900 border-slate-800">
+                <div className="flex flex-col min-[480px]:flex-row gap-3 md:gap-4">
+                <div className="flex flex-1 min-w-0 p-1 border rounded-lg bg-slate-900 border-slate-800">
                     {[{v:'x01', l:'X01 (501)'}, {v:'cricket', l:'CRICKET'}].map(f => (
                         <button key={f.v} onClick={() => setGameTab(f.v)} className={`flex-1 py-3 text-xs font-black rounded-md uppercase tracking-wider transition-colors ${gameTab === f.v ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{f.l}</button>
                     ))}
                 </div>
-                <div className="flex p-1 border rounded-lg bg-slate-900 border-slate-800">
+                <div className="flex flex-1 min-w-0 p-1 border rounded-lg bg-slate-900 border-slate-800">
                     {[{v:'all', l:t('statsAllTime')}, {v:7, l:t('stats7Days')}, {v:30, l:t('stats30Days')}, {v:90, l:t('stats90Days')}].map(f => (
                         <button key={f.v} onClick={() => setTimeRange(f.v)} className={`flex-1 py-2 text-[10px] sm:text-xs font-bold rounded-md uppercase tracking-wider transition-colors ${timeRange === f.v ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{f.l}</button>
                     ))}
+                </div>
                 </div>
 
                 {gameTab === 'x01' && (
@@ -3527,7 +3529,7 @@ function AppMain({ lang, setLang }) {
       )}
       {/* --- HOME --- */}
       {appState === 'home' && (
-        <main className="flex flex-col md:grid md:grid-cols-2 flex-1 w-full max-w-md md:max-w-4xl mx-auto items-center justify-center gap-6 md:gap-12 p-6 overflow-y-auto">
+        <main className="flex flex-col md:grid md:grid-cols-2 flex-1 w-full max-w-md md:max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto items-center justify-center gap-6 md:gap-10 lg:gap-12 p-4 sm:p-6 overflow-y-auto">
                 {/* Levý sloupec: logo, Nová hra, Google / profil */}
                 <div className="flex flex-col w-full gap-4 md:gap-6 items-center">
                     <div className="flex flex-col items-center mb-1">
@@ -3630,8 +3632,8 @@ function AppMain({ lang, setLang }) {
       )}
 
       {appState === 'tournament_viewer_preparing' && userRole === 'viewer' && (
-        <main className="flex flex-col flex-1 w-full max-w-lg mx-auto overflow-y-auto bg-slate-950 p-4 pb-24 justify-center min-h-[50vh]">
-          <p className="text-center text-lg sm:text-xl font-bold text-slate-200 px-4">
+        <main className="flex flex-col md:flex-row md:items-center md:justify-between md:gap-8 flex-1 w-full max-w-lg md:max-w-4xl lg:max-w-5xl mx-auto overflow-y-auto bg-slate-950 p-4 pb-24 justify-center min-h-[50vh]">
+          <p className="text-center md:text-left text-lg sm:text-xl font-bold text-slate-200 px-2 md:px-0 md:flex-1">
             {t('tournament.preparing')}
           </p>
           <button
@@ -3641,7 +3643,7 @@ function AppMain({ lang, setLang }) {
               setActivePin('');
               setAppState('tournament_hub');
             }}
-            className="mt-10 w-full py-4 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
+            className="mt-8 md:mt-0 w-full md:w-auto md:min-w-[12rem] shrink-0 py-4 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
           >
             {translations[lang]?.tournBack ?? 'Zpět'}
           </button>
@@ -3882,8 +3884,8 @@ function AppMain({ lang, setLang }) {
       {/* --- SETUP --- */}
       {appState === 'setup' && (
         <main className={`flex flex-col items-center flex-1 w-full overflow-y-auto p-4 landscape:p-3 ${isKeyboardOpen ? 'pb-[190px] landscape:pb-[150px]' : ''}`}>
-          <div className={`w-full max-w-5xl ${isKeyboardOpen ? 'pb-6 landscape:pb-3' : 'pb-20 landscape:pb-8'}`}>
-            <div className="flex flex-col gap-4 landscape:grid landscape:grid-cols-2 landscape:gap-3 landscape:items-start w-full">
+          <div className={`w-full max-w-5xl xl:max-w-7xl ${isKeyboardOpen ? 'pb-6 landscape:pb-3' : 'pb-20 landscape:pb-8'}`}>
+            <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-4 md:items-start landscape:grid landscape:grid-cols-2 landscape:gap-3 landscape:items-start w-full">
             <div className="space-y-4">
             <div className="flex p-1 border shadow-md bg-slate-800 rounded-xl border-slate-700">
                 <button onClick={() => setSettings({...settings, gameType: 'x01'})} className={`flex-1 py-3 landscape:py-2 text-sm font-black rounded-lg uppercase tracking-widest transition-colors ${settings.gameType === 'x01' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>X01</button>
@@ -4033,21 +4035,21 @@ function AppMain({ lang, setLang }) {
       {/* --- HISTORY --- */}
       {appState === 'history' && (
         <main className="flex flex-col items-center flex-1 w-full p-4 overflow-y-auto">
-            <div className="w-full max-w-lg pb-20 space-y-4">
+            <div className="w-full max-w-lg md:max-w-4xl lg:max-w-6xl pb-20 space-y-4">
                 <h2 className="flex items-center justify-center gap-2 mt-4 mb-6 text-2xl font-black tracking-widest text-white uppercase"><History className="w-6 h-6 text-emerald-500"/> {t('matchHistory')}</h2>
                 <div className="mt-2 overflow-hidden border bg-slate-900 rounded-xl border-slate-800">
                     {(() => {
                         const myMatches = matchHistory;
                         if (myMatches.length === 0) return <div className="p-8 text-center text-slate-500">{t('noMatches')}</div>;
                         return (
-                            <div className="divide-y divide-slate-800">
+                            <div className="divide-y divide-slate-800 md:divide-y-0 md:grid md:grid-cols-2 xl:grid-cols-3 md:gap-3 md:border-0">
                                 {myMatches.map(m => {
                                     const isMultiSet = (m.matchSets || 1) > 1;
                                     const mainP1 = isMultiSet ? (m.p1Sets || 0) : (m.setScores?.[0]?.p1 ?? m.p1Legs ?? 0);
                                     const mainP2 = isMultiSet ? (m.p2Sets || 0) : (m.setScores?.[0]?.p2 ?? m.p2Legs ?? 0);
                                     const legsBreakdown = isMultiSet && m.setScores?.length ? `(${m.setScores.map(s => `${s.p1}:${s.p2}`).join(', ')})` : '';
                                     return (
-                                    <div key={m.id} className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-800/50" onClick={() => setSelectedMatchDetail(m)}>
+                                    <div key={m.id} className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-800/50 md:flex-col md:items-stretch md:gap-2 md:border md:border-slate-800 md:rounded-xl md:bg-slate-950/60" onClick={() => setSelectedMatchDetail(m)}>
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <div className="text-xs text-slate-500">{m.date}</div>
@@ -4083,10 +4085,10 @@ function AppMain({ lang, setLang }) {
 
       {/* --- TUTORIAL --- */}
       {appState === 'tutorial' && (
-        <main className="relative z-10 flex flex-col items-center flex-1 w-full p-4 pb-20 overflow-y-auto sm:p-6">
-            <h2 className="flex items-center gap-2 mb-6 text-2xl font-black tracking-widest text-white uppercase"><FileText className="w-6 h-6 text-emerald-500"/> {t('tutorial')}</h2>
+        <main className="relative z-10 flex flex-col items-center flex-1 w-full max-w-6xl xl:max-w-7xl mx-auto p-4 pb-20 overflow-y-auto sm:p-6">
+            <h2 className="flex items-center gap-2 mb-6 text-2xl font-black tracking-widest text-white uppercase w-full"><FileText className="w-6 h-6 text-emerald-500"/> {t('tutorial')}</h2>
             
-            <div className="flex w-full max-w-md p-1 mb-6 border shadow-md bg-slate-800 rounded-xl border-slate-700">
+            <div className="flex w-full max-w-md md:max-w-xl lg:max-w-2xl p-1 mb-6 border shadow-md bg-slate-800 rounded-xl border-slate-700">
                 <button onClick={() => setTutorialTab('x01')} className={`flex-1 py-3 text-xs font-black rounded-lg uppercase tracking-widest transition-colors ${tutorialTab === 'x01' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{t('tutTabX01')}</button>
                 <button onClick={() => setTutorialTab('cricket')} className={`flex-1 py-3 text-xs font-black rounded-lg uppercase tracking-widest transition-colors ${tutorialTab === 'cricket' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{t('tutTabCricket')}</button>
             </div>
@@ -4156,22 +4158,22 @@ function AppMain({ lang, setLang }) {
 
       {/* --- O APLIKACI --- */}
       {appState === 'about' && (
-        <main className="relative z-10 flex flex-col items-center flex-1 w-full max-w-lg p-4 pb-20 mx-auto overflow-y-auto sm:p-6">
-            <h2 className="flex items-center gap-2 mb-6 text-2xl font-black tracking-widest text-white uppercase"><Info className="w-6 h-6 text-yellow-500"/> {t('aboutApp')}</h2>
-            <div className="w-full p-6 space-y-6 border shadow-xl bg-slate-900 rounded-2xl border-slate-800">
-                <div className="pb-6 space-y-2 text-center border-b border-slate-800">
+        <main className="relative z-10 flex flex-col items-center flex-1 w-full max-w-lg md:max-w-4xl lg:max-w-5xl p-4 pb-20 mx-auto overflow-y-auto sm:p-6">
+            <h2 className="flex items-center gap-2 mb-6 text-2xl font-black tracking-widest text-white uppercase w-full md:text-center"><Info className="w-6 h-6 text-yellow-500"/> {t('aboutApp')}</h2>
+            <div className="w-full p-6 md:p-8 border shadow-xl bg-slate-900 rounded-2xl border-slate-800 md:grid md:grid-cols-2 md:gap-8 md:items-center">
+                <div className="pb-6 md:pb-0 space-y-2 text-center border-b md:border-b-0 md:border-r border-slate-800 md:pr-8">
                     <div className="flex items-center justify-center w-20 h-20 mx-auto mb-4 rounded-full shadow-lg bg-emerald-600"><Target className="w-10 h-10 text-slate-900" /></div>
                     <h1 className="text-2xl font-black tracking-widest text-white">SIMPLE DART</h1>
                     <h2 className="text-sm font-bold tracking-widest text-emerald-500">COUNTER</h2>
                     <div className="mt-2 font-mono text-xs text-slate-500">Verze {APP_VERSION}</div>
                 </div>
-                <div className="pt-2 text-center">
+                <div className="pt-6 md:pt-0 text-center md:text-left">
                     <p className="text-sm text-slate-400">{t('aboutText')}</p>
-                    <button onClick={() => window.location.href = '/privacy.html'} className="flex items-center justify-center w-full gap-2 mt-8 text-sm font-bold tracking-widest underline uppercase text-emerald-500 hover:text-emerald-400">
+                    <button onClick={() => window.location.href = '/privacy.html'} className="flex items-center justify-center md:justify-start w-full gap-2 mt-8 text-sm font-bold tracking-widest underline uppercase text-emerald-500 hover:text-emerald-400">
                         {typeof t === 'function' ? t('privacyPolicy') : 'Zásady ochrany soukromí'}
                     </button>
+                    <div className="text-center md:text-left text-[10px] text-slate-500 pt-8 md:pt-6 border-t border-slate-800 mt-6 md:mt-8">&copy; {new Date().getFullYear()} Vít (ViteCZech).<br/> Všechna práva vyhrazena.</div>
                 </div>
-                <div className="text-center text-[10px] text-slate-500 pt-4 border-t border-slate-800">&copy; {new Date().getFullYear()} Vít (ViteCZech).<br/> Všechna práva vyhrazena.</div>
             </div>
         </main>
       )}
