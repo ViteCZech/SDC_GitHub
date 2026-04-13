@@ -407,7 +407,7 @@ export default function TabletWaitingRoom({
             )}
 
             {dualIdlePanel && (
-              <div className="hidden lg:flex lg:flex-row lg:flex-1 lg:min-h-0 lg:gap-6 lg:gap-8 w-full lg:overflow-hidden lg:items-start">
+              <div className="hidden lg:flex lg:flex-row lg:flex-1 lg:min-h-0 lg:gap-8 w-full lg:overflow-hidden lg:items-start">
                 <div className="shrink-0 min-w-0 w-full lg:w-auto lg:max-w-[min(50%,40rem)] flex flex-col">
                   {renderStandingsPanel()}
                 </div>

@@ -9,30 +9,37 @@ import {
 } from '../utils/tournamentLogic';
 import { translations } from '../translations';
 
-/** Tabulka pořadí – profesionální s všemi detaily */
+/** Tabulka pořadí – kompaktní; sloupec No: ~poloviční velikost oproti zbytku */
 function GroupStandingsTable({ standings, advanceCount, t }) {
+  const cellBase = 'text-[11px] leading-snug';
+  const cellMono = `${cellBase} font-mono tabular-nums`;
+  const noTh =
+    'text-center py-1 w-6 px-0 align-bottom text-[6px] sm:text-[7px] font-bold uppercase tracking-tighter text-slate-500 leading-tight';
+  const noTd =
+    'py-1 px-0 w-6 text-center align-top text-[5px] sm:text-[5.5px] font-bold tabular-nums text-slate-300 leading-none';
+
   return (
     <div className="w-full min-w-0 overflow-x-auto">
-      <table className="w-full max-w-full text-xs sm:text-sm table-fixed">
+      <table className="w-full max-w-full table-auto border-collapse">
         <thead>
-          <tr className="border-b border-slate-700 text-slate-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-tight leading-tight">
-            <th className="text-center py-1.5 w-[2.25rem] sm:w-10 px-0.5 align-bottom">
-              {t('tournStandingPos') || 'No:'}
+          <tr className="border-b border-slate-700 text-slate-400 font-bold uppercase tracking-tight">
+            <th className={noTh}>{t('tournStandingPos') || 'No:'}</th>
+            <th className={`text-left py-1 pr-1 pl-0.5 min-w-0 align-bottom ${cellBase}`}>
+              {t('playerName') || 'Hráč'}
             </th>
-            <th className="text-left py-1.5 pr-1 min-w-0 align-bottom">{t('playerName') || 'Hráč'}</th>
-            <th className="text-center py-1.5 w-8 sm:w-9 px-0.5 align-bottom">
+            <th className={`text-center py-1 w-7 px-0.5 align-bottom whitespace-nowrap ${cellBase}`}>
               {t('tournStandingPoints') || 'Body'}
             </th>
-            <th className="text-center py-1.5 w-[3.25rem] sm:w-[4rem] px-0.5 align-bottom leading-tight whitespace-pre-line">
+            <th className={`text-center py-1 w-[3.1rem] px-0.5 align-bottom leading-tight whitespace-pre-line ${cellBase}`}>
               {t('tournStandingMatchesShort')}
             </th>
-            <th className="text-center py-1.5 w-[3.25rem] sm:w-[4rem] px-0.5 align-bottom leading-tight whitespace-pre-line">
+            <th className={`text-center py-1 w-[3.1rem] px-0.5 align-bottom leading-tight whitespace-pre-line ${cellBase}`}>
               {t('tournStandingLegsShort')}
             </th>
-            <th className="text-center py-1.5 w-9 sm:w-10 px-0.5 align-bottom">
+            <th className={`text-center py-1 w-7 px-0.5 align-bottom ${cellBase}`}>
               {t('tournStandingDiff') || 'Rozdíl'}
             </th>
-            <th className="text-center py-1.5 w-11 sm:w-12 px-0.5 align-bottom">
+            <th className={`text-center py-1 w-9 px-0.5 align-bottom ${cellBase}`}>
               {t('tournStandingAvg') || 'Průměr'}
             </th>
           </tr>
@@ -48,37 +55,34 @@ function GroupStandingsTable({ standings, advanceCount, t }) {
                 isAdvancing ? 'bg-emerald-900/20' : ''
               }`}
             >
-              {/* border-l na <tr> u collapse tabulek často mizí — okraj jen na první buňce */}
               <td
-                className={`py-1.5 px-0.5 text-center text-[10px] sm:text-xs font-bold tabular-nums text-slate-200 ${
-                  isAdvancing ? 'border-l-2 border-l-emerald-500/60' : ''
-                }`}
+                className={`${noTd} ${isAdvancing ? 'border-l-2 border-l-emerald-500/60' : ''}`}
               >
                 {idx + 1}
               </td>
-              <td className="min-w-0 px-1 py-1.5 font-medium truncate text-slate-100">
-                <div className="flex items-center gap-2">
-                  <span className="truncate">{row.name}</span>
+              <td className={`min-w-0 px-1 py-1 text-slate-100 align-top ${cellBase}`}>
+                <div className="flex flex-wrap items-start gap-x-1.5 gap-y-0.5">
+                  <span className="break-words font-medium [hyphens:auto]">{row.name}</span>
                   {isAdvancing && (
-                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
+                    <span className="text-[8px] font-black px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-400 shrink-0 leading-none">
                       P
                     </span>
                   )}
                 </div>
               </td>
-              <td className="py-1.5 px-0.5 text-center text-slate-200 font-mono text-[10px] sm:text-xs font-bold">
+              <td className={`py-1 px-0.5 text-center text-slate-200 font-bold ${cellMono}`}>
                 {row.points ?? row.matchesWon}
               </td>
-              <td className="py-1.5 px-0.5 text-center text-slate-300 font-mono text-[10px] sm:text-xs">
+              <td className={`py-1 px-0.5 text-center text-slate-300 ${cellMono}`}>
                 {row.matchesWon}:{row.matchesLost}
               </td>
-              <td className="py-1.5 px-0.5 text-center text-slate-400 font-mono text-[10px] sm:text-xs">
+              <td className={`py-1 px-0.5 text-center text-slate-400 ${cellMono}`}>
                 {row.legsWon}:{row.legsLost}
               </td>
-              <td className="py-1.5 px-0.5 text-center text-slate-300 font-mono text-[10px] sm:text-xs">
+              <td className={`py-1 px-0.5 text-center text-slate-300 ${cellMono}`}>
                 {row.legDifference > 0 ? '+' : ''}{row.legDifference}
               </td>
-              <td className="py-1.5 px-0.5 text-center text-slate-300 font-mono text-[10px] sm:text-xs">
+              <td className={`py-1 px-0.5 text-center text-slate-300 ${cellMono}`}>
                 {Number(row.average ?? 0).toFixed(2)}
               </td>
             </tr>
@@ -214,36 +218,38 @@ function GroupCard({
   const withdrawCandidates = (group.players || []).filter((p) => !p?.isWithdrawn);
 
   return (
-    <div className="bg-slate-800 rounded-xl p-4 flex flex-col gap-4">
-      {/* Hlavička karty: název skupiny, terč, záložky */}
-      <div className="flex flex-wrap items-center gap-2 mb-0">
-        <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">
-          {t('tournGroup') || 'Skupina'} {group.groupId}
-        </h3>
-        {!isReviewMode && group.boards && group.boards.length > 0 ? (
-          <span className="bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded text-xs font-bold">
-            🎯 {t('tournBoard') || 'Terč'} {group.boards[0]}
-          </span>
-        ) : !isReviewMode ? (
-          <span className="bg-orange-500/20 text-orange-400 px-2 py-1 rounded text-xs font-bold animate-pulse">
-            ⏳ {t('tournWaitingForBoard') || 'Čeká na terč'}
-          </span>
-        ) : null}
+    <div className="bg-slate-800 rounded-xl p-3 sm:p-4 flex flex-col gap-2 sm:gap-3">
+      {/* Jedna řada: název + terč vlevo, akce vpravo (bez druhého řádku) */}
+      <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2 w-full min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 overflow-hidden">
+          <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-300 shrink-0 whitespace-nowrap">
+            {t('tournGroup') || 'Skupina'} {group.groupId}
+          </h3>
+          {!isReviewMode && group.boards && group.boards.length > 0 ? (
+            <span className="bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-bold shrink-0 whitespace-nowrap">
+              🎯 {t('tournBoard') || 'Terč'} {group.boards[0]}
+            </span>
+          ) : !isReviewMode ? (
+            <span className="bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-bold animate-pulse shrink-0 whitespace-nowrap truncate max-w-[9rem] sm:max-w-none">
+              ⏳ {t('tournWaitingForBoard') || 'Čeká na terč'}
+            </span>
+          ) : null}
+        </div>
         {!isReviewMode && (
-          <div className="flex items-center gap-2 ml-auto relative">
+          <div className="flex items-center gap-1 shrink-0 relative">
             {isAdmin && (
             <button
               type="button"
               onClick={() => setActionMenuOpen((v) => !v)}
-              className="p-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-300 hover:text-white hover:bg-slate-600 transition-colors"
+              className="p-1.5 rounded-md bg-slate-700 border border-slate-600 text-slate-300 hover:text-white hover:bg-slate-600 transition-colors"
               title={t('tournament.editTooltip') || 'Upravit/Kontumovat'}
               aria-label={t('tournament.editTooltip') || 'Upravit/Kontumovat'}
             >
-              <Pencil className="w-4 h-4" />
+              <Pencil className="w-3.5 h-3.5" />
             </button>
             )}
             {isAdmin && actionMenuOpen && (
-              <div className="absolute right-0 top-11 z-20 w-72 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl p-3">
+              <div className="absolute right-0 top-full mt-1 z-20 w-72 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl p-3">
                 <div className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2">
                   {t('tournament.actionMenuTitle') || 'Možnosti kontumace'}
                 </div>
@@ -273,11 +279,11 @@ function GroupCard({
                 </div>
               </div>
             )}
-            <div className="flex rounded-lg overflow-hidden border border-slate-700">
+            <div className="flex rounded-md overflow-hidden border border-slate-700 shrink-0">
             <button
               type="button"
               onClick={() => setViewMode('standings')}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`px-2 py-1 text-[10px] sm:text-xs font-semibold transition-colors whitespace-nowrap ${
                 viewMode === 'standings'
                   ? 'bg-emerald-600 text-white'
                   : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
@@ -288,7 +294,7 @@ function GroupCard({
             <button
               type="button"
               onClick={() => setViewMode('matches')}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`px-2 py-1 text-[10px] sm:text-xs font-semibold transition-colors whitespace-nowrap ${
                 viewMode === 'matches'
                   ? 'bg-emerald-600 text-white'
                   : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
