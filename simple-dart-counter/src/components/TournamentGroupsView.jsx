@@ -9,22 +9,59 @@ import {
 } from '../utils/tournamentLogic';
 import { translations } from '../translations';
 
-/** Tabulka pořadí – kompaktní; sloupec No: ~poloviční velikost oproti zbytku */
+/** Rozdělení zobrazeného jména (mezera nebo podtržítko) pro zalamování řádků */
+function splitStandingNameParts(name) {
+  const s = String(name ?? '').trim();
+  if (!s) return [];
+  const u = s.indexOf('_');
+  if (u !== -1) {
+    const a = s.slice(0, u).trim();
+    const b = s.slice(u + 1).replace(/_/g, ' ').trim();
+    return [a, b].filter(Boolean);
+  }
+  const sp = s.indexOf(' ');
+  if (sp > 0) {
+    const a = s.slice(0, sp).trim();
+    const b = s.slice(sp + 1).trim();
+    return [a, b].filter(Boolean);
+  }
+  return [s];
+}
+
+function standingNameTextClass(name) {
+  const n = String(name ?? '').length;
+  if (n > 32) return 'text-[8px] leading-tight';
+  if (n > 20) return 'text-[9px] leading-tight';
+  return 'text-[11px] leading-snug';
+}
+
+/** Tabulka pořadí – P vlevo, No: ~4× menší než zbytek, plná šířka, minimální okraje */
 function GroupStandingsTable({ standings, advanceCount, t }) {
   const cellBase = 'text-[11px] leading-snug';
   const cellMono = `${cellBase} font-mono tabular-nums`;
   const noTh =
-    'text-center py-1 w-6 px-0 align-bottom text-[6px] sm:text-[7px] font-bold uppercase tracking-tighter text-slate-500 leading-tight';
+    'text-center py-1 w-5 px-0 align-bottom text-[2.75px] sm:text-[3px] font-bold uppercase tracking-tighter text-slate-500 leading-none';
   const noTd =
-    'py-1 px-0 w-6 text-center align-top text-[5px] sm:text-[5.5px] font-bold tabular-nums text-slate-300 leading-none';
+    'py-1 px-0 w-5 text-center align-middle text-[2.75px] sm:text-[3px] font-bold tabular-nums text-slate-300 leading-none';
 
   return (
-    <div className="w-full min-w-0 overflow-x-auto">
-      <table className="w-full max-w-full table-auto border-collapse">
+    <div className="w-full min-w-0 -mx-0.5 sm:mx-0 overflow-x-auto">
+      <table className="w-full max-w-full table-fixed border-collapse">
+        <colgroup>
+          <col className="w-5" />
+          <col className="w-5" />
+          <col />
+          <col className="w-7" />
+          <col className="w-[3.25rem]" />
+          <col className="w-[3.25rem]" />
+          <col className="w-7" />
+          <col className="w-9" />
+        </colgroup>
         <thead>
           <tr className="border-b border-slate-700 text-slate-400 font-bold uppercase tracking-tight">
+            <th className="p-0 w-5 align-bottom" aria-hidden="true" />
             <th className={noTh}>{t('tournStandingPos') || 'No:'}</th>
-            <th className={`text-left py-1 pr-1 pl-0.5 min-w-0 align-bottom ${cellBase}`}>
+            <th className={`text-left py-1 pr-0.5 pl-0 min-w-0 align-bottom ${cellBase}`}>
               {t('playerName') || 'Hráč'}
             </th>
             <th className={`text-center py-1 w-7 px-0.5 align-bottom whitespace-nowrap ${cellBase}`}>
@@ -51,38 +88,49 @@ function GroupStandingsTable({ standings, advanceCount, t }) {
             return (
             <tr
               key={row.id}
-              className={`border-b border-slate-800 last:border-0 ${
+              className={`border-b border-slate-800 last:border-0 min-h-[2.75rem] ${
                 isAdvancing ? 'bg-emerald-900/20' : ''
               }`}
             >
               <td
-                className={`${noTd} ${isAdvancing ? 'border-l-2 border-l-emerald-500/60' : ''}`}
+                className={`w-5 p-0 align-middle text-center ${
+                  isAdvancing ? 'border-l-2 border-l-emerald-500/60' : ''
+                }`}
               >
-                {idx + 1}
+                {isAdvancing ? (
+                  <span
+                    className="inline-flex items-center justify-center text-[7px] font-black w-4 h-4 rounded bg-emerald-500/25 text-emerald-300 leading-none"
+                    title={t('tournAdvances') || 'Postup'}
+                  >
+                    P
+                  </span>
+                ) : null}
               </td>
-              <td className={`min-w-0 px-1 py-1 text-slate-100 align-top ${cellBase}`}>
-                <div className="flex flex-wrap items-start gap-x-1.5 gap-y-0.5">
-                  <span className="break-words font-medium [hyphens:auto]">{row.name}</span>
-                  {isAdvancing && (
-                    <span className="text-[8px] font-black px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-400 shrink-0 leading-none">
-                      P
+              <td className={noTd}>{idx + 1}</td>
+              <td className="min-w-0 px-0.5 py-1 text-slate-100 align-middle">
+                <div
+                  className={`flex flex-col justify-center gap-0 font-medium min-h-[2.25rem] ${standingNameTextClass(row.name)}`}
+                >
+                  {splitStandingNameParts(row.name).map((part, pi) => (
+                    <span key={pi} className="break-words [hyphens:auto]">
+                      {part}
                     </span>
-                  )}
+                  ))}
                 </div>
               </td>
-              <td className={`py-1 px-0.5 text-center text-slate-200 font-bold ${cellMono}`}>
+              <td className={`py-1 px-0.5 text-center text-slate-200 font-bold align-middle ${cellMono}`}>
                 {row.points ?? row.matchesWon}
               </td>
-              <td className={`py-1 px-0.5 text-center text-slate-300 ${cellMono}`}>
+              <td className={`py-1 px-0.5 text-center text-slate-300 align-middle ${cellMono}`}>
                 {row.matchesWon}:{row.matchesLost}
               </td>
-              <td className={`py-1 px-0.5 text-center text-slate-400 ${cellMono}`}>
+              <td className={`py-1 px-0.5 text-center text-slate-400 align-middle ${cellMono}`}>
                 {row.legsWon}:{row.legsLost}
               </td>
-              <td className={`py-1 px-0.5 text-center text-slate-300 ${cellMono}`}>
+              <td className={`py-1 px-0.5 text-center text-slate-300 align-middle ${cellMono}`}>
                 {row.legDifference > 0 ? '+' : ''}{row.legDifference}
               </td>
-              <td className={`py-1 px-0.5 text-center text-slate-300 ${cellMono}`}>
+              <td className={`py-1 px-0.5 text-center text-slate-300 align-middle ${cellMono}`}>
                 {Number(row.average ?? 0).toFixed(2)}
               </td>
             </tr>
@@ -218,7 +266,7 @@ function GroupCard({
   const withdrawCandidates = (group.players || []).filter((p) => !p?.isWithdrawn);
 
   return (
-    <div className="bg-slate-800 rounded-xl p-3 sm:p-4 flex flex-col gap-2 sm:gap-3">
+    <div className="bg-slate-800 rounded-xl px-1.5 py-2 sm:px-2 sm:py-3 flex flex-col gap-2 sm:gap-3">
       {/* Jedna řada: název + terč vlevo, akce vpravo (bez druhého řádku) */}
       <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2 w-full min-w-0">
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 overflow-hidden">
