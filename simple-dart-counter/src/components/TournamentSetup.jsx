@@ -129,10 +129,17 @@ export default function TournamentSetup({
     }
     if (tournamentDraft.cloudEnabled && isLoggedIn) {
       const tp = String(tournamentDraft.tabletPassword ?? '').trim();
-      if (!tp || tp.length > 5) {
+      if (!tp) {
+        setValidationError(
+          t('tournTabletPasswordRequired') ||
+            'Máte zapnuté herní tablety — vyplňte heslo pro ně (1–5 znaků, nesmí být stejné jako PIN), jinak nelze pokračovat.'
+        );
+        return false;
+      }
+      if (tp.length > 5) {
         setValidationError(
           t('tournTabletPasswordInvalid') ||
-            'Zadejte heslo pro herní tablety (1–5 znaků), odlišné od PIN.'
+            'Heslo pro herní tablety: max. 5 znaků a nesmí být stejné jako PIN.'
         );
         return false;
       }
@@ -387,10 +394,17 @@ export default function TournamentSetup({
           : Math.floor(1000 + Math.random() * 9000).toString());
       if (tournamentDraft.cloudEnabled && isLoggedIn) {
         const tp = String(tournamentDraft.tabletPassword ?? '').trim();
-        if (!tp || tp.length > 5) {
+        if (!tp) {
+          setValidationError(
+            t('tournTabletPasswordRequired') ||
+              'Máte zapnuté herní tablety — vyplňte heslo pro ně (1–5 znaků, nesmí být stejné jako PIN), jinak nelze pokračovat.'
+          );
+          return;
+        }
+        if (tp.length > 5) {
           setValidationError(
             t('tournTabletPasswordInvalid') ||
-              'Zadejte heslo pro herní tablety (1–5 znaků), odlišné od PIN.'
+              'Heslo pro herní tablety: max. 5 znaků a nesmí být stejné jako PIN.'
           );
           return;
         }
@@ -539,11 +553,6 @@ export default function TournamentSetup({
                   </p>
                 </div>
               )}
-              {validationError && (
-                <div className="p-3 rounded-lg bg-red-900/30 border border-red-500/50 text-red-400 text-sm font-bold">
-                  {validationError}
-                </div>
-              )}
               <div className="rounded-xl border border-slate-700/80 bg-slate-950/60 p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -632,6 +641,14 @@ export default function TournamentSetup({
                   </div>
                 )}
               </div>
+              {validationError && (
+                <div
+                  className="p-3 rounded-lg bg-red-900/30 border border-red-500/50 text-red-400 text-sm font-bold"
+                  role="alert"
+                >
+                  {validationError}
+                </div>
+              )}
             </div>
             <div className="flex justify-between gap-2 sm:hidden">
               {onBack && (
@@ -1226,7 +1243,10 @@ export default function TournamentSetup({
             </div>
 
             {validationError && (
-              <div className="p-3 rounded-lg bg-red-900/30 border border-red-500/50 text-red-400 text-sm font-bold">
+              <div
+                className="p-3 rounded-lg bg-red-900/30 border border-red-500/50 text-red-400 text-sm font-bold"
+                role="alert"
+              >
                 {validationError}
               </div>
             )}

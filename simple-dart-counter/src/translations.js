@@ -76,7 +76,9 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     tournTabletPasswordHint:
       'Nastavte 1–5 znaků (nesmí být stejné jako PIN). Herní tablety zadají PIN i toto heslo; diváci pouze PIN.',
     tournTabletPasswordPlaceholder: 'např. ab12',
-    tournTabletPasswordInvalid: 'Zadejte heslo pro herní tablety (1–5 znaků), odlišné od PIN.',
+    tournTabletPasswordRequired:
+      'Máte zapnuté herní tablety — vyplňte heslo pro ně (1–5 znaků, nesmí být stejné jako PIN). Bez toho nelze pokračovat do dalšího kroku.',
+    tournTabletPasswordInvalid: 'Heslo pro herní tablety musí mít 1–5 znaků a nesmí být stejné jako PIN.',
     tournTabletPasswordDistinct: 'Heslo nesmí být stejné jako PIN turnaje.',
     tournPinTapShowPassword: 'Klepnutím zobrazíte heslo pro herní tablety',
     tournFormat: 'Formát turnaje', tournFormatGroupsKo: 'Skupiny + KO Pavouk', tournFormatKoOnly: 'Pouze KO Pavouk',
@@ -370,7 +372,9 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     tournTabletPasswordHint:
       'Use 1–5 characters (must differ from PIN). Game tablets enter PIN and this password; spectators only PIN.',
     tournTabletPasswordPlaceholder: 'e.g. ab12',
-    tournTabletPasswordInvalid: 'Enter a game-tablet password (1–5 characters), different from the PIN.',
+    tournTabletPasswordRequired:
+      'Game tablets are enabled — set a password for them (1–5 characters, must differ from the PIN). You cannot continue without it.',
+    tournTabletPasswordInvalid: 'Game-tablet password must be 1–5 characters and must not match the PIN.',
     tournTabletPasswordDistinct: 'Password must not be the same as the tournament PIN.',
     tournPinTapShowPassword: 'Tap to show the game-tablet password',
     tournFormat: 'Tournament format', tournFormatGroupsKo: 'Groups + KO Bracket', tournFormatKoOnly: 'KO Bracket only',
@@ -661,7 +665,9 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
     tournTabletPasswordHint:
       '1–5 znaków (nie może być takie samo jak PIN). Tablety gry wpisują PIN i hasło; widzowie tylko PIN.',
     tournTabletPasswordPlaceholder: 'np. ab12',
-    tournTabletPasswordInvalid: 'Wpisz hasło dla tabletów gry (1–5 znaków), inne niż PIN.',
+    tournTabletPasswordRequired:
+      'Włączyłeś tablety gry — ustaw dla nich hasło (1–5 znaków, inne niż PIN). Bez tego nie możesz przejść dalej.',
+    tournTabletPasswordInvalid: 'Hasło dla tabletów gry: 1–5 znaków i nie może być takie samo jak PIN.',
     tournTabletPasswordDistinct: 'Hasło nie może być takie samo jak PIN turnieju.',
     tournPinTapShowPassword: 'Dotknij, aby pokazać hasło dla tabletów gry',
     tournFormat: 'Format turnieju', tournFormatGroupsKo: 'Grupy + drabinka KO', tournFormatKoOnly: 'Tylko drabinka KO',
