@@ -17,7 +17,7 @@ import {
   AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, 
   DownloadCloud, FileText, History, Home, Info, Keyboard as KeyboardIcon, 
   Maximize, Minimize, Mic, MicOff, MousePointer2, Play, RefreshCw, RotateCcw, 
-  Target, Trash2, Trophy, Undo2, Unplug, User, Cloud, X, BarChart2, List, Swords
+  Target, Trash2, Trophy, Undo2, Unplug, User, Cloud, X, BarChart2, List, Swords, ClipboardList
 } from 'lucide-react';
 
 import { translations } from './translations';
