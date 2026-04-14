@@ -952,6 +952,48 @@ export function isBracketRefereePlaceholder(ref, refereeIdLegacy) {
   return false;
 }
 
+/**
+ * Doporučení (vlna) pro ruční výběr počtáře:
+ * - od 2. kola (roundIndex > 0) navrhne proherce z feeder zápasů předchozího kola
+ *   pro konkrétní zápas v aktuálním kole (matchIndex).
+ * - BYE / nekompletní feeder (bez dvou reálných hráčů) se ignoruje.
+ *
+ * Vrací ID kandidátů v preferovaném pořadí (feeder1, feeder2).
+ */
+export function suggestRefereeIdsForBracketMatch(bracketRounds, roundIndex, matchIndex) {
+  const rounds = Array.isArray(bracketRounds) ? bracketRounds : [];
+  const ri = Math.floor(Number(roundIndex));
+  const mi = Math.floor(Number(matchIndex));
+  if (!Number.isFinite(ri) || !Number.isFinite(mi)) return [];
+  if (ri <= 0) return [];
+  if (ri >= rounds.length) return [];
+  const prev = rounds[ri - 1]?.matches || [];
+  const f1 = prev[mi * 2];
+  const f2 = prev[mi * 2 + 1];
+
+  const loserIdFromCompleted = (m) => {
+    if (!m) return null;
+    if (m.isBye === true) return null;
+    if (m.status !== 'completed' && m.status !== 'walkover') return null;
+    const p1 = m.player1Id ?? m.p1Id;
+    const p2 = m.player2Id ?? m.p2Id;
+    if (!p1 || !p2) return null;
+    if (isBracketByeName(m.player1Name) || isBracketByeName(m.player2Name)) return null;
+    const wid = m.winnerId;
+    if (!wid) return null;
+    if (String(wid) === String(p1)) return String(p2);
+    if (String(wid) === String(p2)) return String(p1);
+    return null;
+  };
+
+  const out = [];
+  const a = loserIdFromCompleted(f1);
+  const b = loserIdFromCompleted(f2);
+  if (a) out.push(a);
+  if (b && b !== a) out.push(b);
+  return out;
+}
+
 /** Dokončený feeder zápas, ze kterého nelze vzít „proherce“ (BYE / volný los — žádný reálný soupeř). */
 function isBracketFeederWithoutPlayableLoser(feeder) {
   if (!feeder) return true;
@@ -1633,6 +1675,21 @@ export function getRoundBusyPlayerIds(bracketRounds, roundIndex) {
     const p2 = m.player2Id ?? m.p2Id;
     if (p1 == null || p1 === '' || p2 == null || p2 === '') continue;
     if (isBracketByeName(m.player1Name) || isBracketByeName(m.player2Name)) continue;
+
+    // „Busy“ v daném kole = už hráli / hrají / nebo jsou připraveni na terči (board/check-in).
+    // Pending zápas BEZ terče (fronta) hráče neblokuje, aby šli použít jako počtáři na jiném terči.
+    const st = m.status;
+    const hasBoard = m.board != null && m.board !== '';
+    const tabletBusy = m.tabletStatus === 'checked_in' || m.tabletStatus === 'ready_to_play';
+    const countsAsBusy =
+      st === 'completed' ||
+      st === 'walkover' ||
+      st === 'playing' ||
+      st === 'in_progress' ||
+      tabletBusy ||
+      (st === 'pending' && hasBoard);
+    if (!countsAsBusy) continue;
+
     s.add(p1);
     s.add(p2);
   }

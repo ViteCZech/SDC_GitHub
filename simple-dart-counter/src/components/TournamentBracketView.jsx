@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Settings, Play, ClipboardList, Lock, Unlock, X, Pencil, Flag, Bell } from 'lucide-react';
 import { translations } from '../translations';
-import { getBracketWinLegsForRound, getRoundBusyPlayerIds, isBracketRefereePlaceholder } from '../utils/tournamentLogic';
+import { getBracketWinLegsForRound, getRoundBusyPlayerIds, isBracketRefereePlaceholder, suggestRefereeIdsForBracketMatch } from '../utils/tournamentLogic';
 import { AdminTapTextField } from './AdminTapField';
 
 const BYE_MARKER = 'Volný los';
@@ -301,6 +301,32 @@ export default function TournamentBracketView({
     }
     return { filteredAvailableRefs: avail, filteredBusyRefs: busy };
   }, [filteredRefereeOptions, refereeBusyIds]);
+
+  const suggestedRefereeIds = useMemo(() => {
+    const ri = refereeModal?.roundIndex;
+    const mi = refereeModal?.matchIndex;
+    if (ri === null || ri === undefined) return [];
+    if (mi === null || mi === undefined) return [];
+    return suggestRefereeIdsForBracketMatch(bracketData, ri, mi) || [];
+  }, [bracketData, refereeModal?.roundIndex, refereeModal?.matchIndex]);
+
+  const suggestedRefs = useMemo(() => {
+    if (!suggestedRefereeIds?.length) return [];
+    const mapById = new Map((allTournamentPlayers || []).map((p) => [String(p.id), p]));
+    const q = normalizeSearchKey(refereeSearch);
+    const out = [];
+    for (const id of suggestedRefereeIds) {
+      const p = mapById.get(String(id));
+      if (!p) continue;
+      const key = normalizeSearchKey(`${p?.name ?? ''} ${p?.id ?? ''}`);
+      if (q && !key.includes(q)) continue;
+      // Nepovolit vybrat účastníky zápasu nebo busy v tomto kole (defenzivně)
+      const isBusy = p?.id != null && refereeBusyIds?.has?.(p.id);
+      if (isBusy) continue;
+      out.push(p);
+    }
+    return out;
+  }, [allTournamentPlayers, suggestedRefereeIds, refereeSearch, refereeBusyIds]);
 
   const saveRefereeModal = () => {
     if (!refereeModal) return;
@@ -726,6 +752,15 @@ export default function TournamentBracketView({
               className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
             >
               <option value="">{t('tournSelectScorer') || '— Vyberte počtáře —'}</option>
+              {suggestedRefs.length > 0 && (
+                <optgroup label={t('refereeSuggestedGroup') || 'Doporučení (vlna)'}>
+                  {suggestedRefs.map((p) => (
+                    <option key={p.id} value={String(p.id)}>
+                      ★ {p.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
               <optgroup label={t('refereeAvailableGroup') || 'Dostupní'}>
                 {(filteredAvailableRefs || []).map((p) => (
                   <option key={p.id} value={String(p.id)}>

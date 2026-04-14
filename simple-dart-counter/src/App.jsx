@@ -4132,14 +4132,55 @@ function AppMain({ lang, setLang }) {
                     </>
                 )}
                 {tutorialTab === 'tournaments' && (
-                    <div className="p-6 border shadow-lg bg-slate-900 rounded-2xl border-slate-800 md:col-span-2">
-                        <h3 className="mb-2 text-sm font-bold tracking-wider text-white uppercase">
-                          {t('tutTabTournaments') || 'Turnaje'}
-                        </h3>
-                        <p className="text-sm leading-relaxed text-slate-400">
-                          {t('tutorialTournamentsWIP') || 'Detailní průvodce turnaji se připravuje...'}
-                        </p>
-                    </div>
+                    <>
+                        <div className="flex items-start gap-4 p-5 border shadow-lg bg-slate-900 rounded-2xl border-slate-800 md:col-span-2">
+                            <div className="p-3 border bg-slate-800 rounded-xl border-slate-700 shrink-0"><Swords className="w-6 h-6 text-amber-400" /></div>
+                            <div className="flex-1 pt-1">
+                              <h3 className="mb-2 text-sm font-bold tracking-wider text-white uppercase">{t('tutTournTitle1')}</h3>
+                              <p className="text-sm leading-relaxed text-slate-400">{t('tutTournDesc1')}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-4 p-5 border shadow-lg bg-slate-900 rounded-2xl border-slate-800">
+                            <div className="p-3 border bg-slate-800 rounded-xl border-slate-700 shrink-0"><Target className="w-6 h-6 text-emerald-500" /></div>
+                            <div className="flex-1 pt-1">
+                              <h3 className="mb-2 text-sm font-bold tracking-wider text-white uppercase">{t('tutTournTitle2')}</h3>
+                              <p className="text-sm leading-relaxed text-slate-400">{t('tutTournDesc2')}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-4 p-5 border shadow-lg bg-slate-900 rounded-2xl border-slate-800">
+                            <div className="p-3 border bg-slate-800 rounded-xl border-slate-700 shrink-0"><ClipboardList className="w-6 h-6 text-blue-400" /></div>
+                            <div className="flex-1 pt-1">
+                              <h3 className="mb-2 text-sm font-bold tracking-wider text-white uppercase">{t('tutTournTitle3')}</h3>
+                              <p className="text-sm leading-relaxed text-slate-400">{t('tutTournDesc3')}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-4 p-5 border shadow-lg bg-slate-900 rounded-2xl border-slate-800">
+                            <div className="p-3 border bg-slate-800 rounded-xl border-slate-700 shrink-0"><CheckCircle className="w-6 h-6 text-emerald-500" /></div>
+                            <div className="flex-1 pt-1">
+                              <h3 className="mb-2 text-sm font-bold tracking-wider text-white uppercase">{t('tutTournTitle4')}</h3>
+                              <p className="text-sm leading-relaxed text-slate-400">{t('tutTournDesc4')}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-4 p-5 border shadow-lg bg-slate-900 rounded-2xl border-slate-800">
+                            <div className="p-3 border bg-slate-800 rounded-xl border-slate-700 shrink-0"><Cloud className="w-6 h-6 text-purple-400" /></div>
+                            <div className="flex-1 pt-1">
+                              <h3 className="mb-2 text-sm font-bold tracking-wider text-white uppercase">{t('tutTournTitle5')}</h3>
+                              <p className="text-sm leading-relaxed text-slate-400">{t('tutTournDesc5')}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-4 p-5 border shadow-lg bg-slate-900 rounded-2xl border-slate-800">
+                            <div className="p-3 border bg-slate-800 rounded-xl border-slate-700 shrink-0"><Trophy className="w-6 h-6 text-yellow-400" /></div>
+                            <div className="flex-1 pt-1">
+                              <h3 className="mb-2 text-sm font-bold tracking-wider text-white uppercase">{t('tutTournTitle6')}</h3>
+                              <p className="text-sm leading-relaxed text-slate-400">{t('tutTournDesc6')}</p>
+                            </div>
+                        </div>
+                    </>
                 )}
                 <div className="grid grid-cols-1 col-span-1 gap-4 pt-4 mt-4 border-t md:col-span-2 border-slate-800 md:grid-cols-2">
                     <div className="flex items-start gap-4 p-4 bg-slate-900 rounded-2xl">

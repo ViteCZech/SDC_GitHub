@@ -30,6 +30,24 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     tutTabX01: 'X01 (501/301)', tutTabCricket: 'CRICKET', 
     tutTabTournaments: 'Turnaje',
     tutorialTournamentsWIP: 'Detailní průvodce turnaji se připravuje...',
+    tutTournTitle1: '1. Režimy turnaje (Admin / Tablet / Divák)',
+    tutTournDesc1:
+      'Turnaj běží ve třech rolích: Admin vše nastavuje a řídí, Tablety obsluhují konkrétní terče (check-in a zadávání výsledků), Diváci jen sledují průběh. Pro připojení se používá PIN turnaje; tablety navíc mohou vyžadovat heslo.',
+    tutTournTitle2: '2. Založení turnaje a formát',
+    tutTournDesc2:
+      'Vyberte formát (Skupiny + Pavouk nebo Jen Pavouk), zadejte parametry zápasu (501/301, DO/SO, legy) a počet dostupných terčů. Aplikace dopočítá předkolo, pokud počet hráčů nevyjde na mocninu dvou.',
+    tutTournTitle3: '3. Skupiny, rozpis a přiřazení terčů',
+    tutTournDesc3:
+      'Ve skupinách uvidíte tabulky a rozpisy zápasů. V administraci lze skupinám přiřadit čísla terčů (i více terčů pro jednu skupinu). Prázdné pole znamená frontu – skupina čeká na uvolnění terče.',
+    tutTournTitle4: '4. Pavouk a počtáři',
+    tutTournDesc4:
+      'Pavouk se generuje z postupujících (nebo ze všech hráčů u „Jen Pavouk“). Počtáři se obsazují automaticky, ale admin je může ručně upravit u konkrétního zápasu. Hráči, kteří v daném kole hrají, jsou vidět, ale nelze je vybrat.',
+    tutTournTitle5: '5. Cloud a herní tablety',
+    tutTournDesc5:
+      'Pokud zapnete síťovou hru, turnaj se synchronizuje do cloudu a mohou se připojit herní tablety. Tablety zadávají PIN a případné heslo, zvolí číslo terče a čekají na přidělení zápasu.',
+    tutTournTitle6: '6. Ukončení a historie',
+    tutTournDesc6:
+      'Po skončení turnaje lze výsledky uložit do historie. V historii najdete dokončené turnaje i přehledy (tabulky, průměry a další statistiky podle odehraných zápasů).',
     tutX01Title1: '1. Cíl hry X01', tutX01Desc1: 'Začínáte na 501 nebo 301 bodech. Cílem je dostat se přesně na nulu. Každý hod se odečítá z celkového skóre.',
     tutX01Title2: '2. Double Out', tutX01Desc2: 'Konec hry (zavření) musí být vždy zásahem vnějšího úzkého kruhu (Double) nebo středem (BULL).',
     tutX01Title3: '3. Chytré zadávání', tutX01Desc3: 'Používejte klávesnici pro celkové skóre ze 3 šipek. Objeví se i chytrá tlačítka rychlého zavření.',
@@ -59,6 +77,7 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     playerIsPlaying: 'Hraje',
     refereeAvailableGroup: 'Dostupní',
     refereePlayingGroup: 'Hrající v tomto kole',
+    refereeSuggestedGroup: 'Doporučení (vlna)',
     refereeSearchPlaceholder: 'Začněte psát jméno…',
     deleteAccount: 'Smazat účet a všechna data', deleteAccountConfirm: 'Opravdu smazat účet?', renameConfirm: 'Opravdu se chcete pro tento zápas přejmenovat?',
     aboutText: 'Bezplatná aplikace pro počítání skóre a statistik v šipkách.', privacyPolicy: 'Zásady ochrany osobních údajů',
@@ -334,6 +353,24 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     tutTabX01: 'X01 (501/301)', tutTabCricket: 'CRICKET',
     tutTabTournaments: 'Tournaments',
     tutorialTournamentsWIP: 'A detailed tournament guide is being prepared...',
+    tutTournTitle1: '1. Tournament modes (Admin / Tablet / Viewer)',
+    tutTournDesc1:
+      'A tournament runs in three roles: Admin sets everything up and manages it, Tablets operate specific boards (check-in and results), Viewers only watch. Joining uses the tournament PIN; tablets may also require a password.',
+    tutTournTitle2: '2. Create a tournament and choose a format',
+    tutTournDesc2:
+      'Pick the format (Groups & Bracket or Knockout Only), set match parameters (501/301, DO/SO, legs) and the number of available boards. The app will compute a preliminary round if the player count is not a power of two.',
+    tutTournTitle3: '3. Groups, schedule and board assignment',
+    tutTournDesc3:
+      'In the group stage you can view standings and match schedules. In admin mode you can assign board numbers to groups (even multiple boards per group). An empty field means queue – the group waits for a free board.',
+    tutTournTitle4: '4. Bracket and scorers',
+    tutTournDesc4:
+      'The bracket is generated from advancing players (or from all players in “Knockout Only”). Scorers are assigned automatically, but the admin can override them per match. Players who are playing in the current round are shown but cannot be selected.',
+    tutTournTitle5: '5. Cloud and game tablets',
+    tutTournDesc5:
+      'When network play is enabled, the tournament syncs to the cloud and game tablets can connect. Tablets enter the PIN and optional password, choose a board number and wait for a match assignment.',
+    tutTournTitle6: '6. Finish and history',
+    tutTournDesc6:
+      'After the tournament ends, results can be saved to history. In history you can browse completed tournaments and view summaries (tables, averages and other stats based on played matches).',
     tutX01Title1: '1. X01 Goal', tutX01Desc1: 'Start at 501 or 301. Reach exactly zero.',
     tutX01Title2: '2. Double Out', tutX01Desc2: 'You must finish with a Double or a Bullseye.',
     tutX01Title3: '3. Input', tutX01Desc3: 'Use the keyboard to enter 3-dart score.',
@@ -360,6 +397,7 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     playerIsPlaying: 'Playing',
     refereeAvailableGroup: 'Available',
     refereePlayingGroup: 'Playing this round',
+    refereeSuggestedGroup: 'Suggested (wave)',
     refereeSearchPlaceholder: 'Start typing a name…',
     headerHardResetTitle: 'Hard reset – clears all local data and reloads the page',
     headerHardResetAria: 'Hard reset application',
