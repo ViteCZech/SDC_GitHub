@@ -114,7 +114,7 @@ export default function TournamentSetup({
   const stepLabels = {
     tournStep1: t('tournStep1') || 'Krok 1: Založení',
     tournStep2: t('tournStep2') || 'Krok 2: Registrace hráčů',
-    tournStep3: 'KROK 3 - NASTAVENÍ SKUPIN A PAVOUKA',
+    tournStep3: t('tournStep3') || 'Krok 3: Kontrola nasazení',
   };
 
   const setupPinDisplay = String(tournamentDraft.pin ?? '').trim();
@@ -902,23 +902,25 @@ export default function TournamentSetup({
             <div
               className={`space-y-4 ${fmtBracketOnly ? 'lg:col-span-12 max-w-3xl lg:mx-auto w-full' : 'lg:col-span-5'}`}
             >
-              <div className="flex justify-between items-center mb-0 lg:mb-0">
-                <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400">
-                  {stepLabels.tournStep3}
-                </h2>
-                <div className="hidden sm:flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2 mb-0 lg:mb-0">
+                <div className="w-24 sm:w-40 shrink-0">
                   <button
                     type="button"
                     onClick={() => setStep(2)}
-                    className={`${btnBase} bg-slate-800 text-slate-300 hover:bg-slate-700`}
+                    className={`${btnBase} w-full bg-slate-800 text-slate-300 hover:bg-slate-700`}
                   >
                     <ArrowLeft className="w-5 h-5" /> {t('tournBack') || 'Zpět'}
                   </button>
+                </div>
+                <h2 className="flex-1 text-center text-xl font-black tracking-widest uppercase text-emerald-400 px-2">
+                  {stepLabels.tournStep3}
+                </h2>
+                <div className="w-24 sm:w-40 shrink-0 flex justify-end">
                   <button
                     type="button"
                     onClick={handleGenerate}
                     disabled={players.length < minPlayersRequired || hasAnyDuplicates() || isCustomInvalid}
-                    className={`${btnBase} bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed`}
+                    className={`${btnBase} w-full bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
                     <Target className="w-5 h-5" />
                     {t('tournGenerate') || 'Vygenerovat turnaj'}
@@ -1262,24 +1264,7 @@ export default function TournamentSetup({
               </div>
             )}
 
-            <div className="lg:col-span-12 flex justify-between gap-2 sm:hidden">
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className={`${btnBase} bg-slate-800 text-slate-300 hover:bg-slate-700`}
-              >
-                <ArrowLeft className="w-5 h-5" /> {t('tournBack') || 'Zpět'}
-              </button>
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={players.length < minPlayersRequired || hasAnyDuplicates() || isCustomInvalid}
-                className={`${btnBase} bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 disabled:opacity-40`}
-              >
-                <Target className="w-5 h-5" />
-                {t('tournGenerate') || 'Vygenerovat turnaj'}
-              </button>
-            </div>
+            {/* Akce jsou vždy v horní liště (vlevo / uprostřed / vpravo). */}
           </div>
         )}
       </div>

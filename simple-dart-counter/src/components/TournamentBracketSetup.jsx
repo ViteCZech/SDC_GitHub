@@ -65,9 +65,33 @@ export default function TournamentBracketSetup({
   return (
     <main className="flex flex-col flex-1 w-full overflow-y-auto bg-slate-950">
       <div className="w-full max-w-2xl lg:max-w-5xl xl:max-w-6xl mx-auto p-4 pb-24 space-y-6">
-        <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400">
-          {t('tournBracketSetupTitle') || 'Nastavení vyřazovacího pavouka'}
-        </h2>
+        <div className="flex items-center justify-between gap-2">
+          <div className="w-24 sm:w-40 shrink-0">
+            {onBack ? (
+              <button
+                type="button"
+                onClick={onBack}
+                className={`${btnBase} w-full bg-slate-800 text-slate-300 hover:bg-slate-700`}
+              >
+                <ArrowLeft className="w-5 h-5" /> {t('tournBackToGroups') || 'Zpět ke skupinám'}
+              </button>
+            ) : null}
+          </div>
+          <h2 className="flex-1 text-center text-xl font-black tracking-widest uppercase text-emerald-400 px-2">
+            {t('tournBracketSetupTitle') || 'Nastavení vyřazovacího pavouka'}
+          </h2>
+          <div className="w-24 sm:w-40 shrink-0 flex justify-end">
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={totalAdvancees < 2}
+              className={`${btnBase} w-full bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              <Target className="w-5 h-5" />
+              {t('tournGenerateBracket') || 'Vygenerovat pavouka'}
+            </button>
+          </div>
+        </div>
 
         <div className="p-4 border rounded-xl bg-slate-900 border-slate-800 space-y-6 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-8 lg:items-start">
           <div className="space-y-4 min-w-0">
@@ -140,26 +164,6 @@ export default function TournamentBracketSetup({
             <p className="text-[10px] text-slate-500 mt-2">{t('tournBracketLegsNote')}</p>
           </div>
         </div>
-
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={totalAdvancees < 2}
-          className="flex items-center justify-center gap-3 w-full py-5 text-xl font-black text-white rounded-xl bg-emerald-600 hover:bg-emerald-500 border-2 border-emerald-500 shadow-lg shadow-emerald-900/20 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <Target className="w-8 h-8" />
-          {t('tournGenerateBracket') || 'Vygenerovat pavouka'}
-        </button>
-
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            className={`${btnBase} w-full bg-slate-800 text-slate-300 hover:bg-slate-700`}
-          >
-            <ArrowLeft className="w-5 h-5" /> {t('tournBackToGroups') || 'Zpět ke skupinám'}
-          </button>
-        )}
       </div>
     </main>
   );

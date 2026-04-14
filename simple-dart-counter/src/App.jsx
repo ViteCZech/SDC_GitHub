@@ -1094,12 +1094,12 @@ function AppMain({ lang, setLang }) {
 
   const handleHardResetApp = () => {
     requestConfirm(
-      'Resetovat aplikaci? Smažou se všechna lokální data a stránka se znovu načte.',
+      t('headerHardResetTitle') || 'Resetovat aplikaci? Smažou se všechna lokální data a stránka se znovu načte.',
       () => {
         safeStorage.clear();
         window.location.reload();
       },
-      { confirmLabel: 'Resetovat', cancelLabel: t('cancel') || 'Zrušit' }
+      { confirmLabel: t('resetApp') || 'Resetovat', cancelLabel: t('cancel') || 'Zrušit' }
     );
   };
 
@@ -3550,7 +3550,7 @@ function AppMain({ lang, setLang }) {
                       onClick={handleHardResetApp}
                       className="w-full py-2.5 text-[11px] font-bold tracking-widest uppercase rounded-xl border border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-300 transition-colors"
                     >
-                      Resetovat aplikaci
+                      {t('resetApp') || 'Resetovat aplikaci'}
                     </button>
 
                     {(!user || user.isAnonymous) ? (

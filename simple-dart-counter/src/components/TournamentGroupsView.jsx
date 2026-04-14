@@ -703,25 +703,27 @@ export default function TournamentGroupsView({
       <div className="w-full max-w-[98vw] mx-auto px-2 sm:px-4 pb-24">
         {!isReviewMode && (
           <>
-            {/* Banner predikce času */}
-            <div className="mb-6 p-4 rounded-xl bg-slate-900 border border-slate-800">
-              <p className="text-lg font-bold text-slate-100">
-                {t('tournEstEndGroups') || 'Odhadovaný konec skupin'}:{' '}
-                <span className="text-emerald-400">{formatTime(groupsEndForBanner)}</span>
-              </p>
-              {estimatedTournamentEnd instanceof Date && !Number.isNaN(estimatedTournamentEnd.getTime()) ? (
-                <p className="text-base font-bold text-slate-200 mt-2">
-                  {t('tournEstTournamentEnd') || 'Odhad konec celého turnaje'}:{' '}
-                  <span className="text-emerald-400">{formatTime(estimatedTournamentEnd)}</span>
-                </p>
-              ) : null}
-              <p className="text-sm text-slate-400 mt-1">
-                {t('tournAvgMatchTime') || 'Průměrný čas zápasu'}:{' '}
-                {Math.round(timePrediction.avgMatchDurationMs / 60000)} {t('tournMinutes') || 'minut'}
-              </p>
-            </div>
             {/* Status lišta – nad nadpisem; nadpis má odsazení mt-8 */}
             <div className="flex overflow-x-auto whitespace-nowrap gap-4 p-4 bg-slate-900 border-b border-slate-800 rounded-xl">
+              <div className="shrink-0 flex items-center gap-4">
+                <span className="text-slate-300 font-bold">{t('tournEstTotalTime') || 'Odhady'}:</span>
+                <span className="text-slate-200">
+                  {t('tournEstEndGroups') || 'Odhadovaný konec skupin'}: <b className="text-emerald-300">{formatTime(groupsEndForBanner)}</b>
+                </span>
+                {estimatedTournamentEnd instanceof Date && !Number.isNaN(estimatedTournamentEnd.getTime()) ? (
+                  <span className="text-slate-200">
+                    {t('tournEstTournamentEnd') || 'Odhad konec turnaje'}:{' '}
+                    <b className="text-emerald-300">{formatTime(estimatedTournamentEnd)}</b>
+                  </span>
+                ) : null}
+                <span className="text-slate-200">
+                  {t('tournAvgMatchTime') || 'Průměrný čas zápasu'}:{' '}
+                  <b className="text-slate-100">
+                    {Math.round(timePrediction.avgMatchDurationMs / 60000)} {t('tournMinutes') || 'minut'}
+                  </b>
+                </span>
+              </div>
+              <div className="w-px bg-slate-700 shrink-0" />
               <div className="shrink-0 flex items-center gap-4">
                 <span className="text-slate-300 font-bold">{t('tournGroupsStatus') || 'Stav skupin'}:</span>
                 <span className="text-slate-200">{t('tournGroupsTotal') || 'Celkem skupin'}: <b>{groupStatus.total}</b></span>
