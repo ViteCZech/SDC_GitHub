@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Settings, Play, ClipboardList, Lock, Unlock, X, Pencil, Flag, Bell } from 'lucide-react';
 import { translations } from '../translations';
-import { getBracketWinLegsForRound, isBracketRefereePlaceholder } from '../utils/tournamentLogic';
+import { getBracketWinLegsForRound, getRoundBusyPlayerIds, isBracketRefereePlaceholder } from '../utils/tournamentLogic';
 import { AdminTapTextField } from './AdminTapField';
 
 const BYE_MARKER = 'Volný los';
@@ -263,6 +263,12 @@ export default function TournamentBracketView({
       customName: nm,
     });
   };
+
+  const refereeBusyIds = useMemo(() => {
+    const ri = refereeModal?.roundIndex;
+    if (ri === null || ri === undefined) return new Set();
+    return getRoundBusyPlayerIds(bracketData, ri) || new Set();
+  }, [bracketData, refereeModal?.roundIndex]);
 
   const saveRefereeModal = () => {
     if (!refereeModal) return;
@@ -679,11 +685,16 @@ export default function TournamentBracketView({
               className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
             >
               <option value="">{t('tournSelectScorer') || '— Vyberte počtáře —'}</option>
-              {allTournamentPlayers.map((p) => (
-                <option key={p.id} value={String(p.id)}>
-                  {p.name}
-                </option>
-              ))}
+              {allTournamentPlayers.map((p) => {
+                const pid = p?.id;
+                const isBusy = pid != null && refereeBusyIds?.has?.(pid);
+                const suffix = isBusy ? ` (${t('playerIsPlaying') || 'Hraje'})` : '';
+                return (
+                  <option key={p.id} value={String(p.id)} disabled={!!isBusy}>
+                    {p.name}{suffix}
+                  </option>
+                );
+              })}
             </select>
             <div className="mt-4">
               <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">

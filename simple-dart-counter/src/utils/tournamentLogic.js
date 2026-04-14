@@ -1613,10 +1613,37 @@ export function estimateTotalTournamentTime(opts, bracketOpts = {}) {
 }
 
 /**
- * Globální radar vytížení (cross-round): hráči, kteří NESMÍ být vybráni jako počtář,
+ * Busy hráči pro KONKRÉTNÍ kolo pavouka: hráči, kteří v tomto kole hrají (nebo už hráli).
+ *
+ * Kritické vlastnosti:
+ * - BYE / chybějící soupeř (ne-fyzický zápas) NENÍ busy.
+ * - Funguje i pro předkolo (roundIndex === 0).
+ */
+export function getRoundBusyPlayerIds(bracketRounds, roundIndex) {
+  const s = new Set();
+  const rounds = Array.isArray(bracketRounds) ? bracketRounds : [];
+  const ri = Math.max(0, Math.floor(Number(roundIndex)));
+  if (!Number.isFinite(ri) || ri < 0 || ri >= rounds.length) return s;
+
+  const matches = rounds[ri]?.matches || [];
+  for (const m of matches) {
+    if (!m) continue;
+    if (m.isBye === true) continue;
+    const p1 = m.player1Id ?? m.p1Id;
+    const p2 = m.player2Id ?? m.p2Id;
+    if (p1 == null || p1 === '' || p2 == null || p2 === '') continue;
+    if (isBracketByeName(m.player1Name) || isBracketByeName(m.player2Name)) continue;
+    s.add(p1);
+    s.add(p2);
+  }
+  return s;
+}
+
+/**
+ * Globální radar vytížení (cross-round): hráči, kteří NESMÍ být vybráni jako počtář engine,
  * protože už hrají / jsou check-in / nebo už mají fyzicky přidělený terč v libovolném kole pavouka.
  */
-function getRoundBusyPlayerIds(bracketRounds, roundIndex) {
+function getGlobalBusyPlayerIdsForRefereeEngine(bracketRounds) {
   const s = new Set();
   for (const round of bracketRounds || []) {
     const matches = round?.matches || [];
@@ -2302,7 +2329,7 @@ export const updateBracketReferees = (
   // 2. Hlavní přiřazování s dynamickým limitem terčů (min(availableBoards, …) přes activeBoardsUsed)
   newBracket.forEach((round, roundIndex) => {
     const roundMatches = round?.matches || [];
-    const roundBusyIds = getRoundBusyPlayerIds(newBracket, roundIndex);
+    const roundBusyIds = getGlobalBusyPlayerIdsForRefereeEngine(newBracket);
     const isPrelimRound = hasPrelimBracketRound && roundIndex === 0;
     const isFirstMainRound = roundIndex === firstMainRoundIndex;
     const isLaterKoRound = roundIndex > firstMainRoundIndex;
