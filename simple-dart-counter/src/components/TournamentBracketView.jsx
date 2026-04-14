@@ -671,6 +671,11 @@ export default function TournamentBracketView({
                     : null
                 );
               }}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                saveRefereeModal();
+              }}
               className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
             >
               <option value="">{t('tournSelectScorer') || '— Vyberte počtáře —'}</option>

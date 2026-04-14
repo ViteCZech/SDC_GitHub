@@ -1988,14 +1988,14 @@ export const updateBracketReferees = (
   if (!bracket || bracket.length === 0) return bracket;
   const newBracket = JSON.parse(JSON.stringify(bracket));
 
-  if (!(groups || []).length) {
-    return newBracket;
-  }
+  const hasGroups = (groups || []).length > 0;
 
   const hasPrelimBracketRound =
     prelimLegs != null && Number.isFinite(Number(prelimLegs)) && Number(prelimLegs) > 0;
   const firstMainRoundIndex = hasPrelimBracketRound ? 1 : 0;
-  const nonAdvEntries = buildNonAdvancerPoolSortedWorstFirst(groups, promotersCount, groupMatchesAll);
+  const nonAdvEntries = hasGroups
+    ? buildNonAdvancerPoolSortedWorstFirst(groups, promotersCount, groupMatchesAll)
+    : [];
   const nonAdvPriority = new Map();
   nonAdvEntries.forEach((e, i) => nonAdvPriority.set(e.id, i));
 
@@ -2387,6 +2387,8 @@ export const updateBracketReferees = (
       let pickTier = 0;
 
       if (isPrelimRound) {
+        // Přímý KO bez skupin: v 1. kole/předkole automat nepřiřazuje (není k dispozici „nepostupující“ pool).
+        if (!hasGroups) return;
         const poolIds = new Set(nonAdvEntries.map((e) => e.id));
         chosenRef = selectFromPool({
           poolIds,
@@ -2408,6 +2410,10 @@ export const updateBracketReferees = (
           if (chosenRef) pickTier = 2;
         }
       } else if (isFirstMainRound) {
+        // Přímý KO bez skupin: v prvním hlavním kole automat nepřiřazuje.
+        // Pravidlo „poražený z předchozího kola píše“ se aplikuje až od kol > 0 (viz later rounds níže).
+        if (!hasGroups && !hasPrelimBracketRound) return;
+        if (!hasGroups && hasPrelimBracketRound) return;
         if (hasPrelimBracketRound) {
           const prelimRefIds = collectRefereeIdsInBracketRound(newBracket, 0);
           const r0AllLosers = collectLosersFromBracketRoundIndex(0);

@@ -114,7 +114,7 @@ export default function GameStats({ records = [], lang }) {
                                 
                                 {/* Osa X (Datum) */}
                                 <div className={`h-8 mt-2 flex items-center justify-center text-[10px] sm:text-xs font-bold ${isToday ? 'text-emerald-500' : 'text-slate-500'}`}>
-                                    isToday ? t('statsToday') : day.label
+                                    {isToday ? t('statsToday') : day.label}
                                 </div>
                             </div>
                         );

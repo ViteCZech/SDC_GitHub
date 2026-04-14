@@ -4091,6 +4091,7 @@ function AppMain({ lang, setLang }) {
             <div className="flex w-full max-w-md md:max-w-xl lg:max-w-2xl p-1 mb-6 border shadow-md bg-slate-800 rounded-xl border-slate-700">
                 <button onClick={() => setTutorialTab('x01')} className={`flex-1 py-3 text-xs font-black rounded-lg uppercase tracking-widest transition-colors ${tutorialTab === 'x01' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{t('tutTabX01')}</button>
                 <button onClick={() => setTutorialTab('cricket')} className={`flex-1 py-3 text-xs font-black rounded-lg uppercase tracking-widest transition-colors ${tutorialTab === 'cricket' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{t('tutTabCricket')}</button>
+                <button onClick={() => setTutorialTab('tournaments')} className={`flex-1 py-3 text-xs font-black rounded-lg uppercase tracking-widest transition-colors ${tutorialTab === 'tournaments' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{t('tutTabTournaments') || 'Turnaje'}</button>
             </div>
 
             <div className="grid w-full max-w-4xl grid-cols-1 gap-4 md:grid-cols-2">
@@ -4129,6 +4130,16 @@ function AppMain({ lang, setLang }) {
                             <div className="flex-1 pt-1"><h3 className="mb-2 text-sm font-bold tracking-wider text-white uppercase">{t('tutCricTitle3')}</h3><p className="text-sm leading-relaxed text-slate-400">{t('tutCricDesc3')}</p></div>
                         </div>
                     </>
+                )}
+                {tutorialTab === 'tournaments' && (
+                    <div className="p-6 border shadow-lg bg-slate-900 rounded-2xl border-slate-800 md:col-span-2">
+                        <h3 className="mb-2 text-sm font-bold tracking-wider text-white uppercase">
+                          {t('tutTabTournaments') || 'Turnaje'}
+                        </h3>
+                        <p className="text-sm leading-relaxed text-slate-400">
+                          {t('tutorialTournamentsWIP') || 'Detailní průvodce turnaji se připravuje...'}
+                        </p>
+                    </div>
                 )}
                 <div className="grid grid-cols-1 col-span-1 gap-4 pt-4 mt-4 border-t md:col-span-2 border-slate-800 md:grid-cols-2">
                     <div className="flex items-start gap-4 p-4 bg-slate-900 rounded-2xl">

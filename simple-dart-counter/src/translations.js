@@ -28,6 +28,8 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     howManyDarts: 'Kolik šipek?', playerName: 'Jméno', kbdDone: 'ZAVŘÍT', kbdSpace: 'MEZERNÍK',
 
     tutTabX01: 'X01 (501/301)', tutTabCricket: 'CRICKET', 
+    tutTabTournaments: 'Turnaje',
+    tutorialTournamentsWIP: 'Detailní průvodce turnaji se připravuje...',
     tutX01Title1: '1. Cíl hry X01', tutX01Desc1: 'Začínáte na 501 nebo 301 bodech. Cílem je dostat se přesně na nulu. Každý hod se odečítá z celkového skóre.',
     tutX01Title2: '2. Double Out', tutX01Desc2: 'Konec hry (zavření) musí být vždy zásahem vnějšího úzkého kruhu (Double) nebo středem (BULL).',
     tutX01Title3: '3. Chytré zadávání', tutX01Desc3: 'Používejte klávesnici pro celkové skóre ze 3 šipek. Objeví se i chytrá tlačítka rychlého zavření.',
@@ -326,6 +328,8 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     customAvg: 'Target Average:',
 
     tutTabX01: 'X01 (501/301)', tutTabCricket: 'CRICKET',
+    tutTabTournaments: 'Tournaments',
+    tutorialTournamentsWIP: 'A detailed tournament guide is being prepared...',
     tutX01Title1: '1. X01 Goal', tutX01Desc1: 'Start at 501 or 301. Reach exactly zero.',
     tutX01Title2: '2. Double Out', tutX01Desc2: 'You must finish with a Double or a Bullseye.',
     tutX01Title3: '3. Input', tutX01Desc3: 'Use the keyboard to enter 3-dart score.',
