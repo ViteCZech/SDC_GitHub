@@ -160,6 +160,7 @@ export default function TournamentBracketView({
   const [editBoardsValue, setEditBoardsValue] = useState('');
   const [boardModal, setBoardModal] = useState(null);
   const [refereeModal, setRefereeModal] = useState(null);
+  const [refereeSearch, setRefereeSearch] = useState('');
   const [playerSlotModal, setPlayerSlotModal] = useState(null);
   const [walkoverModal, setWalkoverModal] = useState(null);
   const pressTimer = useRef(null);
@@ -185,6 +186,7 @@ export default function TournamentBracketView({
     setLegsModalOpen(false);
     setBoardModal(null);
     setRefereeModal(null);
+    setRefereeSearch('');
     setPlayerSlotModal(null);
     setWalkoverModal(null);
   }, [activeRoundIndex]);
@@ -262,6 +264,7 @@ export default function TournamentBracketView({
       selectedId: String(match?.referee?.id ?? ''),
       customName: nm,
     });
+    setRefereeSearch('');
   };
 
   const refereeBusyIds = useMemo(() => {
@@ -269,6 +272,35 @@ export default function TournamentBracketView({
     if (ri === null || ri === undefined) return new Set();
     return getRoundBusyPlayerIds(bracketData, ri) || new Set();
   }, [bracketData, refereeModal?.roundIndex]);
+
+  const normalizeSearchKey = (s) =>
+    String(s ?? '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+
+  const filteredRefereeOptions = useMemo(() => {
+    const q = normalizeSearchKey(refereeSearch);
+    const all = Array.isArray(allTournamentPlayers) ? allTournamentPlayers : [];
+    if (!q) return all;
+    return all.filter((p) => {
+      const key = normalizeSearchKey(`${p?.name ?? ''} ${p?.id ?? ''}`);
+      return key.includes(q);
+    });
+  }, [allTournamentPlayers, refereeSearch]);
+
+  const { filteredAvailableRefs, filteredBusyRefs } = useMemo(() => {
+    const avail = [];
+    const busy = [];
+    for (const p of filteredRefereeOptions || []) {
+      const pid = p?.id;
+      const isBusy = pid != null && refereeBusyIds?.has?.(pid);
+      if (isBusy) busy.push(p);
+      else avail.push(p);
+    }
+    return { filteredAvailableRefs: avail, filteredBusyRefs: busy };
+  }, [filteredRefereeOptions, refereeBusyIds]);
 
   const saveRefereeModal = () => {
     if (!refereeModal) return;
@@ -662,6 +694,15 @@ export default function TournamentBracketView({
             <p className="text-xs text-slate-500 mb-3">
               {t('tournSelectScorer') || 'Vyberte počtáře pro tento zápas'}
             </p>
+            <input
+              type="text"
+              value={refereeSearch}
+              onChange={(e) => setRefereeSearch(e.target.value)}
+              placeholder={t('refereeSearchPlaceholder') || 'Začněte psát jméno…'}
+              className="w-full mb-3 px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
+              autoComplete="off"
+              inputMode="text"
+            />
             <select
               value={refereeModal.selectedId}
               onChange={(e) => {
@@ -685,16 +726,25 @@ export default function TournamentBracketView({
               className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
             >
               <option value="">{t('tournSelectScorer') || '— Vyberte počtáře —'}</option>
-              {allTournamentPlayers.map((p) => {
-                const pid = p?.id;
-                const isBusy = pid != null && refereeBusyIds?.has?.(pid);
-                const suffix = isBusy ? ` (${t('playerIsPlaying') || 'Hraje'})` : '';
-                return (
-                  <option key={p.id} value={String(p.id)} disabled={!!isBusy}>
-                    {p.name}{suffix}
+              <optgroup label={t('refereeAvailableGroup') || 'Dostupní'}>
+                {(filteredAvailableRefs || []).map((p) => (
+                  <option key={p.id} value={String(p.id)}>
+                    {p.name}
                   </option>
-                );
-              })}
+                ))}
+              </optgroup>
+              <optgroup label={t('refereePlayingGroup') || 'Hrající v tomto kole'}>
+                {(filteredBusyRefs || []).map((p) => (
+                  <option
+                    key={p.id}
+                    value={String(p.id)}
+                    disabled
+                    title={t('playerIsPlaying') || 'Hraje'}
+                  >
+                    {p.name} ({t('playerIsPlaying') || 'Hraje'})
+                  </option>
+                ))}
+              </optgroup>
             </select>
             <div className="mt-4">
               <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
