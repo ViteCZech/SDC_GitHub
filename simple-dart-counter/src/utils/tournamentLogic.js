@@ -638,6 +638,8 @@ export function calculateTournamentStats(groups = [], bracketRounds = [], groupM
     ? bracketRounds.flatMap((r) => (Array.isArray(r?.matches) ? r.matches : []))
     : [];
 
+  // Aggregate stats only from completed matches, but keep participants from bracket/groups
+  // so winners who advanced by walkover still appear in the final table.
   const allMatches = [...(groupMatches || []), ...bracketMatches].filter((m) => m?.status === 'completed');
 
   const { placementById } = calculateFinalStandings(bracketRounds);
@@ -677,6 +679,20 @@ export function calculateTournamentStats(groups = [], bracketRounds = [], groupM
   let totalScore = 0;
 
   let globalBestLegDarts = Infinity;
+
+  // Ensure all known participants exist in the table (even if they have 0 completed matches).
+  for (const g of groups || []) {
+    for (const p of g?.players || []) {
+      const pid = keyOf(p?.id, p?.name);
+      if (pid) ensurePlayer(pid, p?.name);
+    }
+  }
+  for (const m of bracketMatches || []) {
+    const p1 = keyOf(m?.player1Id, m?.player1Name);
+    const p2 = keyOf(m?.player2Id, m?.player2Name);
+    if (p1) ensurePlayer(p1, m?.player1Name);
+    if (p2) ensurePlayer(p2, m?.player2Name);
+  }
 
   const processPlayerFromMatch = (match, sideKey) => {
     const isP1 = sideKey === 'p1';
