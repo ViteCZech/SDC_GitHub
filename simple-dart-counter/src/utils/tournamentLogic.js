@@ -586,7 +586,7 @@ export function calculateFinalStandings(bracketRounds) {
     const matches = bracketRounds[roundIndex]?.matches ?? [];
     for (const match of matches) {
       if (!match) continue;
-      if (match.status !== 'completed') continue;
+      if (match.status !== 'completed' && match.status !== 'walkover') continue;
       if (match.isBye) continue;
       if (!match.player1Id || !match.player2Id) continue;
       if (match.winnerId == null) continue;
@@ -606,20 +606,32 @@ export function calculateFinalStandings(bracketRounds) {
   const placementById = {};
   const eliminatedAtRoundCount = (roundIndex) => P / Math.pow(2, roundIndex + 1);
 
-  for (const [pid, eliminationRound] of Object.entries(eliminationRoundById)) {
-    // champion: roundIndex == R (speciální)
-    if (Number(eliminationRound) === R) {
-      placementById[pid] = 1;
-      continue;
+  // Champion: if the final match is decided, winner is #1.
+  // (Previously we only tracked losers, so the winner had no placement.)
+  const finalRoundIdx = bracketRounds.length - 1;
+  const finalMatches = bracketRounds?.[finalRoundIdx]?.matches ?? [];
+  for (const m of finalMatches) {
+    if (!m) continue;
+    if (m.isBye) continue;
+    if (m.status !== 'completed' && m.status !== 'walkover') continue;
+    const wid = m.winnerId;
+    if (wid != null && wid !== '') {
+      placementById[String(wid)] = 1;
+      break;
     }
+  }
 
+  for (const [pid, eliminationRound] of Object.entries(eliminationRoundById)) {
     const finishIndex = Number(eliminationRound);
     let betterFinishers = 1; // 1 = vítěz pavouka
     for (let k = finishIndex + 1; k <= R - 1; k++) {
       betterFinishers += eliminatedAtRoundCount(k);
     }
     const rank = betterFinishers + 1;
-    placementById[pid] = Math.max(1, Math.round(rank));
+    // Don't overwrite champion if somehow present in map.
+    if (placementById[String(pid)] == null) {
+      placementById[String(pid)] = Math.max(1, Math.round(rank));
+    }
   }
 
   return { placementById };
