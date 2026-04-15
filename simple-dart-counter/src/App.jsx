@@ -1038,6 +1038,8 @@ function AppMain({ lang, setLang }) {
 
   /** JIT: detekce navýšení počtu terčů v pavouku (aby se hned zaplnily čekající zápasy). */
   const prevBracketBoardsRef = useRef(null);
+  const bracketAutoFixTimerRef = useRef(null);
+  const bracketJitTimerRef = useRef(null);
 
   /** Obnova relace diváka / tabletu po F5 (localStorage). */
   useEffect(() => {
@@ -1279,11 +1281,28 @@ function AppMain({ lang, setLang }) {
     return () => unsub();
   }, [userRole, activePin, tournamentData?.cloudEnabled, user]);
 
-  /** Na kroku Pavouk průběžně srovná terče 1…N podle aktuálního stavu (postupy, předkolo → L16). */
+  /**
+   * Na kroku Pavouk průběžně:
+   * - normalizuje neplatné přiřazení terče (např. po snížení počtu terčů)
+   * - dopočítá počtáře (referee engine)
+   *
+   * Pozn.: samotné automatické rozdělování volných terčů napříč pavoukem řeší JIT efekt níže,
+   * aby se logiky "kolo po kole" vs "globální fronta" nepřetahovaly a neblikaly.
+   */
   useEffect(() => {
     if (userRole !== 'admin') return;
     if (appState !== 'tournament_bracket' || !tournamentData) return;
     if (!Array.isArray(tournamentBracket) || tournamentBracket?.length === 0) return;
+    if (tournamentData?.cloudEnabled && isIncomingCloudUpdate.current) return;
+
+    if (bracketAutoFixTimerRef.current) clearTimeout(bracketAutoFixTimerRef.current);
+    bracketAutoFixTimerRef.current = window.setTimeout(() => {
+      bracketAutoFixTimerRef.current = null;
+      if (userRoleRef.current !== 'admin') return;
+      if (appState !== 'tournament_bracket' || !tournamentData) return;
+      if (!Array.isArray(tournamentBracket) || tournamentBracket?.length === 0) return;
+      if (tournamentData?.cloudEnabled && isIncomingCloudUpdate.current) return;
+
     const defBoards =
       Number(tournamentData.boardsCount ?? tournamentData.totalBoards ?? tournamentData.numBoards) || 1;
     const bracketWithBoards = tournamentBracket.map((round) => {
@@ -1291,9 +1310,21 @@ function AppMain({ lang, setLang }) {
         round.boardsCount != null && Number(round.boardsCount) >= 1
           ? Math.max(1, Math.floor(Number(round.boardsCount)))
           : defBoards;
+      const normalizedMatches = (round.matches || []).map((m) => {
+        if (!m) return m;
+        const b = Number(m.board);
+        const hasBoard = m.board != null && m.board !== '' && Number.isFinite(b);
+        const outOfRange = hasBoard && (b < 1 || b > nb);
+        // Po snížení počtu terčů zneplatníme staré přiřazení u pending zápasů,
+        // aby je JIT fronta mohla deterministicky znovu rozdělit (a UI neblikalo).
+        if (outOfRange && m.status === 'pending') {
+          return { ...m, board: null, boardLocked: false };
+        }
+        return m;
+      });
       return {
         ...round,
-        matches: autoAssignSequentialBoardsToRound(round.matches, nb),
+        matches: normalizedMatches,
       };
     });
     const activeBoards =
@@ -1314,6 +1345,11 @@ function AppMain({ lang, setLang }) {
     if (JSON.stringify(bracketWithRefs) !== JSON.stringify(tournamentBracket)) {
       setTournamentBracket(bracketWithRefs);
     }
+    }, 200);
+
+    return () => {
+      if (bracketAutoFixTimerRef.current) clearTimeout(bracketAutoFixTimerRef.current);
+    };
   }, [
     userRole,
     appState,
@@ -1329,6 +1365,15 @@ function AppMain({ lang, setLang }) {
     if (userRole !== 'admin') return;
     if (appState !== 'tournament_bracket' || !tournamentData) return;
     if (!Array.isArray(tournamentBracket) || tournamentBracket.length === 0) return;
+    if (tournamentData?.cloudEnabled && isIncomingCloudUpdate.current) return;
+
+    if (bracketJitTimerRef.current) clearTimeout(bracketJitTimerRef.current);
+    bracketJitTimerRef.current = window.setTimeout(() => {
+      bracketJitTimerRef.current = null;
+      if (userRoleRef.current !== 'admin') return;
+      if (appState !== 'tournament_bracket' || !tournamentData) return;
+      if (!Array.isArray(tournamentBracket) || tournamentBracket.length === 0) return;
+      if (tournamentData?.cloudEnabled && isIncomingCloudUpdate.current) return;
 
     const availableBoards =
       Number(tournamentData.boardsCount ?? tournamentData.totalBoards ?? tournamentData.numBoards) || 1;
@@ -1414,6 +1459,11 @@ function AppMain({ lang, setLang }) {
     if (JSON.stringify(withRefs) !== JSON.stringify(tournamentBracket)) {
       setTournamentBracket(withRefs);
     }
+    }, 200);
+
+    return () => {
+      if (bracketJitTimerRef.current) clearTimeout(bracketJitTimerRef.current);
+    };
   }, [
     userRole,
     appState,
@@ -2415,9 +2465,18 @@ function AppMain({ lang, setLang }) {
       if (!Array.isArray(prev) || !prev[roundIndex]?.matches) return prev;
       return prev.map((round, ri) => {
         if (ri !== roundIndex) return round;
-        const withLegs = round.matches.map((m) =>
-          m.status === 'pending' ? { ...m, winLegs: legs } : m
-        );
+        const withLegs = round.matches.map((m) => {
+          if (!m) return m;
+          const next = m.status === 'pending' ? { ...m, winLegs: legs } : m;
+          // Pokud admin sníží počet terčů pro kolo, zneplatníme staré T5+,
+          // aby se přiřazení stabilizovalo a šlo znovu dosadit počtáře.
+          const b = Number(next.board);
+          const hasBoard = next.board != null && next.board !== '' && Number.isFinite(b);
+          if (hasBoard && b > boards && next.status === 'pending') {
+            return { ...next, board: null, boardLocked: false };
+          }
+          return next;
+        });
         const roundWithMeta = { ...round, boardsCount: boards, matches: withLegs };
         return {
           ...roundWithMeta,
