@@ -478,45 +478,53 @@ export default function TournamentSetup({
         {/* STEP 1 */}
         {step === 1 && (
           <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start animate-in fade-in duration-200">
-            <div className="lg:col-span-5 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => setTournamentDraft((prev) => ({ ...prev, format: 'groups_bracket' }))}
-                className={`p-6 rounded-2xl border-2 text-left font-black uppercase tracking-wide text-sm sm:text-base transition-all ${
-                  grpFmtStep
-                    ? 'bg-emerald-900/40 border-emerald-500 text-white shadow-lg shadow-emerald-900/20'
-                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
-                }`}
-              >
-                {t('formatGroupsBracket') || t('tournFormatGroupsKo')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setTournamentDraft((prev) => ({ ...prev, format: 'bracket_only' }))}
-                className={`p-6 rounded-2xl border-2 text-left font-black uppercase tracking-wide text-sm sm:text-base transition-all ${
-                  fmtBracketOnly
-                    ? 'bg-emerald-900/40 border-emerald-500 text-white shadow-lg shadow-emerald-900/20'
-                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
-                }`}
-              >
-                {t('formatBracketOnly') || t('tournFormatKoOnly')}
-              </button>
-            </div>
-            <div className="flex justify-between items-center mb-6 lg:mb-0">
-              <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400">{stepLabels.tournStep1}</h2>
-              <div className="hidden sm:flex items-center gap-2">
-                {onBack && (
-                  <button onClick={onBack} className={`${btnBase} bg-slate-800 text-slate-300 hover:bg-slate-700`}>
-                    <ArrowLeft className="w-5 h-5" /> {t('tournBack') || 'Zpět'}
+            <div className="lg:col-span-12 flex items-start justify-between gap-3 flex-wrap">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  {onBack && (
+                    <button onClick={onBack} className={`${btnBase} bg-slate-800 text-slate-300 hover:bg-slate-700`}>
+                      <ArrowLeft className="w-5 h-5" /> {t('tournBack') || 'Zpět'}
+                    </button>
+                  )}
+                  <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400">
+                    {stepLabels.tournStep1}
+                  </h2>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mt-3 max-w-md">
+                  <button
+                    type="button"
+                    onClick={() => setTournamentDraft((prev) => ({ ...prev, format: 'groups_bracket' }))}
+                    className={`px-4 py-3 rounded-xl border-2 text-left font-black uppercase tracking-wide text-xs sm:text-sm transition-all ${
+                      grpFmtStep
+                        ? 'bg-emerald-900/40 border-emerald-500 text-white shadow-lg shadow-emerald-900/20'
+                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                    }`}
+                  >
+                    {t('formatGroupsBracket') || t('tournFormatGroupsKo')}
                   </button>
-                )}
-                <button onClick={handleStep1Continue} className={`${btnBase} bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500`}>
-                  {t('tournContinue') || 'Pokračovat'}
-                  <ArrowRight className="w-5 h-5" />
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setTournamentDraft((prev) => ({ ...prev, format: 'bracket_only' }))}
+                    className={`px-4 py-3 rounded-xl border-2 text-left font-black uppercase tracking-wide text-xs sm:text-sm transition-all ${
+                      fmtBracketOnly
+                        ? 'bg-emerald-900/40 border-emerald-500 text-white shadow-lg shadow-emerald-900/20'
+                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                    }`}
+                  >
+                    {t('formatBracketOnly') || t('tournFormatKoOnly')}
+                  </button>
+                </div>
               </div>
-            </div>
+
+              <button
+                type="button"
+                onClick={handleStep1Continue}
+                className={`${btnBase} bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 ml-auto`}
+              >
+                {t('tournContinue') || 'Pokračovat'}
+                <ArrowRight className="w-5 h-5" />
+              </button>
             </div>
             <div className="lg:col-span-7">
             <div className="p-4 border rounded-xl bg-slate-900 border-slate-800 space-y-4 md:grid md:grid-cols-2 md:gap-6 md:space-y-0">
@@ -657,17 +665,6 @@ export default function TournamentSetup({
               )}
               </div>
             </div>
-            </div>
-            <div className="flex justify-between gap-2 sm:hidden lg:col-span-12">
-              {onBack && (
-                <button onClick={onBack} className={`${btnBase} bg-slate-800 text-slate-300 hover:bg-slate-700`}>
-                  <ArrowLeft className="w-5 h-5" /> {t('tournBack') || 'Zpět'}
-                </button>
-              )}
-              <button onClick={handleStep1Continue} className={`${btnBase} bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 ml-auto`}>
-                {t('tournContinue') || 'Pokračovat'}
-                <ArrowRight className="w-5 h-5" />
-              </button>
             </div>
           </div>
         )}

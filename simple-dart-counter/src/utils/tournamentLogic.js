@@ -757,7 +757,18 @@ export function calculateTournamentStats(groups = [], bracketRounds = [], groupM
         placement: placementById?.[String(p.id)] ?? undefined,
       };
     })
-    .sort((a, b) => b.average - a.average);
+    .sort((a, b) => {
+      const pa = Number.isFinite(Number(a.placement)) ? Number(a.placement) : null;
+      const pb = Number.isFinite(Number(b.placement)) ? Number(b.placement) : null;
+      if (pa != null && pb != null && pa !== pb) return pa - pb;
+      if (pa != null && pb == null) return -1;
+      if (pa == null && pb != null) return 1;
+      // Fallback for ongoing / incomplete brackets: higher average first.
+      const av = Number(a.average ?? 0) || 0;
+      const bv = Number(b.average ?? 0) || 0;
+      if (bv !== av) return bv - av;
+      return String(a.name ?? '').localeCompare(String(b.name ?? ''), 'cs');
+    });
 
   const top180s = Object.values(playerAgg)
     .sort((a, b) => b.total180s - a.total180s)

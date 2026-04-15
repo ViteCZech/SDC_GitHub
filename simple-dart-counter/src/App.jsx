@@ -969,6 +969,17 @@ function AppMain({ lang, setLang }) {
   const [appState, setAppState] = useState('home');
   const t = (k) => translations[lang]?.[k] || k;
 
+  // Allow deep-link back from static pages like `privacy.html`.
+  useEffect(() => {
+    const applyHashRoute = () => {
+      const h = String(window.location.hash || '').toLowerCase();
+      if (h === '#about') setAppState('about');
+    };
+    applyHashRoute();
+    window.addEventListener('hashchange', applyHashRoute);
+    return () => window.removeEventListener('hashchange', applyHashRoute);
+  }, []);
+
   const [settings, setSettings] = useState({
     gameType: 'x01',
     startScore: 501, outMode: 'double',
@@ -4221,7 +4232,7 @@ function AppMain({ lang, setLang }) {
                 </div>
                 <div className="pt-6 md:pt-0 text-center md:text-left">
                     <p className="text-sm text-slate-400">{t('aboutText')}</p>
-                    <button onClick={() => window.location.href = '/privacy.html'} className="flex items-center justify-center md:justify-start w-full gap-2 mt-8 text-sm font-bold tracking-widest underline uppercase text-emerald-500 hover:text-emerald-400">
+                    <button onClick={() => window.location.href = `/privacy.html#${lang}`} className="flex items-center justify-center md:justify-start w-full gap-2 mt-8 text-sm font-bold tracking-widest underline uppercase text-emerald-500 hover:text-emerald-400">
                         {typeof t === 'function' ? t('privacyPolicy') : 'Zásady ochrany soukromí'}
                     </button>
                     <div className="text-center md:text-left text-[10px] text-slate-500 pt-8 md:pt-6 border-t border-slate-800 mt-6 md:mt-8">&copy; {new Date().getFullYear()} Vít (ViteCZech).<br/> Všechna práva vyhrazena.</div>

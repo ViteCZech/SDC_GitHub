@@ -142,7 +142,9 @@ const TournamentStatisticsView = ({
             <div className="text-[10px] uppercase font-bold tracking-widest text-slate-500">
               {t('playerStats') || 'Hráči'}
             </div>
-            <div className="text-xs text-slate-500">{isEmpty ? '' : t('sortedByAverage') || 'Seřazeno dle průměru'}</div>
+            <div className="text-xs text-slate-500">
+              {isEmpty ? '' : t('sortedByPlacement') || 'Seřazeno dle umístění'}
+            </div>
           </div>
 
           {playerStats.length ? (
