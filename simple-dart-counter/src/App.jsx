@@ -1007,6 +1007,58 @@ function AppMain({ lang, setLang }) {
   useEffect(() => {
     tournamentMatchContextRef.current = tournamentMatchContext;
   }, [tournamentMatchContext]);
+
+  // Keep screen awake on scoring/tablet/admin-bracket screens (when supported).
+  useEffect(() => {
+    let wakeLock = null;
+    let cancelled = false;
+
+    const shouldKeepAwake =
+      appState === 'tournament_tablet' ||
+      (appState === 'playing' && tournamentMatchContextRef.current?.type === 'tablet') ||
+      (appState === 'tournament_bracket' && userRoleRef.current === 'admin');
+
+    const release = async () => {
+      try {
+        if (wakeLock) await wakeLock.release();
+      } catch (e) {}
+      wakeLock = null;
+    };
+
+    const acquire = async () => {
+      if (!shouldKeepAwake) {
+        await release();
+        return;
+      }
+      if (document.visibilityState !== 'visible') return;
+      if (!('wakeLock' in navigator) || typeof navigator.wakeLock?.request !== 'function') return;
+      try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener?.('release', () => {
+          // No-op: we re-acquire on visibilitychange if needed.
+        });
+      } catch (e) {
+        // Ignore: permission / not supported / battery saver.
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (cancelled) return;
+      if (document.visibilityState !== 'visible') {
+        release();
+      } else {
+        acquire();
+      }
+    };
+
+    acquire();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      release();
+    };
+  }, [appState]);
   const [tournamentMatches, setTournamentMatches] = useState([]);
   const [startupStorageError, setStartupStorageError] = useState(() => {
     const loaded = getInitialTournamentBootstrapOnce();
@@ -2461,6 +2513,23 @@ function AppMain({ lang, setLang }) {
   const handleUpdateRoundSettings = (roundIndex, newLegs, newBoards) => {
     const legs = Math.max(1, Math.floor(Number(newLegs)));
     const boards = Math.max(1, Math.floor(Number(newBoards)) || 1);
+
+    // Treat "boards in this round" as the active boards cap for the bracket screen.
+    // This prevents ghost boards (T5+) in cloud mode and stabilizes referee assignment.
+    setTournamentData((prev) => {
+      if (!prev) return prev;
+      const nextCap = boards;
+      const curCap =
+        Number(prev.boardsCount ?? prev.totalBoards ?? prev.numBoards) || 1;
+      if (curCap === nextCap) return prev;
+      return {
+        ...prev,
+        boardsCount: nextCap,
+        totalBoards: nextCap,
+        numBoards: nextCap,
+      };
+    });
+
     setTournamentBracket((prev) => {
       if (!Array.isArray(prev) || !prev[roundIndex]?.matches) return prev;
       return prev.map((round, ri) => {

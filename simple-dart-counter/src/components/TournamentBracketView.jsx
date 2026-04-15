@@ -258,11 +258,19 @@ export default function TournamentBracketView({
 
   const openRefereeModal = (roundIndex, matchIndex, match) => {
     const nm = match?.referee?.name != null ? String(match.referee.name) : '';
+    const busySnapshot = (() => {
+      try {
+        return Array.from(getRoundBusyPlayerIds(bracketData, roundIndex) || new Set());
+      } catch (e) {
+        return [];
+      }
+    })();
     setRefereeModal({
       roundIndex,
       matchIndex,
       selectedId: String(match?.referee?.id ?? ''),
       customName: nm,
+      busyIdsSnapshot: busySnapshot,
     });
     setRefereeSearch('');
   };
@@ -270,8 +278,12 @@ export default function TournamentBracketView({
   const refereeBusyIds = useMemo(() => {
     const ri = refereeModal?.roundIndex;
     if (ri === null || ri === undefined) return new Set();
+    // Freeze the busy/idle split while the modal is open to prevent "flicker"
+    // when bracket auto-assignment updates in the background (cloud/JIT).
+    const snap = refereeModal?.busyIdsSnapshot;
+    if (Array.isArray(snap)) return new Set(snap.map(String));
     return getRoundBusyPlayerIds(bracketData, ri) || new Set();
-  }, [bracketData, refereeModal?.roundIndex]);
+  }, [bracketData, refereeModal?.roundIndex, refereeModal?.busyIdsSnapshot]);
 
   const normalizeSearchKey = (s) =>
     String(s ?? '')
