@@ -672,6 +672,26 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
     customAvg: 'Docelowa średnia:',
 
     tutTabX01: 'X01 (501/301)', tutTabCricket: 'KRYKIET',
+    tutTabTournaments: 'Turnieje',
+    tutorialTournamentsWIP: 'Szczegółowy przewodnik po turniejach jest w przygotowaniu...',
+    tutTournTitle1: '1. Tryby turnieju (Admin / Tablet / Widz)',
+    tutTournDesc1:
+      'Turniej działa w trzech rolach: Admin wszystko ustawia i zarządza, Tablety obsługują konkretne tarcze (check-in i wpisywanie wyników), a Widzowie tylko śledzą przebieg. Dołączenie odbywa się przez PIN turnieju; tablety mogą dodatkowo wymagać hasła.',
+    tutTournTitle2: '2. Utwórz turniej i wybierz format',
+    tutTournDesc2:
+      'Wybierz format (Grupy + Drabinka lub Tylko Drabinka), ustaw parametry meczu (501/301, DO/SO, legi) oraz liczbę dostępnych tarcz. Aplikacja wyliczy rundę wstępną, jeśli liczba graczy nie jest potęgą dwójki.',
+    tutTournTitle3: '3. Grupy, harmonogram i przypisanie tarcz',
+    tutTournDesc3:
+      'W fazie grupowej zobaczysz tabele i rozpisy meczów. W trybie administracji możesz przypisać grupom numery tarcz (nawet kilka tarcz na jedną grupę). Puste pole oznacza kolejkę — grupa czeka na zwolnienie tarczy.',
+    tutTournTitle4: '4. Drabinka i zapisujący (liczący)',
+    tutTournDesc4:
+      'Drabinka generuje się z awansujących (albo ze wszystkich graczy w trybie „Tylko Drabinka”). Zapisujący są przydzielani automatycznie, ale admin może ich zmienić dla konkretnego meczu. Gracze, którzy w tej rundzie grają, są widoczni, ale nie można ich wybrać.',
+    tutTournTitle5: '5. Chmura i tablety do gry',
+    tutTournDesc5:
+      'Po włączeniu gry sieciowej turniej synchronizuje się z chmurą i mogą dołączyć tablety do gry. Tablety wpisują PIN i ewentualne hasło, wybierają numer tarczy i czekają na przydzielenie meczu.',
+    tutTournTitle6: '6. Zakończenie i historia',
+    tutTournDesc6:
+      'Po zakończeniu turnieju możesz zapisać wyniki do historii. W historii znajdziesz ukończone turnieje oraz podsumowania (tabele, średnie i inne statystyki na podstawie rozegranych meczów).',
     tutX01Title1: '1. Cel X01', tutX01Desc1: 'Zejdź z 501 do zera.',
     tutX01Title2: '2. Double Out', tutX01Desc2: 'Zakończ podwójnym polem.',
     tutX01Title3: '3. Wprowadzanie', tutX01Desc3: 'Wpisz sumę 3 lotek.',
