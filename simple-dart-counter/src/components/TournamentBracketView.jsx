@@ -343,8 +343,17 @@ export default function TournamentBracketView({
   const saveRefereeModal = () => {
     if (!refereeModal) return;
     const picked = allTournamentPlayers.find((p) => String(p.id) === String(refereeModal.selectedId));
-    if (!picked) return;
     const custom = String(refereeModal.customName ?? '').trim();
+    if (!picked) {
+      // Allow manual entry of a non-player / random referee name.
+      if (!custom) return;
+      onManualRefereeChange?.(refereeModal.roundIndex, refereeModal.matchIndex, {
+        id: custom,
+        name: custom,
+      });
+      setRefereeModal(null);
+      return;
+    }
     onManualRefereeChange?.(refereeModal.roundIndex, refereeModal.matchIndex, {
       id: picked.id,
       name: custom || picked.name,
@@ -507,8 +516,7 @@ export default function TournamentBracketView({
     const canPickRefereeManually =
       isAdmin &&
       match.status === 'pending' &&
-      typeof onManualRefereeChange === 'function' &&
-      allTournamentPlayers.length > 0;
+      typeof onManualRefereeChange === 'function';
     const showRefereeAsButton = canPickRefereeManually;
     const refNameTrim =
       match.referee?.name != null ? String(match.referee.name).trim() : '';

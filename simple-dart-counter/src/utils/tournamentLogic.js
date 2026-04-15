@@ -1703,14 +1703,13 @@ export function getRoundBusyPlayerIds(bracketRounds, roundIndex) {
     if (p1 == null || p1 === '' || p2 == null || p2 === '') continue;
     if (isBracketByeName(m.player1Name) || isBracketByeName(m.player2Name)) continue;
 
-    // „Busy“ v daném kole = už hráli / hrají / nebo jsou připraveni na terči (board/check-in).
-    // Pending zápas BEZ terče (fronta) hráče neblokuje, aby šli použít jako počtáři na jiném terči.
+    // „Busy“ v daném kole = právě hrají / nebo jsou připraveni na terči (board/check-in).
+    // Hotové zápasy v tomtéž kole NESMÍ držet hráče jako busy – jinak nelze model „vlna 1 → vlna 2“
+    // (poražení z vlny 1 mají jít počítat ve vlně 2).
     const st = m.status;
     const hasBoard = m.board != null && m.board !== '';
     const tabletBusy = m.tabletStatus === 'checked_in' || m.tabletStatus === 'ready_to_play';
     const countsAsBusy =
-      st === 'completed' ||
-      st === 'walkover' ||
       st === 'playing' ||
       st === 'in_progress' ||
       tabletBusy ||
