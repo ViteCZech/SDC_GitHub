@@ -1070,6 +1070,8 @@ function AppMain({ lang, setLang }) {
   const [tournamentBracket, setTournamentBracket] = useState(
     () => getInitialTournamentBootstrapOnce().bracket ?? []
   );
+  /** Admin potvrdil přečtení výstrahy u zápasů s tabletStatus timeout_warning (klíče g:id / b:id). */
+  const [adminTabletTimeoutAckKeys, setAdminTabletTimeoutAckKeys] = useState([]);
   const hasBracketGenerated = Array.isArray(tournamentBracket) && (tournamentBracket?.length ?? 0) > 0;
   /** Režim přístupu k turnaji (cloud rozcestník); null = zatím nevybráno v hubu */
   const [userRole, setUserRole] = useState(null);
@@ -1147,13 +1149,14 @@ function AppMain({ lang, setLang }) {
   }, [startupStorageError]);
 
   // Globální confirm modal (nahrazuje window.confirm)
-  const [confirmState, setConfirmState] = useState(null); // { message: string, onConfirm: () => void, confirmLabel?: string, cancelLabel?: string }
+  const [confirmState, setConfirmState] = useState(null); // { message, onConfirm, confirmLabel?, cancelLabel?, title? }
   const requestConfirm = (message, onConfirm, opts = {}) => {
     setConfirmState({
       message: String(message ?? ''),
       onConfirm: typeof onConfirm === 'function' ? onConfirm : () => {},
       confirmLabel: opts.confirmLabel,
       cancelLabel: opts.cancelLabel,
+      title: opts.title,
     });
   };
 
@@ -1177,6 +1180,64 @@ function AppMain({ lang, setLang }) {
     const numGroups = tournamentData.numGroups ?? Math.max(1, Math.ceil(playersWithIds.length / 4));
     return distributePlayersToFixedGroups(playersWithIds, numGroups).map((g) => ({ ...g, boards: g.boards ?? [] }));
   }, [tournamentData?.players, tournamentData?.groups, tournamentData?.numGroups, tournamentData?.tournamentFormat]);
+
+  const adminTabletTimeoutWarningEntries = React.useMemo(() => {
+    const td = tournamentData;
+    const entries = [];
+    const pname = (pid) => resolveTournamentPlayerName(pid, td) || String(pid ?? '');
+    for (const m of tournamentMatches || []) {
+      if (m?.tabletStatus !== 'timeout_warning') continue;
+      if (!m.player1Id || !m.player2Id) continue;
+      if (m.matchId == null && m.id == null) continue;
+      const mid = m.matchId ?? m.id;
+      entries.push({
+        key: `g:${String(mid)}`,
+        phaseKey: 'group',
+        roundIndex: null,
+        board: m.board,
+        label: `${pname(m.player1Id)} vs ${pname(m.player2Id)}`,
+      });
+    }
+    if (Array.isArray(tournamentBracket)) {
+      tournamentBracket.forEach((round, ri) => {
+        for (const m of round?.matches || []) {
+          if (m?.tabletStatus !== 'timeout_warning' || m.isBye) continue;
+          if (!m.player1Id || !m.player2Id) continue;
+          if (m.id == null && m.matchId == null) continue;
+          const mid = m.id ?? m.matchId;
+          entries.push({
+            key: `b:${String(mid)}`,
+            phaseKey: 'bracket',
+            roundIndex: ri,
+            board: m.board,
+            label: `${pname(m.player1Id)} vs ${pname(m.player2Id)}`,
+          });
+        }
+      });
+    }
+    return entries;
+  }, [tournamentData, tournamentMatches, tournamentBracket]);
+
+  useEffect(() => {
+    const active = new Set(adminTabletTimeoutWarningEntries.map((e) => e.key));
+    setAdminTabletTimeoutAckKeys((prev) => prev.filter((k) => active.has(k)));
+  }, [adminTabletTimeoutWarningEntries]);
+
+  const adminTabletTimeoutPending = React.useMemo(
+    () => adminTabletTimeoutWarningEntries.filter((e) => !adminTabletTimeoutAckKeys.includes(e.key)),
+    [adminTabletTimeoutWarningEntries, adminTabletTimeoutAckKeys]
+  );
+
+  const adminTabletTimeoutBannerStates = [
+    'tournament_board_assignment',
+    'tournament_groups',
+    'tournament_bracket',
+    'tournament_stats',
+  ];
+  const showAdminTabletPresentationTimeoutBanner =
+    userRole === 'admin' &&
+    adminTabletTimeoutBannerStates.includes(appState) &&
+    adminTabletTimeoutPending.length > 0;
 
   /** Postup pro engine počtářů: vždy z uloženého turnaje, ne ze zastaralého draftu. */
   const promotersForRefereeEngine = React.useMemo(
@@ -3608,6 +3669,92 @@ function AppMain({ lang, setLang }) {
           })}
         </nav>
       )}
+      {showAdminTabletPresentationTimeoutBanner && (
+        <div
+          className="shrink-0 z-[2500] w-full border-b-2 border-red-600 bg-gradient-to-r from-red-950 via-red-900 to-amber-950 px-3 py-3 sm:px-4 sm:py-3.5 shadow-lg shadow-black/40"
+          role="alert"
+        >
+          <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-8 w-8 shrink-0 text-amber-300 sm:h-9 sm:w-9" aria-hidden />
+              <div className="min-w-0">
+                <p className="text-sm font-black uppercase tracking-wide text-amber-200 sm:text-base">
+                  {t('adminTabletPresentationTimeoutTitle')}
+                </p>
+                <p className="mt-1 text-xs font-semibold leading-snug text-red-100/95 sm:text-sm">
+                  {t('adminTabletPresentationTimeoutLead')}
+                </p>
+                <ul className="mt-2 list-inside list-disc space-y-0.5 text-xs font-bold text-white sm:text-sm">
+                  {adminTabletTimeoutPending.map((e) => {
+                    const boardPart =
+                      e.board != null && e.board !== ''
+                        ? ` (${String(t('adminTabletPresentationTimeoutBoard')).replace('{n}', String(e.board))})`
+                        : '';
+                    if (e.phaseKey === 'group') {
+                      return (
+                        <li key={e.key}>
+                          {t('adminTabletPresentationTimeoutGroup')}: {e.label}
+                          {boardPart}
+                        </li>
+                      );
+                    }
+                    const rk = String(t('adminTabletPresentationTimeoutRound')).replace(
+                      '{n}',
+                      String((e.roundIndex ?? 0) + 1)
+                    );
+                    return (
+                      <li key={e.key}>
+                        {t('adminTabletPresentationTimeoutBracket')} ({rk}): {e.label}
+                        {boardPart}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const pending = adminTabletTimeoutPending;
+                if (pending.length === 0) return;
+                const lines = pending.map((e) => {
+                  const boardPart =
+                    e.board != null && e.board !== ''
+                      ? ` (${String(t('adminTabletPresentationTimeoutBoard')).replace('{n}', String(e.board))})`
+                      : '';
+                  if (e.phaseKey === 'group') {
+                    return `• ${t('adminTabletPresentationTimeoutGroup')}: ${e.label}${boardPart}`;
+                  }
+                  const rk = String(t('adminTabletPresentationTimeoutRound')).replace(
+                    '{n}',
+                    String((e.roundIndex ?? 0) + 1)
+                  );
+                  return `• ${t('adminTabletPresentationTimeoutBracket')} (${rk}): ${e.label}${boardPart}`;
+                });
+                const msg = `${t('adminTabletPresentationTimeoutConfirmBody')}\n\n${lines.join('\n')}`;
+                requestConfirm(
+                  msg,
+                  () => {
+                    setAdminTabletTimeoutAckKeys((prev) => {
+                      const s = new Set(prev);
+                      for (const it of pending) s.add(it.key);
+                      return Array.from(s);
+                    });
+                  },
+                  {
+                    title: t('adminTabletPresentationTimeoutConfirmTitle'),
+                    confirmLabel: t('confirmAction') || 'Potvrdit',
+                    cancelLabel: t('cancel') || 'Zrušit',
+                  }
+                );
+              }}
+              className="w-full shrink-0 rounded-xl border-2 border-amber-400/80 bg-amber-500 px-4 py-3 text-center text-sm font-black uppercase tracking-wider text-slate-950 shadow-md transition hover:bg-amber-400 sm:w-auto sm:min-w-[12rem]"
+            >
+              {t('adminTabletPresentationTimeoutAckButton')}
+            </button>
+          </div>
+        </div>
+      )}
       {showSyncPrompt && (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
         <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-sm w-full shadow-2xl text-center">
@@ -4435,9 +4582,9 @@ function AppMain({ lang, setLang }) {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-black text-white tracking-tight mb-2">
-              {t('confirmModalTitle') || 'Potvrzení'}
+              {confirmState.title || t('confirmModalTitle') || 'Potvrzení'}
             </h3>
-            <p className="text-sm text-slate-300">{confirmState.message}</p>
+            <p className="whitespace-pre-line text-sm text-slate-300">{confirmState.message}</p>
             <div className="flex gap-2 mt-5">
               <button
                 type="button"
