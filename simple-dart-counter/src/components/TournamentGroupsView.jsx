@@ -748,7 +748,7 @@ export default function TournamentGroupsView({
           </h2>
           {isReviewMode && (
             <h3 className="text-lg md:text-xl font-black tracking-wide uppercase text-amber-300">
-              KONTROLA VÝSLEDKŮ: Konečné pořadí ve skupinách
+              {t('tournReviewGroupsHeadline')}
             </h3>
           )}
         </div>
@@ -833,14 +833,14 @@ export default function TournamentGroupsView({
               onClick={() => setIsReviewMode(false)}
               className="py-4 rounded-xl font-black bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700"
             >
-              Zpět k zápasům (Opravit chybu)
+              {t('tournReviewBackToMatches')}
             </button>
             <button
               type="button"
               onClick={() => (onGenerateBracket ?? onFinishGroups)?.()}
               className="py-4 rounded-xl font-black bg-emerald-600 text-white hover:bg-emerald-500 border border-emerald-500"
             >
-              ✅ Potvrdit pořadí a vygenerovat Pavouka
+              {t('tournReviewConfirmBracket')}
             </button>
           </div>
         )}
