@@ -973,6 +973,79 @@ export function isRealPendingBracketMatch(m) {
   return true;
 }
 
+function isPlayableBracketHeadToHead(m) {
+  if (!m || m.isBye) return false;
+  const p1 =
+    m.player1Id != null &&
+    String(m.player1Id) !== '' &&
+    m.player1Id !== 'BYE' &&
+    !isBracketByeName(m.player1Name);
+  const p2 =
+    m.player2Id != null &&
+    String(m.player2Id) !== '' &&
+    m.player2Id !== 'BYE' &&
+    !isBracketByeName(m.player2Name);
+  return p1 && p2;
+}
+
+function isPlayableGroupMatch(m) {
+  if (!m || m.isBye) return false;
+  return (
+    m.player1Id &&
+    m.player2Id &&
+    m.player1Id !== 'BYE' &&
+    m.player2Id !== 'BYE'
+  );
+}
+
+function isMatchFinishedStatus(m) {
+  return m?.status === 'completed' || m?.status === 'walkover';
+}
+
+/**
+ * Turnaj je zcela dohraný: všechny skupinové zápasy (pokud jsou) a všechny „ostré“ zápasy v pavouku dokončeny.
+ * U formátu se skupinami musí být pavouk již vygenerovaný (`bracketRounds.length > 0`).
+ */
+export function isEntireTournamentFinished(tournamentData, groupMatches = [], bracketRounds = []) {
+  if (!tournamentData) return false;
+  const fmt = tournamentData.tournamentFormat || 'groups_bracket';
+
+  for (const m of groupMatches || []) {
+    if (!isPlayableGroupMatch(m)) continue;
+    if (!isMatchFinishedStatus(m)) return false;
+  }
+
+  const rounds = Array.isArray(bracketRounds) ? bracketRounds : [];
+  const hasBracket = rounds.length > 0;
+
+  const allBracketPlayableDone = () => {
+    for (const round of rounds) {
+      for (const m of round?.matches || []) {
+        if (!isPlayableBracketHeadToHead(m)) continue;
+        if (!isMatchFinishedStatus(m)) return false;
+      }
+    }
+    return true;
+  };
+
+  if (isTournamentBracketOnlyFormat(fmt)) {
+    if (!hasBracket) return false;
+    return allBracketPlayableDone();
+  }
+
+  if (isTournamentGroupsThenBracketFormat(fmt)) {
+    if (!hasBracket) return false;
+    return allBracketPlayableDone();
+  }
+
+  if (!hasBracket) {
+    const playable = (groupMatches || []).filter(isPlayableGroupMatch);
+    return playable.length > 0 && playable.every(isMatchFinishedStatus);
+  }
+
+  return allBracketPlayableDone();
+}
+
 /**
  * Zástupný počtář (čeká na neexistujícího „proherce“ z BYE apod.) — musí se nahradit reálným hráčem z poolu nebo ručně.
  * Podporuje i legacy `match.refereeId === 'waiting'`.

@@ -46,6 +46,7 @@ import {
   isTournamentBracketOnlyFormat,
   sortPlayersForBracketSeeding,
   calculateLiveTournamentEndPrediction,
+  isEntireTournamentFinished,
 } from './utils/tournamentLogic';
 import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
 
@@ -1745,6 +1746,11 @@ function AppMain({ lang, setLang }) {
         tabletBoardStr,
       }),
     [tournamentData, tournamentMatches, tournamentBracket, tournamentGroups, tabletBoardStr]
+  );
+
+  const tabletTournamentFinished = React.useMemo(
+    () => isEntireTournamentFinished(tournamentData, tournamentMatches, tournamentBracket),
+    [tournamentData, tournamentMatches, tournamentBracket]
   );
 
   const isTournamentLive =
@@ -3905,6 +3911,11 @@ function AppMain({ lang, setLang }) {
           boardSchedule={tabletBoardSchedule}
           activeMatch={tabletAssignedMatch}
           showDemoAssignButton={false}
+          tournamentFinished={tabletTournamentFinished}
+          tournamentData={tournamentData}
+          tournamentGroups={tournamentGroups}
+          tournamentMatches={tournamentMatches}
+          tournamentBracket={tournamentBracket}
           onCheckInComplete={handleTabletCheckInComplete}
           onTabletTimeoutWarning={handleTabletTimeoutWarning}
           onStartGame={handleTabletStartGame}

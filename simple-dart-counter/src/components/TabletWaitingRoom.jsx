@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { translations } from '../translations';
+import TournamentStatisticsView from './TournamentStatisticsView';
 
 const CHECKIN_SECONDS = 180;
 
@@ -27,6 +28,11 @@ export default function TabletWaitingRoom({
   onTabletTimeoutWarning,
   onBack,
   showDemoAssignButton = true,
+  tournamentFinished = false,
+  tournamentData = null,
+  tournamentGroups = [],
+  tournamentMatches = [],
+  tournamentBracket = [],
 }) {
   const tt = (k) => translations[lang]?.tablet?.[k] ?? k;
   const match = activeMatch ?? assignedMatch;
@@ -82,6 +88,14 @@ export default function TabletWaitingRoom({
       timeoutSentRef.current = false;
     }
   }, [match, phase, resetCheckIn]);
+
+  useEffect(() => {
+    if (!tournamentFinished) return;
+    setPhase(1);
+    resetCheckIn();
+    setTimerExpired(false);
+    timeoutSentRef.current = false;
+  }, [tournamentFinished, resetCheckIn]);
 
   useEffect(() => {
     if (phase !== 2 || !matchKey) return;
@@ -290,7 +304,36 @@ export default function TabletWaitingRoom({
     </button>
   );
 
-  return phase === 2 && match ? (
+  return tournamentFinished && tournamentData ? (
+        <main className="flex flex-1 flex-col min-h-0 h-full max-h-[calc(100dvh-2.5rem-3.5rem)] w-full max-w-6xl mx-auto overflow-hidden bg-slate-950">
+          <div className="shrink-0 px-3 pt-3 pb-2 md:px-6 text-center border-b border-slate-800/80">
+            <p className="text-[10px] md:text-xs font-black uppercase tracking-widest text-emerald-500">
+              {tt('tournamentFinishedHeadline')}
+            </p>
+            <p className="text-xs md:text-sm text-slate-400 mt-0.5">{tt('tournamentFinishedSub')}</p>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain">
+            <TournamentStatisticsView
+              tournamentData={tournamentData}
+              tournamentGroups={tournamentGroups}
+              tournamentMatches={tournamentMatches}
+              tournamentBracket={tournamentBracket}
+              lang={lang}
+            />
+          </div>
+          {onBack ? (
+            <div className="shrink-0 px-3 py-3 md:px-6 border-t border-slate-800/80 bg-slate-950">
+              <button
+                type="button"
+                onClick={onBack}
+                className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 max-w-3xl mx-auto"
+              >
+                {translations[lang]?.backMenu ?? 'Zpět do menu'}
+              </button>
+            </div>
+          ) : null}
+        </main>
+      ) : phase === 2 && match ? (
         <main className="flex flex-1 flex-col min-h-0 h-full max-h-[calc(100dvh-2.5rem-3.5rem)] w-full max-w-6xl mx-auto overflow-hidden bg-slate-950 px-3 pt-1 pb-2 md:px-6 md:pb-3">
           <h1 className="shrink-0 text-center text-sm md:text-xl font-black uppercase tracking-wide text-white py-1">
             {tt('matchCheckIn')}
