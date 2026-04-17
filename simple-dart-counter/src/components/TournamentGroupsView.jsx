@@ -816,10 +816,10 @@ export default function TournamentGroupsView({
           </button>
         )}
 
-        {isReviewMode && hasBracket && (
+        {isReviewMode && hasBracket && typeof onResumeBracket === 'function' && (
           <button
             type="button"
-            onClick={() => onResumeBracket?.()}
+            onClick={() => onResumeBracket()}
             className="mt-8 w-full py-4 rounded-xl font-black bg-emerald-600 text-white hover:bg-emerald-500 border border-emerald-500"
           >
             {t('tournResumeToBracket') || '➡️ Přejít zpět na Pavouka'}

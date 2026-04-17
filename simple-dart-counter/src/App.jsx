@@ -3247,10 +3247,14 @@ function AppMain({ lang, setLang }) {
                   }
                   const wasBracket = tournamentMatchContextRef.current?.type === 'bracket';
                   const wasTablet = tournamentMatchContextRef.current?.type === 'tablet';
+                  const returnToPlayingWithRestore = Boolean(matchFinishRestoreState);
+                  const keepTournamentCtx = returnToPlayingWithRestore && isTournament;
                   setSelectedMatchDetail(null);
-                  setTournamentMatchContext(null);
+                  if (!keepTournamentCtx) {
+                    setTournamentMatchContext(null);
+                  }
                   setAppState(
-                    matchFinishRestoreState
+                    returnToPlayingWithRestore
                       ? 'playing'
                       : isTournament
                         ? wasTablet

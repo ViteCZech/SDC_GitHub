@@ -13,21 +13,68 @@ import {
 
 const IMPOSSIBLE_SCORES = [163, 166, 169, 172, 173, 175, 176, 178, 179];
 
+/** Všechny kladné hodnoty jedné šipky (včetně 25 a 50). */
+const SINGLE_DART_SCORES = (() => {
+  const s = new Set();
+  for (let n = 1; n <= 20; n++) {
+    s.add(n);
+    s.add(2 * n);
+    s.add(3 * n);
+  }
+  s.add(25);
+  s.add(50);
+  return Array.from(s);
+})();
+
+/** Hodnoty zavírací double (včetně bull 50). */
+const DOUBLE_OUT_FINISH_VALUES = (() => {
+  const a = [];
+  for (let n = 1; n <= 20; n++) a.push(2 * n);
+  a.push(50);
+  return a;
+})();
+
+const DOUBLE_OUT_IMPOSSIBLE_TOTAL = [159, 162, 163, 165, 166, 168, 169];
+
 const getMinDartsToCheckout = (score, outMode) => {
-    if (score === 0) return 0;
-    if (score > 180) return Infinity;
-    if (IMPOSSIBLE_SCORES.includes(score)) return Infinity;
-    if (outMode === 'single') { 
-        if (score <= 60) return 1; 
-        if (score <= 120) return 2; 
-        return 3; 
-    }
-    if (score > 170) return Infinity; 
-    const doubleOutBogeys = [159, 162, 163, 165, 166, 168, 169];
-    if (doubleOutBogeys.includes(score)) return Infinity;
-    if (score === 50 || (score <= 40 && score % 2 === 0 && score > 0)) return 1;
-    if (score <= 110) return 2; 
+  if (score === 0) return 0;
+  if (score > 180) return Infinity;
+  if (IMPOSSIBLE_SCORES.includes(score)) return Infinity;
+  if (outMode === 'single') {
+    if (score <= 60) return 1;
+    if (score <= 120) return 2;
     return 3;
+  }
+  if (outMode !== 'double') {
+    if (score <= 60) return 1;
+    if (score <= 120) return 2;
+    return 3;
+  }
+  if (score > 170) return Infinity;
+  if (DOUBLE_OUT_IMPOSSIBLE_TOTAL.includes(score)) return Infinity;
+
+  if (DOUBLE_OUT_FINISH_VALUES.includes(score)) return 1;
+
+  for (let i = 0; i < SINGLE_DART_SCORES.length; i++) {
+    const a = SINGLE_DART_SCORES[i];
+    for (let j = 0; j < DOUBLE_OUT_FINISH_VALUES.length; j++) {
+      const d = DOUBLE_OUT_FINISH_VALUES[j];
+      if (a + d === score) return 2;
+    }
+  }
+
+  for (let i = 0; i < SINGLE_DART_SCORES.length; i++) {
+    const a = SINGLE_DART_SCORES[i];
+    for (let j = 0; j < SINGLE_DART_SCORES.length; j++) {
+      const b = SINGLE_DART_SCORES[j];
+      for (let k = 0; k < DOUBLE_OUT_FINISH_VALUES.length; k++) {
+        const d = DOUBLE_OUT_FINISH_VALUES[k];
+        if (a + b + d === score) return 3;
+      }
+    }
+  }
+
+  return Infinity;
 };
 
 const randNormal = (mean, stdDev) => {
@@ -117,7 +164,18 @@ const FinishDartsSelector = ({ points, minDarts, onConfirm, onCancel, lang, play
     );
 };
 
-export default function GameX01({ settings, lang, onMatchComplete, isLandscape, isPC, restoredGameState, onRestoredConsumed, onRematchVoice }) {
+export default function GameX01({
+  settings,
+  lang,
+  onMatchComplete,
+  isLandscape,
+  isPC,
+  restoredGameState,
+  onRestoredConsumed,
+  onRematchVoice,
+  /** Volitelně: po kroku zpět z checkoutu, který ukončil leg (vrácení do probíhajícího zápasu). */
+  onFinishedLegUndone,
+}) {
     // 1. Zde máte překladovou funkci (pokud ne, přidejte ji)
   const t = (k) => translations[lang]?.[k] || k;
 
@@ -354,9 +412,31 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
     if (gs.history.length === 0) return;
     let sliceCount = 1;
     if (settings.isBot && gs.currentPlayer === 'p1' && gs.history.length >= 2) {
-        if (gs.history[0].player === 'p2') sliceCount = 2;
+      if (gs.history[0].player === 'p2') sliceCount = 2;
     }
-    setGameState(recalculateGame(gs.history.slice(sliceCount), gs));
+    const newHist = gs.history.slice(sliceCount);
+    const ns = recalculateGame(newHist, gs);
+
+    let nextP1Legs = gs.p1Legs;
+    let nextP2Legs = gs.p2Legs;
+    const nextCompletedLegs = [...(gs.completedLegs || [])];
+
+    if (gs.winner && !ns.winner) {
+      if (gs.winner === 'p1') nextP1Legs = Math.max(0, nextP1Legs - 1);
+      if (gs.winner === 'p2') nextP2Legs = Math.max(0, nextP2Legs - 1);
+      nextCompletedLegs.pop();
+      ns.matchWinner = null;
+      if (typeof onFinishedLegUndone === 'function') onFinishedLegUndone();
+    }
+
+    setGameState({
+      ...ns,
+      p1Legs: nextP1Legs,
+      p2Legs: nextP2Legs,
+      p1Sets: gs.p1Sets,
+      p2Sets: gs.p2Sets,
+      completedLegs: nextCompletedLegs,
+    });
   };
 
   const handleQuickBtnDown = (idx) => { setLongPressIdx(idx); longPressTimer.current = setTimeout(() => { if (currentInput && parseInt(currentInput) <= 180) { const newB = [...quickButtons]; newB[idx] = parseInt(currentInput); setQuickButtons(newB); setCurrentInput(''); setErrorMsg(String(translations[lang]?.presetSaved || 'Uloženo')); setTimeout(()=>setErrorMsg(''), 1000); } setLongPressIdx(null); }, 700); };
@@ -447,7 +527,7 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
         setFinishData(null);
         return;
       }
-      if (!gs.winner && gs.history.length > 0) {
+      if (gs.history.length > 0) {
         handleUndoClickRef.current();
       }
       return;
@@ -573,13 +653,18 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
   }, [isMicActive, lang]);
 
   const handleBackFromLeg = () => {
-    if (!prevNextLegStateRef.current) return;
-    setGameState(prevNextLegStateRef.current);
-    prevNextLegStateRef.current = null;
-    setCurrentInput('');
-    setFinishData(null);
-    setEditingMove(null);
-    setErrorMsg('');
+    if (prevNextLegStateRef.current) {
+      setGameState(prevNextLegStateRef.current);
+      prevNextLegStateRef.current = null;
+      setCurrentInput('');
+      setFinishData(null);
+      setEditingMove(null);
+      setErrorMsg('');
+      return;
+    }
+    if (gameStateRef.current.winner && gameStateRef.current.history.length > 0) {
+      handleUndoClick();
+    }
   };
 
   const btnGameBase = "text-white font-bold py-2 rounded text-[10px] sm:text-xs transition-all select-none touch-manipulation active:scale-95";
@@ -799,7 +884,12 @@ export default function GameX01({ settings, lang, onMatchComplete, isLandscape, 
                 </div>
             ) : (
                 <div className={`relative w-full h-full flex flex-col items-center justify-center ${gameState.winner === 'p1' ? 'bg-emerald-900/40 border-emerald-500/50' : 'bg-purple-900/40 border-purple-500/50'} border-2 p-4 rounded-xl text-center animate-in zoom-in duration-300 shadow-2xl shadow-black/50`}>
-                <button onClick={handleBackFromLeg} className="absolute top-3 left-3 p-2 transition-colors border rounded-lg shadow-lg bg-slate-800/70 hover:bg-slate-700 text-slate-400 hover:text-white border-slate-700">
+                <button
+                    type="button"
+                    title={String(translations[lang]?.cmdUndo?.[0] || '')}
+                    onClick={handleBackFromLeg}
+                    className="absolute top-3 left-3 p-2 transition-colors border rounded-lg shadow-lg bg-slate-800/70 hover:bg-slate-700 text-slate-400 hover:text-white border-slate-700"
+                >
                     <ArrowLeft className="w-5 h-5" />
                 </button>
                     <Trophy className={`w-10 h-10 sm:w-12 sm:h-12 mb-2 ${gameState.winner === 'p1' ? 'text-emerald-400' : 'text-purple-400'}`} />

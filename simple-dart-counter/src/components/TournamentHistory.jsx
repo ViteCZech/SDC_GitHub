@@ -5,6 +5,7 @@ import { db } from '../firebase';
 import { translations } from '../translations';
 import TournamentGroupsView from './TournamentGroupsView';
 import TournamentBracketView from './TournamentBracketView';
+import TournamentStatisticsView from './TournamentStatisticsView';
 
 const LOCAL_KEY = 'darts_history_local';
 
@@ -55,6 +56,7 @@ export default function TournamentHistory({ lang = 'cs', user, onBack }) {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null); // { row }
+  const [detailTab, setDetailTab] = useState('overview'); // 'overview' | 'stats'
 
   const selectedSnapshot = useMemo(() => {
     const data = selected?.data;
@@ -102,6 +104,10 @@ export default function TournamentHistory({ lang = 'cs', user, onBack }) {
       cancelled = true;
     };
   }, [user]);
+
+  useEffect(() => {
+    setDetailTab('overview');
+  }, [selected?.id]);
 
   const requestDelete = (row) => {
     setConfirmDelete({ row });
@@ -171,24 +177,61 @@ export default function TournamentHistory({ lang = 'cs', user, onBack }) {
         </div>
 
         {selectedSnapshot.tournamentData && (
-          <div className="space-y-6">
-            <TournamentGroupsView
-              tournamentData={selectedSnapshot.tournamentData}
-              tournamentMatches={selectedSnapshot.groupMatches}
-              tournamentGroups={selectedSnapshot.groups}
-              lang={lang}
-              userRole="viewer"
-              hasBracket={Array.isArray(selectedSnapshot.tournamentBracket) && selectedSnapshot.tournamentBracket.length > 0}
-              onBack={() => setSelected(null)}
-            />
-            {Array.isArray(selectedSnapshot.tournamentBracket) && selectedSnapshot.tournamentBracket.length > 0 ? (
-              <TournamentBracketView
-                bracketData={selectedSnapshot.tournamentBracket}
+          <div className="space-y-4">
+            <div className="flex gap-2 border-b border-slate-800 pb-2">
+              <button
+                type="button"
+                onClick={() => setDetailTab('overview')}
+                className={`px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider border transition-colors ${
+                  detailTab === 'overview'
+                    ? 'bg-emerald-600 text-white border-emerald-500'
+                    : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+                }`}
+              >
+                {t('detail') || 'Detail'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDetailTab('stats')}
+                className={`px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider border transition-colors ${
+                  detailTab === 'stats'
+                    ? 'bg-emerald-600 text-white border-emerald-500'
+                    : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+                }`}
+              >
+                {translations[lang]?.stats?.title ?? t('stepperStatistiky') ?? 'Statistiky'}
+              </button>
+            </div>
+
+            {detailTab === 'overview' ? (
+              <div className="space-y-6">
+                <TournamentGroupsView
+                  tournamentData={selectedSnapshot.tournamentData}
+                  tournamentMatches={selectedSnapshot.groupMatches}
+                  tournamentGroups={selectedSnapshot.groups}
+                  lang={lang}
+                  userRole="viewer"
+                  hasBracket={Array.isArray(selectedSnapshot.tournamentBracket) && selectedSnapshot.tournamentBracket.length > 0}
+                  onBack={() => setSelected(null)}
+                />
+                {Array.isArray(selectedSnapshot.tournamentBracket) && selectedSnapshot.tournamentBracket.length > 0 ? (
+                  <TournamentBracketView
+                    bracketData={selectedSnapshot.tournamentBracket}
+                    tournamentData={selectedSnapshot.tournamentData}
+                    userRole="viewer"
+                    lang={lang}
+                  />
+                ) : null}
+              </div>
+            ) : (
+              <TournamentStatisticsView
                 tournamentData={selectedSnapshot.tournamentData}
-                userRole="viewer"
+                tournamentGroups={selectedSnapshot.groups}
+                tournamentMatches={selectedSnapshot.groupMatches}
+                tournamentBracket={selectedSnapshot.tournamentBracket}
                 lang={lang}
               />
-            ) : null}
+            )}
           </div>
         )}
       </main>

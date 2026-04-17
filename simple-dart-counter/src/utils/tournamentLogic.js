@@ -2015,6 +2015,44 @@ function getLoserLegsWonInBracketMatch(match, loserId) {
   return -1;
 }
 
+/** Počet legů vítěze v dokončeném zápase pavouka (podle winnerId / skóre). */
+function getWinnerLegsWonInBracketMatch(match) {
+  if (!match) return -1;
+  const p1 = Number(match.score?.p1 ?? match.score1 ?? match.legsP1 ?? 0) || 0;
+  const p2 = Number(match.score?.p2 ?? match.score2 ?? match.legsP2 ?? 0) || 0;
+  let wid = match.winnerId;
+  if (wid == null) {
+    if (p1 > p2) wid = match.player1Id;
+    else if (p2 > p1) wid = match.player2Id;
+    else return -1;
+  }
+  if (wid === match.player1Id) return p1;
+  if (wid === match.player2Id) return p2;
+  return -1;
+}
+
+/**
+ * Kdo z dvou poražených z KO zápasů má spíš počítat: horší výsledek (méně uhraných legů, větší rozdíl) první.
+ * Vrací záporné číslo, pokud má být upřednostněn aId před bId.
+ */
+function compareBracketMatchLossSeverityForReferee(matchA, loserIdA, matchB, loserIdB) {
+  const la = getLoserLegsWonInBracketMatch(matchA, loserIdA);
+  const lb = getLoserLegsWonInBracketMatch(matchB, loserIdB);
+  if (la < 0 && lb < 0) return 0;
+  if (la < 0) return 1;
+  if (lb < 0) return -1;
+  const wa = getWinnerLegsWonInBracketMatch(matchA);
+  const wb = getWinnerLegsWonInBracketMatch(matchB);
+  if (wa < 0 && wb < 0) return 0;
+  if (wa < 0) return 1;
+  if (wb < 0) return -1;
+  const ma = wa - la;
+  const mb = wb - lb;
+  if (la !== lb) return la - lb;
+  if (ma !== mb) return mb - ma;
+  return 0;
+}
+
 /** Řádek v tabulce skupiny (0 = nejlepší mezi neodstoupivšími), průměr z dohraných zápasů. */
 function getGroupStandingRowForPlayer(playerId, groups, groupMatchesAll) {
   const pid = String(playerId);
@@ -2034,8 +2072,8 @@ function getGroupStandingRowForPlayer(playerId, groups, groupMatchesAll) {
 }
 
 /**
- * Kdo z dvou proherců „feedujících“ zápasů má spíš počítat: méně legů v KO zápase → pak lepší umístění ve skupině,
- * pak lepší průměr, pak los (id). Vrací záporné číslo, pokud má být upřednostněn aId před bId.
+ * Doplňkové řazení dvou proherců se stejným KO skóre (stejné legy / rozdíl): umístění ve skupině, průměr, id.
+ * Primární „kvalita prohry“ z legů řeší {@link compareBracketMatchLossSeverityForReferee} + zátěž počtáře.
  */
 function compareFeederLosersForChalkOrder(aId, bId, feederMatchByLoserId, groups, groupMatchesAll) {
   const ma = feederMatchByLoserId.get(aId);
@@ -2177,9 +2215,10 @@ export const updateBracketReferees = (
       loserId === match.player1Id ? (match.player1Name ?? loserId) : (match.player2Name ?? loserId);
 
     const stats = playerStats[loserId] || { rank: 1, legDiff: 0 };
+    const loserLegsWon = getLoserLegsWonInBracketMatch(match, loserId);
     return {
       loser: { id: loserId, name: loserName },
-      legs: Math.min(Number.isFinite(p1L) ? p1L : 0, Number.isFinite(p2L) ? p2L : 0),
+      legs: loserLegsWon >= 0 ? loserLegsWon : Math.min(Number.isFinite(p1L) ? p1L : 0, Number.isFinite(p2L) ? p2L : 0),
       rank: stats.rank,
       diff: stats.legDiff,
     };
@@ -2349,6 +2388,16 @@ export const updateBracketReferees = (
         ? preferLastPlaceGroupIds
         : null;
     viable.sort((a, b) => {
+      const aHasLoss = map && map.has(a.id) && getLoserLegsWonInBracketMatch(map.get(a.id), a.id) >= 0;
+      const bHasLoss = map && map.has(b.id) && getLoserLegsWonInBracketMatch(map.get(b.id), b.id) >= 0;
+
+      if (aHasLoss && bHasLoss) {
+        const lossCmp = compareBracketMatchLossSeverityForReferee(map.get(a.id), a.id, map.get(b.id), b.id);
+        if (lossCmp !== 0) return lossCmp;
+      } else if (aHasLoss !== bHasLoss) {
+        return aHasLoss ? -1 : 1;
+      }
+
       if (a.workload !== b.workload) return a.workload - b.workload;
 
       const pr = poolPriorityRank;

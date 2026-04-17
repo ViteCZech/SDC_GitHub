@@ -42,7 +42,7 @@ const TournamentStatisticsView = ({
   const isEmpty = !top180s.length && !topCheckouts.length && !bestLegs.length && !playerStats.length;
 
   return (
-    <main className="flex flex-col flex-1 w-full overflow-y-auto bg-slate-950 p-4 pb-24">
+    <div className="flex flex-col flex-1 w-full overflow-y-auto bg-slate-950 p-4 pb-24">
       <div className="w-full max-w-5xl mx-auto space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -183,7 +183,7 @@ const TournamentStatisticsView = ({
           )}
         </section>
       </div>
-    </main>
+    </div>
   );
 };
 
