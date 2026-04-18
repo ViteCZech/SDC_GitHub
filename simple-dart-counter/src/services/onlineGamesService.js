@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -258,6 +259,29 @@ export async function updateGameState(gameId, stateObject) {
     liveGameState: stateObject,
     liveStateUpdatedAt: serverTimestamp(),
   });
+}
+
+/**
+ * Ukončí online zápas (handshake po X01). Obě strany pak poslouchají `status === 'completed'`.
+ * @param {string} gameId
+ * @param {object | null} pendingMatchRecordForHistory záznam pro historii (zapisuje poražený při potvrzení)
+ */
+export async function completeOnlineGameSession(gameId, pendingMatchRecordForHistory = null) {
+  if (!db) throw new Error('no_db');
+  await ensureAnonymousAuth();
+  const id = String(gameId || '').trim();
+  if (!id) throw new Error('no_db');
+  const ref = doc(db, ONLINE_GAMES_COLLECTION, id);
+  const payload = {
+    status: 'completed',
+    liveGameState: deleteField(),
+    liveStateUpdatedAt: serverTimestamp(),
+    completedAt: serverTimestamp(),
+  };
+  if (pendingMatchRecordForHistory != null) {
+    payload.pendingMatchRecordForHistory = pendingMatchRecordForHistory;
+  }
+  await updateDoc(ref, payload);
 }
 
 /**

@@ -975,7 +975,14 @@ function AppMain({ lang, setLang }) {
   const [onlineGameId, setOnlineGameId] = useState(null);
   /** Na tomto zařízení: hostitel = p1, hostující host = p2 (null = neonline). */
   const [myOnlineRole, setMyOnlineRole] = useState(null);
+  /** Zabrání dvojímu zápisu historie při `status: completed` + lokálním dokončení. */
+  const processedOnlineMatchHistoryRef = React.useRef(new Set());
   const t = (k) => translations[lang]?.[k] || k;
+
+  const handleOnlineSessionEnded = React.useCallback(() => {
+    setOnlineGameId(null);
+    setMyOnlineRole(null);
+  }, []);
 
   const handleOnlineGameStart = React.useCallback((gameData, gameId, role) => {
     const legs = Math.min(21, Math.max(1, Number(gameData?.legs) || 1));
@@ -2394,6 +2401,11 @@ function AppMain({ lang, setLang }) {
   useEffect(() => { safeStorage.setItem('dartsMatchHistory', JSON.stringify(matchHistory)); }, [matchHistory]);
 
   const handleMatchComplete = async (record, restorePayload = null) => {
+      const oid = record?.onlineSessionGameId;
+      if (oid) {
+        if (processedOnlineMatchHistoryRef.current.has(oid)) return;
+        processedOnlineMatchHistoryRef.current.add(oid);
+      }
       const fullRecord = { ...record, gameType: settings.gameType, startScore: settings.startScore, outMode: settings.outMode };
       if (tournamentMatchContext) {
         fullRecord.tournamentMatchId = tournamentMatchContext.match?.matchId;
@@ -3557,6 +3569,7 @@ function AppMain({ lang, setLang }) {
                           }
                     }
                     onMatchComplete={handleMatchComplete}
+                    onOnlineSessionEnded={handleOnlineSessionEnded}
                     restoredGameState={matchFinishRestoreState}
                     onRestoredConsumed={() => setMatchFinishRestoreState(null)}
                   />
