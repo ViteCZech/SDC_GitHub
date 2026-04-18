@@ -1,111 +1,31 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { VideoOff } from 'lucide-react';
+import { useLobbyMedia } from '../../hooks/useLobbyMedia';
 
 const fieldLabel = 'block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5';
 const fieldInput =
   'w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/60';
 
-function stopStream(stream) {
-  if (!stream) return;
-  try {
-    stream.getTracks().forEach((tr) => tr.stop());
-  } catch (e) {
-    /* ignore */
-  }
-}
-
 /**
- * Zadání jména + kamera před zápisem join do Firebase.
+ * Zadání jména + náhled kamery/mikrofonu před zápisem join do Firebase.
  */
 export default function GuestJoinPanel({ t, draft, guestName, onGuestNameChange, onConfirm, onCancel, busy }) {
-  const videoRef = useRef(null);
-  const mediaStreamRef = useRef(null);
-  const [videoInputs, setVideoInputs] = useState([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState('');
-  const [cameraReady, setCameraReady] = useState(false);
-  const [cameraError, setCameraError] = useState(false);
+  const {
+    videoRef,
+    videoInputs,
+    audioInputs,
+    selectedVideoId,
+    setSelectedVideoId,
+    selectedAudioId,
+    setSelectedAudioId,
+    setIncludeAudio,
+    mediaErrorVideo,
+    mediaErrorAudio,
+    previewReady,
+    stopAll,
+  } = useLobbyMedia({ t, active: true });
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const start = async () => {
-      setCameraError(false);
-      setCameraReady(false);
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user' },
-          audio: false,
-        });
-        if (cancelled) {
-          stopStream(stream);
-          return;
-        }
-        mediaStreamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        const track = stream.getVideoTracks()[0];
-        const settings = track?.getSettings?.() || {};
-        const curId = settings.deviceId || '';
-        setSelectedDeviceId(curId);
-
-        const all = await navigator.mediaDevices.enumerateDevices();
-        const inputs = all.filter((d) => d.kind === 'videoinput');
-        setVideoInputs(inputs);
-        if (!curId && inputs[0]?.deviceId) {
-          setSelectedDeviceId(inputs[0].deviceId);
-        }
-        setCameraReady(true);
-      } catch (e) {
-        console.warn('GuestJoinPanel camera', e);
-        if (!cancelled) {
-          setCameraError(true);
-          setCameraReady(false);
-        }
-      }
-    };
-
-    start();
-
-    return () => {
-      cancelled = true;
-      stopStream(mediaStreamRef.current);
-      mediaStreamRef.current = null;
-      if (videoRef.current) {
-        try {
-          videoRef.current.srcObject = null;
-        } catch (e) {
-          /* ignore */
-        }
-      }
-    };
-  }, []);
-
-  const handleDeviceChange = async (deviceId) => {
-    if (!deviceId || busy) return;
-    setSelectedDeviceId(deviceId);
-    stopStream(mediaStreamRef.current);
-    mediaStreamRef.current = null;
-    setCameraReady(false);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: deviceId } },
-        audio: false,
-      });
-      mediaStreamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      setCameraError(false);
-      setCameraReady(true);
-    } catch (e) {
-      console.warn('GuestJoinPanel switch camera', e);
-      setCameraError(true);
-      setCameraReady(false);
-    }
-  };
-
-  const canJoin = cameraReady && !busy && String(guestName || '').trim().length > 0;
+  const canJoin = previewReady && !busy && String(guestName || '').trim().length > 0;
 
   return (
     <div className="flex w-full max-w-lg flex-col gap-4 rounded-2xl border border-slate-700 bg-slate-900/80 p-4 mx-auto">
@@ -127,35 +47,71 @@ export default function GuestJoinPanel({ t, draft, guestName, onGuestNameChange,
       </div>
 
       <div>
-        <label className={fieldLabel} htmlFor="online-guest-cam-source">
+        <label className={fieldLabel} htmlFor="online-guest-video-source">
           {t('onlineCameraSourceLabel')}
         </label>
-        {videoInputs.length > 0 ? (
-          <select
-            id="online-guest-cam-source"
-            className={fieldInput}
-            value={selectedDeviceId || videoInputs[0]?.deviceId || ''}
-            disabled={busy}
-            onChange={(e) => handleDeviceChange(e.target.value)}
-          >
-            {videoInputs.map((d) => (
-              <option key={d.deviceId} value={d.deviceId}>
+        <select
+          id="online-guest-video-source"
+          className={fieldInput}
+          value={selectedVideoId}
+          disabled={busy}
+          onChange={(e) => setSelectedVideoId(e.target.value)}
+        >
+          {videoInputs.length === 0 ? (
+            <option value="">{t('onlineCameraEnumerating')}</option>
+          ) : (
+            videoInputs.map((d) => (
+              <option key={d.deviceId || d.label} value={d.deviceId}>
                 {d.label || d.deviceId || 'Camera'}
               </option>
-            ))}
-          </select>
-        ) : (
-          <div className={fieldInput}>{t('onlineCameraEnumerating')}</div>
+            ))
+          )}
+        </select>
+        {mediaErrorVideo && (
+          <p className="mt-1.5 text-xs font-semibold text-amber-400" role="alert">
+            {mediaErrorVideo}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <label className={fieldLabel} htmlFor="online-guest-audio-source">
+          {t('onlineAudioSourceLabel')}
+        </label>
+        <select
+          id="online-guest-audio-source"
+          className={fieldInput}
+          value={selectedAudioId}
+          disabled={busy}
+          onChange={(e) => {
+            setIncludeAudio(true);
+            setSelectedAudioId(e.target.value);
+          }}
+        >
+          {audioInputs.length === 0 ? (
+            <option value="">{t('onlineCameraEnumerating')}</option>
+          ) : (
+            audioInputs.map((d) => (
+              <option key={d.deviceId || d.label} value={d.deviceId}>
+                {d.label || d.deviceId || 'Microphone'}
+              </option>
+            ))
+          )}
+        </select>
+        {mediaErrorAudio && (
+          <p className="mt-1.5 text-xs font-semibold text-amber-400" role="alert">
+            {mediaErrorAudio}
+          </p>
         )}
         <p className="mt-1 text-[10px] text-slate-500">{t('onlineCameraRequiredHint')}</p>
       </div>
 
       <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-slate-700 bg-black">
         <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-        {(cameraError || !cameraReady) && !busy && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/90 text-slate-400 text-xs px-3 text-center">
+        {!previewReady && !busy && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/85 text-slate-400 text-xs px-3 text-center">
             <VideoOff className="w-8 h-8" />
-            {cameraError ? t('onlineCameraDenied') : t('onlineCameraRequiredHint')}
+            <span>{mediaErrorVideo ? t('onlineCameraRequiredHint') : t('onlineCameraEnumerating')}</span>
           </div>
         )}
       </div>
@@ -185,7 +141,10 @@ export default function GuestJoinPanel({ t, draft, guestName, onGuestNameChange,
       <button
         type="button"
         disabled={busy}
-        onClick={onCancel}
+        onClick={() => {
+          stopAll();
+          onCancel?.();
+        }}
         className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-600 transition-colors"
       >
         {t('cancel')}

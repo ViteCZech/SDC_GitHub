@@ -1,68 +1,35 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { VideoOff } from 'lucide-react';
 import { subscribeOnlineGame } from '../../services/onlineGamesService';
+import { useLobbyMedia } from '../../hooks/useLobbyMedia';
 
-function stopMediaStream(stream) {
-  if (!stream) return;
-  try {
-    stream.getTracks().forEach((tr) => tr.stop());
-  } catch (e) {
-    /* ignore */
-  }
-}
+const fieldLabel = 'block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5';
+const fieldInput =
+  'w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/60';
 
 /**
- * Čekací obrazovka hostitele: kamera, PIN, real-time posluchač až do připojení soupeře.
+ * Čekací obrazovka hostitele: kamera, mikrofon, PIN, real-time posluchač až do připojení soupeře.
+ * Výběr zařízení zůstává viditelný po celou dobu v lobby; stream se uvolní až při odchodu / startu hry.
  */
 export default function WaitingRoom({ t, session, onLeave, onOnlineGameStart }) {
-  const videoRef = useRef(null);
-  const mediaStreamRef = useRef(null);
-  const [cameraError, setCameraError] = useState(false);
-  const [pairBanner, setPairBanner] = useState(null);
   const pairHandledRef = useRef(false);
+  const [pairBanner, setPairBanner] = useState(null);
 
-  const stopCamera = () => {
-    stopMediaStream(mediaStreamRef.current);
-    mediaStreamRef.current = null;
-    if (videoRef.current) {
-      try {
-        videoRef.current.srcObject = null;
-      } catch (e) {
-        /* ignore */
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (session?.role !== 'host') return undefined;
-    let alive = true;
-    let stream;
-    const run = async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user' },
-          audio: false,
-        });
-        if (!alive) {
-          stopMediaStream(stream);
-          return;
-        }
-        mediaStreamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        setCameraError(false);
-      } catch (e) {
-        console.warn('online waiting room camera', e);
-        if (alive) setCameraError(true);
-      }
-    };
-    run();
-    return () => {
-      alive = false;
-      stopCamera();
-    };
-  }, [session?.role, session?.gameId]);
+  const isHost = session?.role === 'host';
+  const {
+    videoRef,
+    videoInputs,
+    audioInputs,
+    selectedVideoId,
+    setSelectedVideoId,
+    selectedAudioId,
+    setSelectedAudioId,
+    setIncludeAudio,
+    mediaErrorVideo,
+    mediaErrorAudio,
+    previewReady,
+    stopAll,
+  } = useLobbyMedia({ t, active: isHost });
 
   useEffect(() => {
     pairHandledRef.current = false;
@@ -70,7 +37,7 @@ export default function WaitingRoom({ t, session, onLeave, onOnlineGameStart }) 
   }, [session?.gameId]);
 
   useEffect(() => {
-    if (session?.role !== 'host' || !session?.gameId || typeof onOnlineGameStart !== 'function') {
+    if (!isHost || !session?.gameId || typeof onOnlineGameStart !== 'function') {
       return undefined;
     }
     let cancelled = false;
@@ -82,11 +49,11 @@ export default function WaitingRoom({ t, session, onLeave, onOnlineGameStart }) 
         if (cancelled || pairHandledRef.current || !docData) return;
         if (docData.status === 'playing' && String(docData.guestName || '').trim()) {
           pairHandledRef.current = true;
-          stopCamera();
           const name = String(docData.guestName).trim();
           setPairBanner(String(t('onlineOpponentJoined')).replace(/\{name\}/g, name));
           pairTimer = window.setTimeout(() => {
             if (!cancelled) {
+              stopAll();
               onOnlineGameStart(docData, session.gameId);
             }
           }, 2000);
@@ -104,11 +71,10 @@ export default function WaitingRoom({ t, session, onLeave, onOnlineGameStart }) 
         /* ignore */
       }
     };
-  }, [session?.role, session?.gameId, onOnlineGameStart]);
+  }, [isHost, session?.gameId, onOnlineGameStart, stopAll]);
 
-  const showPin = session?.role === 'host' && !session?.isPublic && session?.pin;
-  const hint =
-    session?.role === 'host' ? t('onlineWaitingHostHint') : t('onlineWaitingGuestHint');
+  const showPin = isHost && !session?.isPublic && session?.pin;
+  const hint = isHost ? t('onlineWaitingHostHint') : t('onlineWaitingGuestHint');
 
   return (
     <div className="flex flex-col gap-4 w-full max-w-lg mx-auto">
@@ -122,15 +88,74 @@ export default function WaitingRoom({ t, session, onLeave, onOnlineGameStart }) 
         </div>
       )}
 
-      {session?.role === 'host' && !pairBanner && (
-        <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-slate-700 bg-black">
-          <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-          {cameraError && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/90 text-slate-400 text-sm px-4 text-center">
-              <VideoOff className="w-10 h-10" />
-              {t('onlineCameraDenied')}
-            </div>
-          )}
+      {isHost && (
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className={fieldLabel} htmlFor="online-host-video-source">
+              {t('onlineCameraSourceLabel')}
+            </label>
+            <select
+              id="online-host-video-source"
+              className={fieldInput}
+              value={selectedVideoId}
+              onChange={(e) => setSelectedVideoId(e.target.value)}
+            >
+              {videoInputs.length === 0 ? (
+                <option value="">{t('onlineCameraEnumerating')}</option>
+              ) : (
+                videoInputs.map((d) => (
+                  <option key={d.deviceId || d.label} value={d.deviceId}>
+                    {d.label || d.deviceId || 'Camera'}
+                  </option>
+                ))
+              )}
+            </select>
+            {mediaErrorVideo && (
+              <p className="mt-1.5 text-xs font-semibold text-amber-400" role="alert">
+                {mediaErrorVideo}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className={fieldLabel} htmlFor="online-host-audio-source">
+              {t('onlineAudioSourceLabel')}
+            </label>
+            <select
+              id="online-host-audio-source"
+              className={fieldInput}
+              value={selectedAudioId}
+              onChange={(e) => {
+                setIncludeAudio(true);
+                setSelectedAudioId(e.target.value);
+              }}
+            >
+              {audioInputs.length === 0 ? (
+                <option value="">{t('onlineCameraEnumerating')}</option>
+              ) : (
+                audioInputs.map((d) => (
+                  <option key={d.deviceId || d.label} value={d.deviceId}>
+                    {d.label || d.deviceId || 'Microphone'}
+                  </option>
+                ))
+              )}
+            </select>
+            {mediaErrorAudio && (
+              <p className="mt-1.5 text-xs font-semibold text-amber-400" role="alert">
+                {mediaErrorAudio}
+              </p>
+            )}
+          </div>
+
+          <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-slate-700 bg-black">
+            <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+            {!previewReady && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/85 text-slate-400 text-xs px-3 text-center">
+                <VideoOff className="w-8 h-8" />
+                <span>{mediaErrorVideo ? t('onlineCameraRequiredHint') : t('onlineCameraEnumerating')}</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -162,7 +187,7 @@ export default function WaitingRoom({ t, session, onLeave, onOnlineGameStart }) 
         type="button"
         disabled={!!pairBanner}
         onClick={() => {
-          stopCamera();
+          stopAll();
           onLeave?.();
         }}
         className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-600 transition-colors disabled:opacity-50"
