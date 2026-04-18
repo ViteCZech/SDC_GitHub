@@ -33,6 +33,7 @@ import TournamentBracketView from './components/TournamentBracketView';
 import TournamentStatisticsView from './components/TournamentStatisticsView';
 import TabletWaitingRoom from './components/TabletWaitingRoom';
 import TournamentHistory from './components/TournamentHistory';
+import { HomeOnlineMenuTile, HomeOnlineSubmenu } from './components/HomeOnlineMenu';
 import { distributePlayersToFixedGroups, generateGroupMatches } from './utils/tournamentGenerator';
 import {
   generateBracketStructure,
@@ -968,7 +969,13 @@ function AppMain({ lang, setLang }) {
   const [offlineMode, setOfflineMode] = useState(false);
   const [isReady, setIsReady] = useState(true);
   const [appState, setAppState] = useState('home');
+  /** Podmenu na úvodní obrazovce (např. online hra); při opuštění home se nuluje níže. */
+  const [homeSubmenu, setHomeSubmenu] = useState(null);
   const t = (k) => translations[lang]?.[k] || k;
+
+  useEffect(() => {
+    if (appState !== 'home') setHomeSubmenu(null);
+  }, [appState]);
 
   // Allow deep-link back from static pages like `privacy.html`.
   useEffect(() => {
@@ -3826,6 +3833,10 @@ function AppMain({ lang, setLang }) {
       {/* --- HOME --- */}
       {appState === 'home' && (
         <main className="flex flex-col md:grid md:grid-cols-2 flex-1 w-full max-w-md md:max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto items-center justify-center gap-6 md:gap-10 lg:gap-12 p-4 sm:p-6 overflow-y-auto">
+            {homeSubmenu === 'online' ? (
+              <HomeOnlineSubmenu t={t} onBack={() => setHomeSubmenu(null)} />
+            ) : (
+              <>
                 {/* Levý sloupec: logo, Nová hra, Google / profil */}
                 <div className="flex flex-col w-full gap-4 md:gap-6 items-center">
                     <div className="flex flex-col items-center mb-1">
@@ -3879,14 +3890,17 @@ function AppMain({ lang, setLang }) {
                         </div>
                     )}
                 </div>
-                {/* Pravý sloupec: 4 doplňková tlačítka */}
+                {/* Pravý sloupec: doplňková tlačítka */}
                 <div className="grid grid-cols-2 gap-3 w-full">
                     <button onClick={() => setAppState('tutorial')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><FileText className="w-7 h-7 text-emerald-400" /><span className="text-sm font-bold text-white">{t('tutorial')}</span></button>
                     <button onClick={() => setAppState('history')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><History className="text-blue-400 w-7 h-7" /><span className="text-sm font-bold text-white">{t('matchHistory')}</span></button>
                     <button onClick={handleOpenTournamentEntry} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><Swords className="w-7 h-7 text-amber-400" /><span className="text-sm font-bold text-white">{t('tournament')}</span></button>
                     <button onClick={() => setAppState('profile')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><BarChart2 className="text-purple-400 w-7 h-7" /><span className="text-sm">{t('statsPersonal')}</span></button>
-                    <button onClick={() => setAppState('about')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95 col-span-2"><Info className="text-yellow-400 w-7 h-7" /><span className="text-sm font-bold text-white">{t('aboutApp')}</span></button>
+                    <HomeOnlineMenuTile t={t} onOpen={() => setHomeSubmenu('online')} />
+                    <button onClick={() => setAppState('about')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><Info className="text-yellow-400 w-7 h-7" /><span className="text-sm font-bold text-white">{t('aboutApp')}</span></button>
                 </div>
+              </>
+            )}
         </main>
       )}
 
