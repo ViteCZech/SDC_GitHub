@@ -975,19 +975,35 @@ function AppMain({ lang, setLang }) {
   const [onlineGameId, setOnlineGameId] = useState(null);
   /** Na tomto zařízení: hostitel = p1, hostující host = p2 (null = neonline). */
   const [myOnlineRole, setMyOnlineRole] = useState(null);
+  /** Lokální kamera/mikrofon vybrané v online lobby (přenáší se do WebRTC). */
+  const [onlineLocalStream, setOnlineLocalStream] = useState(null);
   /** Zabrání dvojímu zápisu historie při `status: completed` + lokálním dokončení. */
   const processedOnlineMatchHistoryRef = React.useRef(new Set());
   const t = (k) => translations[lang]?.[k] || k;
 
+  const stopMediaStream = (s) => {
+    if (!s) return;
+    try {
+      s.getTracks().forEach((tr) => tr.stop());
+    } catch (e) {
+      /* ignore */
+    }
+  };
+
   const handleOnlineSessionEnded = React.useCallback(() => {
+    setOnlineLocalStream((prev) => {
+      stopMediaStream(prev);
+      return null;
+    });
     setOnlineGameId(null);
     setMyOnlineRole(null);
   }, []);
 
-  const handleOnlineGameStart = React.useCallback((gameData, gameId, role) => {
+  const handleOnlineGameStart = React.useCallback((gameData, gameId, role, localStream = null) => {
     const legs = Math.min(21, Math.max(1, Number(gameData?.legs) || 1));
     const gt = gameData?.gameType === 'cricket' ? 'cricket' : 'x01';
     const r = role === 'p2' ? 'p2' : 'p1';
+    setOnlineLocalStream(localStream || null);
     setSettings((prev) => ({
       ...prev,
       gameType: gt,
@@ -3544,6 +3560,7 @@ function AppMain({ lang, setLang }) {
                     isPC={isPC}
                     onlineGameId={onlineGameId || undefined}
                     myOnlineRole={myOnlineRole || undefined}
+                    onlineLocalStream={onlineLocalStream || undefined}
                     onAbort={
                       isTournamentPlaying
                         ? () => {
@@ -3560,8 +3577,7 @@ function AppMain({ lang, setLang }) {
                           }
                         : () => {
                             if (onlineGameId) {
-                              setOnlineGameId(null);
-                              setMyOnlineRole(null);
+                              handleOnlineSessionEnded();
                               setAppState('home');
                               return;
                             }
@@ -3596,8 +3612,7 @@ function AppMain({ lang, setLang }) {
                           }
                         : () => {
                             if (onlineGameId) {
-                              setOnlineGameId(null);
-                              setMyOnlineRole(null);
+                              handleOnlineSessionEnded();
                               setAppState('home');
                               return;
                             }

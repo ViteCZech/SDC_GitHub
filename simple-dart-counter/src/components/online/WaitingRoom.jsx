@@ -18,6 +18,7 @@ export default function WaitingRoom({ t, session, onLeave, onOnlineGameStart }) 
   const isHost = session?.role === 'host';
   const {
     videoRef,
+    handoffStream,
     videoInputs,
     audioInputs,
     selectedVideoId,
@@ -53,8 +54,7 @@ export default function WaitingRoom({ t, session, onLeave, onOnlineGameStart }) 
           setPairBanner(String(t('onlineOpponentJoined')).replace(/\{name\}/g, name));
           pairTimer = window.setTimeout(() => {
             if (!cancelled) {
-              stopAll();
-              onOnlineGameStart(docData, session.gameId);
+              onOnlineGameStart(docData, session.gameId, handoffStream());
             }
           }, 2000);
         }
@@ -71,7 +71,7 @@ export default function WaitingRoom({ t, session, onLeave, onOnlineGameStart }) 
         /* ignore */
       }
     };
-  }, [isHost, session?.gameId, onOnlineGameStart, stopAll]);
+  }, [isHost, session?.gameId, onOnlineGameStart, handoffStream]);
 
   const showPin = isHost && !session?.isPublic && session?.pin;
   const hint = isHost ? t('onlineWaitingHostHint') : t('onlineWaitingGuestHint');

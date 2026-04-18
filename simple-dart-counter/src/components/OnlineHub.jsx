@@ -58,9 +58,9 @@ export default function OnlineHub({ t, settings, onOnlineGameStart }) {
   const [guestJoinBusy, setGuestJoinBusy] = useState(false);
 
   const startOnlineGame = useCallback(
-    (gameData, gameId, myRole) => {
+    (gameData, gameId, myRole, localStream = null) => {
       if (typeof onOnlineGameStart === 'function') {
-        onOnlineGameStart(gameData, gameId, myRole);
+        onOnlineGameStart(gameData, gameId, myRole, localStream);
       }
     },
     [onOnlineGameStart]
@@ -165,7 +165,7 @@ export default function OnlineHub({ t, settings, onOnlineGameStart }) {
     }
   };
 
-  const handleGuestJoinConfirm = async () => {
+  const handleGuestJoinConfirm = async (localStream = null) => {
     if (!guestJoinDraft?.gameId) return;
     const name = String(guestNameInput || '').trim();
     if (!name) {
@@ -178,7 +178,7 @@ export default function OnlineHub({ t, settings, onOnlineGameStart }) {
       const gid = guestJoinDraft.gameId;
       const merged = await joinOnlineGame(gid, name);
       setGuestJoinDraft(null);
-      startOnlineGame(merged, gid, 'p2');
+      startOnlineGame(merged, gid, 'p2', localStream);
     } catch (e) {
       console.error(e);
       setFormError(mapJoinError(e, t));
@@ -193,7 +193,7 @@ export default function OnlineHub({ t, settings, onOnlineGameStart }) {
         t={t}
         session={waitingSession}
         onLeave={() => setWaitingSession(null)}
-        onOnlineGameStart={(doc, gid) => startOnlineGame(doc, gid, 'p1')}
+        onOnlineGameStart={(doc, gid, localStream) => startOnlineGame(doc, gid, 'p1', localStream)}
       />
     );
   }

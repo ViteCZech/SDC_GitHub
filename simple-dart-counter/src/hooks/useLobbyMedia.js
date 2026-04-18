@@ -21,6 +21,7 @@ function buildVideoConstraint(selectedVideoId) {
 export function useLobbyMedia({ t, active }) {
   const videoRef = useRef(null);
   const mediaStreamRef = useRef(null);
+  const [mediaStream, setMediaStream] = useState(null);
   const [videoInputs, setVideoInputs] = useState([]);
   const [audioInputs, setAudioInputs] = useState([]);
   const [selectedVideoId, setSelectedVideoId] = useState('');
@@ -33,6 +34,7 @@ export function useLobbyMedia({ t, active }) {
   const stopAll = useCallback(() => {
     stopStream(mediaStreamRef.current);
     mediaStreamRef.current = null;
+    setMediaStream(null);
     if (videoRef.current) {
       try {
         videoRef.current.srcObject = null;
@@ -42,10 +44,27 @@ export function useLobbyMedia({ t, active }) {
     }
   }, []);
 
+  /** Předání streamu do hry bez stopnutí tracků (zabrání stopnutí při unmountu lobby). */
+  const handoffStream = useCallback(() => {
+    const s = mediaStreamRef.current;
+    mediaStreamRef.current = null;
+    setMediaStream(null);
+    if (videoRef.current) {
+      try {
+        videoRef.current.srcObject = null;
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    setPreviewReady(false);
+    return s;
+  }, []);
+
   useEffect(() => {
     if (!active || !navigator.mediaDevices?.getUserMedia) {
       stopStream(mediaStreamRef.current);
       mediaStreamRef.current = null;
+      setMediaStream(null);
       if (videoRef.current) {
         try {
           videoRef.current.srcObject = null;
@@ -67,6 +86,7 @@ export function useLobbyMedia({ t, active }) {
         return;
       }
       mediaStreamRef.current = stream;
+      setMediaStream(stream);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
@@ -153,6 +173,7 @@ export function useLobbyMedia({ t, active }) {
       cancelled = true;
       stopStream(mediaStreamRef.current);
       mediaStreamRef.current = null;
+      setMediaStream(null);
       if (videoRef.current) {
         try {
           videoRef.current.srcObject = null;
@@ -166,6 +187,8 @@ export function useLobbyMedia({ t, active }) {
 
   return {
     videoRef,
+    mediaStream,
+    handoffStream,
     videoInputs,
     audioInputs,
     selectedVideoId,

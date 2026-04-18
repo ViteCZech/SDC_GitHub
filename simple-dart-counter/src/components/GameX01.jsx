@@ -7,7 +7,7 @@ import {
   subscribeToGameState,
   updateGameState,
 } from '../services/onlineGamesService';
-import OnlineVideo from './online/OnlineVideo';
+import OnlineVideoContainer from './online/OnlineVideoContainer';
 import {
   SPEECH_LANG_MAP,
   normalizeSpeechCommand,
@@ -220,6 +220,8 @@ export default function GameX01({
   onlineGameId = null,
   /** Na tomto zařízení: 'p1' = hostitel, 'p2' = host. */
   myOnlineRole = null,
+  /** Lokální stream z online lobby (kamera + volitelně mikrofon). */
+  onlineLocalStream = null,
   /** Po online handshake konce zápasu (obě strany) — vymaže onlineGameId v App. */
   onOnlineSessionEnded = null,
   onAbort: _onAbort,
@@ -1531,12 +1533,23 @@ export default function GameX01({
         </div>
       )}
       {onlineGameId && settings.gameType === 'x01' && myOnlineRole && (
-        <div className="pointer-events-none fixed bottom-2 right-2 z-[35] w-[min(38vw,200px)] select-none sm:bottom-3 sm:right-3">
-          <OnlineVideo
-            gameId={onlineGameId}
+        <div className="pointer-events-none fixed inset-x-0 top-[calc(3.25rem+0.25rem)] z-[34] mx-auto w-[min(96vw,900px)] px-2 sm:top-[calc(3.5rem+0.5rem)] sm:px-3">
+          <OnlineVideoContainer
+            onlineGameId={onlineGameId}
             myRole={myOnlineRole}
             currentPlayer={gameState.currentPlayer}
             lang={lang}
+            localStream={onlineLocalStream}
+            overlay={{
+              p1Score: gameState.p1Score,
+              p2Score: gameState.p2Score,
+              p1Legs: gameState.p1Legs,
+              p2Legs: gameState.p2Legs,
+              p1Sets: gameState.p1Sets || 0,
+              p2Sets: gameState.p2Sets || 0,
+              matchSets: settings.matchSets || 1,
+            }}
+            matchCompleted={Boolean(onlineMatchExitAppliedRef.current)}
           />
         </div>
       )}

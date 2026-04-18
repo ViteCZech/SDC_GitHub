@@ -12,6 +12,7 @@ const fieldInput =
 export default function GuestJoinPanel({ t, draft, guestName, onGuestNameChange, onConfirm, onCancel, busy }) {
   const {
     videoRef,
+    handoffStream,
     videoInputs,
     audioInputs,
     selectedVideoId,
@@ -133,7 +134,7 @@ export default function GuestJoinPanel({ t, draft, guestName, onGuestNameChange,
       <button
         type="button"
         disabled={!canJoin}
-        onClick={onConfirm}
+        onClick={() => onConfirm?.(handoffStream())}
         className="w-full py-4 rounded-xl font-black uppercase tracking-wider text-white bg-emerald-600 hover:bg-emerald-500 border border-emerald-500 disabled:opacity-40 transition-colors"
       >
         {busy ? t('onlineConnectingToGame') : t('onlineJoinConfirmButton')}
