@@ -43,7 +43,15 @@ const DartsIndicator = ({ dartsThrown }) => {
   );
 };
 
-export default function GameCricket({ settings, lang, onMatchComplete, isLandscape, isPC }) {
+export default function GameCricket({
+  settings,
+  lang,
+  onMatchComplete,
+  isLandscape,
+  isPC,
+  onlineGameId = null,
+  onAbort: _onAbort,
+}) {
   const [gameState, setGameState] = useState({
     p1Score: 0, p2Score: 0,
     p1Marks: { ...INITIAL_MARKS }, p2Marks: { ...INITIAL_MARKS },
@@ -62,6 +70,7 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
   const t = (k) => translations[lang]?.[k] || k;
 
   const recognitionRef = useRef(null);
+  const onlineGameIdRef = useRef(onlineGameId);
   const isMicActiveRef = useRef(isMicActive);
   const gameStateRef = useRef(gameState);
 
@@ -89,6 +98,10 @@ export default function GameCricket({ settings, lang, onMatchComplete, isLandsca
   useEffect(() => {
     gameStateRef.current = gameState;
   }, [gameState]);
+
+  useEffect(() => {
+    onlineGameIdRef.current = onlineGameId;
+  }, [onlineGameId]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {

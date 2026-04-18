@@ -175,6 +175,9 @@ export default function GameX01({
   onRematchVoice,
   /** Volitelně: po kroku zpět z checkoutu, který ukončil leg (vrácení do probíhajícího zápasu). */
   onFinishedLegUndone,
+  /** ID online zápasu ve Firestore – pro budoucí synchronizaci hodů. */
+  onlineGameId = null,
+  onAbort: _onAbort,
 }) {
     // 1. Zde máte překladovou funkci (pokud ne, přidejte ji)
   const t = (k) => translations[lang]?.[k] || k;
@@ -228,6 +231,7 @@ export default function GameX01({
   const [isMicActive, setIsMicActive] = useState(false); 
 
   const recognitionRef = useRef(null);
+  const onlineGameIdRef = useRef(onlineGameId);
   const gameStateRef = useRef(gameState);
   const isMicActiveRef = useRef(isMicActive);
   const currentInputRef = useRef(currentInput);
@@ -246,6 +250,10 @@ export default function GameX01({
       currentInputRef.current = currentInput; finishDataRef.current = finishData;
       if (historyRef.current) historyRef.current.scrollTop = historyRef.current.scrollHeight; 
   }, [gameState, isMicActive, currentInput, finishData]);
+
+  useEffect(() => {
+    onlineGameIdRef.current = onlineGameId;
+  }, [onlineGameId]);
 
   // Pokud se uživatel vrátí zpět z obrazovky "konec zápasu",
   // obnovíme přesně stav před posledním ukončujícím hodem.

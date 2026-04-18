@@ -971,7 +971,33 @@ function AppMain({ lang, setLang }) {
   const [appState, setAppState] = useState('home');
   /** Podmenu na úvodní obrazovce (např. online hra); při opuštění home se nuluje níže. */
   const [homeSubmenu, setHomeSubmenu] = useState(null);
+  /** ID aktivní online hry ve Firestore (GameX01 / GameCricket). */
+  const [onlineGameId, setOnlineGameId] = useState(null);
   const t = (k) => translations[lang]?.[k] || k;
+
+  const handleOnlineGameStart = React.useCallback((gameData, gameId) => {
+    const legs = Math.min(21, Math.max(1, Number(gameData?.legs) || 1));
+    const gt = gameData?.gameType === 'cricket' ? 'cricket' : 'x01';
+    setSettings((prev) => ({
+      ...prev,
+      gameType: gt,
+      startScore: gt === 'x01' ? Number(gameData?.startScore) || prev.startScore : prev.startScore,
+      outMode:
+        gt === 'x01' && ['double', 'single', 'master'].includes(gameData?.outMode)
+          ? gameData.outMode
+          : prev.outMode,
+      matchMode: 'first_to',
+      matchTarget: legs,
+      matchSets: 1,
+      p1Name: String(gameData?.hostName || '').trim() || prev.p1Name,
+      p2Name: String(gameData?.guestName || '').trim() || prev.p2Name,
+      isBot: false,
+      startPlayer: 'p1',
+    }));
+    setOnlineGameId(String(gameId));
+    setHomeSubmenu(null);
+    setAppState('playing');
+  }, []);
 
   useEffect(() => {
     if (appState !== 'home') setHomeSubmenu(null);
@@ -3430,6 +3456,11 @@ function AppMain({ lang, setLang }) {
                     <button
                       type="button"
                       onClick={() => {
+                        if (onlineGameId) {
+                          setOnlineGameId(null);
+                          setAppState('home');
+                          return;
+                        }
                         if (isTournamentPlaying) {
                           const ctx = tournamentMatchContextRef.current;
                           clearPlayingTournamentMatchWithoutResult();
@@ -3494,6 +3525,7 @@ function AppMain({ lang, setLang }) {
                     lang={lang}
                     isLandscape={isLandscape}
                     isPC={isPC}
+                    onlineGameId={onlineGameId || undefined}
                     onAbort={
                       isTournamentPlaying
                         ? () => {
@@ -3508,7 +3540,14 @@ function AppMain({ lang, setLang }) {
                                   : 'tournament_groups'
                             );
                           }
-                        : () => setAppState('setup')
+                        : () => {
+                            if (onlineGameId) {
+                              setOnlineGameId(null);
+                              setAppState('home');
+                              return;
+                            }
+                            setAppState('setup');
+                          }
                     }
                     onMatchComplete={handleMatchComplete}
                     restoredGameState={matchFinishRestoreState}
@@ -3520,6 +3559,7 @@ function AppMain({ lang, setLang }) {
                     lang={lang}
                     isLandscape={isLandscape}
                     isPC={isPC}
+                    onlineGameId={onlineGameId || undefined}
                     onAbort={
                       isTournamentPlaying
                         ? () => {
@@ -3534,7 +3574,14 @@ function AppMain({ lang, setLang }) {
                                   : 'tournament_groups'
                             );
                           }
-                        : () => setAppState('setup')
+                        : () => {
+                            if (onlineGameId) {
+                              setOnlineGameId(null);
+                              setAppState('home');
+                              return;
+                            }
+                            setAppState('setup');
+                          }
                     }
                     onMatchComplete={handleMatchComplete}
                   />
@@ -3834,7 +3881,12 @@ function AppMain({ lang, setLang }) {
       {appState === 'home' && (
         <main className="flex flex-col md:grid md:grid-cols-2 flex-1 w-full max-w-md md:max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto items-center justify-center gap-6 md:gap-10 lg:gap-12 p-4 sm:p-6 overflow-y-auto">
             {homeSubmenu === 'online' ? (
-              <HomeOnlineSubmenu t={t} onBack={() => setHomeSubmenu(null)} />
+              <HomeOnlineSubmenu
+                t={t}
+                onBack={() => setHomeSubmenu(null)}
+                settings={settings}
+                onOnlineGameStart={handleOnlineGameStart}
+              />
             ) : (
               <>
                 {/* Levý sloupec: logo, Nová hra, Google / profil */}

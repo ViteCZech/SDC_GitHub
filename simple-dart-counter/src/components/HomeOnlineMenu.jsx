@@ -1,10 +1,9 @@
 import React from 'react';
-import { ArrowLeft, Globe, LogIn, PlusCircle, Zap } from 'lucide-react';
+import { ArrowLeft, Globe } from 'lucide-react';
+import OnlineHub from './OnlineHub';
 
 const tileBtnClass =
   'flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95';
-
-const tileBtnClassFull = `${tileBtnClass} w-full`;
 
 /**
  * Dlaždice „Online Hra“ na úvodní mřížce.
@@ -19,17 +18,11 @@ export function HomeOnlineMenuTile({ t, onOpen }) {
 }
 
 /**
- * Podmenu úvodní obrazovky pro online režim (zatím zástupné akce).
+ * Podmenu úvodní obrazovky – online lobby (záložky Založit / Najít).
  */
-export function HomeOnlineSubmenu({
-  t,
-  onBack,
-  onCreateLobby = () => console.log('online: create lobby'),
-  onJoinMatch = () => console.log('online: join match'),
-  onQuickGame = () => console.log('online: quick game'),
-}) {
+export function HomeOnlineSubmenu({ t, onBack, settings, onOnlineGameStart }) {
   return (
-    <div className="flex flex-col w-full max-w-md mx-auto gap-4 md:col-span-2">
+    <div className="flex flex-col w-full max-w-md mx-auto gap-4 md:col-span-2 md:max-w-2xl">
       <button
         type="button"
         onClick={onBack}
@@ -38,22 +31,11 @@ export function HomeOnlineSubmenu({
         <ArrowLeft className="w-7 h-7 shrink-0" />
         {t('backToMenu')}
       </button>
-      <div className="flex flex-col items-center gap-2 py-2">
+      <div className="flex flex-col items-center gap-2 py-1">
         <Globe className="w-10 h-10 text-emerald-400" />
         <h2 className="text-xl font-black tracking-widest text-white text-center uppercase">{t('menuOnline')}</h2>
       </div>
-      <button type="button" onClick={onCreateLobby} className={tileBtnClassFull}>
-        <PlusCircle className="w-7 h-7 text-emerald-400" />
-        <span className="text-sm font-bold text-white">{t('onlineCreateLobby')}</span>
-      </button>
-      <button type="button" onClick={onJoinMatch} className={tileBtnClassFull}>
-        <LogIn className="w-7 h-7 text-blue-400" />
-        <span className="text-sm font-bold text-white">{t('onlineJoinMatch')}</span>
-      </button>
-      <button type="button" onClick={onQuickGame} className={tileBtnClassFull}>
-        <Zap className="w-7 h-7 text-amber-400" />
-        <span className="text-sm font-bold text-white">{t('onlineQuickGame')}</span>
-      </button>
+      <OnlineHub t={t} settings={settings} onOnlineGameStart={onOnlineGameStart} />
     </div>
   );
 }
