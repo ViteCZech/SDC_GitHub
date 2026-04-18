@@ -9,6 +9,7 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  updateDoc,
   where,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -210,4 +211,46 @@ export async function getOnlineGameById(gameId) {
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
   return { id: snap.id, ...snap.data() };
+}
+
+/**
+ * Uloží herní stav do dokumentu online hry (X01: gameState + setScores v stateObject).
+ */
+export async function updateGameState(gameId, stateObject) {
+  if (!db) throw new Error('no_db');
+  const id = String(gameId || '').trim();
+  if (!id) throw new Error('no_db');
+  const ref = doc(db, ONLINE_GAMES_COLLECTION, id);
+  await updateDoc(ref, {
+    liveGameState: stateObject,
+    liveStateUpdatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Real-time sledování pole liveGameState na dokumentu online hry.
+ * @returns {import('firebase/firestore').Unsubscribe}
+ */
+export function subscribeToGameState(gameId, onStateChange, onError) {
+  if (!db || !gameId) {
+    onStateChange(null);
+    return () => {};
+  }
+  const ref = doc(db, ONLINE_GAMES_COLLECTION, String(gameId));
+  return onSnapshot(
+    ref,
+    (snap) => {
+      if (!snap.exists()) {
+        onStateChange(null);
+        return;
+      }
+      const data = snap.data();
+      onStateChange(data?.liveGameState ?? null);
+    },
+    (err) => {
+      console.error('subscribeToGameState', err);
+      if (onError) onError(err);
+      onStateChange(null);
+    }
+  );
 }

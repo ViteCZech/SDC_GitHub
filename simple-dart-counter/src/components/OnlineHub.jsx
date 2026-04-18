@@ -56,9 +56,9 @@ export default function OnlineHub({ t, settings, onOnlineGameStart }) {
   const [guestJoinBusy, setGuestJoinBusy] = useState(false);
 
   const startOnlineGame = useCallback(
-    (gameData, gameId) => {
+    (gameData, gameId, myRole) => {
       if (typeof onOnlineGameStart === 'function') {
-        onOnlineGameStart(gameData, gameId);
+        onOnlineGameStart(gameData, gameId, myRole);
       }
     },
     [onOnlineGameStart]
@@ -170,7 +170,7 @@ export default function OnlineHub({ t, settings, onOnlineGameStart }) {
       const gid = guestJoinDraft.gameId;
       const merged = await joinOnlineGame(gid, name);
       setGuestJoinDraft(null);
-      startOnlineGame(merged, gid);
+      startOnlineGame(merged, gid, 'p2');
     } catch (e) {
       console.error(e);
       setFormError(mapJoinError(e, t));
@@ -185,7 +185,7 @@ export default function OnlineHub({ t, settings, onOnlineGameStart }) {
         t={t}
         session={waitingSession}
         onLeave={() => setWaitingSession(null)}
-        onOnlineGameStart={startOnlineGame}
+        onOnlineGameStart={(doc, gid) => startOnlineGame(doc, gid, 'p1')}
       />
     );
   }

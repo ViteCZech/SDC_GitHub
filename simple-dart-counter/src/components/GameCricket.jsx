@@ -4,9 +4,9 @@ import { matchesAnyPhrase, normalizeSpeechCommand, VOICE_PHRASES } from '../voic
 
 // --- MOCK PŘEKLADŮ (V reálném projektu smažte a použijte import) ---
 const translations = {
-  cs: { serving: 'Hází', legFor: 'Leg vyhrává', nextLeg: 'Další leg', p1Default: 'Domácí', p2Default: 'Hosté', botDefault: 'Robot' },
-  en: { serving: 'Serving', legFor: 'Leg winner', nextLeg: 'Next leg', p1Default: 'Home', p2Default: 'Away', botDefault: 'Bot' },
-  pl: { serving: 'Rzuca', legFor: 'Leg wygrywa', nextLeg: 'Następny leg', p1Default: 'Gospodarze', p2Default: 'Goście', botDefault: 'Bot' }
+  cs: { serving: 'Hází', legFor: 'Leg vyhrává', nextLeg: 'Další leg', p1Default: 'Domácí', p2Default: 'Hosté', botDefault: 'Robot', onlineOpponentThrowing: 'Hází soupeř…' },
+  en: { serving: 'Serving', legFor: 'Leg winner', nextLeg: 'Next leg', p1Default: 'Home', p2Default: 'Away', botDefault: 'Bot', onlineOpponentThrowing: 'Opponent is throwing…' },
+  pl: { serving: 'Rzuca', legFor: 'Leg wygrywa', nextLeg: 'Następny leg', p1Default: 'Gospodarze', p2Default: 'Goście', botDefault: 'Bot', onlineOpponentThrowing: 'Przeciwnik rzuca…' }
 };
 
 const TARGETS = [20, 19, 18, 17, 16, 15, 25];
@@ -50,6 +50,7 @@ export default function GameCricket({
   isLandscape,
   isPC,
   onlineGameId = null,
+  myOnlineRole = null,
   onAbort: _onAbort,
 }) {
   const [gameState, setGameState] = useState({
@@ -106,6 +107,13 @@ export default function GameCricket({
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       if (!isPC || gameState.winner) return;
+      if (
+        onlineGameId &&
+        myOnlineRole &&
+        gameState.currentPlayer !== myOnlineRole
+      ) {
+        return;
+      }
       const key = e.key.toLowerCase();
       if (key === 'm') handleThrow(0);
       else if (key === 's') setGameState(prev => ({...prev, multiplier: 1}));
@@ -114,7 +122,7 @@ export default function GameCricket({
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [isPC, gameState.winner, gameState.multiplier]);
+  }, [isPC, gameState.winner, gameState.multiplier, gameState.currentPlayer, onlineGameId, myOnlineRole]);
 
   // --- HLASOVÉ OVLÁDÁNÍ – CRICKET ---
   const sanitizeSpeech = (text) => {
@@ -406,6 +414,13 @@ export default function GameCricket({
 
   const handleThrow = (target, overrideMultiplier = null) => {
     if (gameState.winner) return;
+    if (
+      onlineGameId &&
+      myOnlineRole &&
+      gameState.currentPlayer !== myOnlineRole
+    ) {
+      return;
+    }
 
     let finalMult = gameState.multiplier;
     if (overrideMultiplier !== null) finalMult = overrideMultiplier;
@@ -543,6 +558,13 @@ export default function GameCricket({
 
   const isP1Active = gameState.currentPlayer === 'p1' && !gameState.winner;
   const isP2Active = gameState.currentPlayer === 'p2' && !gameState.winner;
+  const cricketOnlineLocked = Boolean(
+    onlineGameId &&
+      myOnlineRole &&
+      gameState.currentPlayer !== myOnlineRole &&
+      !gameState.winner &&
+      !gameState.matchWinner
+  );
 
   return (
     <main className={`relative h-full w-full flex-1 overflow-hidden p-2 grid gap-2 sm:gap-4 ${isLandscape ? 'grid-cols-[1.2fr_1.5fr_1fr]' : 'flex flex-col'}`}>
@@ -602,7 +624,18 @@ export default function GameCricket({
 
       <div className="flex flex-col justify-center flex-1 min-h-0">
         {!gameState.winner ? (
-            <div className={`flex flex-col h-full gap-1 sm:gap-2 transition-opacity overflow-y-auto ${settings?.isBot && gameState.currentPlayer === 'p2' ? 'opacity-60 pointer-events-none' : ''}`}>
+            <div
+              className={`relative flex flex-col h-full gap-1 sm:gap-2 transition-opacity overflow-y-auto ${
+                settings?.isBot && gameState.currentPlayer === 'p2' ? 'opacity-60 pointer-events-none' : ''
+              }`}
+            >
+                {cricketOnlineLocked && (
+                  <div className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-slate-950/85 px-2">
+                    <p className="text-center text-xs sm:text-sm font-black uppercase tracking-widest text-amber-300">
+                      {t('onlineOpponentThrowing')}
+                    </p>
+                  </div>
+                )}
                 {TARGETS.map(target => (
                     <div key={target} className="flex items-center overflow-hidden border bg-slate-800/40 rounded-xl border-slate-700/50 h-12 sm:h-14 lg:h-16 shrink-0">
                         <div className="flex items-center justify-end flex-1 h-full py-1 pr-2">

@@ -973,11 +973,14 @@ function AppMain({ lang, setLang }) {
   const [homeSubmenu, setHomeSubmenu] = useState(null);
   /** ID aktivní online hry ve Firestore (GameX01 / GameCricket). */
   const [onlineGameId, setOnlineGameId] = useState(null);
+  /** Na tomto zařízení: hostitel = p1, hostující host = p2 (null = neonline). */
+  const [myOnlineRole, setMyOnlineRole] = useState(null);
   const t = (k) => translations[lang]?.[k] || k;
 
-  const handleOnlineGameStart = React.useCallback((gameData, gameId) => {
+  const handleOnlineGameStart = React.useCallback((gameData, gameId, role) => {
     const legs = Math.min(21, Math.max(1, Number(gameData?.legs) || 1));
     const gt = gameData?.gameType === 'cricket' ? 'cricket' : 'x01';
+    const r = role === 'p2' ? 'p2' : 'p1';
     setSettings((prev) => ({
       ...prev,
       gameType: gt,
@@ -995,6 +998,7 @@ function AppMain({ lang, setLang }) {
       startPlayer: 'p1',
     }));
     setOnlineGameId(String(gameId));
+    setMyOnlineRole(r);
     setHomeSubmenu(null);
     setAppState('playing');
   }, []);
@@ -3458,6 +3462,7 @@ function AppMain({ lang, setLang }) {
                       onClick={() => {
                         if (onlineGameId) {
                           setOnlineGameId(null);
+                          setMyOnlineRole(null);
                           setAppState('home');
                           return;
                         }
@@ -3526,6 +3531,7 @@ function AppMain({ lang, setLang }) {
                     isLandscape={isLandscape}
                     isPC={isPC}
                     onlineGameId={onlineGameId || undefined}
+                    myOnlineRole={myOnlineRole || undefined}
                     onAbort={
                       isTournamentPlaying
                         ? () => {
@@ -3543,6 +3549,7 @@ function AppMain({ lang, setLang }) {
                         : () => {
                             if (onlineGameId) {
                               setOnlineGameId(null);
+                              setMyOnlineRole(null);
                               setAppState('home');
                               return;
                             }
@@ -3577,6 +3584,7 @@ function AppMain({ lang, setLang }) {
                         : () => {
                             if (onlineGameId) {
                               setOnlineGameId(null);
+                              setMyOnlineRole(null);
                               setAppState('home');
                               return;
                             }
@@ -3584,6 +3592,7 @@ function AppMain({ lang, setLang }) {
                           }
                     }
                     onMatchComplete={handleMatchComplete}
+                    myOnlineRole={myOnlineRole || undefined}
                   />
               )}
           </div>

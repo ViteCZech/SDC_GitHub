@@ -16,6 +16,8 @@ export default function HostSetupForm({ t, defaultHostName, onSubmit, busy }) {
   const [gameType, setGameType] = useState('x01');
   const [legs, setLegs] = useState(3);
   const [isPublic, setIsPublic] = useState(true);
+  const [startScore, setStartScore] = useState(501);
+  const [outMode, setOutMode] = useState('double');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -25,8 +27,8 @@ export default function HostSetupForm({ t, defaultHostName, onSubmit, busy }) {
       gameType,
       legs,
       isPublic,
-      startScore: 501,
-      outMode: 'double',
+      startScore: gameType === 'x01' ? startScore : undefined,
+      outMode: gameType === 'x01' ? outMode : undefined,
     });
   };
 
@@ -61,6 +63,40 @@ export default function HostSetupForm({ t, defaultHostName, onSubmit, busy }) {
           <option value="cricket">{t('onlineGameTypeCricket')}</option>
         </select>
       </div>
+
+      {gameType === 'x01' && (
+        <>
+          <div>
+            <label className={fieldLabel} htmlFor="online-start-score">
+              {t('onlineStartScoreLabel')}
+            </label>
+            <select
+              id="online-start-score"
+              value={startScore}
+              onChange={(e) => setStartScore(Number(e.target.value))}
+              className={fieldInput}
+            >
+              <option value={301}>301</option>
+              <option value={501}>501</option>
+            </select>
+          </div>
+          <div>
+            <label className={fieldLabel} htmlFor="online-out-mode">
+              {t('onlineOutModeLabel')}
+            </label>
+            <select
+              id="online-out-mode"
+              value={outMode}
+              onChange={(e) => setOutMode(e.target.value)}
+              className={fieldInput}
+            >
+              <option value="single">{t('onlineOutModeSingle')}</option>
+              <option value="double">{t('onlineOutModeDouble')}</option>
+              <option value="master">{t('onlineOutModeMaster')}</option>
+            </select>
+          </div>
+        </>
+      )}
 
       <div>
         <label className={fieldLabel} htmlFor="online-legs">

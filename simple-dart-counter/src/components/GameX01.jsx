@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Ban, CheckCircle, Delete, Mic, MicOff, Trophy, Undo2, X } from 'lucide-react';
 import { translations } from '../translations';
+import { updateGameState, subscribeToGameState } from '../services/onlineGamesService';
 import {
   SPEECH_LANG_MAP,
   normalizeSpeechCommand,
@@ -177,6 +178,8 @@ export default function GameX01({
   onFinishedLegUndone,
   /** ID online zápasu ve Firestore – pro budoucí synchronizaci hodů. */
   onlineGameId = null,
+  /** Na tomto zařízení: 'p1' = hostitel, 'p2' = host. */
+  myOnlineRole = null,
   onAbort: _onAbort,
 }) {
     // 1. Zde máte překladovou funkci (pokud ne, přidejte ji)
@@ -242,8 +245,22 @@ export default function GameX01({
   const handleNextLegRef = useRef(null);
   const handleVoiceCommandRef = useRef(() => {});
   const micTimeoutRef = useRef(null);
+  const pushOnlineX01LiveRef = useRef(async () => {});
+  const lastPushedWriteIdRef = useRef('');
+  const didSeedOnlineRef = useRef(false);
+  const setScoresRef = useRef(setScores);
 
   const [quickButtons, setQuickButtons] = useState(settings.quickButtons || [41, 45, 60, 100, 140, 180]);
+
+  const isOnlineInputLocked = () =>
+    Boolean(
+      onlineGameId &&
+      settings.gameType === 'x01' &&
+      myOnlineRole &&
+      gameState.currentPlayer !== myOnlineRole &&
+      !gameState.winner &&
+      !gameState.matchWinner
+    );
 
     useEffect(() => {
       gameStateRef.current = gameState; isMicActiveRef.current = isMicActive;
@@ -254,6 +271,73 @@ export default function GameX01({
   useEffect(() => {
     onlineGameIdRef.current = onlineGameId;
   }, [onlineGameId]);
+
+  useEffect(() => {
+    setScoresRef.current = setScores;
+  }, [setScores]);
+
+  useEffect(() => {
+    didSeedOnlineRef.current = false;
+  }, [onlineGameId]);
+
+  useEffect(() => {
+    pushOnlineX01LiveRef.current = async (gs, ss) => {
+      if (!onlineGameId || settings.gameType !== 'x01') return;
+      const writeId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+      lastPushedWriteIdRef.current = writeId;
+      try {
+        await updateGameState(onlineGameId, {
+          kind: 'x01',
+          writeId,
+          gameState: gs,
+          setScores: Array.isArray(ss) ? ss : [],
+        });
+      } catch (e) {
+        console.warn('updateGameState', e);
+      }
+    };
+  }, [onlineGameId, settings.gameType]);
+
+  useEffect(() => {
+    if (!onlineGameId || settings.gameType !== 'x01') return undefined;
+    const unsub = subscribeToGameState(onlineGameId, (live) => {
+      if (!live || live.kind !== 'x01' || !live.gameState) return;
+      if (live.writeId && live.writeId === lastPushedWriteIdRef.current) return;
+      setGameState(live.gameState);
+      setSetScores(Array.isArray(live.setScores) ? live.setScores : []);
+      setCurrentInput('');
+      setFinishData(null);
+      setEditingMove(null);
+    });
+    return () => {
+      try {
+        unsub();
+      } catch (e) {
+        /* ignore */
+      }
+    };
+  }, [onlineGameId, settings.gameType]);
+
+  useEffect(() => {
+    if (!onlineGameId || settings.gameType !== 'x01' || myOnlineRole !== 'p1') return;
+    if (didSeedOnlineRef.current) return;
+    didSeedOnlineRef.current = true;
+    const seed = {
+      p1Score: settings.startScore,
+      p2Score: settings.startScore,
+      p1Legs: 0,
+      p2Legs: 0,
+      p1Sets: 0,
+      p2Sets: 0,
+      currentPlayer: settings.startPlayer || 'p1',
+      startingPlayer: settings.startPlayer || 'p1',
+      winner: null,
+      matchWinner: null,
+      history: [],
+      completedLegs: [],
+    };
+    void pushOnlineX01LiveRef.current(seed, setScoresRef.current || []);
+  }, [onlineGameId, myOnlineRole, settings.gameType, settings.startScore, settings.startPlayer]);
 
   // Pokud se uživatel vrátí zpět z obrazovky "konec zápasu",
   // obnovíme přesně stav před posledním ukončujícím hodem.
@@ -335,6 +419,7 @@ export default function GameX01({
   };
 
   const processTurn = (points, dartsCount = 3) => {
+    if (isOnlineInputLocked()) return;
     const pts = parseInt(points);
     if (isNaN(pts) || pts < 0 || pts > 180 || IMPOSSIBLE_SCORES.includes(pts)) { 
         setErrorMsg(String(translations[lang]?.impossible || 'Chyba')); setTimeout(() => setErrorMsg(''), 1500); setCurrentInput(''); return; 
@@ -388,10 +473,17 @@ export default function GameX01({
         onMatchComplete(record, restorePayload);
       } else {
         setSetScores(nextSetScores);
-        setGameState({ ...ns, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S, matchWinner: null, completedLegs: uLegs });
+        const mergedLeg = { ...ns, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S, matchWinner: null, completedLegs: uLegs };
+        setGameState(mergedLeg);
+        if (onlineGameId && settings.gameType === 'x01') {
+          void pushOnlineX01LiveRef.current(mergedLeg, nextSetScores);
+        }
       }
     } else { 
-      setGameState(ns); 
+      setGameState(ns);
+      if (onlineGameId && settings.gameType === 'x01') {
+        void pushOnlineX01LiveRef.current(ns, setScoresRef.current);
+      }
     }
 
     if (pts >= 95 && !ns.history[0].isBust) {
@@ -406,6 +498,7 @@ export default function GameX01({
   processTurnRef.current = processTurn;
 
   const handleTurnCommit = (points, darts = 3, force = false) => {
+    if (isOnlineInputLocked()) return;
     const cS = gameState.currentPlayer === 'p1' ? gameState.p1Score : gameState.p2Score;
     if ((cS - points) === 0 && !force) {
         const minD = getMinDartsToCheckout(cS, settings.outMode);
@@ -417,6 +510,15 @@ export default function GameX01({
 
   const handleUndoClick = () => {
     const gs = gameStateRef.current;
+    if (
+      onlineGameId &&
+      settings.gameType === 'x01' &&
+      myOnlineRole &&
+      gs.history[0] &&
+      gs.history[0].player !== myOnlineRole
+    ) {
+      return;
+    }
     if (gs.history.length === 0) return;
     let sliceCount = 1;
     if (settings.isBot && gs.currentPlayer === 'p1' && gs.history.length >= 2) {
@@ -437,20 +539,25 @@ export default function GameX01({
       if (typeof onFinishedLegUndone === 'function') onFinishedLegUndone();
     }
 
-    setGameState({
+    const mergedUndo = {
       ...ns,
       p1Legs: nextP1Legs,
       p2Legs: nextP2Legs,
       p1Sets: gs.p1Sets,
       p2Sets: gs.p2Sets,
       completedLegs: nextCompletedLegs,
-    });
+    };
+    setGameState(mergedUndo);
+    if (onlineGameId && settings.gameType === 'x01') {
+      void pushOnlineX01LiveRef.current(mergedUndo, setScoresRef.current);
+    }
   };
 
   const handleQuickBtnDown = (idx) => { setLongPressIdx(idx); longPressTimer.current = setTimeout(() => { if (currentInput && parseInt(currentInput) <= 180) { const newB = [...quickButtons]; newB[idx] = parseInt(currentInput); setQuickButtons(newB); setCurrentInput(''); setErrorMsg(String(translations[lang]?.presetSaved || 'Uloženo')); setTimeout(()=>setErrorMsg(''), 1000); } setLongPressIdx(null); }, 700); };
   const handleQuickBtnUp = (val) => { if (longPressTimer.current) { clearTimeout(longPressTimer.current); if (longPressIdx !== null) handleTurnCommit(val); setLongPressIdx(null); } };
 
   const handleScoreClick = (pKey) => {
+    if (isOnlineInputLocked()) return;
     if (pKey !== gameState.currentPlayer) return;
     if (!currentInput) { const cS = pKey === 'p1' ? gameState.p1Score : gameState.p2Score; const minD = getMinDartsToCheckout(cS, settings.outMode); if (minD !== Infinity) setFinishData({ points: cS, minD }); return; }
     const rem = parseInt(currentInput); if (isNaN(rem)) return;
@@ -461,6 +568,15 @@ export default function GameX01({
 
   const handleSaveEdit = (newS, newD) => {
     if (isNaN(newS) || newS < 0 || newS > 180 || IMPOSSIBLE_SCORES.includes(newS)) { setErrorMsg(String(translations[lang]?.impossible || 'Chyba')); return; }
+    if (
+      onlineGameId &&
+      settings.gameType === 'x01' &&
+      myOnlineRole &&
+      editingMove &&
+      editingMove.player !== myOnlineRole
+    ) {
+      return;
+    }
 
     // Pro případ "zpět" po ukončení zápasu z obrazovky statistik
     // ukládáme stav před uložením úpravy.
@@ -502,7 +618,11 @@ export default function GameX01({
            return;
         }
     }
-    setGameState({ ...ns, p1Legs: nextP1Legs, p2Legs: nextP2Legs, completedLegs: nextCompletedLegs });
+    const mergedEdit = { ...ns, p1Legs: nextP1Legs, p2Legs: nextP2Legs, completedLegs: nextCompletedLegs };
+    setGameState(mergedEdit);
+    if (onlineGameId && settings.gameType === 'x01') {
+      void pushOnlineX01LiveRef.current(mergedEdit, setScoresRef.current);
+    }
     setEditingMove(null);
   };
 
@@ -511,9 +631,21 @@ export default function GameX01({
   const handleNextLeg = () => {
       prevNextLegStateRef.current = gameState;
       const nS = gameState.startingPlayer === 'p1' ? 'p2' : 'p1';
-      setGameState(prev => ({ ...prev, p1Score: settings.startScore, p2Score: settings.startScore, winner: null, history: [], currentPlayer: nS, startingPlayer: nS }));
+      const next = {
+        ...gameState,
+        p1Score: settings.startScore,
+        p2Score: settings.startScore,
+        winner: null,
+        history: [],
+        currentPlayer: nS,
+        startingPlayer: nS,
+      };
+      setGameState(next);
       setCurrentInput('');
       setFinishData(null);
+      if (onlineGameId && settings.gameType === 'x01') {
+        void pushOnlineX01LiveRef.current(next, setScoresRef.current);
+      }
   };
 
   handleUndoClickRef.current = handleUndoClick;
@@ -522,6 +654,15 @@ export default function GameX01({
   const handleVoiceCommand = (rawTranscript) => {
     const command = normalizeSpeechCommand(rawTranscript);
     const gs = gameStateRef.current;
+    const voiceInputLocked = () =>
+      Boolean(
+        onlineGameId &&
+        settings.gameType === 'x01' &&
+        myOnlineRole &&
+        gs.currentPlayer !== myOnlineRole &&
+        !gs.winner &&
+        !gs.matchWinner
+      );
     const tMap = translations[lang];
     const legacyUndo = Array.isArray(tMap?.cmdUndo) ? tMap.cmdUndo : [];
     const legacyNext = Array.isArray(tMap?.cmdNextLeg) ? tMap.cmdNextLeg : [];
@@ -542,6 +683,7 @@ export default function GameX01({
     }
 
     if (finishDataRef.current) {
+      if (voiceInputLocked()) return;
       const num = parseNumberFromSpeech(rawTranscript);
       if (num != null && num >= finishDataRef.current.minD && num <= 3) {
         processTurnRef.current(finishDataRef.current.points, num);
@@ -567,6 +709,7 @@ export default function GameX01({
 
     if (matchesAnyPhrase(command, VOICE_PHRASES.bust)) {
       if (!gs.winner) {
+        if (voiceInputLocked()) return;
         const cScore = gs.currentPlayer === 'p1' ? gs.p1Score : gs.p2Score;
         const bustPts = getBustPointsForActiveScore(cScore);
         handleTurnCommitRef.current(bustPts);
@@ -577,6 +720,7 @@ export default function GameX01({
     const checkoutMatch = checkoutPhrases.some((p) => matchesAnyPhrase(command, [p]));
     if (checkoutMatch) {
       if (!gs.winner) {
+        if (voiceInputLocked()) return;
         const cScore = gs.currentPlayer === 'p1' ? gs.p1Score : gs.p2Score;
         const requestedDarts = parseNumberFromSpeech(rawTranscript);
         if (requestedDarts != null && requestedDarts >= 1 && requestedDarts <= 3) {
@@ -595,6 +739,7 @@ export default function GameX01({
     }
 
     if (!gs.winner) {
+      if (voiceInputLocked()) return;
       const num = parseNumberFromSpeech(rawTranscript);
       if (num != null && num >= 0 && num <= 180) {
         handleTurnCommitRef.current(num);
@@ -739,6 +884,8 @@ export default function GameX01({
     return pts <= 180 ? pts : Math.min(180, activeScore + 1);
   })();
 
+  const onlineInputLocked = isOnlineInputLocked();
+
   return (
     <>
       <main className={`relative flex-1 overflow-hidden p-1 sm:p-2 grid gap-1 sm:gap-2 ${isLandscape ? 'grid-cols-[1fr_1.5fr_1fr]' : 'flex flex-col'}`}>
@@ -806,7 +953,18 @@ export default function GameX01({
         {/* Střední část */}
         <div className="flex flex-col justify-center flex-1 h-full min-h-0 gap-1">
             {!gameState.winner ? (
-                <div className={`flex flex-col gap-1 shrink-0 transition-opacity w-full h-full justify-center ${settings.isBot && gameState.currentPlayer === 'p2' ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div
+                  className={`relative flex flex-col gap-1 shrink-0 transition-opacity w-full h-full justify-center ${
+                    settings.isBot && gameState.currentPlayer === 'p2' ? 'opacity-50 pointer-events-none' : ''
+                  }`}
+                >
+                    {onlineInputLocked && (
+                      <div className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-slate-950/85 px-2">
+                        <p className="text-center text-xs sm:text-sm font-black uppercase tracking-widest text-amber-300">
+                          {t('onlineOpponentThrowing')}
+                        </p>
+                      </div>
+                    )}
                     <div className={`flex items-center gap-1 p-1 sm:p-1.5 rounded-lg border bg-opacity-10 border-opacity-10 ${gameState.currentPlayer === 'p1' ? 'bg-emerald-900 border-emerald-500' : 'bg-purple-900 border-purple-500'}`}>
                     <span className={`text-[8px] font-bold uppercase px-1 ${gameState.currentPlayer === 'p1' ? 'text-emerald-600/60' : 'text-purple-600/60'}`}>{translations[lang]?.quickCheckout || 'Zavřeno'}</span>
                     {[1, 2, 3].map(d => {
