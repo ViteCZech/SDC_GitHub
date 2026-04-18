@@ -44,6 +44,7 @@ function randomFourDigitPin() {
  * @param {boolean} opts.isPublic
  * @param {number} [opts.startScore] pro X01
  * @param {'double'|'single'|'master'} [opts.outMode] pro X01
+ * @param {'p1'|'p2'} [opts.startPlayer] kdo začíná první leg (p1 = hostitel, p2 = host)
  */
 export async function createOnlineGame(opts) {
   if (!db) throw new Error('no_db');
@@ -51,6 +52,7 @@ export async function createOnlineGame(opts) {
   const gameType = opts.gameType === 'cricket' ? 'cricket' : 'x01';
   const legs = Math.min(5, Math.max(1, Number(opts.legs) || 1));
   const isPublic = !!opts.isPublic;
+  const startPlayer = opts.startPlayer === 'p2' ? 'p2' : 'p1';
   const startScore = gameType === 'x01' ? Number(opts.startScore) || 501 : null;
   const outMode =
     gameType === 'x01' && ['double', 'single', 'master'].includes(opts.outMode)
@@ -71,6 +73,7 @@ export async function createOnlineGame(opts) {
     gameType,
     startScore: gameType === 'x01' ? startScore : null,
     outMode: gameType === 'x01' ? outMode : null,
+    startPlayer,
     createdAt: serverTimestamp(),
     pin,
   };
@@ -86,6 +89,7 @@ export async function createOnlineGame(opts) {
     gameType,
     startScore: doc.startScore,
     outMode: doc.outMode,
+    startPlayer: doc.startPlayer,
   };
 }
 

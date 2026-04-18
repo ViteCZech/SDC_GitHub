@@ -14,6 +14,36 @@ import {
 
 const IMPOSSIBLE_SCORES = [163, 166, 169, 172, 173, 175, 176, 178, 179];
 
+/**
+ * Online X01: po ukončení legu synchronizace — čeká na OK hráče, který leg prohrál.
+ * @returns {{ awaitingAckFrom: 'p1'|'p2', checkoutScore: number, checkoutDarts: number, winnerLegDarts: number } | null}
+ */
+function buildOnlineLegTransition(mergedLeg) {
+  if (!mergedLeg?.winner) return null;
+  const w = mergedLeg.winner;
+  const loser = w === 'p1' ? 'p2' : 'p1';
+  const winMove =
+    (mergedLeg.history || []).find((m) => m.player === w && !m.isBust && m.remaining === 0) ||
+    (mergedLeg.history || [])[0];
+  if (!winMove || winMove.player !== w) {
+    return { awaitingAckFrom: loser, checkoutScore: 0, checkoutDarts: 3, winnerLegDarts: 0 };
+  }
+  const checkoutScore = winMove.score ?? 0;
+  const checkoutDarts = winMove.dartsUsed ?? 3;
+  const winnerLegDarts = (mergedLeg.history || [])
+    .filter((m) => m.player === w && !m.isBust)
+    .reduce((acc, m) => acc + (m.dartsUsed ?? 3), 0);
+  return { awaitingAckFrom: loser, checkoutScore, checkoutDarts, winnerLegDarts };
+}
+
+function fillI18nTemplate(str, vars) {
+  let out = String(str || '');
+  Object.entries(vars).forEach(([k, v]) => {
+    out = out.split(`{${k}}`).join(String(v));
+  });
+  return out;
+}
+
 /** Všechny kladné hodnoty jedné šipky (včetně 25 a 50). */
 const SINGLE_DART_SCORES = (() => {
   const s = new Set();
@@ -224,6 +254,9 @@ export default function GameX01({
   const [editingMove, setEditingMove] = useState(null); 
   const [finishData, setFinishData] = useState(null);
   const [setScores, setSetScores] = useState(() => restoredGameState?.setScores || []);
+  /** Online: po výhře legu čeká na potvrzení (OK) poražený hráč — data z Firebase `liveGameState.legTransition`. */
+  const [onlineLegTransition, setOnlineLegTransition] = useState(null);
+  const onlineLegTransitionRef = useRef(null);
 
   const [highScoreAnimation, setHighScoreAnimation] = useState(null);
   const [longPressIdx, setLongPressIdx] = useState(null);
@@ -277,11 +310,19 @@ export default function GameX01({
   }, [setScores]);
 
   useEffect(() => {
+    onlineLegTransitionRef.current = onlineLegTransition;
+  }, [onlineLegTransition]);
+
+  useEffect(() => {
     didSeedOnlineRef.current = false;
   }, [onlineGameId]);
 
   useEffect(() => {
-    pushOnlineX01LiveRef.current = async (gs, ss) => {
+    setOnlineLegTransition(null);
+  }, [onlineGameId]);
+
+  useEffect(() => {
+    pushOnlineX01LiveRef.current = async (gs, ss, legTransition = null) => {
       if (!onlineGameId || settings.gameType !== 'x01') return;
       const writeId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
       lastPushedWriteIdRef.current = writeId;
@@ -291,6 +332,7 @@ export default function GameX01({
           writeId,
           gameState: gs,
           setScores: Array.isArray(ss) ? ss : [],
+          legTransition: legTransition ?? null,
         });
       } catch (e) {
         console.warn('updateGameState', e);
@@ -305,6 +347,7 @@ export default function GameX01({
       if (live.writeId && live.writeId === lastPushedWriteIdRef.current) return;
       setGameState(live.gameState);
       setSetScores(Array.isArray(live.setScores) ? live.setScores : []);
+      setOnlineLegTransition(live.legTransition ?? null);
       setCurrentInput('');
       setFinishData(null);
       setEditingMove(null);
@@ -336,7 +379,7 @@ export default function GameX01({
       history: [],
       completedLegs: [],
     };
-    void pushOnlineX01LiveRef.current(seed, setScoresRef.current || []);
+    void pushOnlineX01LiveRef.current(seed, setScoresRef.current || [], null);
   }, [onlineGameId, myOnlineRole, settings.gameType, settings.startScore, settings.startPlayer]);
 
   // Pokud se uživatel vrátí zpět z obrazovky "konec zápasu",
@@ -470,19 +513,27 @@ export default function GameX01({
             setIsMicActive(false);
           }, 10000);
         }
+        setOnlineLegTransition(null);
         onMatchComplete(record, restorePayload);
       } else {
         setSetScores(nextSetScores);
         const mergedLeg = { ...ns, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S, matchWinner: null, completedLegs: uLegs };
+        let legT = null;
+        if (onlineGameId && settings.gameType === 'x01') {
+          legT = buildOnlineLegTransition(mergedLeg);
+          setOnlineLegTransition(legT);
+        } else {
+          setOnlineLegTransition(null);
+        }
         setGameState(mergedLeg);
         if (onlineGameId && settings.gameType === 'x01') {
-          void pushOnlineX01LiveRef.current(mergedLeg, nextSetScores);
+          void pushOnlineX01LiveRef.current(mergedLeg, nextSetScores, legT);
         }
       }
     } else { 
       setGameState(ns);
       if (onlineGameId && settings.gameType === 'x01') {
-        void pushOnlineX01LiveRef.current(ns, setScoresRef.current);
+        void pushOnlineX01LiveRef.current(ns, setScoresRef.current, null);
       }
     }
 
@@ -547,9 +598,12 @@ export default function GameX01({
       p2Sets: gs.p2Sets,
       completedLegs: nextCompletedLegs,
     };
+    if (gs.winner && !ns.winner) {
+      setOnlineLegTransition(null);
+    }
     setGameState(mergedUndo);
     if (onlineGameId && settings.gameType === 'x01') {
-      void pushOnlineX01LiveRef.current(mergedUndo, setScoresRef.current);
+      void pushOnlineX01LiveRef.current(mergedUndo, setScoresRef.current, null);
     }
   };
 
@@ -594,6 +648,9 @@ export default function GameX01({
         if (gameState.winner === 'p2') nextP2Legs = Math.max(0, nextP2Legs - 1);
         nextCompletedLegs.pop();
         ns.matchWinner = null;
+        if (onlineGameId && settings.gameType === 'x01') {
+          setOnlineLegTransition(null);
+        }
     }
     else if (!gameState.winner && ns.winner) {
         if (ns.winner === 'p1') nextP1Legs++;
@@ -614,21 +671,60 @@ export default function GameX01({
            };
            const record = { id: Date.now(), date: new Date().toLocaleString(), gameType: 'x01', p1Name: settings.p1Name, p1Id: settings.p1Id || null, p2Name: settings.p2Name, p2Id: settings.p2Id || null, p1Legs: resultForStore.p1Legs, p2Legs: resultForStore.p2Legs, finalResult, matchWinner: ns.winner, completedLegs: nextCompletedLegs, isBot: settings.isBot, botLevel: settings.botLevel, botAvg: settings.botAvg };
            setEditingMove(null);
+           setOnlineLegTransition(null);
            onMatchComplete(record, restorePayload);
            return;
         }
     }
     const mergedEdit = { ...ns, p1Legs: nextP1Legs, p2Legs: nextP2Legs, completedLegs: nextCompletedLegs };
+    let legT = null;
+    if (onlineGameId && settings.gameType === 'x01') {
+      if (mergedEdit.winner) {
+        legT = buildOnlineLegTransition(mergedEdit);
+        setOnlineLegTransition(legT);
+      } else {
+        setOnlineLegTransition(null);
+      }
+    }
     setGameState(mergedEdit);
     if (onlineGameId && settings.gameType === 'x01') {
-      void pushOnlineX01LiveRef.current(mergedEdit, setScoresRef.current);
+      void pushOnlineX01LiveRef.current(mergedEdit, setScoresRef.current, mergedEdit.winner ? legT : null);
     }
     setEditingMove(null);
   };
 
   const prevNextLegStateRef = useRef(null);
 
+  const acknowledgeOnlineLegEnd = () => {
+    if (!onlineGameId || settings.gameType !== 'x01') return;
+    const lt = onlineLegTransitionRef.current;
+    if (!lt || lt.awaitingAckFrom !== myOnlineRole) return;
+    const gs = gameStateRef.current;
+    if (!gs.winner) return;
+    prevNextLegStateRef.current = gs;
+    const nS = gs.startingPlayer === 'p1' ? 'p2' : 'p1';
+    const next = {
+      ...gs,
+      p1Score: settings.startScore,
+      p2Score: settings.startScore,
+      winner: null,
+      history: [],
+      currentPlayer: nS,
+      startingPlayer: nS,
+    };
+    setGameState(next);
+    setCurrentInput('');
+    setFinishData(null);
+    setOnlineLegTransition(null);
+    void pushOnlineX01LiveRef.current(next, setScoresRef.current, null);
+  };
+  const acknowledgeOnlineLegEndRef = useRef(() => {});
+  acknowledgeOnlineLegEndRef.current = acknowledgeOnlineLegEnd;
+
   const handleNextLeg = () => {
+      if (onlineGameId && settings.gameType === 'x01' && onlineLegTransitionRef.current) {
+        return;
+      }
       prevNextLegStateRef.current = gameState;
       const nS = gameState.startingPlayer === 'p1' ? 'p2' : 'p1';
       const next = {
@@ -644,7 +740,7 @@ export default function GameX01({
       setCurrentInput('');
       setFinishData(null);
       if (onlineGameId && settings.gameType === 'x01') {
-        void pushOnlineX01LiveRef.current(next, setScoresRef.current);
+        void pushOnlineX01LiveRef.current(next, setScoresRef.current, null);
       }
   };
 
@@ -702,7 +798,21 @@ export default function GameX01({
 
     if (matchesAnyPhrase(command, [...VOICE_PHRASES.nextLeg, ...legacyNext])) {
       if (gs.winner && !gs.matchWinner) {
-        handleNextLegRef.current();
+        if (
+          onlineGameId &&
+          settings.gameType === 'x01' &&
+          onlineLegTransitionRef.current?.awaitingAckFrom === myOnlineRole
+        ) {
+          acknowledgeOnlineLegEndRef.current();
+        } else if (
+          onlineGameId &&
+          settings.gameType === 'x01' &&
+          onlineLegTransitionRef.current
+        ) {
+          /* vítěz legu čeká na OK soupeře */
+        } else {
+          handleNextLegRef.current();
+        }
       }
       return;
     }
@@ -819,6 +929,23 @@ export default function GameX01({
       handleUndoClick();
     }
   };
+
+  const showOnlineLegAckModal =
+    Boolean(
+      onlineGameId &&
+        settings.gameType === 'x01' &&
+        onlineLegTransition &&
+        gameState.winner &&
+        myOnlineRole === onlineLegTransition.awaitingAckFrom
+    );
+  const showOnlineLegWaitOpponent =
+    Boolean(
+      onlineGameId &&
+        settings.gameType === 'x01' &&
+        onlineLegTransition &&
+        gameState.winner &&
+        myOnlineRole === gameState.winner
+    );
 
   const btnGameBase = "text-white font-bold py-2 rounded text-[10px] sm:text-xs transition-all select-none touch-manipulation active:scale-95";
   const numBtnBase = "h-full w-full bg-slate-800 text-2xl sm:text-3xl landscape:text-3xl leading-none font-bold rounded-xl border border-slate-700/50 hover:bg-slate-700 active:bg-slate-600 select-none touch-manipulation flex items-center justify-center";
@@ -1062,9 +1189,16 @@ export default function GameX01({
                     <h3 className={`text-lg sm:text-2xl font-black uppercase tracking-widest ${gameState.winner === 'p1' ? 'text-emerald-400' : 'text-purple-400'} mb-2`}>
                         {translations[lang]?.legFor || 'Leg vyhrává'} {getDisplayName(gameState.winner === 'p1' ? settings.p1Name : settings.p2Name, gameState.winner === 'p1', gameState.winner === 'p2' && settings.isBot)}
                     </h3>
+                    {showOnlineLegWaitOpponent && (
+                      <p className="mb-3 max-w-sm text-xs sm:text-sm font-bold leading-relaxed text-amber-200/95">
+                        {t('onlineLegWaitLoserAck')}
+                      </p>
+                    )}
+                    {!showOnlineLegWaitOpponent && !showOnlineLegAckModal && (
                     <button onClick={handleNextLeg} className={`w-full max-w-[250px] ${gameState.winner === 'p1' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-purple-600 hover:bg-purple-500'} text-white py-3 sm:py-4 rounded-xl font-black text-base sm:text-lg mt-2 sm:mt-4 shadow-lg active:scale-95 transition-all`}>
                         {translations[lang]?.nextLeg || 'Další leg'}
                     </button>
+                    )}
                 </div>
             )}
         </div>
@@ -1078,6 +1212,37 @@ export default function GameX01({
         </div>
       </main>
 
+      {showOnlineLegAckModal && onlineLegTransition && (
+        <div
+          className="fixed inset-0 z-[120] flex flex-col items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="online-leg-ack-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-amber-500/40 bg-slate-900 p-5 shadow-2xl sm:p-6">
+            <h3
+              id="online-leg-ack-title"
+              className="text-center text-sm font-black uppercase tracking-widest text-amber-300 sm:text-base"
+            >
+              {t('onlineLegLoserAckTitle')}
+            </h3>
+            <p className="mt-4 text-center text-sm font-bold leading-relaxed text-slate-200 sm:text-base">
+              {fillI18nTemplate(t('onlineLegLoserAckBody'), {
+                checkout: onlineLegTransition.checkoutScore,
+                dartsVisit: onlineLegTransition.checkoutDarts,
+                dartsLeg: onlineLegTransition.winnerLegDarts,
+              })}
+            </p>
+            <button
+              type="button"
+              onClick={() => acknowledgeOnlineLegEnd()}
+              className="mt-6 w-full rounded-xl border border-amber-600/60 bg-amber-600 py-3 text-center text-base font-black uppercase tracking-widest text-slate-950 shadow-lg transition-colors hover:bg-amber-500 active:scale-[0.99]"
+            >
+              {t('onlineLegLoserAckOk')}
+            </button>
+          </div>
+        </div>
+      )}
       {finishData && <FinishDartsSelector points={finishData.points} minDarts={finishData.minD} onConfirm={(d) => { processTurn(finishData.points, d); setFinishData(null); }} onCancel={() => setFinishData(null)} lang={lang} player={gameState.currentPlayer} />}
       {editingMove && <EditScoreModal initialScore={editingMove.score} initialDarts={editingMove.dartsUsed} isFinish={(editingMove.remaining+editingMove.score)-editingMove.score===0} scoreBefore={editingMove.remaining+editingMove.score} outMode={settings.outMode} onSave={handleSaveEdit} onCancel={()=>setEditingMove(null)} lang={lang} />}
       

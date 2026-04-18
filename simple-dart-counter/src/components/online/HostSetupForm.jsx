@@ -18,6 +18,8 @@ export default function HostSetupForm({ t, defaultHostName, onSubmit, busy }) {
   const [isPublic, setIsPublic] = useState(true);
   const [startScore, setStartScore] = useState(501);
   const [outMode, setOutMode] = useState('double');
+  /** První leg: p1 = hostitel, p2 = připojený host. */
+  const [startPlayer, setStartPlayer] = useState('p1');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -27,6 +29,7 @@ export default function HostSetupForm({ t, defaultHostName, onSubmit, busy }) {
       gameType,
       legs,
       isPublic,
+      startPlayer,
       startScore: gameType === 'x01' ? startScore : undefined,
       outMode: gameType === 'x01' ? outMode : undefined,
     });
@@ -113,6 +116,21 @@ export default function HostSetupForm({ t, defaultHostName, onSubmit, busy }) {
               {n}
             </option>
           ))}
+        </select>
+      </div>
+
+      <div>
+        <label className={fieldLabel} htmlFor="online-first-throw">
+          {t('onlineFirstThrowLabel')}
+        </label>
+        <select
+          id="online-first-throw"
+          value={startPlayer}
+          onChange={(e) => setStartPlayer(e.target.value === 'p2' ? 'p2' : 'p1')}
+          className={fieldInput}
+        >
+          <option value="p1">{t('onlineFirstThrowHost')}</option>
+          <option value="p2">{t('onlineFirstThrowGuest')}</option>
         </select>
       </div>
 

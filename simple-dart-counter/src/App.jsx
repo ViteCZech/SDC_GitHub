@@ -995,7 +995,7 @@ function AppMain({ lang, setLang }) {
       p1Name: String(gameData?.hostName || '').trim() || prev.p1Name,
       p2Name: String(gameData?.guestName || '').trim() || prev.p2Name,
       isBot: false,
-      startPlayer: 'p1',
+      startPlayer: gameData?.startPlayer === 'p2' ? 'p2' : 'p1',
     }));
     setOnlineGameId(String(gameId));
     setMyOnlineRole(r);
