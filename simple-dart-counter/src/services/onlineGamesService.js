@@ -12,13 +12,40 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { signInAnonymously } from 'firebase/auth';
+import { auth, db } from '../firebase';
 
 export const ONLINE_GAMES_COLLECTION = 'onlineGames';
+
+/**
+ * Poznámka pro vývojáře: až budete zpřísňovat Firestore Rules, nastavte pro kolekci
+ * `onlineGames` podmínku `request.auth != null` (a případně další pravidla), aby
+ * čtení/zápis vyžadoval platného uživatele — anonymní přihlášení z této služby
+ * pak poskytne `request.auth.uid` bez nutnosti e-mailové registrace.
+ */
 
 /** Konzistentní kód chyby pro UI (překlady). */
 export const ONLINE_JOIN_ERROR_NOT_AVAILABLE = 'game_not_available';
 export const ONLINE_JOIN_ERROR_GUEST_NAME = 'guest_name_required';
+/** Selhalo tiché přihlášení (síť, Firebase Auth, …). */
+export const ONLINE_AUTH_FAILED = 'auth_failed';
+
+/**
+ * Zajistí anonymní Firebase Auth před operacemi s kolekcí `onlineGames`.
+ * Nevolat mimo tento modul (offline režim a turnaje zůstávají bez Auth).
+ */
+async function ensureAnonymousAuth() {
+  if (!auth) {
+    throw new Error('no_db');
+  }
+  try {
+    if (auth.currentUser) return;
+    await signInAnonymously(auth);
+  } catch (e) {
+    console.warn('ensureAnonymousAuth', e);
+    throw new Error(ONLINE_AUTH_FAILED);
+  }
+}
 
 /**
  * Lidsky čitelný formát pro dokument (např. "501 DO" nebo "Cricket").
@@ -48,6 +75,7 @@ function randomFourDigitPin() {
  */
 export async function createOnlineGame(opts) {
   if (!db) throw new Error('no_db');
+  await ensureAnonymousAuth();
   const hostName = String(opts.hostName || '').trim() || 'Host';
   const gameType = opts.gameType === 'cricket' ? 'cricket' : 'x01';
   const legs = Math.min(5, Math.max(1, Number(opts.legs) || 1));
@@ -151,6 +179,7 @@ export async function findWaitingGameByPin(pinRaw) {
  */
 export async function joinOnlineGame(gameId, guestName) {
   if (!db) throw new Error('no_db');
+  await ensureAnonymousAuth();
   const id = String(gameId || '').trim();
   if (!id) throw new Error(ONLINE_JOIN_ERROR_NOT_AVAILABLE);
   const guest = String(guestName || '').trim();

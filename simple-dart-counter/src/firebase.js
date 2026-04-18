@@ -13,15 +13,14 @@ const firebaseConfig = {
 };
 
 let app;
-let auth;
-let db;
 
 try {
   app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app, 'eur3');
 } catch (e) {
   console.error('Firebase Init Error:', e);
 }
 
-export { app, auth, db };
+/** Autentizace (Google, anonymní online, …). Při selhání inicializace je `null`. */
+export const auth = app ? getAuth(app) : null;
+export const db = app ? getFirestore(app, 'eur3') : null;
+export { app };

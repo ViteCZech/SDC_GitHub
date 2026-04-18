@@ -8,6 +8,7 @@ import {
   createOnlineGame,
   findWaitingGameByPin,
   joinOnlineGame,
+  ONLINE_AUTH_FAILED,
   ONLINE_JOIN_ERROR_GUEST_NAME,
   ONLINE_JOIN_ERROR_NOT_AVAILABLE,
   subscribePublicWaitingGames,
@@ -35,6 +36,7 @@ function mapJoinError(err, t) {
   if (code === ONLINE_JOIN_ERROR_NOT_AVAILABLE) return t('onlineJoinGameUnavailable');
   if (code === ONLINE_JOIN_ERROR_GUEST_NAME) return t('onlineGuestNameRequired');
   if (code === 'no_db') return t('onlineErrorNoDb');
+  if (code === ONLINE_AUTH_FAILED) return t('onlineErrorAuthFailed');
   return t('onlineJoinGameUnavailable');
 }
 
@@ -122,7 +124,13 @@ export default function OnlineHub({ t, settings, onOnlineGameStart }) {
       });
     } catch (e) {
       console.error(e);
-      setFormError(e?.message === 'no_db' ? t('onlineErrorNoDb') : String(e?.message || 'error'));
+      setFormError(
+        e?.message === 'no_db'
+          ? t('onlineErrorNoDb')
+          : e?.message === ONLINE_AUTH_FAILED
+            ? t('onlineErrorAuthFailed')
+            : String(e?.message || 'error')
+      );
     } finally {
       setHostBusy(false);
     }
