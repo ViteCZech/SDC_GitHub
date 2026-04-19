@@ -320,8 +320,24 @@ export async function completeOnlineGameSession(gameId, pendingMatchRecordForHis
 }
 
 /**
+ * Úprava toho, kdo začíná první leg (po domluvě obou hráčů v zápase).
+ * @param {string} gameId
+ * @param {'p1'|'p2'} startPlayer
+ */
+export async function updateOnlineGameStartPlayer(gameId, startPlayer) {
+  if (!db) throw new Error('no_db');
+  await ensureAnonymousAuth();
+  const id = String(gameId || '').trim();
+  if (!id) throw new Error('no_db');
+  const sp = startPlayer === 'p2' ? 'p2' : 'p1';
+  const ref = doc(db, ONLINE_GAMES_COLLECTION, id);
+  await updateDoc(ref, {
+    startPlayer: sp,
+  });
+}
+
+/**
  * Úmyslné opuštění rozjetého online zápasu (bez „ztráty spojení“).
- * Nastaví `status: 'abandoned'` a `abandonedBy` podle role — soupeř v UI uvidí konec relace, ne offline overlay.
  * @param {string} gameId
  * @param {'p1'|'p2'} myRole
  */

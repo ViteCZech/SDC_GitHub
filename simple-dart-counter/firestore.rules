@@ -55,6 +55,14 @@ service cloud.firestore {
         && isParticipantOnGameResource();
     }
 
+    function updateStartPlayerField() {
+      return diffKeys().hasOnly(['startPlayer'])
+        && resource.data.status == 'playing'
+        && isParticipantOnGameResource()
+        && (request.resource.data.startPlayer == 'p1'
+            || request.resource.data.startPlayer == 'p2');
+    }
+
     function completeOnlineSession() {
       return diffKeys().hasOnly([
             'status',
@@ -103,6 +111,7 @@ service cloud.firestore {
             || updateHeartbeatHost()
             || updateHeartbeatGuest()
             || updateLiveGameState()
+            || updateStartPlayerField()
             || completeOnlineSession()
             || abandonOnlineSession());
 

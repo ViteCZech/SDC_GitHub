@@ -13,31 +13,32 @@ const radioUnselected = 'border-slate-700';
  */
 export default function HostSetupForm({ t, defaultHostName, onSubmit, busy }) {
   const [hostName, setHostName] = useState(() => String(defaultHostName || '').trim() || '');
-  const [gameType, setGameType] = useState('x01');
   const [legs, setLegs] = useState(3);
   const [isPublic, setIsPublic] = useState(true);
   const [startScore, setStartScore] = useState(501);
   const [outMode, setOutMode] = useState('double');
-  /** První leg: p1 = hostitel, p2 = připojený host. */
-  const [startPlayer, setStartPlayer] = useState('p1');
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!hostName.trim() || busy) return;
     onSubmit({
       hostName: hostName.trim(),
-      gameType,
+      gameType: 'x01',
       legs,
       isPublic,
-      startPlayer,
-      startScore: gameType === 'x01' ? startScore : undefined,
-      outMode: gameType === 'x01' ? outMode : undefined,
+      /** Domluva „kdo začíná“ proběhne až v zápase (oba přihlášeni). */
+      startPlayer: 'p1',
+      startScore,
+      outMode,
     });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full">
-      <div>
+    <form
+      onSubmit={handleSubmit}
+      className="grid w-full grid-cols-1 gap-4 landscape:grid-cols-2 landscape:grid-rows-[auto_auto_1fr_auto] landscape:gap-x-5 landscape:gap-y-3"
+    >
+      <div className="landscape:col-span-2">
         <label className={fieldLabel} htmlFor="online-host-name">
           {t('onlinePlayerNameLabel')}
         </label>
@@ -53,55 +54,35 @@ export default function HostSetupForm({ t, defaultHostName, onSubmit, busy }) {
       </div>
 
       <div>
-        <label className={fieldLabel} htmlFor="online-game-type">
-          {t('onlineGameTypeLabel')}
+        <label className={fieldLabel} htmlFor="online-start-score">
+          {t('onlineStartScoreLabel')}
         </label>
         <select
-          id="online-game-type"
-          value={gameType}
-          onChange={(e) => setGameType(e.target.value)}
+          id="online-start-score"
+          value={startScore}
+          onChange={(e) => setStartScore(Number(e.target.value))}
           className={fieldInput}
         >
-          <option value="x01">{t('onlineGameTypeX01')}</option>
-          <option value="cricket">{t('onlineGameTypeCricket')}</option>
+          <option value={301}>301</option>
+          <option value={501}>501</option>
+        </select>
+      </div>
+      <div>
+        <label className={fieldLabel} htmlFor="online-out-mode">
+          {t('onlineOutModeLabel')}
+        </label>
+        <select
+          id="online-out-mode"
+          value={outMode}
+          onChange={(e) => setOutMode(e.target.value)}
+          className={fieldInput}
+        >
+          <option value="single">{t('onlineOutModeSingle')}</option>
+          <option value="double">{t('onlineOutModeDouble')}</option>
         </select>
       </div>
 
-      {gameType === 'x01' && (
-        <>
-          <div>
-            <label className={fieldLabel} htmlFor="online-start-score">
-              {t('onlineStartScoreLabel')}
-            </label>
-            <select
-              id="online-start-score"
-              value={startScore}
-              onChange={(e) => setStartScore(Number(e.target.value))}
-              className={fieldInput}
-            >
-              <option value={301}>301</option>
-              <option value={501}>501</option>
-            </select>
-          </div>
-          <div>
-            <label className={fieldLabel} htmlFor="online-out-mode">
-              {t('onlineOutModeLabel')}
-            </label>
-            <select
-              id="online-out-mode"
-              value={outMode}
-              onChange={(e) => setOutMode(e.target.value)}
-              className={fieldInput}
-            >
-              <option value="single">{t('onlineOutModeSingle')}</option>
-              <option value="double">{t('onlineOutModeDouble')}</option>
-              <option value="master">{t('onlineOutModeMaster')}</option>
-            </select>
-          </div>
-        </>
-      )}
-
-      <div>
+      <div className="landscape:col-span-2">
         <label className={fieldLabel} htmlFor="online-legs">
           {t('onlineLegsLabel')}
         </label>
@@ -119,22 +100,7 @@ export default function HostSetupForm({ t, defaultHostName, onSubmit, busy }) {
         </select>
       </div>
 
-      <div>
-        <label className={fieldLabel} htmlFor="online-first-throw">
-          {t('onlineFirstThrowLabel')}
-        </label>
-        <select
-          id="online-first-throw"
-          value={startPlayer}
-          onChange={(e) => setStartPlayer(e.target.value === 'p2' ? 'p2' : 'p1')}
-          className={fieldInput}
-        >
-          <option value="p1">{t('onlineFirstThrowHost')}</option>
-          <option value="p2">{t('onlineFirstThrowGuest')}</option>
-        </select>
-      </div>
-
-      <div className="space-y-2">
+      <div className="space-y-2 landscape:col-span-2">
         <span className={fieldLabel.replace('mb-1.5', 'mb-0')}>{t('onlineVisibilityLabel')}</span>
         <label className={`${radioBase} ${isPublic ? radioSelected : radioUnselected}`}>
           <input
@@ -161,7 +127,7 @@ export default function HostSetupForm({ t, defaultHostName, onSubmit, busy }) {
       <button
         type="submit"
         disabled={!hostName.trim() || busy}
-        className="w-full py-4 rounded-xl font-black uppercase tracking-wider text-white bg-emerald-600 hover:bg-emerald-500 border border-emerald-500 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+        className="w-full py-4 rounded-xl font-black uppercase tracking-wider text-white bg-emerald-600 hover:bg-emerald-500 border border-emerald-500 disabled:opacity-40 disabled:pointer-events-none transition-colors landscape:col-span-2"
       >
         {busy ? t('onlineCreating') : t('onlineCreateWaitingRoom')}
       </button>

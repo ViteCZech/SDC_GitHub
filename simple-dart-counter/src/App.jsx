@@ -23,7 +23,7 @@ import {
   AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, 
   DownloadCloud, FileText, History, Home, Info, Keyboard as KeyboardIcon, 
   Maximize, Minimize, Mic, MicOff, MousePointer2, Play, RefreshCw, RotateCcw, 
-  Target, Trash2, Trophy, Undo2, Unplug, LogOut, User, Cloud, X, BarChart2, List, Swords, ClipboardList
+  Target, Trash2, Trophy, Undo2, Unplug, User, Cloud, X, BarChart2, List, Swords, ClipboardList
 } from 'lucide-react';
 
 import { translations } from './translations';
@@ -1029,9 +1029,11 @@ function AppMain({ lang, setLang }) {
       gameType: gt,
       startScore: gt === 'x01' ? Number(gameData?.startScore) || prev.startScore : prev.startScore,
       outMode:
-        gt === 'x01' && ['double', 'single', 'master'].includes(gameData?.outMode)
+        gt === 'x01' && ['double', 'single'].includes(gameData?.outMode)
           ? gameData.outMode
-          : prev.outMode,
+          : gt === 'x01'
+            ? 'double'
+            : prev.outMode,
       matchMode: 'first_to',
       matchTarget: legs,
       matchSets: 1,
@@ -1316,6 +1318,11 @@ function AppMain({ lang, setLang }) {
     handleOnlineSessionEnded();
     setHomeSubmenu('online');
   }, [handleOnlineSessionEnded, t, showNotification]);
+
+  const syncOnlineDocStartPlayer = React.useCallback((sp) => {
+    const v = sp === 'p2' ? 'p2' : 'p1';
+    setSettings((prev) => ({ ...prev, startPlayer: v }));
+  }, []);
 
   const handleOnlineExitMatchRequest = React.useCallback(() => {
     if (!onlineGameId || !myOnlineRole) return;
@@ -3608,11 +3615,7 @@ function AppMain({ lang, setLang }) {
                       type="button"
                       onClick={() => {
                         if (onlineGameId) {
-                          clearLastOnlineSession();
-                          setSkipOnlineInitialSeedGameId(null);
-                          setOnlineGameId(null);
-                          setMyOnlineRole(null);
-                          setAppState('home');
+                          handleOnlineExitMatchRequest();
                           return;
                         }
                         if (isTournamentPlaying) {
@@ -3631,7 +3634,8 @@ function AppMain({ lang, setLang }) {
                         }
                       }}
                       className="p-2 transition-colors rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
-                      aria-label="Home"
+                      aria-label={onlineGameId ? t('onlineExitMatchTitle') : 'Home'}
+                      title={onlineGameId ? t('onlineExitMatchTitle') : undefined}
                     >
                       <Home className="w-5 h-5" />
                     </button>
@@ -3665,18 +3669,6 @@ function AppMain({ lang, setLang }) {
                       </div>
                   </div>
                   <div className="flex items-center gap-2">
-                      {onlineGameId && !isTournamentPlaying && (
-                        <button
-                          type="button"
-                          onClick={handleOnlineExitMatchRequest}
-                          title={t('onlineExitMatchTitle')}
-                          className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-600/55 bg-amber-950/45 px-2 py-1.5 text-[9px] font-black uppercase tracking-wider text-amber-100 hover:bg-amber-900/55 sm:gap-1.5 sm:px-2.5 sm:text-[10px]"
-                        >
-                          <LogOut className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
-                          <span className="sm:hidden">EXIT</span>
-                          <span className="hidden sm:inline">{t('onlineExitMatch')}</span>
-                        </button>
-                      )}
                       <button onClick={toggleFullscreen} className="p-2 transition-colors rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700">
                           {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
                       </button>
@@ -3695,6 +3687,8 @@ function AppMain({ lang, setLang }) {
                     myOnlineRole={myOnlineRole || undefined}
                     onlineLocalStream={onlineLocalStream || undefined}
                     skipOnlineInitialSeedGameId={skipOnlineInitialSeedGameId || undefined}
+                    requestConfirm={requestConfirm}
+                    onOnlineDocStartPlayer={syncOnlineDocStartPlayer}
                     onAbort={
                       isTournamentPlaying
                         ? () => {
@@ -4052,7 +4046,13 @@ function AppMain({ lang, setLang }) {
       )}
       {/* --- HOME --- */}
       {appState === 'home' && (
-        <main className="flex flex-col md:grid md:grid-cols-2 flex-1 w-full max-w-md md:max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto items-center justify-center gap-6 md:gap-10 lg:gap-12 p-4 sm:p-6 overflow-y-auto">
+        <main
+          className={`mx-auto flex w-full flex-1 p-4 sm:p-6 lg:max-w-6xl xl:max-w-7xl ${
+            homeSubmenu === 'online'
+              ? 'min-h-0 max-w-2xl flex-col items-stretch justify-start overflow-hidden md:max-w-3xl'
+              : 'max-w-md flex-col items-center justify-center gap-6 overflow-y-auto md:max-w-4xl md:grid md:grid-cols-2 md:gap-10 lg:gap-12'
+          }`}
+        >
             {homeSubmenu === 'online' ? (
               <HomeOnlineSubmenu
                 t={t}

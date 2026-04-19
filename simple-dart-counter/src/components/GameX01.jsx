@@ -7,6 +7,7 @@ import {
   subscribeToGameState,
   updateGameState,
   updateHeartbeat,
+  updateOnlineGameStartPlayer,
 } from '../services/onlineGamesService';
 import OnlineVideoContainer from './online/OnlineVideoContainer';
 import PostMatchView from './online/PostMatchView';
@@ -230,6 +231,10 @@ export default function GameX01({
   onOnlinePeerAbandoned = null,
   /** ID online hry: pokud se shoduje s tímto, p1 neodesílá prázdný seed (obnova stránky s live stavem). */
   skipOnlineInitialSeedGameId = null,
+  /** Globální potvrzovací dialog z App (stejné jako u opuštění zápasu). */
+  requestConfirm = null,
+  /** Synchronizace `onlineGames.startPlayer` do lokálních nastavení. */
+  onOnlineDocStartPlayer = null,
   onAbort: _onAbort,
 }) {
     // 1. Zde máte překladovou funkci (pokud ne, přidejte ji)
@@ -315,6 +320,9 @@ export default function GameX01({
   const setScoresRef = useRef(setScores);
   const opponentHeartbeatMsRef = useRef(null);
   const [isOpponentOffline, setIsOpponentOffline] = useState(false);
+  const lastDocStartPlayerRef = useRef(null);
+  const onlineStarterPressRef = useRef({ timer: null, armed: false });
+  const blockStarterScoreClickRef = useRef(false);
 
   const [quickButtons, setQuickButtons] = useState(settings.quickButtons || [41, 45, 60, 100, 140, 180]);
 
@@ -451,6 +459,15 @@ export default function GameX01({
     if (!onlineGameId || settings.gameType !== 'x01') return undefined;
     const unsub = subscribeOnlineGame(onlineGameId, (doc) => {
       if (!doc) return;
+      if (doc.startPlayer === 'p1' || doc.startPlayer === 'p2') {
+        const sp = doc.startPlayer === 'p2' ? 'p2' : 'p1';
+        if (lastDocStartPlayerRef.current !== sp) {
+          lastDocStartPlayerRef.current = sp;
+          if (typeof onOnlineDocStartPlayer === 'function') {
+            onOnlineDocStartPlayer(sp);
+          }
+        }
+      }
       if (doc.status === 'completed') {
         setOnlineFirestoreSessionCompleted(true);
       }
@@ -484,7 +501,7 @@ export default function GameX01({
         /* ignore */
       }
     };
-  }, [onlineGameId, settings.gameType, myOnlineRole, onOnlinePeerAbandoned]);
+  }, [onlineGameId, settings.gameType, myOnlineRole, onOnlinePeerAbandoned, onOnlineDocStartPlayer]);
 
   useEffect(() => {
     if (!onlineGameId || settings.gameType !== 'x01' || !myOnlineRole) return undefined;
@@ -832,6 +849,87 @@ export default function GameX01({
     const cS = pKey === 'p1' ? gameState.p1Score : gameState.p2Score; const thr = cS - rem;
     if (thr < 0 || thr > 180 || IMPOSSIBLE_SCORES.includes(thr)) { setErrorMsg(String(translations[lang]?.impossible || 'Chyba')); setTimeout(()=>setErrorMsg(''), 1500); setCurrentInput(''); return; }
     if (rem === 0) { const minD = getMinDartsToCheckout(cS, settings.outMode); if (minD === Infinity) { setErrorMsg(String(translations[lang]?.impossible || 'Chyba')); setTimeout(()=>setErrorMsg(''), 1500); setCurrentInput(''); return; } setFinishData({ points: thr, minD }); } else handleTurnCommit(thr);
+  };
+
+  const clearOnlineStarterPressTimer = () => {
+    if (onlineStarterPressRef.current.timer != null) {
+      clearTimeout(onlineStarterPressRef.current.timer);
+      onlineStarterPressRef.current.timer = null;
+    }
+    onlineStarterPressRef.current.armed = false;
+  };
+
+  useEffect(() => () => clearOnlineStarterPressTimer(), []);
+
+  const canLongPressSwitchOnlineStarter = (pKey) =>
+    Boolean(
+      onlineGameId &&
+        settings.gameType === 'x01' &&
+        myOnlineRole === pKey &&
+        !gameState.winner &&
+        !gameState.matchWinner &&
+        !onlineLegTransition &&
+        !onlineMatchTransition &&
+        Array.isArray(gameState.history) &&
+        gameState.history.length === 0
+    );
+
+  const onScoreCardClick = (pKey, e) => {
+    if (blockStarterScoreClickRef.current) {
+      e?.preventDefault?.();
+      e?.stopPropagation?.();
+      return;
+    }
+    handleScoreClick(pKey);
+  };
+
+  const onOnlineStarterPointerDown = (pKey) => {
+    if (!canLongPressSwitchOnlineStarter(pKey)) return;
+    clearOnlineStarterPressTimer();
+    onlineStarterPressRef.current.armed = true;
+    onlineStarterPressRef.current.timer = window.setTimeout(() => {
+      onlineStarterPressRef.current.timer = null;
+      onlineStarterPressRef.current.armed = false;
+      blockStarterScoreClickRef.current = true;
+      window.setTimeout(() => {
+        blockStarterScoreClickRef.current = false;
+      }, 450);
+      const runSwitch = async () => {
+        const cur = gameStateRef.current.startingPlayer === 'p2' ? 'p2' : 'p1';
+        const next = cur === 'p1' ? 'p2' : 'p1';
+        try {
+          await updateOnlineGameStartPlayer(onlineGameId, next);
+          onOnlineDocStartPlayer?.(next);
+          const gs = gameStateRef.current;
+          if (!gs.history?.length && !gs.winner) {
+            const merged = { ...gs, currentPlayer: next, startingPlayer: next };
+            setGameState(merged);
+            await pushOnlineX01LiveRef.current(merged, setScoresRef.current, {});
+          }
+        } catch (err) {
+          console.warn('updateOnlineGameStartPlayer', err);
+          setErrorMsg(t('onlineSwitchStarterError'));
+          setTimeout(() => setErrorMsg(''), 2500);
+        }
+      };
+      if (typeof requestConfirm === 'function') {
+        requestConfirm(
+          t('onlineSwitchStartingPlayerBody'),
+          () => {
+            void runSwitch();
+          },
+          {
+            title: t('onlineSwitchStartingPlayerTitle'),
+            confirmLabel: t('onlineSwitchStartingPlayerConfirm'),
+            cancelLabel: t('cancel'),
+          }
+        );
+      } else if (
+        window.confirm(`${t('onlineSwitchStartingPlayerTitle')}\n\n${t('onlineSwitchStartingPlayerBody')}`)
+      ) {
+        void runSwitch();
+      }
+    }, 780);
   };
 
   const handleSaveEdit = (newS, newD) => {
@@ -1481,7 +1579,11 @@ export default function GameX01({
                                   onlineOpponentVideoBackdrop ? 'bg-slate-950/85 backdrop-blur-sm' : 'bg-slate-900'
                                 }`
                           }`}
-                          onClick={() => handleScoreClick(pKey)}
+                          onPointerDown={() => onOnlineStarterPointerDown(pKey)}
+                          onPointerUp={clearOnlineStarterPressTimer}
+                          onPointerCancel={clearOnlineStarterPressTimer}
+                          onPointerLeave={clearOnlineStarterPressTimer}
+                          onClick={(e) => onScoreCardClick(pKey, e)}
                         >
                         {act && <div className={`absolute -top-1 sm:-top-1.5 ${isP1?'bg-emerald-500 border-emerald-400':'bg-purple-600 border-purple-400'} text-slate-900 text-[9px] font-bold px-3 py-0.5 rounded-full z-10 border leading-none`}>{translations[lang]?.serving || 'Hází'}</div>}
                         {gameState.startingPlayer === pKey && <div className="absolute top-2 left-2 w-1.5 h-1.5 rounded-full bg-slate-500"></div>}

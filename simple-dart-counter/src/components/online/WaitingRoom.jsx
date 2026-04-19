@@ -11,7 +11,14 @@ const fieldInput =
  * Čekací obrazovka hostitele: kamera, mikrofon, PIN, real-time posluchač až do připojení soupeře.
  * Výběr zařízení zůstává viditelný po celou dobu v lobby; stream se uvolní až při odchodu / startu hry.
  */
-export default function WaitingRoom({ t, session, onLeave, onOnlineGameStart }) {
+export default function WaitingRoom({
+  t,
+  session,
+  onLeave,
+  onOnlineGameStart,
+  hideFooterLeave = false,
+  onHostWaitingHeaderState,
+}) {
   const pairHandledRef = useRef(false);
   const [pairBanner, setPairBanner] = useState(null);
 
@@ -72,6 +79,19 @@ export default function WaitingRoom({ t, session, onLeave, onOnlineGameStart }) 
       }
     };
   }, [isHost, session?.gameId, onOnlineGameStart, handoffStream]);
+
+  useEffect(() => {
+    if (!onHostWaitingHeaderState) return undefined;
+    onHostWaitingHeaderState({
+      leaveDisabled: !!pairBanner,
+      leave: () => {
+        if (pairBanner) return;
+        stopAll();
+        onLeave?.();
+      },
+    });
+    return () => onHostWaitingHeaderState(null);
+  }, [pairBanner, stopAll, onLeave, onHostWaitingHeaderState]);
 
   const showPin = isHost && !session?.isPublic && session?.pin;
   const hint = isHost ? t('onlineWaitingHostHint') : t('onlineWaitingGuestHint');
@@ -183,17 +203,19 @@ export default function WaitingRoom({ t, session, onLeave, onOnlineGameStart }) 
         <p className="text-xs text-slate-500 pt-1">{hint}</p>
       </div>
 
-      <button
-        type="button"
-        disabled={!!pairBanner}
-        onClick={() => {
-          stopAll();
-          onLeave?.();
-        }}
-        className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-600 transition-colors disabled:opacity-50"
-      >
-        {t('onlineLeaveWaitingRoom')}
-      </button>
+      {!hideFooterLeave && (
+        <button
+          type="button"
+          disabled={!!pairBanner}
+          onClick={() => {
+            stopAll();
+            onLeave?.();
+          }}
+          className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-600 transition-colors disabled:opacity-50"
+        >
+          {t('onlineLeaveWaitingRoom')}
+        </button>
+      )}
     </div>
   );
 }

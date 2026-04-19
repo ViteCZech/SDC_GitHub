@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Mic, MicOff } from 'lucide-react';
 import { addDoc, collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { ONLINE_GAMES_COLLECTION, subscribeOnlineGame } from '../../services/onlineGamesService';
@@ -10,6 +11,17 @@ function stopStream(stream) {
   if (!stream) return;
   try {
     stream.getTracks().forEach((t) => t.stop());
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+function applyLocalMicToStream(stream, muted) {
+  if (!stream) return;
+  try {
+    stream.getAudioTracks().forEach((tr) => {
+      tr.enabled = !muted;
+    });
   } catch (e) {
     /* ignore */
   }
@@ -52,6 +64,8 @@ export default function OnlineVideoContainer({
   const iceSeenRef = useRef(new Set());
 
   const [camError, setCamError] = useState(false);
+  const [localMicMuted, setLocalMicMuted] = useState(false);
+  const localMicMutedRef = useRef(false);
   /** Po pádu WebRTC znovu spustit celý signaling stack (nový offer/answer). */
   const [webrtcSessionKey, setWebrtcSessionKey] = useState(0);
   const webrtcReconnectTimerRef = useRef(null);
@@ -93,6 +107,15 @@ export default function OnlineVideoContainer({
   useEffect(() => {
     webrtcReconnectAttemptsRef.current = 0;
   }, [onlineGameId]);
+
+  useEffect(() => {
+    localMicMutedRef.current = localMicMuted;
+  }, [localMicMuted]);
+
+  useEffect(() => {
+    applyLocalMicToStream(localStreamProp, localMicMuted);
+    applyLocalMicToStream(internalStreamRef.current, localMicMuted);
+  }, [localStreamProp, localMicMuted, webrtcSessionKey]);
 
   useEffect(() => {
     if (!db || !onlineGameId || (myRole !== 'p1' && myRole !== 'p2') || matchCompleted) return undefined;
@@ -164,6 +187,7 @@ export default function OnlineVideoContainer({
       if (cancelled || !local) return;
 
       attachVideo(localVideoRef.current, local);
+      applyLocalMicToStream(local, localMicMutedRef.current);
 
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       pcRef.current = pc;
@@ -409,13 +433,29 @@ export default function OnlineVideoContainer({
             className={`${layout.remote} ${isPostMatch ? 'h-full min-h-0' : ''}`}
           />
 
-          <video
-            ref={localVideoRef}
-            playsInline
-            autoPlay
-            muted
-            className={`${layout.local} ${isPostMatch ? 'h-full min-h-0' : ''}`}
-          />
+          <div className={`relative pointer-events-auto ${layout.local}`}>
+            <video
+              ref={localVideoRef}
+              playsInline
+              autoPlay
+              muted
+              className="h-full min-h-0 w-full object-cover"
+            />
+            {!isPostMatch && !matchCompleted && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLocalMicMuted((m) => !m);
+                }}
+                title={localMicMuted ? t('onlineLocalMicUnmuteTitle') : t('onlineLocalMicMuteTitle')}
+                aria-label={localMicMuted ? t('onlineLocalMicUnmuteTitle') : t('onlineLocalMicMuteTitle')}
+                className="absolute bottom-1 left-1 z-30 rounded-full border border-white/15 bg-black/45 p-1.5 text-white/90 shadow-md backdrop-blur-sm transition-colors hover:bg-black/55 sm:bottom-1.5 sm:left-1.5 sm:p-2"
+              >
+                {localMicMuted ? <MicOff className="h-4 w-4 sm:h-[1.15rem] sm:w-[1.15rem]" /> : <Mic className="h-4 w-4 sm:h-[1.15rem] sm:w-[1.15rem]" />}
+              </button>
+            )}
+          </div>
 
           {layout.showOpponentOverlay && (
             <div className="absolute inset-0 z-[6] flex flex-col justify-between bg-gradient-to-b from-black/45 via-transparent to-black/50 p-2 sm:p-3">

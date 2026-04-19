@@ -50,6 +50,7 @@ export default function OnlineHub({
   onOnlineGameStart,
   resumeHostWaitingSession = null,
   onResumeHostWaitingConsumed,
+  onLobbyChromeChange = null,
 }) {
   const [tab, setTab] = useState('host');
   const [waitingSession, setWaitingSession] = useState(null);
@@ -63,6 +64,8 @@ export default function OnlineHub({
   const [joinBusyId, setJoinBusyId] = useState(null);
   const [formError, setFormError] = useState(null);
   const [guestJoinBusy, setGuestJoinBusy] = useState(false);
+  const [hostWaitingHeader, setHostWaitingHeader] = useState(null);
+  const [guestJoinHeader, setGuestJoinHeader] = useState(null);
 
   const startOnlineGame = useCallback(
     (gameData, gameId, myRole, localStream = null) => {
@@ -100,6 +103,41 @@ export default function OnlineHub({
     );
     return () => unsub();
   }, [tab]);
+
+  useEffect(() => {
+    if (typeof onLobbyChromeChange !== 'function') return undefined;
+    if (waitingSession?.role === 'host') {
+      onLobbyChromeChange({
+        secondary: {
+          kind: 'leave',
+          title: t('onlineLeaveWaitingRoom'),
+          disabled: !!hostWaitingHeader?.leaveDisabled,
+          onClick: () => hostWaitingHeader?.leave?.(),
+        },
+      });
+    } else if (guestJoinDraft) {
+      onLobbyChromeChange({
+        secondary: {
+          kind: 'cancel',
+          title: t('cancel'),
+          disabled: !!guestJoinHeader?.cancelDisabled,
+          onClick: () => guestJoinHeader?.cancel?.(),
+        },
+      });
+    } else {
+      onLobbyChromeChange(null);
+    }
+    return () => {
+      if (typeof onLobbyChromeChange === 'function') onLobbyChromeChange(null);
+    };
+  }, [
+    onLobbyChromeChange,
+    waitingSession,
+    guestJoinDraft,
+    hostWaitingHeader,
+    guestJoinHeader,
+    t,
+  ]);
 
   const defaultHostName = settings?.p1Name || '';
 
@@ -216,6 +254,8 @@ export default function OnlineHub({
       <WaitingRoom
         t={t}
         session={waitingSession}
+        hideFooterLeave
+        onHostWaitingHeaderState={setHostWaitingHeader}
         onLeave={() => {
           clearLastOnlineSession();
           setWaitingSession(null);
@@ -233,6 +273,8 @@ export default function OnlineHub({
         guestName={guestNameInput}
         onGuestNameChange={setGuestNameInput}
         onConfirm={handleGuestJoinConfirm}
+        hideFooterCancel
+        onGuestJoinHeaderState={setGuestJoinHeader}
         onCancel={() => {
           setGuestJoinDraft(null);
           setFormError(null);

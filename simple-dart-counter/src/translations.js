@@ -70,6 +70,13 @@ export const translations = {
     onlineFirstThrowLabel: 'Kdo začíná první leg',
     onlineFirstThrowHost: 'Hostitel (Domácí)',
     onlineFirstThrowGuest: 'Host (Hosté)',
+    onlineSwitchStartingPlayerTitle: 'Změnit začínajícího hráče?',
+    onlineSwitchStartingPlayerBody:
+      'Chystáš se změnit, kdo začne první leg (před prvním hodem). Pokud se domluvíte jinak, soupeř může stejným způsobem (dlouhé podržení na své kartě skóre) volbu zase vrátit.',
+    onlineSwitchStartingPlayerConfirm: 'Změnit',
+    onlineSwitchStarterError: 'Změnu se nepodařilo uložit. Zkus to znovu.',
+    onlineLocalMicMuteTitle: 'Vypnout jen můj mikrofon (video zůstane)',
+    onlineLocalMicUnmuteTitle: 'Zapnout můj mikrofon',
     onlineLegLoserAckTitle: 'Leg ukončen',
     onlineLegLoserAckBody:
       'Protihráč zavřel na {checkout} za {dartsVisit} šipek v tomto návštění. Vítěz v tomto legu odehrál celkem {dartsLeg} šipek. Potvrďte OK — teprve poté začne další leg.',
@@ -514,6 +521,13 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     onlineFirstThrowLabel: 'Who throws first (first leg)',
     onlineFirstThrowHost: 'Host (Home)',
     onlineFirstThrowGuest: 'Guest (Away)',
+    onlineSwitchStartingPlayerTitle: 'Change who starts?',
+    onlineSwitchStartingPlayerBody:
+      'You are about to change who throws first in this leg (before the first throw). If you agree differently, your opponent can switch it back the same way (long-press on their own score card).',
+    onlineSwitchStartingPlayerConfirm: 'Change',
+    onlineSwitchStarterError: 'Could not save the change. Please try again.',
+    onlineLocalMicMuteTitle: 'Mute only my microphone (video stays on)',
+    onlineLocalMicUnmuteTitle: 'Unmute my microphone',
     onlineLegLoserAckTitle: 'Leg finished',
     onlineLegLoserAckBody:
       'Your opponent closed {checkout} in {dartsVisit} darts this visit. The winner threw {dartsLeg} darts in this leg. Tap OK — the next leg starts only after you confirm.',
@@ -941,6 +955,13 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     onlineFirstThrowLabel: 'Kto zaczyna pierwszego lega',
     onlineFirstThrowHost: 'Gospodarz (Dom)',
     onlineFirstThrowGuest: 'Gość (Wyjazd)',
+    onlineSwitchStartingPlayerTitle: 'Zmienić zaczynającego?',
+    onlineSwitchStartingPlayerBody:
+      'Zmienisz, kto rozpoczyna pierwszego lega (przed pierwszym rzutem). Przeciwnik może to cofnąć tak samo (długie przytrzymanie na własnej karcie wyniku).',
+    onlineSwitchStartingPlayerConfirm: 'Zmień',
+    onlineSwitchStarterError: 'Nie udało się zapisać zmiany. Spróbuj ponownie.',
+    onlineLocalMicMuteTitle: 'Wycisz tylko mój mikrofon (wideo zostaje)',
+    onlineLocalMicUnmuteTitle: 'Włącz mój mikrofon',
     onlineLegLoserAckTitle: 'Leg zakończony',
     onlineLegLoserAckBody:
       'Przeciwnik zamknął {checkout} w {dartsVisit} lotkach w tej wizycie. Zwycięzca w tym legu rzucił łącznie {dartsLeg} lotek. Naciśnij OK — następny leg zacznie się dopiero po potwierdzeniu.',
