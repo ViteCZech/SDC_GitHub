@@ -16,7 +16,9 @@ function stopStream(stream) {
 }
 
 /**
- * WebRTC container + dynamické škálování UI podle toho, kdo hází.
+ * WebRTC (signaling pod `onlineGames/{id}/signaling/…` ve Firestore) + dynamické rozvržení podle tahu.
+ * Lokální stream z lobby (`useLobbyMedia` → handoff) se nesmí v této komponentě stopovat — vlastník je App.
+ *
  * @param {{
  *  onlineGameId: string,
  *  myRole: 'p1'|'p2',
@@ -25,6 +27,7 @@ function stopStream(stream) {
  *  lang?: string,
  *  overlay?: { p1Score?: number, p2Score?: number, p1Legs?: number, p2Legs?: number, p1Sets?: number, p2Sets?: number, matchSets?: number },
  *  matchCompleted?: boolean,
+ *  isPostMatch?: boolean,
  * }} props
  */
 export default function OnlineVideoContainer({
@@ -35,9 +38,10 @@ export default function OnlineVideoContainer({
   lang = 'cs',
   overlay = null,
   matchCompleted = false,
+  isPostMatch = false,
 }) {
   const t = (k) => translations[lang]?.[k] || k;
-  const imThrowing = currentPlayer === myRole;
+  const imThrowing = !isPostMatch && currentPlayer === myRole;
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -50,24 +54,40 @@ export default function OnlineVideoContainer({
   const [camError, setCamError] = useState(false);
 
   const layout = useMemo(() => {
+    if (isPostMatch) {
+      return {
+        outer: 'relative z-[12] mb-1.5 w-full max-w-3xl shrink-0 self-center sm:mb-2',
+        stage:
+          'grid h-[min(22vh,168px)] w-full grid-cols-2 gap-2 sm:h-[min(24vh,200px)] sm:gap-3 md:h-[min(26vh,220px)]',
+        remote: 'min-h-0 w-full overflow-hidden rounded-xl border border-slate-600/80 bg-black/40 object-cover shadow-lg',
+        local:
+          'min-h-0 w-full overflow-hidden rounded-xl border border-slate-600/80 bg-black/40 object-cover shadow-lg',
+        showOpponentOverlay: false,
+      };
+    }
     if (imThrowing) {
       return {
-        container: 'h-[110px] sm:h-[130px] md:h-[150px]',
-        remoteVideo: 'opacity-95',
-        localPiP: 'max-h-[52%] max-w-[42%] sm:max-h-[56%] sm:max-w-[38%]',
+        outer: 'relative z-[12] mb-1 w-full shrink-0 sm:mb-2',
+        stage: 'relative mx-auto w-full max-w-md',
+        remote:
+          'relative z-0 aspect-video max-h-[120px] w-full max-w-[min(100%,22rem)] overflow-hidden rounded-2xl border border-slate-700/70 bg-black/50 object-cover shadow-xl sm:max-h-[150px] md:max-h-[170px]',
+        local:
+          'absolute bottom-1.5 right-1.5 z-10 aspect-video w-[34%] max-w-[7.5rem] overflow-hidden rounded-xl border border-slate-600/90 object-cover shadow-lg sm:bottom-2 sm:right-2 sm:max-w-[9rem]',
         showOpponentOverlay: false,
       };
     }
     return {
-      container: 'h-[180px] sm:h-[220px] md:h-[260px]',
-      remoteVideo: 'opacity-100',
-      localPiP: 'max-h-[30%] max-w-[30%] sm:max-h-[30%] sm:max-w-[26%]',
+      outer: 'pointer-events-none absolute inset-0 z-[8] overflow-hidden rounded-xl sm:rounded-2xl',
+      stage: 'absolute inset-0',
+      remote: 'absolute inset-0 z-0 h-full w-full object-cover',
+      local:
+        'absolute bottom-3 right-3 z-10 aspect-video w-[22%] max-w-[8.5rem] overflow-hidden rounded-xl border border-slate-600/90 object-cover shadow-2xl sm:bottom-4 sm:right-4',
       showOpponentOverlay: true,
     };
-  }, [imThrowing]);
+  }, [imThrowing, isPostMatch]);
 
   useEffect(() => {
-    if (!db || !onlineGameId || (myRole !== 'p1' && myRole !== 'p2')) return undefined;
+    if (!db || !onlineGameId || (myRole !== 'p1' && myRole !== 'p2') || matchCompleted) return undefined;
 
     const gid = String(onlineGameId).trim();
     if (!gid) return undefined;
@@ -152,6 +172,15 @@ export default function OnlineVideoContainer({
         if (stream) {
           remoteStreamRef.current = stream;
           attachVideo(remoteVideoRef.current, stream);
+          const rv = remoteVideoRef.current;
+          if (rv) {
+            rv.muted = false;
+            try {
+              rv.volume = 1;
+            } catch (e) {
+              /* ignore */
+            }
+          }
         }
       };
 
@@ -256,9 +285,6 @@ export default function OnlineVideoContainer({
               stopStream(s);
               internalStreamRef.current = null;
             }
-            if (localStreamProp) {
-              stopStream(localStreamProp);
-            }
           }
         })
       );
@@ -275,82 +301,110 @@ export default function OnlineVideoContainer({
         stopStream(s);
         internalStreamRef.current = null;
       }
-      if (localStreamProp) {
-        stopStream(localStreamProp);
-      }
 
       attachVideo(localVideoRef.current, null);
       attachVideo(remoteVideoRef.current, null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- pc lifecycle podle gameId/role/stream
-  }, [onlineGameId, myRole, localStreamProp]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pc lifecycle podle gameId/role/stream/dokončení
+  }, [onlineGameId, myRole, localStreamProp, matchCompleted]);
 
   useEffect(() => {
-    if (matchCompleted) {
-      if (pcRef.current) {
-        try {
-          pcRef.current.close();
-        } catch (e) {
-          /* ignore */
-        }
+    if (!matchCompleted) return;
+    unsubscribersRef.current.forEach((fn) => {
+      try {
+        fn();
+      } catch (e) {
+        /* ignore */
+      }
+    });
+    unsubscribersRef.current = [];
+    iceSeenRef.current = new Set();
+    if (pcRef.current) {
+      try {
+        pcRef.current.close();
+      } catch (e) {
+        /* ignore */
       }
       pcRef.current = null;
     }
+    remoteStreamRef.current = null;
+    const internal = internalStreamRef.current;
+    if (internal) {
+      stopStream(internal);
+      internalStreamRef.current = null;
+    }
+    try {
+      if (localVideoRef.current) localVideoRef.current.srcObject = null;
+      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    } catch (e) {
+      /* ignore */
+    }
   }, [matchCompleted]);
 
+  if (matchCompleted) {
+    return null;
+  }
+
   return (
-    <div className="pointer-events-none w-full select-none">
-      <div
-        className={`relative w-full overflow-hidden rounded-2xl border border-slate-700/70 bg-black/40 shadow-2xl ${layout.container}`}
-      >
-        <video
-          ref={remoteVideoRef}
-          playsInline
-          autoPlay
-          className={`h-full w-full object-cover ${layout.remoteVideo}`}
-        />
+    <div className={`w-full select-none ${imThrowing ? '' : 'pointer-events-none'}`}>
+      <div className={layout.outer}>
+        <div className={layout.stage}>
+          <video
+            ref={remoteVideoRef}
+            playsInline
+            autoPlay
+            muted={false}
+            className={`${layout.remote} ${isPostMatch ? 'h-full min-h-0' : ''}`}
+          />
 
-        <video
-          ref={localVideoRef}
-          playsInline
-          autoPlay
-          muted
-          className={`absolute bottom-2 right-2 rounded-xl border border-slate-600/80 object-cover shadow-lg ${layout.localPiP}`}
-        />
+          <video
+            ref={localVideoRef}
+            playsInline
+            autoPlay
+            muted
+            className={`${layout.local} ${isPostMatch ? 'h-full min-h-0' : ''}`}
+          />
 
-        {layout.showOpponentOverlay && (
-          <div className="absolute inset-0 flex flex-col justify-between p-3">
-            <div className="self-start rounded-xl bg-black/40 backdrop-blur-sm px-3 py-2 border border-white/10">
-              <p className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-amber-200">
-                {t('onlineOpponentThrowing')}
-              </p>
-            </div>
-            {overlay && (
-              <div className="self-end rounded-2xl bg-black/40 backdrop-blur-sm px-3 py-2 border border-white/10 text-right">
-                <div className="text-[10px] sm:text-xs font-black tracking-widest text-slate-200">
-                  {overlay.matchSets && overlay.matchSets > 1 ? (
-                    <>
-                      <span className="text-emerald-300">SETS {overlay.p1Sets || 0} – {overlay.p2Sets || 0}</span>
-                      <span className="mx-2 text-white/20">|</span>
-                      <span className="text-yellow-300">LEGS {overlay.p1Legs || 0} – {overlay.p2Legs || 0}</span>
-                    </>
-                  ) : (
-                    <span className="text-yellow-300">LEGS {overlay.p1Legs || 0} – {overlay.p2Legs || 0}</span>
-                  )}
-                </div>
-                <div className="mt-1 flex items-baseline justify-end gap-3 font-mono font-black text-white">
-                  <span className="text-xl sm:text-2xl">{overlay.p1Score ?? ''}</span>
-                  <span className="text-white/30">:</span>
-                  <span className="text-xl sm:text-2xl">{overlay.p2Score ?? ''}</span>
-                </div>
+          {layout.showOpponentOverlay && (
+            <div className="absolute inset-0 z-[6] flex flex-col justify-between bg-gradient-to-b from-black/45 via-transparent to-black/50 p-2 sm:p-3">
+              <div className="self-start rounded-xl border border-white/10 bg-black/40 px-2.5 py-1.5 backdrop-blur-md sm:px-3 sm:py-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-200 sm:text-xs">
+                  {t('onlineOpponentThrowing')}
+                </p>
               </div>
-            )}
-          </div>
-        )}
+              {overlay && (
+                <div className="self-end rounded-2xl border border-white/10 bg-black/40 px-2.5 py-1.5 text-right backdrop-blur-md sm:px-3 sm:py-2">
+                  <div className="text-[10px] font-black tracking-widest text-slate-200 sm:text-xs">
+                    {overlay.matchSets && overlay.matchSets > 1 ? (
+                      <>
+                        <span className="text-emerald-300">
+                          SETS {overlay.p1Sets || 0} – {overlay.p2Sets || 0}
+                        </span>
+                        <span className="mx-2 text-white/20">|</span>
+                        <span className="text-yellow-300">
+                          LEGS {overlay.p1Legs || 0} – {overlay.p2Legs || 0}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-yellow-300">
+                        LEGS {overlay.p1Legs || 0} – {overlay.p2Legs || 0}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 flex items-baseline justify-end gap-2 font-mono font-black text-white sm:gap-3">
+                    <span className="text-lg sm:text-2xl">{overlay.p1Score ?? ''}</span>
+                    <span className="text-white/30">:</span>
+                    <span className="text-lg sm:text-2xl">{overlay.p2Score ?? ''}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {camError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 p-2">
-            <p className="text-center text-[10px] sm:text-xs font-bold text-amber-200">
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 p-2">
+            <p className="text-center text-[10px] font-bold text-amber-200 sm:text-xs">
               {t('onlineVideoCamDenied')}
             </p>
           </div>

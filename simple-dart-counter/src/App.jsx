@@ -977,6 +977,11 @@ function AppMain({ lang, setLang }) {
   const [myOnlineRole, setMyOnlineRole] = useState(null);
   /** Lokální kamera/mikrofon vybrané v online lobby (přenáší se do WebRTC). */
   const [onlineLocalStream, setOnlineLocalStream] = useState(null);
+  const [tournamentMatchContext, setTournamentMatchContext] = useState(null);
+  const tournamentMatchContextRef = useRef(null);
+  useEffect(() => {
+    tournamentMatchContextRef.current = tournamentMatchContext;
+  }, [tournamentMatchContext]);
   /** Zabrání dvojímu zápisu historie při `status: completed` + lokálním dokončení. */
   const processedOnlineMatchHistoryRef = React.useRef(new Set());
   const t = (k) => translations[lang]?.[k] || k;
@@ -997,6 +1002,9 @@ function AppMain({ lang, setLang }) {
     });
     setOnlineGameId(null);
     setMyOnlineRole(null);
+    if (!tournamentMatchContextRef.current) {
+      setAppState('home');
+    }
   }, []);
 
   const handleOnlineGameStart = React.useCallback((gameData, gameId, role, localStream = null) => {
@@ -1063,11 +1071,6 @@ function AppMain({ lang, setLang }) {
   const [customSetsValue, setCustomSetsValue] = useState(1);
   const [customLegsValue, setCustomLegsValue] = useState(3);
   const [matchFinishRestoreState, setMatchFinishRestoreState] = useState(null);
-  const [tournamentMatchContext, setTournamentMatchContext] = useState(null);
-  const tournamentMatchContextRef = useRef(null);
-  useEffect(() => {
-    tournamentMatchContextRef.current = tournamentMatchContext;
-  }, [tournamentMatchContext]);
 
   // Keep screen awake on scoring/tablet/admin-bracket screens (when supported).
   useEffect(() => {

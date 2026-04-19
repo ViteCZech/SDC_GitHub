@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, Ban, CheckCircle, Delete, Mic, MicOff, Trophy, Undo2, X } from 'lucide-react';
 import { translations } from '../translations';
 import {
@@ -8,6 +8,7 @@ import {
   updateGameState,
 } from '../services/onlineGamesService';
 import OnlineVideoContainer from './online/OnlineVideoContainer';
+import PostMatchView from './online/PostMatchView';
 import {
   SPEECH_LANG_MAP,
   normalizeSpeechCommand,
@@ -275,7 +276,12 @@ export default function GameX01({
   const onlineMatchTransitionRef = useRef(null);
   const [pendingOnlineMatchRecord, setPendingOnlineMatchRecord] = useState(null);
   const pendingOnlineMatchRecordRef = useRef(null);
-  const onlineMatchExitAppliedRef = useRef(false);
+  /** Firestore `onlineGames/{id}.status === 'completed'` — ukončení WebRTC v náhledu. */
+  const [onlineFirestoreSessionCompleted, setOnlineFirestoreSessionCompleted] = useState(false);
+  /** Po potvrzení poraženého — statistiky + odpočet před `completeOnlineGameSession`. */
+  const [postMatchStatsActive, setPostMatchStatsActive] = useState(false);
+  const postMatchStatsActiveRef = useRef(false);
+  const onlineSessionEndOnceRef = useRef(false);
 
   const [highScoreAnimation, setHighScoreAnimation] = useState(null);
   const [longPressIdx, setLongPressIdx] = useState(null);
@@ -306,12 +312,13 @@ export default function GameX01({
 
   const isOnlineInputLocked = () =>
     Boolean(
-      onlineGameId &&
-      settings.gameType === 'x01' &&
-      myOnlineRole &&
-      (onlineMatchTransition ||
-        gameState.matchWinner ||
-        (gameState.currentPlayer !== myOnlineRole && !gameState.winner && !gameState.matchWinner))
+      postMatchStatsActiveRef.current ||
+      (onlineGameId &&
+        settings.gameType === 'x01' &&
+        myOnlineRole &&
+        (onlineMatchTransition ||
+          gameState.matchWinner ||
+          (gameState.currentPlayer !== myOnlineRole && !gameState.winner && !gameState.matchWinner)))
     );
 
     useEffect(() => {
@@ -341,6 +348,10 @@ export default function GameX01({
   }, [pendingOnlineMatchRecord]);
 
   useEffect(() => {
+    postMatchStatsActiveRef.current = postMatchStatsActive;
+  }, [postMatchStatsActive]);
+
+  useEffect(() => {
     didSeedOnlineRef.current = false;
   }, [onlineGameId]);
 
@@ -348,7 +359,10 @@ export default function GameX01({
     setOnlineLegTransition(null);
     setOnlineMatchTransition(null);
     setPendingOnlineMatchRecord(null);
-    onlineMatchExitAppliedRef.current = false;
+    setOnlineFirestoreSessionCompleted(false);
+    setPostMatchStatsActive(false);
+    postMatchStatsActiveRef.current = false;
+    onlineSessionEndOnceRef.current = false;
   }, [onlineGameId]);
 
   useEffect(() => {
@@ -375,16 +389,20 @@ export default function GameX01({
       }
       const writeId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
       lastPushedWriteIdRef.current = writeId;
+      const payload = {
+        kind: 'x01',
+        writeId,
+        gameState: gs,
+        setScores: Array.isArray(ss) ? ss : [],
+        legTransition,
+        matchTransition,
+        pendingMatchRecord,
+      };
+      if (postMatchStatsActiveRef.current) {
+        payload.postMatchStatsActive = true;
+      }
       try {
-        await updateGameState(onlineGameId, {
-          kind: 'x01',
-          writeId,
-          gameState: gs,
-          setScores: Array.isArray(ss) ? ss : [],
-          legTransition,
-          matchTransition,
-          pendingMatchRecord,
-        });
+        await updateGameState(onlineGameId, payload);
       } catch (e) {
         console.warn('updateGameState', e);
       }
@@ -401,6 +419,10 @@ export default function GameX01({
       setOnlineLegTransition(live.legTransition ?? null);
       setOnlineMatchTransition(live.matchTransition ?? null);
       setPendingOnlineMatchRecord(live.pendingMatchRecord ?? null);
+      if (live.postMatchStatsActive) {
+        setPostMatchStatsActive(true);
+        setOnlineMatchTransition(null);
+      }
       setCurrentInput('');
       setFinishData(null);
       setEditingMove(null);
@@ -418,15 +440,7 @@ export default function GameX01({
     if (!onlineGameId || settings.gameType !== 'x01') return undefined;
     const unsub = subscribeOnlineGame(onlineGameId, (doc) => {
       if (!doc || doc.status !== 'completed') return;
-      if (onlineMatchExitAppliedRef.current) return;
-      onlineMatchExitAppliedRef.current = true;
-      const rec = doc.pendingMatchRecordForHistory;
-      if (rec && typeof onMatchComplete === 'function') {
-        void onMatchComplete(rec, null);
-      }
-      if (typeof onOnlineSessionEnded === 'function') {
-        onOnlineSessionEnded();
-      }
+      setOnlineFirestoreSessionCompleted(true);
     });
     return () => {
       try {
@@ -435,7 +449,7 @@ export default function GameX01({
         /* ignore */
       }
     };
-  }, [onlineGameId, settings.gameType, onMatchComplete, onOnlineSessionEnded]);
+  }, [onlineGameId, settings.gameType]);
 
   useEffect(() => {
     if (!onlineGameId || settings.gameType !== 'x01' || myOnlineRole !== 'p1') return;
@@ -906,17 +920,64 @@ export default function GameX01({
     void pushOnlineX01LiveRef.current(next, setScoresRef.current, { legTransition: null });
   };
 
-  const handleOnlineMatchComplete = async () => {
+  const handleOnlineMatchComplete = useCallback(async () => {
     if (!onlineGameId || settings.gameType !== 'x01') return;
-    const mt = onlineMatchTransitionRef.current;
-    if (!mt || mt.awaitingAckFrom !== myOnlineRole) return;
+    if (onlineSessionEndOnceRef.current) return;
+    if (!postMatchStatsActiveRef.current) return;
     const rec = pendingOnlineMatchRecordRef.current;
+    onlineSessionEndOnceRef.current = true;
     try {
       await completeOnlineGameSession(onlineGameId, rec);
     } catch (e) {
       console.warn('completeOnlineGameSession', e);
+      onlineSessionEndOnceRef.current = false;
+      return;
     }
-  };
+    try {
+      if (rec && typeof onMatchComplete === 'function') {
+        await onMatchComplete(rec, null);
+      }
+    } catch (e) {
+      console.warn('onMatchComplete', e);
+    }
+    if (typeof onOnlineSessionEnded === 'function') {
+      onOnlineSessionEnded();
+    }
+  }, [onlineGameId, settings.gameType, onMatchComplete, onOnlineSessionEnded]);
+
+  const beginOnlinePostMatchStats = useCallback(async () => {
+    if (!onlineGameId || settings.gameType !== 'x01') return;
+    const mt = onlineMatchTransitionRef.current;
+    if (!mt || mt.awaitingAckFrom !== myOnlineRole) return;
+    const rec = pendingOnlineMatchRecordRef.current;
+    if (!rec) return;
+    const gs = gameStateRef.current;
+    const ss = setScoresRef.current;
+    postMatchStatsActiveRef.current = true;
+    setPostMatchStatsActive(true);
+    onlineMatchTransitionRef.current = null;
+    setOnlineMatchTransition(null);
+    const writeId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    lastPushedWriteIdRef.current = writeId;
+    try {
+      await updateGameState(onlineGameId, {
+        kind: 'x01',
+        writeId,
+        gameState: gs,
+        setScores: Array.isArray(ss) ? ss : [],
+        legTransition: null,
+        matchTransition: null,
+        pendingMatchRecord: rec,
+        postMatchStatsActive: true,
+      });
+    } catch (e) {
+      console.warn('beginOnlinePostMatchStats', e);
+      postMatchStatsActiveRef.current = false;
+      setPostMatchStatsActive(false);
+      onlineMatchTransitionRef.current = mt;
+      setOnlineMatchTransition(mt);
+    }
+  }, [onlineGameId, settings.gameType, myOnlineRole]);
   const acknowledgeOnlineLegEndRef = useRef(() => {});
   acknowledgeOnlineLegEndRef.current = acknowledgeOnlineLegEnd;
 
@@ -924,7 +985,9 @@ export default function GameX01({
       if (
         onlineGameId &&
         settings.gameType === 'x01' &&
-        (onlineLegTransitionRef.current || onlineMatchTransitionRef.current)
+        (onlineLegTransitionRef.current ||
+          onlineMatchTransitionRef.current ||
+          postMatchStatsActiveRef.current)
       ) {
         return;
       }
@@ -955,12 +1018,13 @@ export default function GameX01({
     const gs = gameStateRef.current;
     const voiceInputLocked = () =>
       Boolean(
-        onlineGameId &&
-        settings.gameType === 'x01' &&
-        myOnlineRole &&
-        (onlineMatchTransitionRef.current ||
-          gs.matchWinner ||
-          (gs.currentPlayer !== myOnlineRole && !gs.winner && !gs.matchWinner))
+        postMatchStatsActiveRef.current ||
+        (onlineGameId &&
+          settings.gameType === 'x01' &&
+          myOnlineRole &&
+          (onlineMatchTransitionRef.current ||
+            gs.matchWinner ||
+            (gs.currentPlayer !== myOnlineRole && !gs.winner && !gs.matchWinner)))
       );
     const tMap = translations[lang];
     const legacyUndo = Array.isArray(tMap?.cmdUndo) ? tMap.cmdUndo : [];
@@ -1155,6 +1219,7 @@ export default function GameX01({
     Boolean(
       onlineGameId &&
         settings.gameType === 'x01' &&
+        !postMatchStatsActive &&
         onlineMatchTransition &&
         myOnlineRole === onlineMatchTransition.awaitingAckFrom
     );
@@ -1232,10 +1297,59 @@ export default function GameX01({
 
   const onlineInputLocked = isOnlineInputLocked();
 
+  const onlineOpponentVideoBackdrop =
+    Boolean(onlineGameId) &&
+    settings.gameType === 'x01' &&
+    Boolean(myOnlineRole) &&
+    !postMatchStatsActive &&
+    gameState.currentPlayer !== myOnlineRole &&
+    !gameState.winner &&
+    !gameState.matchWinner;
+
+  const onlineVideoMatchDone = onlineFirestoreSessionCompleted;
+
+  const mainLayoutClass = postMatchStatsActive
+    ? 'relative flex flex-1 min-h-0 flex-col gap-2 overflow-hidden p-1 sm:p-2'
+    : `relative flex-1 min-h-0 overflow-hidden p-1 sm:p-2 grid gap-1 sm:gap-2 ${
+        isLandscape ? 'grid-cols-[1fr_1.5fr_1fr]' : 'flex flex-col'
+      }`;
+
   return (
     <>
-      <main className={`relative flex-1 overflow-hidden p-1 sm:p-2 grid gap-1 sm:gap-2 ${isLandscape ? 'grid-cols-[1fr_1.5fr_1fr]' : 'flex flex-col'}`}>
-        {highScoreAnimation !== null && (
+      <main className={mainLayoutClass}>
+        {onlineGameId && settings.gameType === 'x01' && myOnlineRole && (
+          <div className={`shrink-0 ${!postMatchStatsActive && isLandscape ? 'col-span-3' : ''}`}>
+            <OnlineVideoContainer
+              onlineGameId={onlineGameId}
+              myRole={myOnlineRole}
+              currentPlayer={gameState.currentPlayer}
+              lang={lang}
+              localStream={onlineLocalStream}
+              overlay={{
+                p1Score: gameState.p1Score,
+                p2Score: gameState.p2Score,
+                p1Legs: gameState.p1Legs,
+                p2Legs: gameState.p2Legs,
+                p1Sets: gameState.p1Sets || 0,
+                p2Sets: gameState.p2Sets || 0,
+                matchSets: settings.matchSets || 1,
+              }}
+              matchCompleted={onlineVideoMatchDone}
+              isPostMatch={postMatchStatsActive}
+            />
+          </div>
+        )}
+        {postMatchStatsActive && pendingOnlineMatchRecord && (
+          <PostMatchView
+            lang={lang}
+            record={pendingOnlineMatchRecord}
+            startScore={settings.startScore}
+            onLeaveSession={handleOnlineMatchComplete}
+            p1Name={getDisplayName(settings.p1Name, true, false)}
+            p2Name={getDisplayName(settings.p2Name, false, settings.isBot)}
+          />
+        )}
+        {!postMatchStatsActive && highScoreAnimation !== null && (
           <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50"
             aria-hidden
@@ -1248,7 +1362,13 @@ export default function GameX01({
             </span>
           </div>
         )}
-        <div className={`w-full flex items-center justify-center rounded-lg border border-slate-800 bg-slate-900/70 py-1 px-2 ${isLandscape ? 'col-span-3' : ''}`}>
+        {!postMatchStatsActive && (
+          <>
+        <div
+          className={`relative z-30 w-full flex items-center justify-center rounded-lg border border-slate-800 py-1 px-2 ${isLandscape ? 'col-span-3' : ''} ${
+            onlineOpponentVideoBackdrop ? 'bg-slate-950/80 backdrop-blur-sm' : 'bg-slate-900/70'
+          }`}
+        >
             {(settings.matchSets || 1) === 1 ? (
                 <div className="text-sm sm:text-base font-black text-yellow-400 tracking-wider">LEGS {gameState.p1Legs} - {gameState.p2Legs}</div>
             ) : (
@@ -1261,7 +1381,9 @@ export default function GameX01({
         </div>
         
         {/* Score Cards */}
-        <div className={`flex flex-col gap-1 sm:gap-2 w-full ${isLandscape ? 'h-full min-h-0' : 'h-auto shrink-0'}`}>
+        <div
+          className={`relative z-30 flex flex-col gap-1 sm:gap-2 w-full ${isLandscape ? 'h-full min-h-0' : 'h-auto shrink-0'}`}
+        >
             <div className={`flex ${isLandscape ? 'flex-col min-h-0' : 'flex-row w-full'} flex-1 gap-1.5 h-full`}>
                 {['p1', 'p2'].map(pKey => {
                     const act = gameState.currentPlayer === pKey && !gameState.winner; 
@@ -1270,7 +1392,19 @@ export default function GameX01({
                     const displayName = getDisplayName(isP1 ? settings.p1Name : settings.p2Name, isP1, isBot);
 
                     return (
-                        <div key={pKey} className={`flex-1 relative p-2 sm:p-4 rounded-xl border transition-all duration-300 flex flex-col items-center justify-center ${act ? `bg-slate-800 ${isP1?'border-emerald-500':'border-purple-500'} shadow-xl` : 'bg-slate-900 border-slate-800 opacity-90'}`} onClick={() => handleScoreClick(pKey)}>
+                        <div
+                          key={pKey}
+                          className={`flex-1 relative p-2 sm:p-4 rounded-xl border transition-all duration-300 flex flex-col items-center justify-center ${
+                            act
+                              ? `${onlineOpponentVideoBackdrop ? 'bg-slate-900/95 backdrop-blur-sm' : 'bg-slate-800'} ${
+                                  isP1 ? 'border-emerald-500' : 'border-purple-500'
+                                } shadow-xl`
+                              : `border-slate-800 opacity-90 ${
+                                  onlineOpponentVideoBackdrop ? 'bg-slate-950/85 backdrop-blur-sm' : 'bg-slate-900'
+                                }`
+                          }`}
+                          onClick={() => handleScoreClick(pKey)}
+                        >
                         {act && <div className={`absolute -top-1 sm:-top-1.5 ${isP1?'bg-emerald-500 border-emerald-400':'bg-purple-600 border-purple-400'} text-slate-900 text-[9px] font-bold px-3 py-0.5 rounded-full z-10 border leading-none`}>{translations[lang]?.serving || 'Hází'}</div>}
                         {gameState.startingPlayer === pKey && <div className="absolute top-2 left-2 w-1.5 h-1.5 rounded-full bg-slate-500"></div>}
                         <div className="flex items-center justify-between w-full mb-1">
@@ -1297,7 +1431,7 @@ export default function GameX01({
         </div>
 
         {/* Střední část */}
-        <div className="flex flex-col justify-center flex-1 h-full min-h-0 gap-1">
+        <div className="relative z-30 flex flex-col justify-center flex-1 h-full min-h-0 gap-1">
             {!gameState.winner ? (
                 <div
                   className={`relative flex flex-col gap-1 shrink-0 transition-opacity w-full h-full justify-center ${
@@ -1449,12 +1583,18 @@ export default function GameX01({
         </div>
 
         {/* Pravá část Historie */}
-        <div className={`bg-slate-900/40 rounded-xl border border-slate-800 overflow-hidden flex flex-col ${isLandscape ? 'h-full' : 'shrink-0 h-[22vh] sm:h-48'}`}>
+        <div
+          className={`relative z-30 rounded-xl border border-slate-800 overflow-hidden flex flex-col ${isLandscape ? 'h-full' : 'shrink-0 h-[22vh] sm:h-48'} ${
+            onlineOpponentVideoBackdrop ? 'bg-slate-950/80 backdrop-blur-sm' : 'bg-slate-900/40'
+          }`}
+        >
             <div className="bg-slate-800/80 p-1.5 border-b border-slate-700 text-[9px] font-black uppercase text-center text-slate-500 tracking-widest hidden landscape:block">Historie náhozů</div>
             <div className="flex-1 overflow-hidden">
                 {renderUnifiedHistory()}
             </div>
         </div>
+          </>
+        )}
       </main>
 
       {showOnlineLegAckModal && onlineLegTransition && (
@@ -1524,33 +1664,12 @@ export default function GameX01({
             </p>
             <button
               type="button"
-              onClick={() => void handleOnlineMatchComplete()}
+              onClick={() => void beginOnlinePostMatchStats()}
               className="mt-6 w-full rounded-xl border border-rose-600/60 bg-rose-600 py-3 text-center text-base font-black uppercase tracking-widest text-white shadow-lg transition-colors hover:bg-rose-500 active:scale-[0.99]"
             >
               {t('onlineMatchEndButton')}
             </button>
           </div>
-        </div>
-      )}
-      {onlineGameId && settings.gameType === 'x01' && myOnlineRole && (
-        <div className="pointer-events-none fixed inset-x-0 top-[calc(3.25rem+0.25rem)] z-[34] mx-auto w-[min(96vw,900px)] px-2 sm:top-[calc(3.5rem+0.5rem)] sm:px-3">
-          <OnlineVideoContainer
-            onlineGameId={onlineGameId}
-            myRole={myOnlineRole}
-            currentPlayer={gameState.currentPlayer}
-            lang={lang}
-            localStream={onlineLocalStream}
-            overlay={{
-              p1Score: gameState.p1Score,
-              p2Score: gameState.p2Score,
-              p1Legs: gameState.p1Legs,
-              p2Legs: gameState.p2Legs,
-              p1Sets: gameState.p1Sets || 0,
-              p2Sets: gameState.p2Sets || 0,
-              matchSets: settings.matchSets || 1,
-            }}
-            matchCompleted={Boolean(onlineMatchExitAppliedRef.current)}
-          />
         </div>
       )}
       {finishData && <FinishDartsSelector points={finishData.points} minDarts={finishData.minD} onConfirm={(d) => { processTurn(finishData.points, d); setFinishData(null); }} onCancel={() => setFinishData(null)} lang={lang} player={gameState.currentPlayer} />}
