@@ -13,7 +13,7 @@ import {
   mergeAdminGroupMatchesFromTabletCloud,
   mergeAdminBracketFromTabletCloud,
 } from './services/tournamentSync';
-import { abandonOnlineGameSession, getOnlineGameById } from './services/onlineGamesService';
+import { cancelOnlineGame, getOnlineGameById } from './services/onlineGamesService';
 import {
   readLastOnlineSession,
   clearLastOnlineSession,
@@ -1330,9 +1330,9 @@ function AppMain({ lang, setLang }) {
       t('onlineExitMatchBody'),
       async () => {
         try {
-          await abandonOnlineGameSession(onlineGameId, myOnlineRole);
+          await cancelOnlineGame(onlineGameId);
         } catch (e) {
-          console.warn('abandonOnlineGameSession', e);
+          console.warn('cancelOnlineGame', e);
           showNotification(t('onlineExitMatchError'), 'error');
         } finally {
           handleOnlineSessionEnded();

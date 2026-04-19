@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   deleteField,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -112,6 +113,7 @@ export async function createOnlineGame(opts) {
     outMode: gameType === 'x01' ? outMode : null,
     startPlayer,
     createdAt: serverTimestamp(),
+    heartbeatHost: serverTimestamp(),
     pin,
   };
 
@@ -147,7 +149,15 @@ export function subscribePublicWaitingGames(onList, onError) {
   return onSnapshot(
     q,
     (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const now = Date.now();
+      const list = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((g) => {
+          // Lobby filter: nezobrazovat waiting hry, jejichž host se 30s neozval.
+          const hb = g?.heartbeatHost?.toMillis?.();
+          if (typeof hb !== 'number' || Number.isNaN(hb)) return false;
+          return now - hb <= 30000;
+        });
       list.sort((a, b) => {
         const ta = a.createdAt?.toMillis?.() ?? 0;
         const tb = b.createdAt?.toMillis?.() ?? 0;
@@ -352,6 +362,32 @@ export async function abandonOnlineGameSession(gameId, myRole) {
     status: 'abandoned',
     abandonedBy,
     abandonedAt: serverTimestamp(),
+    liveGameState: deleteField(),
+    liveStateUpdatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Úmyslný úklid při opuštění online režimu.
+ * - waiting: smaže dokument (nezůstává viset v lobby)
+ * - playing / cokoliv jiného: označí `status: obsolete` (neplatný zápas)
+ */
+export async function cancelOnlineGame(gameId) {
+  if (!db) throw new Error('no_db');
+  await ensureAnonymousAuth();
+  const id = String(gameId || '').trim();
+  if (!id) throw new Error('no_db');
+  const ref = doc(db, ONLINE_GAMES_COLLECTION, id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const prev = snap.data();
+  if (prev?.status === 'waiting') {
+    await deleteDoc(ref);
+    return;
+  }
+  await updateDoc(ref, {
+    status: 'obsolete',
+    obsoleteAt: serverTimestamp(),
     liveGameState: deleteField(),
     liveStateUpdatedAt: serverTimestamp(),
   });

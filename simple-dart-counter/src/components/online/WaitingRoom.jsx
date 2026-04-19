@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { VideoOff } from 'lucide-react';
-import { subscribeOnlineGame } from '../../services/onlineGamesService';
+import { cancelOnlineGame, subscribeOnlineGame, updateHeartbeat } from '../../services/onlineGamesService';
 import { useLobbyMedia } from '../../hooks/useLobbyMedia';
 
 const fieldLabel = 'block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5';
@@ -20,6 +20,7 @@ export default function WaitingRoom({
   onHostWaitingHeaderState,
 }) {
   const pairHandledRef = useRef(false);
+  const lastStatusRef = useRef(null);
   const [pairBanner, setPairBanner] = useState(null);
 
   const isHost = session?.role === 'host';
@@ -55,6 +56,7 @@ export default function WaitingRoom({
       session.gameId,
       (docData) => {
         if (cancelled || pairHandledRef.current || !docData) return;
+        lastStatusRef.current = docData.status ?? null;
         if (docData.status === 'playing' && String(docData.guestName || '').trim()) {
           pairHandledRef.current = true;
           const name = String(docData.guestName).trim();
@@ -79,6 +81,29 @@ export default function WaitingRoom({
       }
     };
   }, [isHost, session?.gameId, onOnlineGameStart, handoffStream]);
+
+  // Heartbeat hostitele i ve waiting (aby lobby mohla filtrovat mrtvé hry).
+  useEffect(() => {
+    if (!isHost || !session?.gameId) return undefined;
+    const tick = () => {
+      void updateHeartbeat(session.gameId, 'p1').catch((e) => console.warn('updateHeartbeat(waiting)', e));
+    };
+    tick();
+    const id = window.setInterval(tick, 5000);
+    return () => window.clearInterval(id);
+  }, [isHost, session?.gameId]);
+
+  // Cleanup on unmount: host opustí waiting room → hru zneplatnit (a/nebo smazat).
+  useEffect(() => {
+    if (!isHost || !session?.gameId) return undefined;
+    const gid = session.gameId;
+    return () => {
+      const st = lastStatusRef.current;
+      if (st === 'waiting') {
+        void cancelOnlineGame(gid).catch((e) => console.warn('cancelOnlineGame(unmount)', e));
+      }
+    };
+  }, [isHost, session?.gameId]);
 
   useEffect(() => {
     if (!onHostWaitingHeaderState) return undefined;

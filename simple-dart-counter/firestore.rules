@@ -96,8 +96,22 @@ service cloud.firestore {
         );
     }
 
+    function obsoleteOnlineSession() {
+      return diffKeys().hasOnly([
+            'status',
+            'obsoleteAt',
+            'liveGameState',
+            'liveStateUpdatedAt',
+          ])
+        && (resource.data.status == 'waiting' || resource.data.status == 'playing')
+        && request.resource.data.status == 'obsolete'
+        && isParticipantOnGameResource();
+    }
+
     match /onlineGames/{gameId} {
-      allow read: if request.auth != null;
+      // Lobby může číst jen waiting hry; ostatní stavy jen účastník.
+      allow read: if request.auth != null
+        && (resource.data.status == 'waiting' || isParticipantOnGameResource());
 
       allow create: if request.auth != null
         && request.resource.data.keys().hasAny(['hostUid'])
@@ -113,9 +127,13 @@ service cloud.firestore {
             || updateLiveGameState()
             || updateStartPlayerField()
             || completeOnlineSession()
-            || abandonOnlineSession());
+            || abandonOnlineSession()
+            || obsoleteOnlineSession());
 
-      allow delete: if false;
+      // Cleanup waiting her při odchodu hostitele.
+      allow delete: if request.auth != null
+        && resource.data.status == 'waiting'
+        && request.auth.uid == resource.data.hostUid;
 
       match /webrtc/{document=**} {
         allow read, write: if isOnlineGameParticipantByParent(gameId);

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, Ban, CheckCircle, Delete, Mic, MicOff, Trophy, Undo2, X } from 'lucide-react';
 import { translations } from '../translations';
 import {
+  cancelOnlineGame,
   completeOnlineGameSession,
   subscribeOnlineGame,
   subscribeToGameState,
@@ -320,6 +321,9 @@ export default function GameX01({
   const setScoresRef = useRef(setScores);
   const opponentHeartbeatMsRef = useRef(null);
   const [isOpponentOffline, setIsOpponentOffline] = useState(false);
+  const [showObsoleteExit, setShowObsoleteExit] = useState(false);
+  const onlineDocStatusRef = useRef(null);
+  const onlineDocStatusStateRef = useRef(null);
   const lastDocStartPlayerRef = useRef(null);
   const onlineStarterPressRef = useRef({ timer: null, armed: false });
   const blockStarterScoreClickRef = useRef(false);
@@ -382,6 +386,9 @@ export default function GameX01({
     peerAbandonNotifyRef.current = false;
     opponentHeartbeatMsRef.current = null;
     setIsOpponentOffline(false);
+    setShowObsoleteExit(false);
+    onlineDocStatusRef.current = null;
+    onlineDocStatusStateRef.current = null;
   }, [onlineGameId]);
 
   useEffect(() => {
@@ -459,6 +466,8 @@ export default function GameX01({
     if (!onlineGameId || settings.gameType !== 'x01') return undefined;
     const unsub = subscribeOnlineGame(onlineGameId, (doc) => {
       if (!doc) return;
+      onlineDocStatusRef.current = doc.status ?? null;
+      onlineDocStatusStateRef.current = doc.status ?? null;
       if (doc.startPlayer === 'p1' || doc.startPlayer === 'p2') {
         const sp = doc.startPlayer === 'p2' ? 'p2' : 'p1';
         if (lastDocStartPlayerRef.current !== sp) {
@@ -470,6 +479,11 @@ export default function GameX01({
       }
       if (doc.status === 'completed') {
         setOnlineFirestoreSessionCompleted(true);
+      }
+      if (doc.status === 'obsolete') {
+        setOnlineFirestoreSessionCompleted(true);
+        opponentHeartbeatMsRef.current = null;
+        setIsOpponentOffline(false);
       }
       if (
         doc.status === 'abandoned' &&
@@ -525,6 +539,29 @@ export default function GameX01({
     }, 1000);
     return () => clearInterval(id);
   }, [onlineGameId, settings.gameType, myOnlineRole]);
+
+  // Watchdog: soupeř offline déle než 2 min → nabídnout ukončení neplatného zápasu.
+  useEffect(() => {
+    if (!onlineGameId || settings.gameType !== 'x01' || !myOnlineRole) return undefined;
+    if (onlineFirestoreSessionCompleted) return undefined;
+    const isPlaying = onlineDocStatusRef.current === 'playing';
+    if (!isPlaying) {
+      setShowObsoleteExit(false);
+      return undefined;
+    }
+    if (!isOpponentOffline) {
+      setShowObsoleteExit(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      // stále platí?
+      const stillPlaying = onlineDocStatusRef.current === 'playing';
+      if (stillPlaying && isOpponentOffline) {
+        setShowObsoleteExit(true);
+      }
+    }, 120000);
+    return () => window.clearTimeout(timer);
+  }, [onlineGameId, settings.gameType, myOnlineRole, isOpponentOffline, onlineFirestoreSessionCompleted]);
 
   useEffect(() => {
     if (!onlineGameId || settings.gameType !== 'x01' || myOnlineRole !== 'p1') return;
@@ -1104,7 +1141,10 @@ export default function GameX01({
       return;
     }
     try {
-      if (rec && typeof onMatchComplete === 'function') {
+      // Obsolete / neplatné zápasy nikdy nezapisujeme do historie/statistik.
+      if (onlineDocStatusStateRef.current === 'obsolete') {
+        // skip
+      } else if (rec && typeof onMatchComplete === 'function') {
         await onMatchComplete(rec, null);
       }
     } catch (e) {
@@ -1784,9 +1824,32 @@ export default function GameX01({
                   role="status"
                   aria-live="polite"
                 >
-                  <p className="text-center text-xs font-black uppercase tracking-widest text-amber-200 sm:text-sm">
-                    {t('onlineOpponentOffline')}
-                  </p>
+                  <div className="flex flex-col items-center justify-center gap-3 text-center">
+                    <p className="text-center text-xs font-black uppercase tracking-widest text-amber-200 sm:text-sm">
+                      {t('onlineOpponentOffline')}
+                    </p>
+                    {showObsoleteExit && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!onlineGameId) return;
+                          try {
+                            await cancelOnlineGame(onlineGameId);
+                          } catch (e) {
+                            console.warn('cancelOnlineGame(obsolete)', e);
+                            return;
+                          }
+                          setOnlineFirestoreSessionCompleted(true);
+                          if (typeof onOnlineSessionEnded === 'function') {
+                            onOnlineSessionEnded();
+                          }
+                        }}
+                        className="rounded-xl border border-amber-500/50 bg-amber-500 px-4 py-2 text-[11px] font-black uppercase tracking-widest text-slate-950 shadow-lg hover:bg-amber-400 active:scale-[0.99]"
+                      >
+                        Ukončit neplatný zápas
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
           </div>

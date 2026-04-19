@@ -6,6 +6,7 @@ import WaitingRoom from './online/WaitingRoom';
 import GuestJoinPanel from './online/GuestJoinPanel';
 import {
   createOnlineGame,
+  cancelOnlineGame,
   findWaitingGameByPin,
   joinOnlineGame,
   ONLINE_AUTH_FAILED,
@@ -257,8 +258,12 @@ export default function OnlineHub({
         hideFooterLeave
         onHostWaitingHeaderState={setHostWaitingHeader}
         onLeave={() => {
+          const gid = waitingSession?.gameId;
           clearLastOnlineSession();
           setWaitingSession(null);
+          if (gid) {
+            void cancelOnlineGame(gid).catch((e) => console.warn('cancelOnlineGame', e));
+          }
         }}
         onOnlineGameStart={(doc, gid, localStream) => startOnlineGame(doc, gid, 'p1', localStream)}
       />
