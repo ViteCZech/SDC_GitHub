@@ -27,7 +27,7 @@ export default function OnlineVideo({ gameId, myRole, currentPlayer, localStream
     if (!gid) return undefined;
 
     const signalRef = doc(db, ONLINE_GAMES_COLLECTION, gid, 'webrtc', 'signal');
-    const iceCol = collection(db, ONLINE_GAMES_COLLECTION, gid, 'webrtc', 'iceCandidates');
+    const iceCol = collection(db, ONLINE_GAMES_COLLECTION, gid, 'webrtc', 'signal', 'iceCandidates');
     let cancelled = false;
 
     const pushUnsub = (u) => {

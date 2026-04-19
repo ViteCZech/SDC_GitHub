@@ -16,7 +16,7 @@ function stopStream(stream) {
 }
 
 /**
- * WebRTC (signaling pod `onlineGames/{id}/signaling/…` ve Firestore) + dynamické rozvržení podle tahu.
+ * WebRTC (signaling pod `onlineGames/{id}/signaling/signal` + `.../signal/iceCandidates` ve Firestore) + dynamické rozvržení podle tahu.
  * Lokální stream z lobby (`useLobbyMedia` → handoff) se nesmí v této komponentě stopovat — vlastník je App.
  *
  * @param {{
@@ -101,7 +101,8 @@ export default function OnlineVideoContainer({
     if (!gid) return undefined;
 
     const signalDocRef = doc(db, ONLINE_GAMES_COLLECTION, gid, 'signaling', 'signal');
-    const iceColRef = collection(db, ONLINE_GAMES_COLLECTION, gid, 'signaling', 'iceCandidates');
+    // Kolekce musí mít lichý počet segmentů: ICE pod dokumentem `signal`, ne vedle něj.
+    const iceColRef = collection(db, ONLINE_GAMES_COLLECTION, gid, 'signaling', 'signal', 'iceCandidates');
 
     let cancelled = false;
 
