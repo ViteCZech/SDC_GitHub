@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Trophy, Undo2 } from 'lucide-react';
 import { matchesAnyPhrase, normalizeSpeechCommand, VOICE_PHRASES } from '../voiceSpeech';
+import { subscribeOnlineGame } from '../services/onlineGamesService';
 
 // --- MOCK PŘEKLADŮ (V reálném projektu smažte a použijte import) ---
 const translations = {
@@ -51,6 +52,7 @@ export default function GameCricket({
   isPC,
   onlineGameId = null,
   myOnlineRole = null,
+  onOnlinePeerAbandoned = null,
   onAbort: _onAbort,
 }) {
   const [gameState, setGameState] = useState({
@@ -71,6 +73,7 @@ export default function GameCricket({
   const t = (k) => translations[lang]?.[k] || k;
 
   const recognitionRef = useRef(null);
+  const peerAbandonCricketRef = useRef(false);
   const onlineGameIdRef = useRef(onlineGameId);
   const isMicActiveRef = useRef(isMicActive);
   const gameStateRef = useRef(gameState);
@@ -103,6 +106,28 @@ export default function GameCricket({
   useEffect(() => {
     onlineGameIdRef.current = onlineGameId;
   }, [onlineGameId]);
+
+  useEffect(() => {
+    peerAbandonCricketRef.current = false;
+  }, [onlineGameId]);
+
+  useEffect(() => {
+    if (!onlineGameId || !myOnlineRole || typeof onOnlinePeerAbandoned !== 'function') return undefined;
+    const unsub = subscribeOnlineGame(onlineGameId, (doc) => {
+      if (!doc || doc.status !== 'abandoned' || !doc.abandonedBy) return;
+      if (doc.abandonedBy === myOnlineRole) return;
+      if (peerAbandonCricketRef.current) return;
+      peerAbandonCricketRef.current = true;
+      onOnlinePeerAbandoned();
+    });
+    return () => {
+      try {
+        unsub();
+      } catch (e) {
+        /* ignore */
+      }
+    };
+  }, [onlineGameId, myOnlineRole, onOnlinePeerAbandoned]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {

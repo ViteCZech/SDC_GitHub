@@ -326,7 +326,7 @@ export default function OnlineVideoContainer({
       pushUnsub(
         subscribeOnlineGame(gid, (docData) => {
           if (cancelled) return;
-          if (docData?.status === 'completed') {
+          if (docData?.status === 'completed' || docData?.status === 'abandoned') {
             cleanupPeer();
             const s = internalStreamRef.current;
             if (s) {

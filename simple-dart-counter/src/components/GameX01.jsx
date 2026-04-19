@@ -226,6 +226,8 @@ export default function GameX01({
   onlineLocalStream = null,
   /** Po online handshake konce zápasu (obě strany) — vymaže onlineGameId v App. */
   onOnlineSessionEnded = null,
+  /** Soupeř úmyslně opustil zápas (`status: abandoned`). */
+  onOnlinePeerAbandoned = null,
   /** ID online hry: pokud se shoduje s tímto, p1 neodesílá prázdný seed (obnova stránky s live stavem). */
   skipOnlineInitialSeedGameId = null,
   onAbort: _onAbort,
@@ -285,6 +287,7 @@ export default function GameX01({
   const [postMatchStatsActive, setPostMatchStatsActive] = useState(false);
   const postMatchStatsActiveRef = useRef(false);
   const onlineSessionEndOnceRef = useRef(false);
+  const peerAbandonNotifyRef = useRef(false);
 
   const [highScoreAnimation, setHighScoreAnimation] = useState(null);
   const [longPressIdx, setLongPressIdx] = useState(null);
@@ -368,6 +371,7 @@ export default function GameX01({
     setPostMatchStatsActive(false);
     postMatchStatsActiveRef.current = false;
     onlineSessionEndOnceRef.current = false;
+    peerAbandonNotifyRef.current = false;
     opponentHeartbeatMsRef.current = null;
     setIsOpponentOffline(false);
   }, [onlineGameId]);
@@ -450,6 +454,22 @@ export default function GameX01({
       if (doc.status === 'completed') {
         setOnlineFirestoreSessionCompleted(true);
       }
+      if (
+        doc.status === 'abandoned' &&
+        doc.abandonedBy &&
+        myOnlineRole &&
+        doc.abandonedBy !== myOnlineRole
+      ) {
+        setOnlineFirestoreSessionCompleted(true);
+        opponentHeartbeatMsRef.current = null;
+        setIsOpponentOffline(false);
+        if (!peerAbandonNotifyRef.current) {
+          peerAbandonNotifyRef.current = true;
+          if (typeof onOnlinePeerAbandoned === 'function') {
+            onOnlinePeerAbandoned();
+          }
+        }
+      }
       if (!myOnlineRole) return;
       const oppField = myOnlineRole === 'p1' ? doc.heartbeatGuest : doc.heartbeatHost;
       const ms = oppField?.toMillis?.();
@@ -464,7 +484,7 @@ export default function GameX01({
         /* ignore */
       }
     };
-  }, [onlineGameId, settings.gameType, myOnlineRole]);
+  }, [onlineGameId, settings.gameType, myOnlineRole, onOnlinePeerAbandoned]);
 
   useEffect(() => {
     if (!onlineGameId || settings.gameType !== 'x01' || !myOnlineRole) return undefined;

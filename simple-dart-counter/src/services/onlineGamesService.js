@@ -320,6 +320,28 @@ export async function completeOnlineGameSession(gameId, pendingMatchRecordForHis
 }
 
 /**
+ * Úmyslné opuštění rozjetého online zápasu (bez „ztráty spojení“).
+ * Nastaví `status: 'abandoned'` a `abandonedBy` podle role — soupeř v UI uvidí konec relace, ne offline overlay.
+ * @param {string} gameId
+ * @param {'p1'|'p2'} myRole
+ */
+export async function abandonOnlineGameSession(gameId, myRole) {
+  if (!db) throw new Error('no_db');
+  await ensureAnonymousAuth();
+  const id = String(gameId || '').trim();
+  if (!id) throw new Error('no_db');
+  const abandonedBy = myRole === 'p2' ? 'p2' : 'p1';
+  const ref = doc(db, ONLINE_GAMES_COLLECTION, id);
+  await updateDoc(ref, {
+    status: 'abandoned',
+    abandonedBy,
+    abandonedAt: serverTimestamp(),
+    liveGameState: deleteField(),
+    liveStateUpdatedAt: serverTimestamp(),
+  });
+}
+
+/**
  * Real-time sledování pole liveGameState na dokumentu online hry.
  * @returns {import('firebase/firestore').Unsubscribe}
  */

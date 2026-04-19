@@ -68,6 +68,26 @@ service cloud.firestore {
         && isParticipantOnGameResource();
     }
 
+    function abandonOnlineSession() {
+      return diffKeys().hasOnly([
+            'status',
+            'abandonedBy',
+            'abandonedAt',
+            'liveGameState',
+            'liveStateUpdatedAt',
+          ])
+        && resource.data.status == 'playing'
+        && request.resource.data.status == 'abandoned'
+        && isParticipantOnGameResource()
+        && request.resource.data.abandonedBy is string
+        && (
+          (request.resource.data.abandonedBy == 'p1' && request.auth.uid == resource.data.hostUid)
+          || (request.resource.data.abandonedBy == 'p2'
+              && resource.data.keys().hasAny(['guestUid'])
+              && request.auth.uid == resource.data.guestUid)
+        );
+    }
+
     match /onlineGames/{gameId} {
       allow read: if request.auth != null;
 
@@ -83,7 +103,8 @@ service cloud.firestore {
             || updateHeartbeatHost()
             || updateHeartbeatGuest()
             || updateLiveGameState()
-            || completeOnlineSession());
+            || completeOnlineSession()
+            || abandonOnlineSession());
 
       allow delete: if false;
 

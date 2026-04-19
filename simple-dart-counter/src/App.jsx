@@ -13,7 +13,7 @@ import {
   mergeAdminGroupMatchesFromTabletCloud,
   mergeAdminBracketFromTabletCloud,
 } from './services/tournamentSync';
-import { getOnlineGameById } from './services/onlineGamesService';
+import { abandonOnlineGameSession, getOnlineGameById } from './services/onlineGamesService';
 import {
   readLastOnlineSession,
   clearLastOnlineSession,
@@ -23,7 +23,7 @@ import {
   AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, 
   DownloadCloud, FileText, History, Home, Info, Keyboard as KeyboardIcon, 
   Maximize, Minimize, Mic, MicOff, MousePointer2, Play, RefreshCw, RotateCcw, 
-  Target, Trash2, Trophy, Undo2, Unplug, User, Cloud, X, BarChart2, List, Swords, ClipboardList
+  Target, Trash2, Trophy, Undo2, Unplug, LogOut, User, Cloud, X, BarChart2, List, Swords, ClipboardList
 } from 'lucide-react';
 
 import { translations } from './translations';
@@ -1310,6 +1310,35 @@ function AppMain({ lang, setLang }) {
       title: opts.title,
     });
   };
+
+  const handleOnlinePeerAbandonedMatch = React.useCallback(() => {
+    showNotification(t('onlinePeerAbandonedMatch'), 'error');
+    handleOnlineSessionEnded();
+    setHomeSubmenu('online');
+  }, [handleOnlineSessionEnded, t, showNotification]);
+
+  const handleOnlineExitMatchRequest = React.useCallback(() => {
+    if (!onlineGameId || !myOnlineRole) return;
+    requestConfirm(
+      t('onlineExitMatchBody'),
+      async () => {
+        try {
+          await abandonOnlineGameSession(onlineGameId, myOnlineRole);
+        } catch (e) {
+          console.warn('abandonOnlineGameSession', e);
+          showNotification(t('onlineExitMatchError'), 'error');
+        } finally {
+          handleOnlineSessionEnded();
+          setHomeSubmenu('online');
+        }
+      },
+      {
+        title: t('onlineExitMatchTitle'),
+        confirmLabel: t('onlineExitMatchConfirmBtn'),
+        cancelLabel: t('cancel'),
+      }
+    );
+  }, [onlineGameId, myOnlineRole, t, showNotification, handleOnlineSessionEnded]);
 
   const handleHardResetApp = () => {
     requestConfirm(
@@ -3636,6 +3665,18 @@ function AppMain({ lang, setLang }) {
                       </div>
                   </div>
                   <div className="flex items-center gap-2">
+                      {onlineGameId && !isTournamentPlaying && (
+                        <button
+                          type="button"
+                          onClick={handleOnlineExitMatchRequest}
+                          title={t('onlineExitMatchTitle')}
+                          className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-600/55 bg-amber-950/45 px-2 py-1.5 text-[9px] font-black uppercase tracking-wider text-amber-100 hover:bg-amber-900/55 sm:gap-1.5 sm:px-2.5 sm:text-[10px]"
+                        >
+                          <LogOut className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+                          <span className="sm:hidden">EXIT</span>
+                          <span className="hidden sm:inline">{t('onlineExitMatch')}</span>
+                        </button>
+                      )}
                       <button onClick={toggleFullscreen} className="p-2 transition-colors rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700">
                           {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
                       </button>
@@ -3679,6 +3720,7 @@ function AppMain({ lang, setLang }) {
                     }
                     onMatchComplete={handleMatchComplete}
                     onOnlineSessionEnded={handleOnlineSessionEnded}
+                    onOnlinePeerAbandoned={handleOnlinePeerAbandonedMatch}
                     restoredGameState={matchFinishRestoreState}
                     onRestoredConsumed={() => setMatchFinishRestoreState(null)}
                   />
@@ -3714,6 +3756,7 @@ function AppMain({ lang, setLang }) {
                     }
                     onMatchComplete={handleMatchComplete}
                     myOnlineRole={myOnlineRole || undefined}
+                    onOnlinePeerAbandoned={handleOnlinePeerAbandonedMatch}
                   />
               )}
           </div>
