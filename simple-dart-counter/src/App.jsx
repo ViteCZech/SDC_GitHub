@@ -13,6 +13,12 @@ import {
   mergeAdminGroupMatchesFromTabletCloud,
   mergeAdminBracketFromTabletCloud,
 } from './services/tournamentSync';
+import { getOnlineGameById } from './services/onlineGamesService';
+import {
+  readLastOnlineSession,
+  clearLastOnlineSession,
+  persistLastOnlineSession,
+} from './online/onlineReconnectStorage';
 import { 
   AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, 
   DownloadCloud, FileText, History, Home, Info, Keyboard as KeyboardIcon, 
@@ -977,6 +983,10 @@ function AppMain({ lang, setLang }) {
   const [myOnlineRole, setMyOnlineRole] = useState(null);
   /** Lokální kamera/mikrofon vybrané v online lobby (přenáší se do WebRTC). */
   const [onlineLocalStream, setOnlineLocalStream] = useState(null);
+  /** Obnova čekárny hostitele po F5 (dokument ve stavu waiting). */
+  const [onlineHostResumeWaitingSession, setOnlineHostResumeWaitingSession] = useState(null);
+  /** Po obnově stránky: ID hry, u které už existuje liveGameState — neodesílat prázdný p1 seed. */
+  const [skipOnlineInitialSeedGameId, setSkipOnlineInitialSeedGameId] = useState(null);
   const [tournamentMatchContext, setTournamentMatchContext] = useState(null);
   const tournamentMatchContextRef = useRef(null);
   useEffect(() => {
@@ -996,6 +1006,8 @@ function AppMain({ lang, setLang }) {
   };
 
   const handleOnlineSessionEnded = React.useCallback(() => {
+    clearLastOnlineSession();
+    setSkipOnlineInitialSeedGameId(null);
     setOnlineLocalStream((prev) => {
       stopMediaStream(prev);
       return null;
@@ -1030,9 +1042,84 @@ function AppMain({ lang, setLang }) {
     }));
     setOnlineGameId(String(gameId));
     setMyOnlineRole(r);
+    persistLastOnlineSession(String(gameId), r);
     setHomeSubmenu(null);
     setAppState('playing');
   }, []);
+
+  const consumeOnlineHostResume = React.useCallback(() => {
+    setOnlineHostResumeWaitingSession(null);
+  }, []);
+
+  /** Obnova online relace po obnovení stránky (persistované lastOnline* v localStorage). */
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      const sp = safeStorage.getItem(SESSION_ROLE_KEY);
+      if (sp === 'viewer' || sp === 'tablet') return;
+
+      const meta = readLastOnlineSession();
+      if (!meta?.gameId) return;
+
+      let data;
+      try {
+        data = await getOnlineGameById(meta.gameId);
+      } catch (e) {
+        console.warn('resume online game', e);
+        if (!cancelled) clearLastOnlineSession();
+        return;
+      }
+      if (cancelled) return;
+      if (!data) {
+        clearLastOnlineSession();
+        return;
+      }
+
+      const st = data.status;
+      if (st !== 'waiting' && st !== 'playing') {
+        clearLastOnlineSession();
+        return;
+      }
+
+      const role = meta.role === 'p2' ? 'p2' : 'p1';
+
+      if (st === 'waiting') {
+        if (role !== 'p1') {
+          clearLastOnlineSession();
+          return;
+        }
+        setOnlineHostResumeWaitingSession({
+          gameId: data.id,
+          pin: data.pin ?? null,
+          hostName: data.hostName,
+          gameFormat: data.gameFormat,
+          legs: data.legs,
+          isPublic: !!data.isPublic,
+        });
+        setHomeSubmenu('online');
+        setAppState('home');
+        return;
+      }
+
+      if (st === 'playing' && role === 'p2' && !String(data.guestName || '').trim()) {
+        clearLastOnlineSession();
+        return;
+      }
+
+      const live = data.liveGameState;
+      const hasLiveX01 =
+        data.gameType !== 'cricket' && !!(live && live.kind === 'x01' && live.gameState);
+      setSkipOnlineInitialSeedGameId(hasLiveX01 ? meta.gameId : null);
+
+      handleOnlineGameStart(data, meta.gameId, role, null);
+      setAppState('playing');
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [handleOnlineGameStart]);
 
   useEffect(() => {
     if (appState !== 'home') setHomeSubmenu(null);
@@ -3492,6 +3579,8 @@ function AppMain({ lang, setLang }) {
                       type="button"
                       onClick={() => {
                         if (onlineGameId) {
+                          clearLastOnlineSession();
+                          setSkipOnlineInitialSeedGameId(null);
                           setOnlineGameId(null);
                           setMyOnlineRole(null);
                           setAppState('home');
@@ -3564,6 +3653,7 @@ function AppMain({ lang, setLang }) {
                     onlineGameId={onlineGameId || undefined}
                     myOnlineRole={myOnlineRole || undefined}
                     onlineLocalStream={onlineLocalStream || undefined}
+                    skipOnlineInitialSeedGameId={skipOnlineInitialSeedGameId || undefined}
                     onAbort={
                       isTournamentPlaying
                         ? () => {
@@ -3926,6 +4016,8 @@ function AppMain({ lang, setLang }) {
                 onBack={() => setHomeSubmenu(null)}
                 settings={settings}
                 onOnlineGameStart={handleOnlineGameStart}
+                resumeHostWaitingSession={onlineHostResumeWaitingSession}
+                onResumeHostWaitingConsumed={consumeOnlineHostResume}
               />
             ) : (
               <>

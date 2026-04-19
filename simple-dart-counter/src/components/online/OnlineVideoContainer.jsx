@@ -52,6 +52,10 @@ export default function OnlineVideoContainer({
   const iceSeenRef = useRef(new Set());
 
   const [camError, setCamError] = useState(false);
+  /** Po pádu WebRTC znovu spustit celý signaling stack (nový offer/answer). */
+  const [webrtcSessionKey, setWebrtcSessionKey] = useState(0);
+  const webrtcReconnectTimerRef = useRef(null);
+  const webrtcReconnectAttemptsRef = useRef(0);
 
   const layout = useMemo(() => {
     if (isPostMatch) {
@@ -85,6 +89,10 @@ export default function OnlineVideoContainer({
       showOpponentOverlay: true,
     };
   }, [imThrowing, isPostMatch]);
+
+  useEffect(() => {
+    webrtcReconnectAttemptsRef.current = 0;
+  }, [onlineGameId]);
 
   useEffect(() => {
     if (!db || !onlineGameId || (myRole !== 'p1' && myRole !== 'p2') || matchCompleted) return undefined;
@@ -158,6 +166,45 @@ export default function OnlineVideoContainer({
 
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       pcRef.current = pc;
+
+      const scheduleReconnect = () => {
+        if (cancelled) return;
+        if (webrtcReconnectAttemptsRef.current >= 12) return;
+        webrtcReconnectAttemptsRef.current += 1;
+        setWebrtcSessionKey((k) => k + 1);
+      };
+
+      const clearReconnectTimer = () => {
+        if (webrtcReconnectTimerRef.current != null) {
+          clearTimeout(webrtcReconnectTimerRef.current);
+          webrtcReconnectTimerRef.current = null;
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (cancelled) return;
+        const st = pc.connectionState;
+        if (st === 'connected' || st === 'connecting') {
+          clearReconnectTimer();
+          return;
+        }
+        if (st === 'failed') {
+          clearReconnectTimer();
+          scheduleReconnect();
+          return;
+        }
+        if (st === 'disconnected') {
+          clearReconnectTimer();
+          webrtcReconnectTimerRef.current = window.setTimeout(() => {
+            webrtcReconnectTimerRef.current = null;
+            if (cancelled || pcRef.current !== pc) return;
+            const cur = pc.connectionState;
+            if (cur === 'disconnected' || cur === 'failed') {
+              scheduleReconnect();
+            }
+          }, 4000);
+        }
+      };
 
       local.getTracks().forEach((track) => {
         try {
@@ -294,6 +341,10 @@ export default function OnlineVideoContainer({
 
     return () => {
       cancelled = true;
+      if (webrtcReconnectTimerRef.current != null) {
+        clearTimeout(webrtcReconnectTimerRef.current);
+        webrtcReconnectTimerRef.current = null;
+      }
       cleanupPeer();
 
       const s = internalStreamRef.current;
@@ -306,7 +357,7 @@ export default function OnlineVideoContainer({
       attachVideo(remoteVideoRef.current, null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pc lifecycle podle gameId/role/stream/dokončení
-  }, [onlineGameId, myRole, localStreamProp, matchCompleted]);
+  }, [onlineGameId, myRole, localStreamProp, matchCompleted, webrtcSessionKey]);
 
   useEffect(() => {
     if (!matchCompleted) return;

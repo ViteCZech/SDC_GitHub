@@ -1,0 +1,103 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function gameData(gameId) {
+      return get(/databases/$(database)/documents/onlineGames/$(gameId)).data;
+    }
+
+    /** Účastník zápasu podle rodičovského dokumentu onlineGames/{gameId} (signaling / webrtc). */
+    function isOnlineGameParticipantByParent(gameId) {
+      let g = gameData(gameId);
+      return request.auth != null
+        && g.keys().hasAny(['hostUid'])
+        && (request.auth.uid == g.hostUid
+            || (g.keys().hasAny(['guestUid']) && request.auth.uid == g.guestUid));
+    }
+
+    /** Účastník při přímo update dokumentu hry (resource = onlineGames/{id}). */
+    function isParticipantOnGameResource() {
+      return request.auth != null
+        && resource.data.keys().hasAny(['hostUid'])
+        && (request.auth.uid == resource.data.hostUid
+            || (resource.data.keys().hasAny(['guestUid'])
+                && request.auth.uid == resource.data.guestUid));
+    }
+
+    function diffKeys() {
+      return resource.data.diff(request.resource.data).affectedKeys();
+    }
+
+    function joinAsGuest() {
+      return resource.data.status == 'waiting'
+        && request.resource.data.status == 'playing'
+        && request.resource.data.guestUid == request.auth.uid
+        && !resource.data.keys().hasAny(['guestUid'])
+        && diffKeys().hasOnly(['status', 'guestName', 'joinedAt', 'guestUid'])
+        && request.resource.data.guestName is string
+        && request.resource.data.guestName.size() > 0;
+    }
+
+    function updateHeartbeatHost() {
+      return request.auth.uid == resource.data.hostUid
+        && diffKeys().hasOnly(['heartbeatHost']);
+    }
+
+    function updateHeartbeatGuest() {
+      return resource.data.keys().hasAny(['guestUid'])
+        && request.auth.uid == resource.data.guestUid
+        && diffKeys().hasOnly(['heartbeatGuest']);
+    }
+
+    function updateLiveGameState() {
+      return diffKeys().hasOnly(['liveGameState', 'liveStateUpdatedAt'])
+        && request.resource.data.status == resource.data.status
+        && isParticipantOnGameResource();
+    }
+
+    function completeOnlineSession() {
+      return diffKeys().hasOnly([
+            'status',
+            'liveGameState',
+            'liveStateUpdatedAt',
+            'completedAt',
+            'pendingMatchRecordForHistory',
+          ])
+        && resource.data.status == 'playing'
+        && request.resource.data.status == 'completed'
+        && isParticipantOnGameResource();
+    }
+
+    match /onlineGames/{gameId} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAny(['hostUid'])
+        && request.resource.data.hostUid == request.auth.uid
+        && request.resource.data.hostUid is string
+        && request.resource.data.status == 'waiting';
+
+      allow update: if request.auth != null
+        && resource.data.keys().hasAny(['hostUid'])
+        && (joinAsGuest()
+            || updateHeartbeatHost()
+            || updateHeartbeatGuest()
+            || updateLiveGameState()
+            || completeOnlineSession());
+
+      allow delete: if false;
+
+      match /webrtc/{document=**} {
+        allow read, write: if isOnlineGameParticipantByParent(gameId);
+      }
+
+      match /signaling/{document=**} {
+        allow read, write: if isOnlineGameParticipantByParent(gameId);
+      }
+    }
+
+    match /tournaments/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

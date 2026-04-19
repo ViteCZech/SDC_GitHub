@@ -6,6 +6,7 @@ import {
   subscribeOnlineGame,
   subscribeToGameState,
   updateGameState,
+  updateHeartbeat,
 } from '../services/onlineGamesService';
 import OnlineVideoContainer from './online/OnlineVideoContainer';
 import PostMatchView from './online/PostMatchView';
@@ -225,6 +226,8 @@ export default function GameX01({
   onlineLocalStream = null,
   /** Po online handshake konce zápasu (obě strany) — vymaže onlineGameId v App. */
   onOnlineSessionEnded = null,
+  /** ID online hry: pokud se shoduje s tímto, p1 neodesílá prázdný seed (obnova stránky s live stavem). */
+  skipOnlineInitialSeedGameId = null,
   onAbort: _onAbort,
 }) {
     // 1. Zde máte překladovou funkci (pokud ne, přidejte ji)
@@ -307,6 +310,8 @@ export default function GameX01({
   const lastPushedWriteIdRef = useRef('');
   const didSeedOnlineRef = useRef(false);
   const setScoresRef = useRef(setScores);
+  const opponentHeartbeatMsRef = useRef(null);
+  const [isOpponentOffline, setIsOpponentOffline] = useState(false);
 
   const [quickButtons, setQuickButtons] = useState(settings.quickButtons || [41, 45, 60, 100, 140, 180]);
 
@@ -363,6 +368,8 @@ export default function GameX01({
     setPostMatchStatsActive(false);
     postMatchStatsActiveRef.current = false;
     onlineSessionEndOnceRef.current = false;
+    opponentHeartbeatMsRef.current = null;
+    setIsOpponentOffline(false);
   }, [onlineGameId]);
 
   useEffect(() => {
@@ -439,8 +446,16 @@ export default function GameX01({
   useEffect(() => {
     if (!onlineGameId || settings.gameType !== 'x01') return undefined;
     const unsub = subscribeOnlineGame(onlineGameId, (doc) => {
-      if (!doc || doc.status !== 'completed') return;
-      setOnlineFirestoreSessionCompleted(true);
+      if (!doc) return;
+      if (doc.status === 'completed') {
+        setOnlineFirestoreSessionCompleted(true);
+      }
+      if (!myOnlineRole) return;
+      const oppField = myOnlineRole === 'p1' ? doc.heartbeatGuest : doc.heartbeatHost;
+      const ms = oppField?.toMillis?.();
+      if (typeof ms === 'number' && !Number.isNaN(ms)) {
+        opponentHeartbeatMsRef.current = ms;
+      }
     });
     return () => {
       try {
@@ -449,11 +464,41 @@ export default function GameX01({
         /* ignore */
       }
     };
-  }, [onlineGameId, settings.gameType]);
+  }, [onlineGameId, settings.gameType, myOnlineRole]);
+
+  useEffect(() => {
+    if (!onlineGameId || settings.gameType !== 'x01' || !myOnlineRole) return undefined;
+    const tick = () => {
+      void updateHeartbeat(onlineGameId, myOnlineRole).catch((e) => console.warn('updateHeartbeat', e));
+    };
+    tick();
+    const id = setInterval(tick, 5000);
+    return () => clearInterval(id);
+  }, [onlineGameId, settings.gameType, myOnlineRole]);
+
+  useEffect(() => {
+    if (!onlineGameId || settings.gameType !== 'x01' || !myOnlineRole) return undefined;
+    const id = setInterval(() => {
+      const ms = opponentHeartbeatMsRef.current;
+      if (ms == null) {
+        setIsOpponentOffline(false);
+        return;
+      }
+      setIsOpponentOffline(Date.now() - ms > 15000);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [onlineGameId, settings.gameType, myOnlineRole]);
 
   useEffect(() => {
     if (!onlineGameId || settings.gameType !== 'x01' || myOnlineRole !== 'p1') return;
     if (didSeedOnlineRef.current) return;
+    if (
+      skipOnlineInitialSeedGameId &&
+      String(skipOnlineInitialSeedGameId) === String(onlineGameId)
+    ) {
+      didSeedOnlineRef.current = true;
+      return;
+    }
     didSeedOnlineRef.current = true;
     const seed = {
       p1Score: settings.startScore,
@@ -470,7 +515,14 @@ export default function GameX01({
       completedLegs: [],
     };
     void pushOnlineX01LiveRef.current(seed, setScoresRef.current || [], {});
-  }, [onlineGameId, myOnlineRole, settings.gameType, settings.startScore, settings.startPlayer]);
+  }, [
+    onlineGameId,
+    myOnlineRole,
+    settings.gameType,
+    settings.startScore,
+    settings.startPlayer,
+    skipOnlineInitialSeedGameId,
+  ]);
 
   // Pokud se uživatel vrátí zpět z obrazovky "konec zápasu",
   // obnovíme přesně stav před posledním ukončujícím hodem.
@@ -1363,9 +1415,15 @@ export default function GameX01({
           </div>
         )}
         {!postMatchStatsActive && (
-          <>
+          <div
+            className={`relative z-0 min-h-0 w-full flex-1 ${
+              isLandscape
+                ? 'col-span-3 grid h-full min-h-0 grid-cols-[1fr_1.5fr_1fr] grid-rows-[auto_minmax(0,1fr)] gap-1 sm:gap-2'
+                : 'flex flex-col gap-1 sm:gap-2'
+            }`}
+          >
         <div
-          className={`relative z-30 w-full flex items-center justify-center rounded-lg border border-slate-800 py-1 px-2 ${isLandscape ? 'col-span-3' : ''} ${
+          className={`relative z-30 flex w-full items-center justify-center rounded-lg border border-slate-800 py-1 px-2 ${isLandscape ? 'col-span-3 row-start-1' : ''} ${
             onlineOpponentVideoBackdrop ? 'bg-slate-950/80 backdrop-blur-sm' : 'bg-slate-900/70'
           }`}
         >
@@ -1382,7 +1440,7 @@ export default function GameX01({
         
         {/* Score Cards */}
         <div
-          className={`relative z-30 flex flex-col gap-1 sm:gap-2 w-full ${isLandscape ? 'h-full min-h-0' : 'h-auto shrink-0'}`}
+          className={`relative z-30 flex w-full flex-col gap-1 sm:gap-2 ${isLandscape ? 'col-start-1 row-start-2 h-full min-h-0' : 'h-auto shrink-0'}`}
         >
             <div className={`flex ${isLandscape ? 'flex-col min-h-0' : 'flex-row w-full'} flex-1 gap-1.5 h-full`}>
                 {['p1', 'p2'].map(pKey => {
@@ -1431,7 +1489,9 @@ export default function GameX01({
         </div>
 
         {/* Střední část */}
-        <div className="relative z-30 flex flex-col justify-center flex-1 h-full min-h-0 gap-1">
+        <div
+          className={`relative z-30 flex h-full min-h-0 flex-1 flex-col justify-center gap-1 ${isLandscape ? 'col-start-2 row-start-2' : ''}`}
+        >
             {!gameState.winner ? (
                 <div
                   className={`relative flex flex-col gap-1 shrink-0 transition-opacity w-full h-full justify-center ${
@@ -1584,7 +1644,7 @@ export default function GameX01({
 
         {/* Pravá část Historie */}
         <div
-          className={`relative z-30 rounded-xl border border-slate-800 overflow-hidden flex flex-col ${isLandscape ? 'h-full' : 'shrink-0 h-[22vh] sm:h-48'} ${
+          className={`relative z-30 flex flex-col overflow-hidden rounded-xl border border-slate-800 ${isLandscape ? 'col-start-3 row-start-2 h-full min-h-0' : 'shrink-0 h-[22vh] sm:h-48'} ${
             onlineOpponentVideoBackdrop ? 'bg-slate-950/80 backdrop-blur-sm' : 'bg-slate-900/40'
           }`}
         >
@@ -1593,7 +1653,21 @@ export default function GameX01({
                 {renderUnifiedHistory()}
             </div>
         </div>
-          </>
+            {Boolean(onlineGameId) &&
+              settings.gameType === 'x01' &&
+              myOnlineRole &&
+              isOpponentOffline && (
+                <div
+                  className="absolute inset-0 z-[35] flex cursor-default items-center justify-center rounded-lg bg-slate-950/70 px-3 py-4 backdrop-blur-sm"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <p className="text-center text-xs font-black uppercase tracking-widest text-amber-200 sm:text-sm">
+                    {t('onlineOpponentOffline')}
+                  </p>
+                </div>
+              )}
+          </div>
         )}
       </main>
 

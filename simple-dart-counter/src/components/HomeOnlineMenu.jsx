@@ -20,7 +20,14 @@ export function HomeOnlineMenuTile({ t, onOpen }) {
 /**
  * Podmenu úvodní obrazovky – online lobby (záložky Založit / Najít).
  */
-export function HomeOnlineSubmenu({ t, onBack, settings, onOnlineGameStart }) {
+export function HomeOnlineSubmenu({
+  t,
+  onBack,
+  settings,
+  onOnlineGameStart,
+  resumeHostWaitingSession = null,
+  onResumeHostWaitingConsumed,
+}) {
   return (
     <div className="flex flex-col w-full max-w-md mx-auto gap-4 md:col-span-2 md:max-w-2xl">
       <button
@@ -35,7 +42,13 @@ export function HomeOnlineSubmenu({ t, onBack, settings, onOnlineGameStart }) {
         <Globe className="w-10 h-10 text-emerald-400" />
         <h2 className="text-xl font-black tracking-widest text-white text-center uppercase">{t('menuOnline')}</h2>
       </div>
-      <OnlineHub t={t} settings={settings} onOnlineGameStart={onOnlineGameStart} />
+      <OnlineHub
+        t={t}
+        settings={settings}
+        onOnlineGameStart={onOnlineGameStart}
+        resumeHostWaitingSession={resumeHostWaitingSession}
+        onResumeHostWaitingConsumed={onResumeHostWaitingConsumed}
+      />
     </div>
   );
 }

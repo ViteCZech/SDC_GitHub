@@ -16,6 +16,12 @@ import {
 import { signInAnonymously } from 'firebase/auth';
 import { auth, db } from '../firebase';
 
+function requireAuthUid() {
+  const uid = auth?.currentUser?.uid;
+  if (!uid) throw new Error(ONLINE_AUTH_FAILED);
+  return uid;
+}
+
 export const ONLINE_GAMES_COLLECTION = 'onlineGames';
 
 /**
@@ -92,9 +98,11 @@ export async function createOnlineGame(opts) {
       ? 'Cricket'
       : buildGameFormatLabel({ gameType: 'x01', startScore, outMode });
   const pin = isPublic ? null : randomFourDigitPin();
+  const hostUid = requireAuthUid();
 
   const doc = {
     status: 'waiting',
+    hostUid,
     isPublic,
     hostName,
     gameFormat,
@@ -197,9 +205,17 @@ export async function joinOnlineGame(gameId, guestName) {
     if (prev.status !== 'waiting') {
       throw new Error(ONLINE_JOIN_ERROR_NOT_AVAILABLE);
     }
+    if (prev.guestUid != null && String(prev.guestUid).length > 0) {
+      throw new Error(ONLINE_JOIN_ERROR_NOT_AVAILABLE);
+    }
+    const guestUid = requireAuthUid();
+    if (prev.hostUid != null && prev.hostUid === guestUid) {
+      throw new Error(ONLINE_JOIN_ERROR_NOT_AVAILABLE);
+    }
     transaction.update(ref, {
       status: 'playing',
       guestName: guest,
+      guestUid,
       joinedAt: serverTimestamp(),
     });
     return {
@@ -207,6 +223,7 @@ export async function joinOnlineGame(gameId, guestName) {
       ...prev,
       status: 'playing',
       guestName: guest,
+      guestUid,
     };
   });
 }
@@ -241,10 +258,28 @@ export function subscribeOnlineGame(gameId, onData, onError) {
 /** Jednorázové načtení dokumentu (např. ověření po join). */
 export async function getOnlineGameById(gameId) {
   if (!db || !gameId) return null;
+  await ensureAnonymousAuth();
   const ref = doc(db, ONLINE_GAMES_COLLECTION, String(gameId));
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
   return { id: snap.id, ...snap.data() };
+}
+
+/**
+ * Heartbeat pro detekci přítomnosti hráče (Reconnecting fáze 1).
+ * @param {string} gameId
+ * @param {'p1'|'p2'} role host = p1, guest = p2
+ */
+export async function updateHeartbeat(gameId, role) {
+  if (!db) throw new Error('no_db');
+  await ensureAnonymousAuth();
+  const id = String(gameId || '').trim();
+  if (!id) throw new Error('no_db');
+  const ref = doc(db, ONLINE_GAMES_COLLECTION, id);
+  const field = role === 'p2' ? 'heartbeatGuest' : 'heartbeatHost';
+  await updateDoc(ref, {
+    [field]: serverTimestamp(),
+  });
 }
 
 /**

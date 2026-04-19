@@ -13,6 +13,7 @@ import {
   ONLINE_JOIN_ERROR_NOT_AVAILABLE,
   subscribePublicWaitingGames,
 } from '../services/onlineGamesService';
+import { persistLastOnlineSession, clearLastOnlineSession } from '../online/onlineReconnectStorage';
 
 const tabBtn =
   'flex-1 py-3 text-center text-xs font-black uppercase tracking-widest rounded-xl border transition-colors';
@@ -43,7 +44,13 @@ function mapJoinError(err, t) {
 /**
  * Online lobby: záložky Založit / Najít, Firebase čekárna a veřejný seznam her.
  */
-export default function OnlineHub({ t, settings, onOnlineGameStart }) {
+export default function OnlineHub({
+  t,
+  settings,
+  onOnlineGameStart,
+  resumeHostWaitingSession = null,
+  onResumeHostWaitingConsumed,
+}) {
   const [tab, setTab] = useState('host');
   const [waitingSession, setWaitingSession] = useState(null);
   const [guestJoinDraft, setGuestJoinDraft] = useState(null);
@@ -67,6 +74,22 @@ export default function OnlineHub({ t, settings, onOnlineGameStart }) {
   );
 
   useEffect(() => {
+    if (!resumeHostWaitingSession?.gameId) return;
+    setWaitingSession({
+      role: 'host',
+      gameId: resumeHostWaitingSession.gameId,
+      pin: resumeHostWaitingSession.pin ?? null,
+      hostName: resumeHostWaitingSession.hostName,
+      gameFormat: resumeHostWaitingSession.gameFormat,
+      legs: resumeHostWaitingSession.legs,
+      isPublic: !!resumeHostWaitingSession.isPublic,
+    });
+    if (typeof onResumeHostWaitingConsumed === 'function') {
+      onResumeHostWaitingConsumed();
+    }
+  }, [resumeHostWaitingSession, onResumeHostWaitingConsumed]);
+
+  useEffect(() => {
     if (tab !== 'join') return undefined;
     const unsub = subscribePublicWaitingGames(
       (list) => {
@@ -82,6 +105,7 @@ export default function OnlineHub({ t, settings, onOnlineGameStart }) {
 
   const openHostWaiting = (payload) => {
     setGuestJoinDraft(null);
+    persistLastOnlineSession(payload.gameId, 'p1');
     setWaitingSession({
       role: 'host',
       gameId: payload.gameId,
@@ -192,7 +216,10 @@ export default function OnlineHub({ t, settings, onOnlineGameStart }) {
       <WaitingRoom
         t={t}
         session={waitingSession}
-        onLeave={() => setWaitingSession(null)}
+        onLeave={() => {
+          clearLastOnlineSession();
+          setWaitingSession(null);
+        }}
         onOnlineGameStart={(doc, gid, localStream) => startOnlineGame(doc, gid, 'p1', localStream)}
       />
     );
