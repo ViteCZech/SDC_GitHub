@@ -76,7 +76,7 @@ export default function WaitingRoom({
       if (pairTimer) window.clearTimeout(pairTimer);
       try {
         unsub();
-      } catch (e) {
+      } catch {
         /* ignore */
       }
     };
@@ -100,7 +100,7 @@ export default function WaitingRoom({
     return () => {
       const st = lastStatusRef.current;
       if (st === 'waiting') {
-        void cancelOnlineGame(gid).catch((e) => console.warn('cancelOnlineGame(unmount)', e));
+        void cancelOnlineGame(gid).catch(() => console.warn('cancelOnlineGame(unmount)'));
       }
     };
   }, [isHost, session?.gameId]);

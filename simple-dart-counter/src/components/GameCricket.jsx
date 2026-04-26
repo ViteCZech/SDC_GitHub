@@ -53,7 +53,6 @@ export default function GameCricket({
   onlineGameId = null,
   myOnlineRole = null,
   onOnlinePeerAbandoned = null,
-  onAbort: _onAbort,
 }) {
   const [gameState, setGameState] = useState({
     p1Score: 0, p2Score: 0,
@@ -123,11 +122,167 @@ export default function GameCricket({
     return () => {
       try {
         unsub();
-      } catch (e) {
-        /* ignore */
-      }
+      } catch {}
     };
   }, [onlineGameId, myOnlineRole, onOnlinePeerAbandoned]);
+
+  const recalculateGame = (baseHistory, baseState) => {
+    const moves = [...baseHistory].reverse();
+    let st = {
+      p1Score: 0, p2Score: 0,
+      p1Marks: { ...INITIAL_MARKS }, p2Marks: { ...INITIAL_MARKS },
+      currentPlayer: baseState.startingPlayer,
+      dartsThrown: 0,
+      winner: null
+    };
+
+    for (let i = 0; i < moves.length; i++) {
+      const move = moves[i];
+      if (st.winner) break;
+
+      st.currentPlayer = move.player;
+
+      if (move.target !== 0) {
+        const myMarks = move.player === 'p1' ? st.p1Marks : st.p2Marks;
+        const oppMarks = move.player === 'p1' ? st.p2Marks : st.p1Marks;
+        
+        let remainingHits = move.multiplier;
+        const neededToClose = 3 - myMarks[move.target];
+        
+        // Zde je přesně ta matematika: "Rozkouskování" zásahů
+        if (neededToClose > 0) {
+          const hitsToApply = Math.min(remainingHits, neededToClose);
+          myMarks[move.target] += hitsToApply;
+          remainingHits -= hitsToApply;
+        }
+
+        // Pokud něco zbylo a soupeř nemá zavřeno, stávají se z toho body
+        if (remainingHits > 0 && oppMarks[move.target] < 3) {
+          const points = remainingHits * (move.target === 25 ? 25 : move.target);
+          if (move.player === 'p1') st.p1Score += points; else st.p2Score += points;
+        }
+      }
+
+      const currentMyMarks = move.player === 'p1' ? st.p1Marks : st.p2Marks;
+      const myScore = move.player === 'p1' ? st.p1Score : st.p2Score;
+      const oppScore = move.player === 'p1' ? st.p2Score : st.p1Score;
+
+      const allClosed = TARGETS.every(t => currentMyMarks[t] >= 3);
+      if (allClosed && myScore >= oppScore) {
+        st.winner = move.player;
+      } else {
+        st.dartsThrown++;
+        if (st.dartsThrown === 3) {
+          st.currentPlayer = st.currentPlayer === 'p1' ? 'p2' : 'p1';
+          st.dartsThrown = 0;
+        }
+      }
+    }
+
+    return { 
+      ...baseState, 
+      p1Score: st.p1Score, p2Score: st.p2Score, 
+      p1Marks: st.p1Marks, p2Marks: st.p2Marks,
+      currentPlayer: st.winner ? st.currentPlayer : st.currentPlayer, 
+      dartsThrown: st.dartsThrown,
+      winner: st.winner,
+      history: baseHistory,
+      multiplier: 1 
+    };
+  };
+
+  const handleThrow = (target, overrideMultiplier = null) => {
+    if (gameState.winner) return;
+    if (
+      onlineGameId &&
+      myOnlineRole &&
+      gameState.currentPlayer !== myOnlineRole
+    ) {
+      return;
+    }
+
+    let finalMult = gameState.multiplier;
+    if (overrideMultiplier !== null) finalMult = overrideMultiplier;
+    else if (target === 25 && gameState.multiplier === 3) finalMult = 2;
+
+    const isHighThrow = target > 0 && (finalMult === 3 || (target === 25 && finalMult === 2));
+    if (isHighThrow) {
+      const isP1 = gameState.currentPlayer === 'p1';
+      const color = isP1 ? 'rgb(52,211,153)' : 'rgb(168,85,247)';
+      const label = target === 25 ? '50' : `T${target}`;
+      setHighScoreAnimation({ score: label, color });
+      setTimeout(() => setHighScoreAnimation(null), 1500);
+    }
+
+    setGameState(prev => {
+      let finalMultiplier = prev.multiplier;
+      if (overrideMultiplier !== null) {
+        finalMultiplier = overrideMultiplier;
+      } else if (target === 25 && prev.multiplier === 3) {
+        finalMultiplier = 2;
+      }
+
+      const newMove = { 
+          id: Date.now(), 
+          player: prev.currentPlayer, 
+          target: target, 
+          multiplier: target === 0 ? 1 : finalMultiplier 
+      };
+      
+      const newState = recalculateGame([newMove, ...prev.history], prev);
+
+      if (newState.winner) {
+        const legTarget = settings?.matchMode === 'first_to' ? settings.matchTarget : Math.ceil((settings?.matchTarget || 1) / 2);
+        let p1W = newState.winner === 'p1' ? prev.p1Legs + 1 : prev.p1Legs;
+        let p2W = newState.winner === 'p2' ? prev.p2Legs + 1 : prev.p2Legs;
+        let p1S = prev.p1Sets || 0;
+        let p2S = prev.p2Sets || 0;
+        let nextSetScores = [...setScores];
+        if (p1W >= legTarget || p2W >= legTarget) {
+          nextSetScores = [...nextSetScores, { p1: p1W, p2: p2W }];
+        }
+        if (p1W >= legTarget) { p1S += 1; p1W = 0; p2W = 0; }
+        if (p2W >= legTarget) { p2S += 1; p1W = 0; p2W = 0; }
+        const setTarget = settings?.matchSets || 1;
+        const isOver = p1S >= setTarget || p2S >= setTarget;
+        const uLegs = [...prev.completedLegs, { history: newState.history, winner: newState.winner }];
+
+        if (isOver && onMatchComplete) {
+          onMatchComplete({ 
+            id: Date.now(), date: new Date().toLocaleString(), gameType: 'cricket', 
+            p1Name: settings.p1Name, p2Name: settings.p2Name, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S,
+            matchSets: settings?.matchSets || 1, setScores: nextSetScores,
+            matchWinner: newState.winner, completedLegs: uLegs, 
+            isBot: settings.isBot, botLevel: settings.botLevel 
+          });
+          setSetScores(nextSetScores);
+          return { ...newState, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S, completedLegs: uLegs };
+        } else {
+          setSetScores(nextSetScores);
+          return { ...newState, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S, matchWinner: null, completedLegs: uLegs };
+        }
+      } else {
+        return newState;
+      }
+    });
+  };
+
+  const handleUndoClick = () => {
+    if (gameState.history.length === 0) return;
+    let sliceCount = 1;
+    if (settings?.isBot && gameState.currentPlayer === 'p1' && gameState.history.length >= 3) {
+       if (gameState.history[0].player === 'p2') sliceCount = 1 + gameState.history.filter(m => m.player === 'p2').length % 3 || 3;
+    }
+    setGameState(recalculateGame(gameState.history.slice(sliceCount), gameState));
+  };
+
+  const handleNextLeg = () => {
+    const nS = gameState.startingPlayer === 'p1' ? 'p2' : 'p1'; 
+    setGameState(prev => ({ 
+      ...prev, p1Score: 0, p2Score: 0, p1Marks: {...INITIAL_MARKS}, p2Marks: {...INITIAL_MARKS}, 
+      winner: null, history: [], currentPlayer: nS, startingPlayer: nS, dartsThrown: 0, multiplier: 1 
+    })); 
+  };
 
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
@@ -185,7 +340,6 @@ export default function GameCricket({
       'osiemnascie': '18',
       'dziewietnascie': '19',
       'dwadziescia': '20',
-      'bullseye': '50',
       // Miss / zero
       'vedle': '0', 'mimo': '0', 'nula': '0', 'nic': '0', 'minul': '0',
       'miss': '0', 'outside': '0', 'no score': '0',
@@ -347,7 +501,7 @@ export default function GameCricket({
       recognition.onend = () => {
         setIsListening(false);
         if (isMicActiveRef.current) {
-          try { recognition.start(); } catch (e) {}
+          try { recognition.start(); } catch {}
         }
       };
       recognition.onresult = (event) => {
@@ -355,7 +509,7 @@ export default function GameCricket({
         handleVoiceCommand(res);
       };
       recognition.onerror = () => {};
-      try { recognition.start(); } catch (e) {}
+      try { recognition.start(); } catch {}
       recognitionRef.current = recognition;
     } else {
       if (recognition) {
@@ -371,171 +525,6 @@ export default function GameCricket({
       }
     };
   }, [isMicActive, lang]);
-
-  const recalculateGame = (baseHistory, baseState) => {
-    const moves = [...baseHistory].reverse();
-    let st = {
-      p1Score: 0, p2Score: 0,
-      p1Marks: { ...INITIAL_MARKS }, p2Marks: { ...INITIAL_MARKS },
-      currentPlayer: baseState.startingPlayer,
-      dartsThrown: 0,
-      winner: null
-    };
-
-    for (let i = 0; i < moves.length; i++) {
-      const move = moves[i];
-      if (st.winner) break;
-
-      st.currentPlayer = move.player;
-
-      if (move.target !== 0) {
-        const myMarks = move.player === 'p1' ? st.p1Marks : st.p2Marks;
-        const oppMarks = move.player === 'p1' ? st.p2Marks : st.p1Marks;
-        
-        let remainingHits = move.multiplier;
-        const neededToClose = 3 - myMarks[move.target];
-        
-        // Zde je přesně ta matematika: "Rozkouskování" zásahů
-        if (neededToClose > 0) {
-          const hitsToApply = Math.min(remainingHits, neededToClose);
-          myMarks[move.target] += hitsToApply;
-          remainingHits -= hitsToApply;
-        }
-
-        // Pokud něco zbylo a soupeř nemá zavřeno, stávají se z toho body
-        if (remainingHits > 0 && oppMarks[move.target] < 3) {
-          const points = remainingHits * (move.target === 25 ? 25 : move.target);
-          if (move.player === 'p1') st.p1Score += points; else st.p2Score += points;
-        }
-      }
-
-      const currentMyMarks = move.player === 'p1' ? st.p1Marks : st.p2Marks;
-      const myScore = move.player === 'p1' ? st.p1Score : st.p2Score;
-      const oppScore = move.player === 'p1' ? st.p2Score : st.p1Score;
-
-      const allClosed = TARGETS.every(t => currentMyMarks[t] >= 3);
-      if (allClosed && myScore >= oppScore) {
-        st.winner = move.player;
-      } else {
-        st.dartsThrown++;
-        if (st.dartsThrown === 3) {
-          st.currentPlayer = st.currentPlayer === 'p1' ? 'p2' : 'p1';
-          st.dartsThrown = 0;
-        }
-      }
-    }
-
-    return { 
-      ...baseState, 
-      p1Score: st.p1Score, p2Score: st.p2Score, 
-      p1Marks: st.p1Marks, p2Marks: st.p2Marks,
-      currentPlayer: st.winner ? st.currentPlayer : st.currentPlayer, 
-      dartsThrown: st.dartsThrown,
-      winner: st.winner,
-      history: baseHistory,
-      multiplier: 1 
-    };
-  };
-
-  const handleThrow = (target, overrideMultiplier = null) => {
-    if (gameState.winner) return;
-    if (
-      onlineGameId &&
-      myOnlineRole &&
-      gameState.currentPlayer !== myOnlineRole
-    ) {
-      return;
-    }
-
-    let finalMult = gameState.multiplier;
-    if (overrideMultiplier !== null) finalMult = overrideMultiplier;
-    else if (target === 25 && gameState.multiplier === 3) finalMult = 2;
-
-    const isHighThrow = target > 0 && (finalMult === 3 || (target === 25 && finalMult === 2));
-    if (isHighThrow) {
-      const isP1 = gameState.currentPlayer === 'p1';
-      const color = isP1 ? 'rgb(52,211,153)' : 'rgb(168,85,247)';
-      const label = target === 25 ? '50' : `T${target}`;
-      setHighScoreAnimation({ score: label, color });
-      setTimeout(() => setHighScoreAnimation(null), 1500);
-    }
-
-    setGameState(prev => {
-      let finalMultiplier = prev.multiplier;
-      if (overrideMultiplier !== null) {
-        finalMultiplier = overrideMultiplier;
-      } else if (target === 25 && prev.multiplier === 3) {
-        finalMultiplier = 2;
-      }
-
-      const newMove = { 
-          id: Date.now(), 
-          player: prev.currentPlayer, 
-          target: target, 
-          multiplier: target === 0 ? 1 : finalMultiplier 
-      };
-      
-      const newState = recalculateGame([newMove, ...prev.history], prev);
-
-      if (newState.winner) {
-        const legTarget = settings?.matchMode === 'first_to' ? settings.matchTarget : Math.ceil((settings?.matchTarget || 1) / 2);
-        let p1W = newState.winner === 'p1' ? prev.p1Legs + 1 : prev.p1Legs;
-        let p2W = newState.winner === 'p2' ? prev.p2Legs + 1 : prev.p2Legs;
-        let p1S = prev.p1Sets || 0;
-        let p2S = prev.p2Sets || 0;
-        let nextSetScores = [...setScores];
-        if (p1W >= legTarget || p2W >= legTarget) {
-          nextSetScores = [...nextSetScores, { p1: p1W, p2: p2W }];
-        }
-        if (p1W >= legTarget) { p1S += 1; p1W = 0; p2W = 0; }
-        if (p2W >= legTarget) { p2S += 1; p1W = 0; p2W = 0; }
-        const setTarget = settings?.matchSets || 1;
-        const isOver = p1S >= setTarget || p2S >= setTarget;
-        const uLegs = [...prev.completedLegs, { history: newState.history, winner: newState.winner }];
-
-        if (isOver && onMatchComplete) {
-          onMatchComplete({ 
-            id: Date.now(), date: new Date().toLocaleString(), gameType: 'cricket', 
-            p1Name: settings.p1Name, p2Name: settings.p2Name, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S,
-            matchSets: settings?.matchSets || 1, setScores: nextSetScores,
-            matchWinner: newState.winner, completedLegs: uLegs, 
-            isBot: settings.isBot, botLevel: settings.botLevel 
-          });
-          setSetScores(nextSetScores);
-          return { ...newState, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S, completedLegs: uLegs };
-        } else {
-          setSetScores(nextSetScores);
-          return { ...newState, p1Legs: p1W, p2Legs: p2W, p1Sets: p1S, p2Sets: p2S, matchWinner: null, completedLegs: uLegs };
-        }
-      } else {
-        return newState;
-      }
-    });
-  };
-
-  const handleUndoClick = () => {
-    if (gameState.history.length === 0) return;
-    let sliceCount = 1;
-    if (settings?.isBot && gameState.currentPlayer === 'p1' && gameState.history.length >= 3) {
-       if (gameState.history[0].player === 'p2') sliceCount = 1 + gameState.history.filter(m => m.player === 'p2').length % 3 || 3;
-    }
-    setGameState(recalculateGame(gameState.history.slice(sliceCount), gameState));
-  };
-
-  const handleNextLeg = () => {
-    const nS = gameState.startingPlayer === 'p1' ? 'p2' : 'p1'; 
-    setGameState(prev => ({ 
-      ...prev, p1Score: 0, p2Score: 0, p1Marks: {...INITIAL_MARKS}, p2Marks: {...INITIAL_MARKS}, 
-      winner: null, history: [], currentPlayer: nS, startingPlayer: nS, dartsThrown: 0, multiplier: 1 
-    })); 
-  };
-
-  useEffect(() => {
-    if (settings?.isBot && gameState.currentPlayer === 'p2' && !gameState.winner) {
-      const timeout = setTimeout(() => playBotDart(), 800);
-      return () => clearTimeout(timeout);
-    }
-  }, [gameState.currentPlayer, gameState.dartsThrown, gameState.winner, settings?.isBot]);
 
   const playBotDart = () => {
     const lvl = settings?.botLevel || 'amateur';
@@ -571,6 +560,13 @@ export default function GameCricket({
     setGameState(prev => ({...prev, multiplier: mult}));
     setTimeout(() => handleThrow(target), 200);
   };
+
+  useEffect(() => {
+    if (settings?.isBot && gameState.currentPlayer === 'p2' && !gameState.winner) {
+      const timeout = setTimeout(() => playBotDart(), 800);
+      return () => clearTimeout(timeout);
+    }
+  }, [gameState.currentPlayer, gameState.dartsThrown, gameState.winner, settings?.isBot]);
 
   const calculateMPR = (playerKey) => {
     const pHistory = gameState.history.filter(h => h.player === playerKey);

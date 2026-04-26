@@ -38,7 +38,7 @@ export default function OnlineVideo({ gameId, myRole, currentPlayer, localStream
       unsubscribersRef.current.forEach((fn) => {
         try {
           fn();
-        } catch (e) {
+        } catch {
           /* ignore */
         }
       });
@@ -47,7 +47,7 @@ export default function OnlineVideo({ gameId, myRole, currentPlayer, localStream
       if (pcRef.current) {
         try {
           pcRef.current.close();
-        } catch (e) {
+        } catch {
           /* ignore */
         }
         pcRef.current = null;
@@ -66,8 +66,8 @@ export default function OnlineVideo({ gameId, myRole, currentPlayer, localStream
         }
         internalStreamRef.current = s;
         return s;
-      } catch (e) {
-        console.warn('OnlineVideo getUserMedia', e);
+      } catch {
+        console.warn('OnlineVideo getUserMedia');
         setCamError(true);
         return null;
       }
@@ -99,8 +99,8 @@ export default function OnlineVideo({ gameId, myRole, currentPlayer, localStream
       local.getTracks().forEach((track) => {
         try {
           pc.addTrack(track, local);
-        } catch (e) {
-          console.warn('OnlineVideo addTrack', e);
+        } catch {
+          console.warn('OnlineVideo addTrack');
         }
       });
 
@@ -118,7 +118,7 @@ export default function OnlineVideo({ gameId, myRole, currentPlayer, localStream
           from: myRole,
           cand: JSON.stringify(ev.candidate.toJSON()),
           createdAt: serverTimestamp(),
-        }).catch((e) => console.warn('OnlineVideo ice addDoc', e));
+        }).catch(() => console.warn('OnlineVideo ice addDoc'));
       };
 
       const applyRemoteIce = async (snap) => {
@@ -132,15 +132,15 @@ export default function OnlineVideo({ gameId, myRole, currentPlayer, localStream
           let cand;
           try {
             cand = JSON.parse(d.cand);
-          } catch (e) {
+          } catch {
             return;
           }
           try {
             if (pc.signalingState !== 'closed') {
               await pc.addIceCandidate(new RTCIceCandidate(cand));
             }
-          } catch (e) {
-            console.warn('OnlineVideo addIceCandidate', e);
+          } catch {
+            console.warn('OnlineVideo addIceCandidate');
           }
         });
       };
@@ -165,8 +165,8 @@ export default function OnlineVideo({ gameId, myRole, currentPlayer, localStream
             },
             { merge: true }
           );
-        } catch (e) {
-          console.warn('OnlineVideo offer', e);
+        } catch {
+          console.warn('OnlineVideo offer');
           return;
         }
 
@@ -179,8 +179,8 @@ export default function OnlineVideo({ gameId, myRole, currentPlayer, localStream
             if (pc.remoteDescription) return;
             try {
               await pc.setRemoteDescription(new RTCSessionDescription(ans));
-            } catch (e) {
-              console.warn('OnlineVideo setRemote answer', e);
+            } catch {
+              console.warn('OnlineVideo setRemote answer');
             }
           })
         );
@@ -200,8 +200,8 @@ export default function OnlineVideo({ gameId, myRole, currentPlayer, localStream
                   answer: { type: answer.type, sdp: answer.sdp },
                   updatedAt: serverTimestamp(),
                 });
-              } catch (e) {
-                console.warn('OnlineVideo answer flow', e);
+              } catch {
+                console.warn('OnlineVideo answer flow');
               }
             }
           })

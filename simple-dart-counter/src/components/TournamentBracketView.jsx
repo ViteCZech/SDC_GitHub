@@ -261,7 +261,7 @@ export default function TournamentBracketView({
     const busySnapshot = (() => {
       try {
         return Array.from(getRoundBusyPlayerIds(bracketData, roundIndex) || new Set());
-      } catch (e) {
+      } catch {
         return [];
       }
     })();

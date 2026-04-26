@@ -89,7 +89,9 @@ export default function PostMatchView({ lang, record, startScore, onLeaveSession
   const [countdown, setCountdown] = useState(10);
   const leaveOnceRef = useRef(false);
   const onLeaveRef = useRef(onLeaveSession);
-  onLeaveRef.current = onLeaveSession;
+  useEffect(() => {
+    onLeaveRef.current = onLeaveSession;
+  }, [onLeaveSession]);
 
   const stats = useMemo(() => computePostMatchX01Stats(record, startScore), [record, startScore]);
 

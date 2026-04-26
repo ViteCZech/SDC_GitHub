@@ -4,7 +4,7 @@ function stopStream(stream) {
   if (!stream) return;
   try {
     stream.getTracks().forEach((tr) => tr.stop());
-  } catch (e) {
+  } catch {
     /* ignore */
   }
 }
@@ -38,7 +38,7 @@ export function useLobbyMedia({ t, active }) {
     if (videoRef.current) {
       try {
         videoRef.current.srcObject = null;
-      } catch (e) {
+      } catch {
         /* ignore */
       }
     }
@@ -52,7 +52,7 @@ export function useLobbyMedia({ t, active }) {
     if (videoRef.current) {
       try {
         videoRef.current.srcObject = null;
-      } catch (e) {
+      } catch {
         /* ignore */
       }
     }
@@ -68,7 +68,7 @@ export function useLobbyMedia({ t, active }) {
       if (videoRef.current) {
         try {
           videoRef.current.srcObject = null;
-        } catch (e) {
+        } catch {
           /* ignore */
         }
       }
@@ -118,7 +118,7 @@ export function useLobbyMedia({ t, active }) {
       if (videoRef.current) {
         try {
           videoRef.current.srcObject = null;
-        } catch (e) {
+        } catch {
           /* ignore */
         }
       }
@@ -141,8 +141,8 @@ export function useLobbyMedia({ t, active }) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia(withAudio);
         await attachAndEnumerate(stream);
-      } catch (e) {
-        console.warn('useLobbyMedia getUserMedia', e);
+      } catch {
+        console.warn('useLobbyMedia getUserMedia');
         if (cancelled) return;
         if (includeAudio && withAudio.audio !== false) {
           try {
@@ -177,7 +177,7 @@ export function useLobbyMedia({ t, active }) {
       if (videoRef.current) {
         try {
           videoRef.current.srcObject = null;
-        } catch (e) {
+        } catch {
           /* ignore */
         }
       }

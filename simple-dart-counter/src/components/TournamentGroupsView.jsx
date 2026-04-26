@@ -163,6 +163,7 @@ function ScrollableMatchList({
   getPlayerName,
   onStartMatch,
   onResetMatch,
+  requestConfirm,
   t,
   allowAdminMatchActions = true,
 }) {
@@ -270,6 +271,7 @@ function GroupCard({
   onStartMatch,
   onResetMatch,
   onRequestWithdrawPlayer,
+  requestConfirm,
   isAdmin,
   t,
 }) {
@@ -384,6 +386,7 @@ function GroupCard({
           getPlayerName={getPlayerName}
           onStartMatch={onStartMatch}
           onResetMatch={onResetMatch}
+          requestConfirm={requestConfirm}
           allowAdminMatchActions={isAdmin}
           t={t}
         />
@@ -519,12 +522,10 @@ export default function TournamentGroupsView({
   };
 
   const getFirstPlayableIndex = (groupMatches) => {
-    let idx = 0;
     for (let i = 0; i < groupMatches.length; i++) {
       if (groupMatches[i].status === 'pending' || groupMatches[i].status === 'playing') {
         return i;
       }
-      idx = i + 1;
     }
     return groupMatches.length;
   };
@@ -783,6 +784,7 @@ export default function TournamentGroupsView({
                 onStartMatch={handleStartMatch}
                 onResetMatch={onResetMatch}
                 onRequestWithdrawPlayer={handleRequestWithdrawPlayer}
+                requestConfirm={requestConfirm}
                 isAdmin={isAdmin}
                 t={(key) => {
                   const nested = tNested(key);

@@ -6,8 +6,6 @@ export default function GameStats({ records = [], lang }) {
     const t = (k) => translations[lang]?.[k] || k;
     // Výpočet statistik pomocí timestampů (record.id)
     const stats = useMemo(() => {
-        const now = Date.now();
-        
         // Začátky aktuálních časových úseků (půlnoc)
         const todayStart = new Date().setHours(0, 0, 0, 0);
         const startOfWeek = todayStart - (6 * 86400000); // Posledních 7 dní

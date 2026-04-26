@@ -3,7 +3,7 @@
  * Žádné UI závislosti.
  */
 
-import { distributePlayersToGroups, distributePlayersToFixedGroups } from './tournamentGenerator';
+import { distributePlayersToFixedGroups } from './tournamentGenerator';
 
 const BRACKET_BYE_LABEL = 'Volný los';
 
@@ -150,15 +150,6 @@ export function generateRoundRobinSchedule(players, groupId) {
   return generateRoundRobinFallback(normalized, groupId);
 }
 
-/**
- * Spočítá počet odehraných legů v zápase (score1 + score2).
- */
-function getLegsInMatch(m) {
-  const s1 = m.score1 ?? m.legsP1 ?? 0;
-  const s2 = m.score2 ?? m.legsP2 ?? 0;
-  return (Number(s1) || 0) + (Number(s2) || 0);
-}
-
 function isGroupMatchTerminal(m) {
   const s = m?.status;
   return s === 'completed' || s === 'walkover';
@@ -257,18 +248,6 @@ function estimateGroupsPhaseRemainingMs(groups, matches, settings, now) {
 
   const parallelBlend = Math.max(maxSerial, sumSerial / boards);
   return { remainingMs: parallelBlend, avgMatchDurationMs: avgFullMatchMs };
-}
-
-function allGroupsPhaseComplete(groups, matches) {
-  const list = groups || [];
-  if (list.length === 0) return true;
-  for (const g of list) {
-    const gid = g.groupId ?? g.id;
-    const gm = (matches || []).filter((m) => (m.groupId ?? m.group) === gid);
-    if (gm.length === 0) return false;
-    if (!gm.every((m) => isGroupMatchTerminal(m))) return false;
-  }
-  return true;
 }
 
 function bracketMatchTerminal(m) {
@@ -1556,7 +1535,7 @@ export function getGroupAdvancementPhraseKey(playerCount, numGroups, advancePerG
   if (advancePerGroup === 'all') return { key: 'tournAdvancePhraseAll' };
   const adv = Number(advancePerGroup);
   if (!Number.isFinite(adv)) return { key: 'tournAdvancePhraseUniform', params: { adv: '?', size: '?' } };
-  const { base, rem, minSize, maxSize } = getGroupSplit(n, g);
+  const { rem, minSize, maxSize } = getGroupSplit(n, g);
   if (rem === 0) {
     if (adv >= minSize) return { key: 'tournAdvancePhraseEveryoneSize', params: { size: minSize } };
     return { key: 'tournAdvancePhraseUniform', params: { adv, size: minSize } };
@@ -1842,44 +1821,6 @@ function getGlobalBusyPlayerIdsForRefereeEngine(bracketRounds) {
   return s;
 }
 
-/** Jen hráči, kteří v kole právě HRAJÍ (playing) — pending mohou pískat na jiném terči (fronta). */
-function getRoundPlayingOnlyPlayerIds(bracketRounds, roundIndex) {
-  const s = new Set();
-  const matches = bracketRounds[roundIndex]?.matches || [];
-  for (const m of matches) {
-    if (!m || m.isBye) continue;
-    if (m.status !== 'playing') continue;
-    if (m.player1Id && !isBracketByeName(m.player1Name)) s.add(m.player1Id);
-    if (m.player2Id && !isBracketByeName(m.player2Name)) s.add(m.player2Id);
-  }
-  return s;
-}
-
-function findGroupByBoardNumber(groups, boardRaw) {
-  if (boardRaw == null || boardRaw === '') return null;
-  const b = String(boardRaw).trim();
-  for (const g of groups || []) {
-    const boards = Array.isArray(g.boards) ? g.boards : [];
-    for (const x of boards) {
-      if (String(x).trim() === b) return g;
-    }
-  }
-  return null;
-}
-
-/** Poslední neodstoupivší hráč v pořadí skupiny (tabulka: nejlepší první). */
-function getLastPlaceGroupPlayer(group, groupMatchesAll) {
-  if (!group?.groupId) return null;
-  const gm = (groupMatchesAll || []).filter((m) => (m.groupId ?? m.group) === group.groupId);
-  const standings = calculateGroupStandings(group.players || [], gm);
-  for (let i = standings.length - 1; i >= 0; i--) {
-    const p = standings[i];
-    if (p.isWithdrawn) continue;
-    return { id: p.id, name: p.name ?? p.id };
-  }
-  return null;
-}
-
 /**
  * Všichni nepostupující ze skupin, seřazení od nejhoršího (nejhorší místo v tabulce skupiny první).
  * Stejný zdroj jako {@link updateBracketReferees} pro předkolo / první KO vlna 1.
@@ -2062,15 +2003,6 @@ function collectRound0ByeWalkoverRefCandidates(bracketRounds, seedRankById) {
     out.push({ id: wid, name: wname ?? wid, seedIdx });
   }
   return out;
-}
-
-function getPlayerPendingRound0Match(playerId, roundMatches) {
-  if (playerId == null) return null;
-  for (const m of roundMatches || []) {
-    if (!m || m.status !== 'pending' || m.isBye) continue;
-    if (m.player1Id === playerId || m.player2Id === playerId) return m;
-  }
-  return null;
 }
 
 /** Počet legů, které daný poražený odehrál v dokončeném zápase pavouka. */

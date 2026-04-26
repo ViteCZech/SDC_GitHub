@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle, Cloud, Edit2, Target, Trash2, UserPlus } from 'lucide-react';
 import { translations } from '../translations';
-import { distributePlayersToFixedGroups } from '../utils/tournamentGenerator';
 import {
   applyAdvancementPhrase,
   countPlayersAdvancingFromGroups,
@@ -89,7 +88,7 @@ export default function TournamentSetup({
     const t = window.setTimeout(() => {
       try {
         playerNameFieldRef.current?.focus();
-      } catch (e) {}
+      } catch {}
     }, 0);
     return () => clearTimeout(t);
   }, [step, editingIndex]);
@@ -274,12 +273,6 @@ export default function TournamentSetup({
 
   const advancePerGroup =
     tournamentDraft.advancePerGroup ?? (isTournamentBracketOnlyFormat(tournamentDraft.format) ? 'all' : 2);
-  const setAdvancePerGroup = (v) =>
-    setTournamentDraft((prev) => ({
-      ...prev,
-      advancePerGroup: v === 'all' ? 'all' : v,
-      promotersCount: v === 'all' ? 'all' : v,
-    }));
   const bracketKoLegs = tournamentDraft.bracketKoLegs ?? tournamentDraft.bracketLegs ?? 3;
   const setBracketKoLegs = (v) => setTournamentDraft((prev) => ({ ...prev, bracketKoLegs: v }));
 
@@ -309,14 +302,6 @@ export default function TournamentSetup({
   const resolvedNumGroups =
     tournamentDraft.numGroups ?? selectedVariant?.numGroups ?? listValidGroupCounts(players.length)[0] ?? 1;
 
-  const groups = useMemo(() => {
-    if (!isTournamentGroupsThenBracketFormat(tournamentDraft.format) || players.length < GROUP_SIZE_MIN) return [];
-    const playersWithIds = players.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}` }));
-    const numGroups =
-      tournamentDraft.numGroups ?? selectedVariant?.numGroups ?? listValidGroupCounts(playersWithIds.length)[0] ?? 1;
-    return distributePlayersToFixedGroups(playersWithIds, numGroups);
-  }, [tournamentDraft.format, tournamentDraft.numGroups, selectedVariant, players]);
-
   const numBoards = Math.max(1, Math.min(99, Number(tournamentDraft.numBoards) || 2));
   const rawNumBoards = tournamentDraft.numBoards;
 
@@ -333,41 +318,11 @@ export default function TournamentSetup({
     if (totalAdvancees < 2) return false;
     return !Number.isInteger(Math.log2(totalAdvancees));
   }, [totalAdvancees]);
-  const showByeWarning = needsPrelim;
   const customSplitOk = isAllowedGroupSplit(players.length, customNumGroups);
   const customMinGroup = customSplitOk ? Math.floor(players.length / customNumGroups) : 0;
   const customAdvanceOk = customAdvancePerGroup <= customMinGroup;
   const isCustomInvalid =
     isCustomFormat && grpFmtStep && (!customSplitOk || !customAdvanceOk);
-
-  const timeEstimate = useMemo(() => {
-    const fmt = isTournamentBracketOnlyFormat(tournamentDraft.format)
-      ? 'bracket_only'
-      : 'groups_bracket';
-    const opts = {
-      players,
-      format: fmt,
-      groupLegs: tournamentDraft.groupLegs,
-      bracketLegs: bracketKoLegs,
-    };
-    const numGroupsForEst =
-      tournamentDraft.numGroups ?? selectedVariant?.numGroups ?? listValidGroupCounts(players.length)[0];
-    return estimateTotalTournamentTime(opts, {
-      advancePerGroup,
-      bracketKoLegs,
-      numBoards,
-      numGroups: numGroupsForEst,
-    });
-  }, [
-    players,
-    tournamentDraft.format,
-    tournamentDraft.groupLegs,
-    tournamentDraft.numGroups,
-    selectedVariant?.numGroups,
-    advancePerGroup,
-    bracketKoLegs,
-    numBoards,
-  ]);
 
   /** Seřazení hráčů podle rankingu. */
   const getSortedPlayersForTournament = () =>

@@ -128,7 +128,7 @@ const randNormal = (mean, stdDev) => {
 };
 
 // --- Modals ---
-const EditScoreModal = ({ initialScore, initialDarts, isFinish, scoreBefore, outMode, onSave, onCancel, lang }) => {
+const EditScoreModal = ({ initialScore, initialDarts, scoreBefore, outMode, onSave, onCancel, lang }) => {
     const [score, setScore] = useState(initialScore.toString());
     const [darts, setDarts] = useState(initialDarts);
     const [isFirstEntry, setIsFirstEntry] = useState(true); 
@@ -236,7 +236,6 @@ export default function GameX01({
   requestConfirm = null,
   /** Synchronizace `onlineGames.startPlayer` do lokálních nastavení. */
   onOnlineDocStartPlayer = null,
-  onAbort: _onAbort,
 }) {
     // 1. Zde máte překladovou funkci (pokud ne, přidejte ji)
   const t = (k) => translations[lang]?.[k] || k;
@@ -429,9 +428,7 @@ export default function GameX01({
       }
       try {
         await updateGameState(onlineGameId, payload);
-      } catch (e) {
-        console.warn('updateGameState', e);
-      }
+      } catch {}
     };
   }, [onlineGameId, settings.gameType]);
 
@@ -456,9 +453,7 @@ export default function GameX01({
     return () => {
       try {
         unsub();
-      } catch (e) {
-        /* ignore */
-      }
+      } catch {}
     };
   }, [onlineGameId, settings.gameType]);
 
@@ -511,9 +506,7 @@ export default function GameX01({
     return () => {
       try {
         unsub();
-      } catch (e) {
-        /* ignore */
-      }
+      } catch {}
     };
   }, [onlineGameId, settings.gameType, myOnlineRole, onOnlinePeerAbandoned, onOnlineDocStartPlayer]);
 
@@ -628,13 +621,6 @@ export default function GameX01({
   const toggleMic = () => setIsMicActive(!isMicActive);
 
   // Bot logic
-  useEffect(() => {
-      if (settings.isBot && gameState.currentPlayer === 'p2' && !gameState.winner) {
-          const timeout = setTimeout(() => playBotTurn(), 1500);
-          return () => clearTimeout(timeout);
-      }
-  }, [gameState.currentPlayer, gameState.winner, settings.isBot]);
-
   const playBotTurn = () => {
       const cScore = gameState.p2Score; let pts = 0; const lvl = settings.botLevel;
       const canOut = cScore <= 170 && ![169, 168, 166, 165, 163, 162, 159].includes(cScore);
@@ -658,8 +644,15 @@ export default function GameX01({
           if (canOut && Math.random() < Math.min(0.95, tAvg/110)) pts = cScore; else pts = canOut ? 0 : randNormal(tAvg, 22);
       } else { pts = randNormal(50, 20); }
 
-      processTurn(Math.min(180, Math.max(0, pts)), cScore === pts ? getMinDartsToCheckout(cScore, settings.outMode) : 3);
+      processTurnRef.current(Math.min(180, Math.max(0, pts)), cScore === pts ? getMinDartsToCheckout(cScore, settings.outMode) : 3);
   };
+
+  useEffect(() => {
+      if (settings.isBot && gameState.currentPlayer === 'p2' && !gameState.winner) {
+          const timeout = setTimeout(() => playBotTurn(), 1500);
+          return () => clearTimeout(timeout);
+      }
+  }, [gameState.currentPlayer, gameState.winner, settings.isBot]);
 
   const recalculateGame = (baseHistory, baseState) => {
     const bs = baseState ?? gameState;
@@ -943,8 +936,8 @@ export default function GameX01({
             setGameState(merged);
             await pushOnlineX01LiveRef.current(merged, setScoresRef.current, {});
           }
-        } catch (err) {
-          console.warn('updateOnlineGameStartPlayer', err);
+        } catch {
+          console.warn('updateOnlineGameStartPlayer');
           setErrorMsg(t('onlineSwitchStarterError'));
           setTimeout(() => setErrorMsg(''), 2500);
         }
@@ -1135,8 +1128,8 @@ export default function GameX01({
     onlineSessionEndOnceRef.current = true;
     try {
       await completeOnlineGameSession(onlineGameId, rec);
-    } catch (e) {
-      console.warn('completeOnlineGameSession', e);
+    } catch {
+      console.warn('completeOnlineGameSession');
       onlineSessionEndOnceRef.current = false;
       return;
     }
@@ -1147,9 +1140,7 @@ export default function GameX01({
       } else if (rec && typeof onMatchComplete === 'function') {
         await onMatchComplete(rec, null);
       }
-    } catch (e) {
-      console.warn('onMatchComplete', e);
-    }
+    } catch {}
     if (typeof onOnlineSessionEnded === 'function') {
       onOnlineSessionEnded();
     }
@@ -1180,8 +1171,8 @@ export default function GameX01({
         pendingMatchRecord: rec,
         postMatchStatsActive: true,
       });
-    } catch (e) {
-      console.warn('beginOnlinePostMatchStats', e);
+    } catch {
+      console.warn('beginOnlinePostMatchStats');
       postMatchStatsActiveRef.current = false;
       setPostMatchStatsActive(false);
       onlineMatchTransitionRef.current = mt;
@@ -1359,7 +1350,7 @@ export default function GameX01({
         if (isMicActiveRef.current) {
           try {
             recognition.start();
-          } catch (e) {}
+          } catch {}
         }
       };
       recognition.onresult = (event) => {
@@ -1375,7 +1366,7 @@ export default function GameX01({
       };
       try {
         recognition.start();
-      } catch (e) {}
+      } catch {}
       recognitionRef.current = recognition;
     } else {
       if (recognition) {
@@ -1835,8 +1826,8 @@ export default function GameX01({
                           if (!onlineGameId) return;
                           try {
                             await cancelOnlineGame(onlineGameId);
-                          } catch (e) {
-                            console.warn('cancelOnlineGame(obsolete)', e);
+                          } catch {
+                            console.warn('cancelOnlineGame(obsolete)');
                             return;
                           }
                           setOnlineFirestoreSessionCompleted(true);

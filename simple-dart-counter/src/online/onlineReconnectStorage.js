@@ -6,7 +6,7 @@ export const LS_LAST_ONLINE_ROLE = 'lastOnlineRole';
 function safeGet(key) {
   try {
     return localStorage.getItem(key);
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -14,7 +14,7 @@ function safeGet(key) {
 function safeSet(key, value) {
   try {
     localStorage.setItem(key, String(value));
-  } catch (e) {
+  } catch {
     /* ignore */
   }
 }
@@ -22,7 +22,7 @@ function safeSet(key, value) {
 function safeRemove(key) {
   try {
     localStorage.removeItem(key);
-  } catch (e) {
+  } catch {
     /* ignore */
   }
 }

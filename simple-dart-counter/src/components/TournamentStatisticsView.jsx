@@ -29,7 +29,7 @@ const TournamentStatisticsView = ({
   const stats = useMemo(() => {
     try {
       return calculateTournamentStats(tournamentGroups, tournamentBracket, tournamentMatches);
-    } catch (e) {
+    } catch {
       return null;
     }
   }, [tournamentGroups, tournamentBracket, tournamentMatches]);

@@ -89,10 +89,10 @@ function createDefaultTournamentDraft() {
 }
 
 const safeStorage = {
-  getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return null; } },
-  setItem: (key, value) => { try { localStorage.setItem(key, value); } catch (e) {} },
-  removeItem: (key) => { try { localStorage.removeItem(key); } catch (e) {} },
-  clear: () => { try { localStorage.clear(); } catch (e) {} },
+  getItem: (key) => { try { return localStorage.getItem(key); } catch { return null; } },
+  setItem: (key, value) => { try { localStorage.setItem(key, value); } catch {} },
+  removeItem: (key) => { try { localStorage.removeItem(key); } catch {} },
+  clear: () => { try { localStorage.clear(); } catch {} },
 };
 
 const TOURNAMENT_WIP_KEY = 'dartsTournamentSetupWip';
@@ -136,8 +136,8 @@ function loadInitialState(key, fallback) {
     const parsed = JSON.parse(item);
     if (parsed === null || parsed === undefined) return fallback;
     return parsed;
-  } catch (error) {
-    console.error(`Chyba načítání ${key}:`, error);
+  } catch {
+    console.error(`Chyba načítání ${key}:`, key);
     safeStorage.removeItem(key);
     return fallback;
   }
@@ -150,9 +150,7 @@ function appendLocalTournamentHistory(entry) {
   const arr = Array.isArray(prev) ? [...prev, entry] : [entry];
   try {
     safeStorage.setItem(LOCAL_TOURNAMENT_HISTORY_KEY, JSON.stringify(arr));
-  } catch (e) {
-    console.warn('appendLocalTournamentHistory:', e);
-  }
+  } catch {}
 }
 
 function loadSafeMatchHistory() {
@@ -177,8 +175,8 @@ function loadSafeTournamentData() {
     if (parsed.tournamentFormat === 'groups_ko') parsed.tournamentFormat = 'groups_bracket';
     if (parsed.tournamentFormat === 'ko_only') parsed.tournamentFormat = 'bracket_only';
     return { value: parsed, hadError: false };
-  } catch (error) {
-    console.error('Chyba při načítání uloženého turnaje. Data byla resetována:', error);
+  } catch {
+    console.error('Chyba při načítání uloženého turnaje. Data byla resetována.');
     safeStorage.removeItem('dartsTournamentData');
     // legacy key cleanup
     safeStorage.removeItem('dartsTournament');
@@ -534,7 +532,7 @@ const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch, isTo
             if (isMicRematchRef.current) {
                 try {
                     recognition.start();
-                } catch (e) {}
+                } catch {}
             }
         };
         recognition.onresult = (event) => {
@@ -546,7 +544,7 @@ const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch, isTo
         };
         try {
             recognition.start();
-        } catch (e) {}
+        } catch {}
         return () => {
             recognition.onend = null;
             recognition.stop();
@@ -971,9 +969,7 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, onLogin, lang, 
 function AppMain({ lang, setLang }) {
   const { openKeyboard, isKeyboardOpen, internalKeyboardEnabled } = useAdminVirtualKeyboard();
   const [user, setUser] = useState(null);
-  const [loadingUser, setLoadingUser] = useState(true);
   const [offlineMode, setOfflineMode] = useState(false);
-  const [isReady, setIsReady] = useState(true);
   const [appState, setAppState] = useState('home');
   /** Podmenu na úvodní obrazovce (např. online hra); při opuštění home se nuluje níže. */
   const [homeSubmenu, setHomeSubmenu] = useState(null);
@@ -1000,7 +996,7 @@ function AppMain({ lang, setLang }) {
     if (!s) return;
     try {
       s.getTracks().forEach((tr) => tr.stop());
-    } catch (e) {
+    } catch {
       /* ignore */
     }
   };
@@ -1066,8 +1062,8 @@ function AppMain({ lang, setLang }) {
       let data;
       try {
         data = await getOnlineGameById(meta.gameId);
-      } catch (e) {
-        console.warn('resume online game', e);
+      } catch {
+        console.warn('resume online game');
         if (!cancelled) clearLastOnlineSession();
         return;
       }
@@ -1174,7 +1170,7 @@ function AppMain({ lang, setLang }) {
     const release = async () => {
       try {
         if (wakeLock) await wakeLock.release();
-      } catch (e) {}
+      } catch {}
       wakeLock = null;
     };
 
@@ -1190,7 +1186,7 @@ function AppMain({ lang, setLang }) {
         wakeLock.addEventListener?.('release', () => {
           // No-op: we re-acquire on visibilitychange if needed.
         });
-      } catch (e) {
+      } catch {
         // Ignore: permission / not supported / battery saver.
       }
     };
@@ -1331,8 +1327,8 @@ function AppMain({ lang, setLang }) {
       async () => {
         try {
           await cancelOnlineGame(onlineGameId);
-        } catch (e) {
-          console.warn('cancelOnlineGame', e);
+        } catch {
+          console.warn('cancelOnlineGame');
           showNotification(t('onlineExitMatchError'), 'error');
         } finally {
           handleOnlineSessionEnded();
@@ -1524,7 +1520,7 @@ function AppMain({ lang, setLang }) {
         'dartsTournamentData',
         JSON.stringify({ ...tournamentData, tournamentBracket: tournamentBracket ?? [] })
       );
-    } catch (e) {}
+    } catch {}
   }, [tournamentData, tournamentBracket]);
 
   /** Živá synchronizace z Firestore pro diváka a tablet. */
@@ -1548,7 +1544,7 @@ function AppMain({ lang, setLang }) {
         setTournamentMatchContext(null);
         try {
           safeStorage.removeItem('dartsTournamentData');
-        } catch (e) {}
+        } catch {}
         setAppState('home');
         return;
       }
@@ -2143,8 +2139,8 @@ function AppMain({ lang, setLang }) {
               t('archiveSuccess') || 'Turnaj byl úspěšně uložen do historie.',
               'success'
             );
-          } catch (err) {
-            console.warn('archivePastTournamentAndDeleteActive failed:', err);
+          } catch {
+            console.warn('archivePastTournamentAndDeleteActive failed');
             showNotification(
               t('tournamentHub.syncError') || 'Chyba při ukládání dokončeného turnaje do cloudu.',
               'error'
@@ -2167,13 +2163,13 @@ function AppMain({ lang, setLang }) {
               t('archiveSuccess') || 'Turnaj byl úspěšně uložen do historie.',
               'success'
             );
-          } catch (err) {
-            console.warn('appendLocalTournamentHistory failed:', err);
+          } catch {
+            console.warn('appendLocalTournamentHistory failed');
           }
           try {
             await deleteCloudTournament(pinToDelete);
-          } catch (err) {
-            console.warn('deleteCloudTournament failed:', err);
+          } catch {
+            console.warn('deleteCloudTournament failed');
           }
         }
 
@@ -2187,7 +2183,7 @@ function AppMain({ lang, setLang }) {
         clearTournamentWip();
         try {
           safeStorage.removeItem('dartsTournamentData');
-        } catch (e) {}
+        } catch {}
         setAppState('home');
       }
     );
@@ -2394,7 +2390,7 @@ function AppMain({ lang, setLang }) {
         const next = { ...prev, groups: nextGroups };
         try {
           safeStorage.setItem('dartsTournamentData', JSON.stringify(next));
-        } catch (e) {}
+        } catch {}
         return next;
       });
 
@@ -2438,7 +2434,7 @@ function AppMain({ lang, setLang }) {
       };
       try {
         safeStorage.setItem('dartsTournamentData', JSON.stringify(next));
-      } catch (e) {}
+      } catch {}
       return next;
     });
   }, [userRole, tournamentData]);
@@ -2488,8 +2484,8 @@ function AppMain({ lang, setLang }) {
           
           setMatchHistory(updatedHistory); // Přepíše localStorage
           setShowSyncPrompt(false); // Zavře okno
-      } catch (err) {
-          console.error("Chyba při zálohování:", err);
+      } catch {
+          console.error("Chyba při zálohování");
       }
   };
 
@@ -2520,8 +2516,7 @@ function AppMain({ lang, setLang }) {
   useEffect(() => {
     if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-        if (u) { setUser(u); } else { try { await signInAnonymously(auth); } catch (e) { setOfflineMode(true); } }
-        setLoadingUser(false);
+        if (u) { setUser(u); } else { try { await signInAnonymously(auth); } catch { setOfflineMode(true); } }
     });
     return () => unsubscribe();
   }, []);
@@ -2557,7 +2552,7 @@ function AppMain({ lang, setLang }) {
         setAppState('match_finished');
       } else {
         setMatchHistory(prev => [fullRecord, ...prev]);
-        if(db && user && !user.isAnonymous) { try { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'matches'), fullRecord); } catch(err) {} }
+        if(db && user && !user.isAnonymous) { try { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'matches'), fullRecord); } catch {} }
         setSelectedMatchDetail(fullRecord);
         setMatchFinishRestoreState(restorePayload);
         setAppState('match_finished');
@@ -2641,8 +2636,8 @@ function AppMain({ lang, setLang }) {
       await updateCloudMatchFromTablet(pin, am.matchType, am.matchId ?? am.id, {
         tabletStatus: 'checked_in',
       });
-    } catch (err) {
-      console.warn('Tablet check-in cloud sync:', err);
+    } catch {
+      console.warn('Tablet check-in cloud sync');
       showNotification(
         translations[lang]?.tournamentHub?.syncError || 'Chyba synchronizace s cloudem.',
         'error'
@@ -2657,9 +2652,7 @@ function AppMain({ lang, setLang }) {
       await updateCloudMatchFromTablet(pin, matchType, matchId, {
         tabletStatus: 'timeout_warning',
       });
-    } catch (err) {
-      console.warn('Tablet timeout_warning cloud sync:', err);
-    }
+    } catch {}
   };
 
   const handleTabletStartGame = async (matchId, startingPlayerId) => {
@@ -2679,9 +2672,7 @@ function AppMain({ lang, setLang }) {
           whoStarts: startingPlayerId,
           tabletStatus: 'ready_to_play',
         });
-      } catch (err) {
-        console.warn('Tablet whoStarts cloud sync:', err);
-      }
+      } catch {}
     }
 
     const td =
@@ -3010,7 +3001,7 @@ function AppMain({ lang, setLang }) {
           const next = { ...prev, players: nextPlayers };
           try {
             safeStorage.setItem('dartsTournamentData', JSON.stringify(next));
-          } catch (e) {}
+          } catch {}
           return next;
         });
 
@@ -3113,7 +3104,7 @@ function AppMain({ lang, setLang }) {
         };
       });
       const next = { ...prev, groups: nextGroups };
-      try { safeStorage.setItem('dartsTournamentData', JSON.stringify(next)); } catch (e) {}
+      try { safeStorage.setItem('dartsTournamentData', JSON.stringify(next)); } catch {}
       return next;
     });
 
@@ -3152,14 +3143,14 @@ function AppMain({ lang, setLang }) {
   const handleLogin = async () => { 
       const provider = new GoogleAuthProvider(); 
       provider.setCustomParameters({ prompt: 'select_account' }); 
-      try { await signInWithPopup(auth, provider); } catch (error) {} 
+      try { await signInWithPopup(auth, provider); } catch {} 
   };
 
   const toggleFullscreen = async () => {
       try {
           if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
           else await document.exitFullscreen();
-      } catch (e) {}
+      } catch {}
   };
 
   let legOptions = [];
@@ -3228,8 +3219,6 @@ function AppMain({ lang, setLang }) {
       }
   }, [settings.matchMode]);
 
-  if (!isReady) return <div className="w-full h-full bg-slate-950"></div>;
-
   if (appState === 'match_finished' || selectedMatchDetail) {
       const isTournament = !!tournamentMatchContext;
       return (
@@ -3293,9 +3282,7 @@ function AppMain({ lang, setLang }) {
                           mid,
                           completedPatch
                         );
-                      } catch (e) {
-                        console.warn('Tablet match result cloud sync:', e);
-                      }
+                      } catch {}
                     }
 
                     if (tmt === 'bracket' && ctx.roundIndex != null && bm?.id != null) {
@@ -4249,7 +4236,7 @@ function AppMain({ lang, setLang }) {
                   'dartsTournamentData',
                   JSON.stringify({ ...withId, tournamentBracket: rawBracket })
                 );
-              } catch (e) {}
+              } catch {}
               setTournamentDraft((prev) => ({ ...prev, boardAssignments: {} }));
               setAppState('tournament_bracket');
               return;
@@ -4265,7 +4252,7 @@ function AppMain({ lang, setLang }) {
             setTournamentData(withId);
             try {
               safeStorage.setItem('dartsTournamentData', JSON.stringify(withId));
-            } catch (e) {}
+            } catch {}
             setTournamentDraft((prev) => ({
               ...prev,
               boardAssignments: {},
@@ -4301,7 +4288,7 @@ function AppMain({ lang, setLang }) {
                     g.groupId === groupId ? { ...g, boards } : g
                   );
                   const next = { ...prev, groups: nextGroups };
-                  try { safeStorage.setItem('dartsTournamentData', JSON.stringify(next)); } catch (e) {}
+                  try { safeStorage.setItem('dartsTournamentData', JSON.stringify(next)); } catch {}
                   return next;
                 });
               });
@@ -4313,7 +4300,7 @@ function AppMain({ lang, setLang }) {
                 g.groupId === groupId ? { ...g, boards } : g
               );
               const next = { ...prev, groups: nextGroups };
-              try { safeStorage.setItem('dartsTournamentData', JSON.stringify(next)); } catch (e) {}
+              try { safeStorage.setItem('dartsTournamentData', JSON.stringify(next)); } catch {}
               return next;
             });
           }}
@@ -4325,7 +4312,7 @@ function AppMain({ lang, setLang }) {
               boardAssignments[g.groupId] = Array.isArray(g.boards) && g.boards.length > 0 ? g.boards.join(', ') : '';
             }
             setTournamentDraft((prev) => ({ ...prev, boardAssignments }));
-            try { safeStorage.setItem('dartsTournamentData', JSON.stringify(data)); } catch (e) {}
+            try { safeStorage.setItem('dartsTournamentData', JSON.stringify(data)); } catch {}
             setAppState('tournament_groups');
           }}
           onBack={() => setAppState('tournament_setup')}
@@ -4614,7 +4601,7 @@ function AppMain({ lang, setLang }) {
                                                 
                                             </div>
                                         </div>
-                                        <button onClick={async (e) => { e.stopPropagation(); setMatchHistory(p => p.filter(x => x.id !== m.id)); if (m.docId && db && user && !offlineMode) { try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'matches', m.docId)); } catch(err) {} } }} className="p-3 transition-colors rounded-lg text-slate-600 hover:text-red-400 hover:bg-slate-800"><Trash2 className="w-5 h-5" /></button>
+                                        <button onClick={async (e) => { e.stopPropagation(); setMatchHistory(p => p.filter(x => x.id !== m.id)); if (m.docId && db && user && !offlineMode) { try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'matches', m.docId)); } catch {} } }} className="p-3 transition-colors rounded-lg text-slate-600 hover:text-red-400 hover:bg-slate-800"><Trash2 className="w-5 h-5" /></button>
                                     </div>
                                 )})}
                             </div>
@@ -4806,8 +4793,8 @@ function AppMain({ lang, setLang }) {
                         await deleteUser(user); 
                         setAppState('home'); 
                         showNotification(t('presetSaved') || 'Uloženo!', 'success');
-                    } catch(e) {
-                        console.error('Chyba při mazání:', e);
+                    } catch {
+                        console.error('Chyba při mazání');
                         showNotification(
                           'Chyba. Z bezpečnostních důvodů vyžaduje Google před smazáním účtu čerstvé přihlášení. Odhlaste se, znovu se přihlaste a akci opakujte.',
                           'error'
@@ -4852,9 +4839,7 @@ function AppMain({ lang, setLang }) {
                   setConfirmState(null);
                   try {
                     await fn?.();
-                  } catch (e) {
-                    showNotification(String(e?.message ?? e ?? 'Chyba'), 'error');
-                  }
+                  } catch {}
                 }}
                 className="flex-1 py-3 rounded-xl font-black text-white bg-emerald-600 hover:bg-emerald-500 transition-colors"
               >

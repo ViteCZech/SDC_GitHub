@@ -39,7 +39,6 @@ export default function TournamentBoardAssignment({
   tournamentData,
   tournamentDraft,
   setTournamentDraft,
-  tournamentMatches: _tournamentMatches = [],
   onUpdateGroupBoard,
   lang = 'cs',
   onComplete,
