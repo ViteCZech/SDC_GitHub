@@ -21,6 +21,9 @@ export default function TournamentHub({
   const [board, setBoard] = useState('');
   const [tabletPassword, setTabletPassword] = useState('');
 
+  const normalizePin = (v) => String(v || '').replace(/\D/g, '').slice(0, 4);
+  const normalizeBoard = (v) => String(v || '').replace(/\D/g, '').slice(0, 2);
+
   const resetForm = () => {
     setPin('');
     setBoard('');
@@ -51,8 +54,9 @@ export default function TournamentHub({
               type="text"
               inputMode="numeric"
               autoComplete="off"
+              maxLength={4}
               value={pin}
-              onChange={(e) => setPin(e.target.value)}
+              onChange={(e) => setPin(normalizePin(e.target.value))}
               className={fieldInput}
               placeholder="0000"
             />
@@ -65,8 +69,9 @@ export default function TournamentHub({
               type="text"
               inputMode="numeric"
               autoComplete="off"
+              maxLength={2}
               value={board}
-              onChange={(e) => setBoard(e.target.value)}
+              onChange={(e) => setBoard(normalizeBoard(e.target.value))}
               className={fieldInput}
               placeholder="1"
             />
@@ -90,7 +95,9 @@ export default function TournamentHub({
         <div className="grid w-full grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <button
             type="button"
-            onClick={() => onTabletJoin?.(pin.trim(), board.trim(), tabletPassword.trim())}
+            onClick={() =>
+              onTabletJoin?.(normalizePin(pin), normalizeBoard(board), String(tabletPassword || '').trim())
+            }
             className="w-full py-4 rounded-xl font-black bg-emerald-600 text-white hover:bg-emerald-500 border border-emerald-500 [@media(max-height:520px)]:py-3"
           >
             {th('join')}
@@ -130,7 +137,8 @@ export default function TournamentHub({
               inputMode="numeric"
               autoComplete="off"
               value={pin}
-              onChange={(e) => setPin(e.target.value)}
+              onChange={(e) => setPin(normalizePin(e.target.value))}
+              maxLength={4}
               className={fieldInput}
               placeholder="0000"
             />
@@ -138,7 +146,7 @@ export default function TournamentHub({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => onViewerJoin?.(pin.trim())}
+              onClick={() => onViewerJoin?.(normalizePin(pin))}
               className="w-full py-4 rounded-xl font-black bg-emerald-600 text-white hover:bg-emerald-500 border border-emerald-500 [@media(max-height:520px)]:py-3"
             >
               {th('join')}
