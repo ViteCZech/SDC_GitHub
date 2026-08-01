@@ -2256,8 +2256,10 @@ function AppMain({ lang, setLang }) {
       );
       return;
     }
-    const p = String(pin).trim();
-    const access = await verifyTabletBoardAccess(p, tabletPassword);
+    const p = String(pin).replace(/\D/g, '').slice(0, 4);
+    const b = String(board || '').replace(/\D/g, '').slice(0, 2);
+    const tp = String(tabletPassword ?? '').trim();
+    const access = await verifyTabletBoardAccess(p, tp);
     if (!access.ok) {
       showNotification(
         access.reason === 'bad_password'
@@ -2272,8 +2274,8 @@ function AppMain({ lang, setLang }) {
     setTournamentBracket([]);
     setActivePin(p);
     setUserRole('tablet');
-    setTournamentDraft((prev) => ({ ...prev, hubTabletBoard: board || '' }));
-    persistSpectatorSession('tablet', p, board || '');
+    setTournamentDraft((prev) => ({ ...prev, hubTabletBoard: b }));
+    persistSpectatorSession('tablet', p, b);
     setAppState('tournament_tablet');
   };
 
@@ -2285,7 +2287,7 @@ function AppMain({ lang, setLang }) {
       );
       return;
     }
-    const p = String(pin).trim();
+    const p = String(pin).replace(/\D/g, '').slice(0, 4);
     const ok = await verifyTournamentPin(p);
     if (!ok) {
       showNotification(t('tournamentHub.invalidPin'), 'error');
