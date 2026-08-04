@@ -53,6 +53,18 @@ export function parseOptionalDateTimeLocal(val) {
 }
 
 /**
+ * @param {string|null|undefined} deadlineVal - datetime-local
+ * @param {string|null|undefined} startVal - datetime-local
+ * @returns {boolean}
+ */
+export function isDeadlineAfterStart(deadlineVal, startVal) {
+  const start = parseOptionalDateTimeLocal(startVal);
+  const deadline = parseOptionalDateTimeLocal(deadlineVal);
+  if (!start || !deadline) return false;
+  return deadline.getTime() > start.getTime();
+}
+
+/**
  * @param {string} tournamentId
  * @returns {string}
  */

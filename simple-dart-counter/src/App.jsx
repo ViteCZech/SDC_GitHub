@@ -4551,7 +4551,12 @@ function AppMain({ lang, setLang }) {
         />
       )}
 
-      {/* --- VEŘEJNÁ PŘEDREGISTRACE /t/:id --- */}
+      {/* --- ADMIN PŘEDREGISTRACE --- */}
+      {(appState === 'prereg_list' ||
+        appState === 'prereg_setup' ||
+        appState === 'prereg_admin' ||
+        appState === 'prereg_public') && (
+        <div className="flex flex-col flex-1 min-h-0 w-full overflow-hidden">
       {appState === 'prereg_public' && preregTournamentId && (
         <PublicTournamentPage
           lang={lang}
@@ -4595,6 +4600,8 @@ function AppMain({ lang, setLang }) {
           onImportToSetup={handlePreRegImportToSetup}
           onGoogleLogin={handleLogin}
         />
+      )}
+        </div>
       )}
 
       {/* --- SETUP --- */}

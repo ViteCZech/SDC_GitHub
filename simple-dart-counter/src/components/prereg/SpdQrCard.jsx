@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Banknote, CheckCircle, Clock, Hash, Wallet } from 'lucide-react';
 import { translations } from '../../translations';
 import { generateSpdString } from '../../utils/spdQr';
+import { resolveBankAccountString } from '../../utils/bankAccount';
 
 /**
  * @param {{
@@ -20,7 +21,7 @@ import { generateSpdString } from '../../utils/spdQr';
 export default function SpdQrCard({ lang, tournament, registration }) {
   const t = (k) => translations[lang]?.[k] || k;
 
-  const accountNumber = tournament?.finance?.bankInfo?.accountNumber ?? null;
+  const accountNumber = resolveBankAccountString(tournament?.finance?.bankInfo);
   const amount = registration?.amount ?? tournament?.finance?.entryFee ?? null;
   const variableSymbol = registration?.variableSymbol ?? null;
   const paymentMethod = registration?.paymentMethod ?? null;

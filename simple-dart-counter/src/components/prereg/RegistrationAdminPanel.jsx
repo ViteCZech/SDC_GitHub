@@ -25,6 +25,8 @@ import {
 import { calculatePrizePool, distributePrizePool, getDistributionTemplate } from '../../utils/prizePool';
 import { getPublicRegistrationUrl } from '../../utils/preregAdmin';
 import ImportToTournamentButton from './ImportToTournamentButton';
+import PreRegPageShell from './PreRegPageShell';
+import CsoPlayerNameField from './CsoPlayerNameField';
 
 const FILTERS = ['ALL', 'CONFIRMED', 'WAITLIST', 'CANCELLED'];
 
@@ -81,12 +83,16 @@ function ManualRegistrationModal({ lang, tournament, onClose, onSaved }) {
           </button>
         </div>
 
-        <input
-          value={playerName}
-          onChange={(e) => setPlayerName(e.target.value)}
-          placeholder={`${t('preregPlayerName')} *`}
-          className={inputCls}
+        <CsoPlayerNameField
+          lang={lang}
+          playerName={playerName}
+          onPlayerNameChange={setPlayerName}
+          csoRank={csoRank}
+          onCsoRankChange={setCsoRank}
+          inputClassName={inputCls}
+          disabled={loading}
         />
+
         <input
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -98,12 +104,6 @@ function ManualRegistrationModal({ lang, tournament, onClose, onSaved }) {
           onChange={(e) => setPhone(e.target.value)}
           placeholder={t('preregPhone')}
           className={inputCls}
-        />
-        <input
-          value={csoRank}
-          onChange={(e) => setCsoRank(e.target.value.replace(/\D/g, ''))}
-          placeholder={t('tournRanking')}
-          className={`${inputCls} font-mono`}
         />
 
         {methods.length > 0 && (
@@ -262,25 +262,28 @@ export default function RegistrationAdminPanel({ lang, tournamentId, onBack, onI
 
   if (loading) {
     return (
-      <main className="min-h-[50vh] flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
-      </main>
+      <PreRegPageShell>
+        <div className="min-h-[50vh] flex items-center justify-center">
+          <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
+        </div>
+      </PreRegPageShell>
     );
   }
 
   if (!tournament) {
     return (
-      <main className="max-w-lg mx-auto p-6">
+      <PreRegPageShell wide={false}>
         <p className="text-amber-400">{error || t('preregErrNotFound')}</p>
         <button type="button" onClick={onBack} className="mt-4 text-slate-400 hover:text-white text-sm">
           {t('tournBack')}
         </button>
-      </main>
+      </PreRegPageShell>
     );
   }
 
   return (
-    <main className="max-w-5xl mx-auto p-4 pb-24 space-y-6">
+    <PreRegPageShell>
+      <div className="space-y-6">
       <button type="button" onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm">
         <ArrowLeft className="w-4 h-4" /> {t('tournBack')}
       </button>
@@ -534,6 +537,7 @@ export default function RegistrationAdminPanel({ lang, tournamentId, onBack, onI
           onSaved={() => setManualOpen(false)}
         />
       )}
-    </main>
+      </div>
+    </PreRegPageShell>
   );
 }

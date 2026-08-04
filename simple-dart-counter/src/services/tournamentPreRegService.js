@@ -7,6 +7,7 @@ import {
   getPublicRegistrationUrl,
   hashAdminPin,
 } from '../utils/preregAdmin';
+import { buildCzechBankAccount } from '../utils/bankAccount';
 
 /** Region musí odpovídat nasazení Cloud Functions (`functions/src/registerPlayer.ts`). */
 const FUNCTIONS_REGION = 'europe-west1';
@@ -284,6 +285,13 @@ export async function createPreRegTournament(input) {
   const adminPinHash = input.adminPin ? await hashAdminPin(input.adminPin) : null;
   const inviteToken = generateInviteToken();
 
+  const bankParts = {
+    accountPrefix: input.accountPrefix ?? null,
+    accountNumber: input.accountNumber ?? null,
+    bankCode: input.bankCode ?? null,
+  };
+  const accountCombined = buildCzechBankAccount(bankParts);
+
   const docData = {
     status: 'REGISTRATION_OPEN',
     meta: {
@@ -304,7 +312,10 @@ export async function createPreRegTournament(input) {
       addedSponsorMoney: input.addedSponsorMoney ?? null,
       vsPrefix: input.vsPrefix ?? null,
       bankInfo: {
-        accountNumber: input.accountNumber ?? null,
+        accountPrefix: bankParts.accountPrefix,
+        accountNumber: bankParts.accountNumber,
+        bankCode: bankParts.bankCode,
+        accountNumberCombined: accountCombined,
         bic: input.bic ?? null,
       },
     },

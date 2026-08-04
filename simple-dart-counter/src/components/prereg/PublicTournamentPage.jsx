@@ -8,6 +8,7 @@ import {
 import { loadStoredRegistration, saveStoredRegistration } from '../../utils/preregStorage';
 import RegistrationForm from './RegistrationForm';
 import SpdQrCard from './SpdQrCard';
+import PreRegPageShell from './PreRegPageShell';
 
 /**
  * @param {{
@@ -81,16 +82,19 @@ export default function PublicTournamentPage({ tournamentId, lang, onBack }) {
 
   if (loading) {
     return (
-      <main className="min-h-[60vh] flex flex-col items-center justify-center gap-3 p-6">
-        <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
-        <p className="text-slate-400">{t('preregLoading')}</p>
-      </main>
+      <PreRegPageShell wide={false}>
+        <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3">
+          <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
+          <p className="text-slate-400">{t('preregLoading')}</p>
+        </div>
+      </PreRegPageShell>
     );
   }
 
   if (error || !tournament) {
     return (
-      <main className="max-w-lg mx-auto p-6 space-y-4">
+      <PreRegPageShell wide={false}>
+        <div className="space-y-4">
         {onBack && (
           <button
             type="button"
@@ -103,7 +107,8 @@ export default function PublicTournamentPage({ tournamentId, lang, onBack }) {
         <div className="p-6 rounded-xl border border-amber-500/50 bg-amber-900/20 text-amber-200 text-center">
           {error || t('preregErrNotFound')}
         </div>
-      </main>
+        </div>
+      </PreRegPageShell>
     );
   }
 
@@ -113,7 +118,8 @@ export default function PublicTournamentPage({ tournamentId, lang, onBack }) {
   const showClosedOnly = !isRegistrationOpen && !registration;
 
   return (
-    <main className="max-w-xl mx-auto p-4 pb-24 space-y-6">
+    <PreRegPageShell wide={false}>
+      <div className="space-y-6">
       {onBack && (
         <button
           type="button"
@@ -178,6 +184,7 @@ export default function PublicTournamentPage({ tournamentId, lang, onBack }) {
           />
         </section>
       )}
-    </main>
+      </div>
+    </PreRegPageShell>
   );
 }

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Calendar, ClipboardList, Loader2, Plus, Trophy, Users } from 'lucide-react';
 import { translations } from '../../translations';
 import { listOwnerTournaments } from '../../services/tournamentPreRegService';
+import PreRegPageShell from './PreRegPageShell';
 
 const STATUS_KEYS = {
   REGISTRATION_OPEN: 'preregListStatusOpen',
@@ -105,7 +106,8 @@ export default function MyPreRegTournamentsList({
   }, [ownerUid, lang]);
 
   return (
-    <main className="max-w-2xl mx-auto p-4 pb-24 space-y-6">
+    <PreRegPageShell wide={false}>
+      <div className="space-y-6">
       <button type="button" onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm">
         <ArrowLeft className="w-4 h-4" /> {t('tournBack')}
       </button>
@@ -214,6 +216,7 @@ export default function MyPreRegTournamentsList({
           })}
         </ul>
       )}
-    </main>
+      </div>
+    </PreRegPageShell>
   );
 }

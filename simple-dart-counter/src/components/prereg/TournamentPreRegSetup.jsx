@@ -3,10 +3,12 @@ import { ArrowLeft, CheckCircle, Copy, Loader2, Trophy } from 'lucide-react';
 import { translations } from '../../translations';
 import { createPreRegTournament } from '../../services/tournamentPreRegService';
 import {
+  isDeadlineAfterStart,
   parseOptionalDateTimeLocal,
   parseOptionalNumber,
   parseOptionalString,
 } from '../../utils/preregAdmin';
+import PreRegPageShell from './PreRegPageShell';
 
 /**
  * @param {{
@@ -32,7 +34,9 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
   const [sponsorMoney, setSponsorMoney] = useState('');
   const [payQr, setPayQr] = useState(true);
   const [payCash, setPayCash] = useState(true);
+  const [accountPrefix, setAccountPrefix] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
+  const [bankCode, setBankCode] = useState('');
   const [vsPrefix, setVsPrefix] = useState('');
   const [termsAndConditions, setTermsAndConditions] = useState('');
   const [adminPin, setAdminPin] = useState('');
@@ -42,6 +46,22 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
   const [createdLinks, setCreatedLinks] = useState(null);
 
   const showBankFields = payQr;
+
+  const handleStartsAtChange = (val) => {
+    setStartsAt(val);
+    if (registrationDeadline && isDeadlineAfterStart(registrationDeadline, val)) {
+      setRegistrationDeadline(val);
+    }
+  };
+
+  const handleDeadlineChange = (val) => {
+    if (startsAt && isDeadlineAfterStart(val, startsAt)) {
+      setError(t('preregAdminErrDeadlineAfterStart'));
+      return;
+    }
+    setError('');
+    setRegistrationDeadline(val);
+  };
 
   const copyText = async (text) => {
     try {
@@ -72,8 +92,13 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
     if (payQr) paymentMethods.push('QR');
     if (payCash) paymentMethods.push('CASH');
 
-    if (payQr && !accountNumber.trim()) {
+    if (payQr && (!accountNumber.trim() || !bankCode.trim())) {
       setError(t('preregAdminErrAccount'));
+      return;
+    }
+
+    if (startsAt && registrationDeadline && isDeadlineAfterStart(registrationDeadline, startsAt)) {
+      setError(t('preregAdminErrDeadlineAfterStart'));
       return;
     }
 
@@ -90,7 +115,9 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
         payoutPercent: parseOptionalNumber(payoutPercent),
         addedSponsorMoney: parseOptionalNumber(sponsorMoney),
         paymentMethods,
+        accountPrefix: showBankFields ? parseOptionalString(accountPrefix) : null,
         accountNumber: showBankFields ? parseOptionalString(accountNumber) : null,
+        bankCode: showBankFields ? parseOptionalString(bankCode) : null,
         vsPrefix: showBankFields ? parseOptionalString(vsPrefix) : null,
         termsAndConditions: parseOptionalString(termsAndConditions),
         adminPin: adminPin.trim(),
@@ -109,7 +136,8 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
 
   if (createdLinks) {
     return (
-      <main className="max-w-xl mx-auto p-4 pb-24 space-y-6">
+      <PreRegPageShell wide={false}>
+        <div className="space-y-6">
         <div className="p-5 rounded-xl border border-emerald-500/50 bg-emerald-900/20 text-center space-y-3">
           <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto" />
           <h2 className="text-xl font-black text-white">{t('preregAdminCreatedTitle')}</h2>
@@ -152,12 +180,14 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
         >
           {t('preregAdminOpenPanel')}
         </button>
-      </main>
+        </div>
+      </PreRegPageShell>
     );
   }
 
   return (
-    <main className="max-w-2xl mx-auto p-4 pb-24 space-y-6">
+    <PreRegPageShell>
+      <div className="space-y-6">
       <button type="button" onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm">
         <ArrowLeft className="w-4 h-4" /> {t('tournBack')}
       </button>
@@ -185,28 +215,30 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <section className="p-4 rounded-xl border border-slate-800 bg-slate-900/80 space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-6 lg:grid lg:grid-cols-2 lg:gap-6 lg:space-y-0 lg:items-start">
+        <section className="p-4 rounded-xl border border-slate-800 bg-slate-900/80 space-y-4 lg:col-span-2">
           <h2 className="text-sm font-black uppercase tracking-widest text-slate-400">
             {t('preregAdminSectionBasic')}
           </h2>
-          <div>
-            <label className={labelCls}>{t('preregAdminName')} *</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} disabled={loading} />
-          </div>
-          <div>
-            <label className={labelCls}>{t('preregAdminVenue')}</label>
-            <input value={venue} onChange={(e) => setVenue(e.target.value)} className={inputCls} disabled={loading} />
-          </div>
-          <div>
-            <label className={labelCls}>{t('preregAdminStartsAt')}</label>
-            <input
-              type="datetime-local"
-              value={startsAt}
-              onChange={(e) => setStartsAt(e.target.value)}
-              className={inputCls}
-              disabled={loading}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className={labelCls}>{t('preregAdminName')} *</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} disabled={loading} />
+            </div>
+            <div>
+              <label className={labelCls}>{t('preregAdminVenue')}</label>
+              <input value={venue} onChange={(e) => setVenue(e.target.value)} className={inputCls} disabled={loading} />
+            </div>
+            <div>
+              <label className={labelCls}>{t('preregAdminStartsAt')}</label>
+              <input
+                type="datetime-local"
+                value={startsAt}
+                onChange={(e) => handleStartsAtChange(e.target.value)}
+                className={inputCls}
+                disabled={loading}
+              />
+            </div>
           </div>
         </section>
 
@@ -240,10 +272,14 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
             <input
               type="datetime-local"
               value={registrationDeadline}
-              onChange={(e) => setRegistrationDeadline(e.target.value)}
+              onChange={(e) => handleDeadlineChange(e.target.value)}
+              max={startsAt || undefined}
               className={inputCls}
               disabled={loading}
             />
+            {startsAt && (
+              <p className="text-[10px] text-slate-500 mt-1">{t('preregAdminDeadlineHint')}</p>
+            )}
           </div>
         </section>
 
@@ -303,16 +339,43 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
           </div>
           {showBankFields && (
             <>
-              <div>
-                <label className={labelCls}>{t('preregAdminAccount')} *</label>
-                <input
-                  value={accountNumber}
-                  onChange={(e) => setAccountNumber(e.target.value)}
-                  placeholder="123456/0100 nebo IBAN"
-                  className={`${inputCls} font-mono`}
-                  disabled={loading}
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className={labelCls}>{t('preregAdminAccountPrefix')}</label>
+                  <input
+                    value={accountPrefix}
+                    onChange={(e) => setAccountPrefix(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="123456"
+                    className={`${inputCls} font-mono`}
+                    disabled={loading}
+                    inputMode="numeric"
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>{t('preregAdminAccountNumber')} *</label>
+                  <input
+                    value={accountNumber}
+                    onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="1234567890"
+                    className={`${inputCls} font-mono`}
+                    disabled={loading}
+                    inputMode="numeric"
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>{t('preregAdminBankCode')} *</label>
+                  <input
+                    value={bankCode}
+                    onChange={(e) => setBankCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    placeholder="0100"
+                    className={`${inputCls} font-mono`}
+                    disabled={loading}
+                    inputMode="numeric"
+                    maxLength={4}
+                  />
+                </div>
               </div>
+              <p className="text-[10px] text-slate-500">{t('preregAdminAccountFormatHint')}</p>
               <div>
                 <label className={labelCls}>{t('preregAdminVsPrefix')}</label>
                 <input
@@ -359,13 +422,13 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
         </section>
 
         {error && (
-          <div className="p-3 rounded-lg bg-amber-900/30 border border-amber-500/50 text-amber-300 text-sm">{error}</div>
+          <div className="p-3 rounded-lg bg-amber-900/30 border border-amber-500/50 text-amber-300 text-sm lg:col-span-2">{error}</div>
         )}
 
         <button
           type="submit"
           disabled={loading || !isLoggedIn}
-          className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 lg:col-span-2"
         >
           {loading ? (
             <>
@@ -376,6 +439,7 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
           )}
         </button>
       </form>
-    </main>
+      </div>
+    </PreRegPageShell>
   );
 }
