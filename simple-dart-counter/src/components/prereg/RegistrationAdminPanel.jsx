@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Banknote,
@@ -170,9 +170,18 @@ export default function RegistrationAdminPanel({ lang, tournamentId, onBack, onI
   const [actionId, setActionId] = useState(null);
   const [copyFeedback, setCopyFeedback] = useState('');
   const [needsLogin, setNeedsLogin] = useState(false);
+  const isFetchingTournamentRef = useRef(false);
 
   useEffect(() => {
+    if (!tournamentId) return;
+    if (isFetchingTournamentRef.current) return;
+
     let cancelled = false;
+    isFetchingTournamentRef.current = true;
+    setLoading(true);
+    setError('');
+    setNeedsLogin(false);
+
     getOwnerTournamentData(tournamentId)
       .then((data) => {
         if (!cancelled) setTournament(data);
@@ -183,16 +192,18 @@ export default function RegistrationAdminPanel({ lang, tournamentId, onBack, onI
           if (msg.includes('prereg_auth_required') || msg.includes('prereg_access_denied')) {
             setNeedsLogin(true);
           }
-          setError(t('preregErrLoad'));
+          setError(translations[lang]?.preregErrLoad ?? 'preregErrLoad');
         }
       })
       .finally(() => {
+        isFetchingTournamentRef.current = false;
         if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
+      isFetchingTournamentRef.current = false;
     };
-  }, [tournamentId, t]);
+  }, [tournamentId, lang]);
 
   useEffect(() => {
     const unsub = listenToRegistrations(tournamentId, setRegistrations);

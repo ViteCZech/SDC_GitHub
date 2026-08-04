@@ -192,20 +192,38 @@ export async function claimAdminInviteAccess(tournamentId, token) {
 /**
  * @returns {Promise<Array<object>>}
  */
+let ownerTournamentsInflight = null;
+let ownerTournamentsInflightUid = null;
+
 export async function listOwnerTournaments() {
   const uid = requireOwnerUid();
-  const q = query(
-    collection(requireDb(), 'tournaments'),
-    where('admin.ownerUid', '==', uid)
-  );
-  const snap = await getDocs(q);
-  const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  list.sort((a, b) => {
-    const ta = a.createdAt?.toMillis?.() ?? 0;
-    const tb = b.createdAt?.toMillis?.() ?? 0;
-    return tb - ta;
-  });
-  return list;
+
+  if (ownerTournamentsInflight && ownerTournamentsInflightUid === uid) {
+    return ownerTournamentsInflight;
+  }
+
+  ownerTournamentsInflightUid = uid;
+  ownerTournamentsInflight = (async () => {
+    try {
+      const q = query(
+        collection(requireDb(), 'tournaments'),
+        where('admin.ownerUid', '==', uid)
+      );
+      const snap = await getDocs(q);
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => {
+        const ta = a.createdAt?.toMillis?.() ?? 0;
+        const tb = b.createdAt?.toMillis?.() ?? 0;
+        return tb - ta;
+      });
+      return list;
+    } finally {
+      ownerTournamentsInflight = null;
+      ownerTournamentsInflightUid = null;
+    }
+  })();
+
+  return ownerTournamentsInflight;
 }
 
 /**

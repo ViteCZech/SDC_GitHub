@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Calendar, ClipboardList, Loader2, Plus, Trophy, Users } from 'lucide-react';
 import { translations } from '../../translations';
 import { listOwnerTournaments } from '../../services/tournamentPreRegService';
@@ -62,20 +62,25 @@ export default function MyPreRegTournamentsList({
   onGoogleLogin,
 }) {
   const t = (k) => translations[lang]?.[k] || k;
-  const isLoggedIn = user && !user.isAnonymous;
+  const ownerUid = user && !user.isAnonymous ? user.uid : null;
 
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const isFetchingRef = useRef(false);
 
   useEffect(() => {
-    if (!isLoggedIn) {
+    if (!ownerUid) {
       setLoading(false);
       setTournaments([]);
+      setError('');
       return;
     }
 
+    if (isFetchingRef.current) return;
+
     let cancelled = false;
+    isFetchingRef.current = true;
     setLoading(true);
     setError('');
 
@@ -85,17 +90,19 @@ export default function MyPreRegTournamentsList({
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(String(err?.message ?? t('preregListErrLoad')));
+          setError(String(err?.message ?? translations[lang]?.preregListErrLoad ?? 'preregListErrLoad'));
         }
       })
       .finally(() => {
+        isFetchingRef.current = false;
         if (!cancelled) setLoading(false);
       });
 
     return () => {
       cancelled = true;
+      isFetchingRef.current = false;
     };
-  }, [isLoggedIn, t]);
+  }, [ownerUid, lang]);
 
   return (
     <main className="max-w-2xl mx-auto p-4 pb-24 space-y-6">
@@ -114,14 +121,14 @@ export default function MyPreRegTournamentsList({
         <button
           type="button"
           onClick={onCreateNew}
-          disabled={!isLoggedIn}
+          disabled={!ownerUid}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-500 text-white text-sm disabled:opacity-40"
         >
           <Plus className="w-4 h-4" /> {t('preregListCreateBtn')}
         </button>
       </header>
 
-      {!isLoggedIn && (
+      {!ownerUid && (
         <div className="p-4 rounded-xl border border-amber-500/50 bg-amber-900/20 space-y-3">
           <p className="text-sm text-amber-200">{t('preregAdminLoginRequired')}</p>
           {onGoogleLogin && (
@@ -148,7 +155,7 @@ export default function MyPreRegTournamentsList({
         </div>
       )}
 
-      {!loading && isLoggedIn && tournaments.length === 0 && !error && (
+      {!loading && ownerUid && tournaments.length === 0 && !error && (
         <div className="p-8 rounded-xl border border-dashed border-slate-700 text-center space-y-3">
           <Trophy className="w-10 h-10 text-slate-600 mx-auto" />
           <p className="text-slate-400">{t('preregListEmpty')}</p>

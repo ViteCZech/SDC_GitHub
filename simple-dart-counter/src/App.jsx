@@ -1202,8 +1202,11 @@ function AppMain({ lang, setLang }) {
   }, []);
 
   /** Po přihlášení Google uplatnit invite token (spolupořaditel). */
+  const claimedInviteRef = useRef(new Set());
+
   useEffect(() => {
-    if (!user || user.isAnonymous) return;
+    const uid = user?.uid;
+    if (!uid || user?.isAnonymous) return;
     const tournamentId = activePreRegTournamentId;
     if (!tournamentId) return;
 
@@ -1213,10 +1216,14 @@ function AppMain({ lang, setLang }) {
       null;
     if (!token) return;
 
+    const claimKey = `${tournamentId}:${token}:${uid}`;
+    if (claimedInviteRef.current.has(claimKey)) return;
+    claimedInviteRef.current.add(claimKey);
+
     void claimAdminInviteAccess(tournamentId, token).catch(() => {
-      /* neplatný / již uplatněný token */
+      claimedInviteRef.current.delete(claimKey);
     });
-  }, [user, activePreRegTournamentId, activePreRegInviteToken]);
+  }, [user?.uid, user?.isAnonymous, activePreRegTournamentId, activePreRegInviteToken]);
 
   const [settings, setSettings] = useState({
     gameType: 'x01',
