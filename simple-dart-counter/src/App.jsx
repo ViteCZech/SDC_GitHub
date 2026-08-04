@@ -57,7 +57,7 @@ import {
 } from './utils/tournamentLogic';
 import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
 
-const APP_VERSION = "v1.9.6";
+const APP_VERSION = "v1.9.7";
 
 function generatePin() {
   return Math.floor(1000 + Math.random() * 9000).toString();

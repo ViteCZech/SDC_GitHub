@@ -121,7 +121,7 @@ export default function TournamentSetup({
       })
       .catch((err) => {
         if (!cancelled) {
-          setCsoError(err?.message ?? 'Nepodařilo se načíst žebříček');
+          setCsoError(err?.message ?? t('tournCsoLoadError'));
           setCsoList([]);
           setCsoMeta(null);
         }
@@ -753,11 +753,10 @@ export default function TournamentSetup({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">
-                      {t('tournUseCsoRanking') || 'Použít oficiální žebříček ČŠO'}
+                      {t('tournUseCsoRanking')}
                     </p>
                     <p className="text-[11px] text-slate-500 leading-snug">
-                      {t('tournUseCsoRankingHint') ||
-                        'Umožní našeptávání hráčů z oficiální databáze a automatické doplnění rankingu pro nasazení.'}
+                      {t('tournUseCsoRankingHint')}
                     </p>
                   </div>
                   <button
@@ -787,7 +786,7 @@ export default function TournamentSetup({
                   {useCsoRanking && (
                   <div className="flex flex-wrap items-center gap-3 mb-4 pb-4 border-b border-slate-800">
                     <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                      {t('tournCsoRanking') || 'Oficiální žebříček ČŠO'}
+                      {t('tournCsoRanking')}
                     </span>
                     <div className="flex rounded-lg overflow-hidden border border-slate-600">
                       {(['men', 'women']).map((g) => (
@@ -803,9 +802,7 @@ export default function TournamentSetup({
                               : 'bg-slate-900 text-slate-400 hover:text-white'
                           }`}
                         >
-                          {g === 'men'
-                            ? t('tournMen') || 'Muži'
-                            : t('tournWomen') || 'Ženy'}
+                          {g === 'men' ? t('tournMen') : t('tournWomen')}
                         </button>
                       ))}
                     </div>
@@ -816,16 +813,16 @@ export default function TournamentSetup({
                       className={`${btnBase} bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm`}
                     >
                       <ExternalLink className="w-4 h-4" />
-                      {t('tournOpenOfficialRanking') || 'Otevřít oficiální žebříček'}
+                      {t('tournOpenOfficialRanking')}
                     </a>
                     {csoLoading && (
                       <span className="text-xs text-slate-500">
-                        {t('tournCsoLoading') || 'Načítám žebříček…'}
+                        {t('tournCsoLoading')}
                       </span>
                     )}
                     {!csoLoading && !csoError && csoMeta?.updatedAt && (
                       <span className="text-xs text-slate-500 px-2 py-1 rounded-md bg-slate-800/80 border border-slate-700">
-                        {(t('tournCsoUpdatedAt') || 'Žebříček aktuální k:')}{' '}
+                        {t('tournCsoUpdatedAt')}{' '}
                         <span className="text-slate-300 font-mono">
                           {formatCsoUpdatedAt(csoMeta.updatedAt)}
                         </span>
@@ -882,7 +879,7 @@ export default function TournamentSetup({
                         {t('tournRanking') || 'Ranking'}
                         {useCsoRanking && selectedCsoRank != null && (
                           <span className="ml-2 normal-case font-normal text-emerald-400">
-                            ({t('tournCsoFromRanking') || 'z žebříčku'})
+                            ({t('tournCsoFromRanking')})
                           </span>
                         )}
                       </label>
