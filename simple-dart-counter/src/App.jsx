@@ -4595,8 +4595,13 @@ function AppMain({ lang, setLang }) {
         <RegistrationAdminPanel
           key={`${activePreRegTournamentId}-${user?.uid ?? 'anon'}`}
           lang={lang}
+          user={user}
           tournamentId={activePreRegTournamentId}
           onBack={() => setAppState('prereg_list')}
+          onDeleted={() => {
+            setActivePreRegTournamentId(null);
+            setActivePreRegInviteToken(null);
+          }}
           onImportToSetup={handlePreRegImportToSetup}
           onGoogleLogin={handleLogin}
         />

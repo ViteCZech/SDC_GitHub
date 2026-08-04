@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, collection, onSnapshot, runTransaction, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, onSnapshot, runTransaction, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, deleteDoc, writeBatch } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app, db, auth } from '../firebase';
 import {
@@ -257,6 +257,33 @@ export async function getAdminInviteLinkForTournament(tournamentId) {
     });
   }
   return getAdminInviteUrl(tournamentId, token);
+}
+
+/**
+ * Smaže turnaj včetně všech registrací. Pouze vlastník (admin.ownerUid).
+ * @param {string} tournamentId
+ */
+export async function deletePreRegTournament(tournamentId) {
+  const uid = requireAuthUid();
+  const id = String(tournamentId ?? '').trim();
+  if (!id) throw new Error(PREREG_NOT_FOUND);
+
+  const tourRef = doc(requireDb(), 'tournaments', id);
+  const tourSnap = await getDoc(tourRef);
+  if (!tourSnap.exists()) throw new Error(PREREG_NOT_FOUND);
+  if (tourSnap.data()?.admin?.ownerUid !== uid) {
+    throw new Error('prereg_access_denied');
+  }
+
+  const regSnap = await getDocs(collection(requireDb(), 'tournaments', id, 'registrations'));
+  const regDocs = regSnap.docs;
+  for (let i = 0; i < regDocs.length; i += 500) {
+    const batch = writeBatch(requireDb());
+    regDocs.slice(i, i + 500).forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+
+  await deleteDoc(tourRef);
 }
 
 /**

@@ -8,6 +8,7 @@ import {
   Loader2,
   Plus,
   QrCode,
+  Trash2,
   UserCheck,
   UserX,
   X,
@@ -16,6 +17,7 @@ import { translations } from '../../translations';
 import {
   cancelRegistration,
   createManualRegistration,
+  deletePreRegTournament,
   getAdminInviteLinkForTournament,
   getOwnerTournamentData,
   listenToRegistrations,
@@ -24,6 +26,7 @@ import {
 } from '../../services/tournamentPreRegService';
 import { calculatePrizePool, distributePrizePool, getDistributionTemplate } from '../../utils/prizePool';
 import { getPublicRegistrationUrl } from '../../utils/preregAdmin';
+import { clearAdminInviteSession } from '../../utils/preregStorage';
 import ImportToTournamentButton from './ImportToTournamentButton';
 import PreRegPageShell from './PreRegPageShell';
 import CsoPlayerNameField from './CsoPlayerNameField';
@@ -153,12 +156,22 @@ function ManualRegistrationModal({ lang, tournament, onClose, onSaved }) {
  * @param {{
  *   lang: string,
  *   tournamentId: string,
+ *   user: object|null,
  *   onBack: () => void,
+ *   onDeleted?: () => void,
  *   onImportToSetup: (payload: { players: object[], tournamentName: string|null }) => void,
  *   onGoogleLogin?: () => void,
  * }} props
  */
-export default function RegistrationAdminPanel({ lang, tournamentId, onBack, onImportToSetup, onGoogleLogin }) {
+export default function RegistrationAdminPanel({
+  lang,
+  tournamentId,
+  user,
+  onBack,
+  onDeleted,
+  onImportToSetup,
+  onGoogleLogin,
+}) {
   const t = (k) => translations[lang]?.[k] || k;
 
   const [tournament, setTournament] = useState(null);
@@ -170,7 +183,14 @@ export default function RegistrationAdminPanel({ lang, tournamentId, onBack, onI
   const [actionId, setActionId] = useState(null);
   const [copyFeedback, setCopyFeedback] = useState('');
   const [needsLogin, setNeedsLogin] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const isFetchingTournamentRef = useRef(false);
+
+  const isOwner =
+    !!user?.uid &&
+    !user?.isAnonymous &&
+    tournament?.admin?.ownerUid === user.uid;
 
   useEffect(() => {
     if (!tournamentId) return;
@@ -260,6 +280,23 @@ export default function RegistrationAdminPanel({ lang, tournamentId, onBack, onI
     }
   };
 
+  const handleDeleteTournament = async () => {
+    setDeleting(true);
+    setError('');
+    try {
+      await deletePreRegTournament(tournamentId);
+      clearAdminInviteSession(tournamentId);
+      setDeleteConfirmOpen(false);
+      onDeleted?.();
+      onBack?.();
+    } catch (err) {
+      setError(String(err?.message ?? t('preregAdminDeleteErr')));
+      setDeleteConfirmOpen(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <PreRegPageShell>
@@ -304,6 +341,16 @@ export default function RegistrationAdminPanel({ lang, tournamentId, onBack, onI
             <Copy className="w-3.5 h-3.5" />
           </button>
           {copyFeedback && <span className="text-xs text-emerald-400">{copyFeedback}</span>}
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => setDeleteConfirmOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-red-950/40 border border-red-500/40 text-red-400 hover:bg-red-950/70"
+            >
+              <Trash2 className="w-4 h-4" />
+              {t('preregAdminDeleteBtn')}
+            </button>
+          )}
         </div>
       </header>
 
@@ -536,6 +583,40 @@ export default function RegistrationAdminPanel({ lang, tournamentId, onBack, onI
           onClose={() => setManualOpen(false)}
           onSaved={() => setManualOpen(false)}
         />
+      )}
+
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4">
+            <h3 className="text-lg font-black text-white">{t('preregAdminDeleteTitle')}</h3>
+            <p className="text-sm text-slate-400 whitespace-pre-line">{t('preregAdminDeleteConfirm')}</p>
+            <p className="text-sm font-bold text-white">{tournament.meta?.name || t('preregUntitled')}</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmOpen(false)}
+                disabled={deleting}
+                className="flex-1 py-3 rounded-xl font-bold bg-slate-800 text-slate-300 border border-slate-600 hover:bg-slate-700 disabled:opacity-50"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteTournament}
+                disabled={deleting}
+                className="flex-1 py-3 rounded-xl font-black bg-red-600 hover:bg-red-500 text-white disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> {t('preregAdminDeleting')}
+                  </>
+                ) : (
+                  t('preregAdminDeleteBtn')
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       </div>
     </PreRegPageShell>
