@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle, Cloud, Edit2, Target, Trash2, UserPlus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle, Cloud, Edit2, ExternalLink, Target, Trash2, UserPlus } from 'lucide-react';
 import { translations } from '../translations';
 import {
   applyAdvancementPhrase,
@@ -15,6 +15,12 @@ import {
 } from '../utils/tournamentLogic';
 import { AdminTapTextField } from './AdminTapField';
 import { useAdminVirtualKeyboardOptional } from '../context/AdminVirtualKeyboardContext';
+import {
+  formatCsoUpdatedAt,
+  getCsoRankingUrl,
+  loadCsoRanking,
+  searchCsoPlayers,
+} from '../utils/csoRanking';
 
 /** Ranking z inputu: prázdné nebo 0 → null */
 function parseRankingFromInput(val) {
@@ -71,11 +77,93 @@ export default function TournamentSetup({
   const [editingIndex, setEditingIndex] = useState(null);
   const [editName, setEditName] = useState('');
   const [editRanking, setEditRanking] = useState('');
+  const [csoList, setCsoList] = useState([]);
+  const [csoMeta, setCsoMeta] = useState(null);
+  const [csoLoading, setCsoLoading] = useState(false);
+  const [csoError, setCsoError] = useState(null);
+  const [nameSuggestions, setNameSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedCsoRank, setSelectedCsoRank] = useState(null);
   const tournamentNameFieldRef = useRef(null);
   const playerNameFieldRef = useRef(null);
   const playerRankingFieldRef = useRef(null);
 
   const players = tournamentDraft.players || [];
+  const csoGender = tournamentDraft.csoRankingGender === 'women' ? 'women' : 'men';
+  const useCsoRanking = !!tournamentDraft.useCsoRanking;
+
+  useEffect(() => {
+    if (step !== 2 || !useCsoRanking) {
+      setCsoList([]);
+      setCsoMeta(null);
+      setCsoLoading(false);
+      setCsoError(null);
+      setShowSuggestions(false);
+      setNameSuggestions([]);
+      setSelectedCsoRank(null);
+      return;
+    }
+
+    let cancelled = false;
+    setCsoLoading(true);
+    setCsoError(null);
+    setCsoMeta(null);
+    setShowSuggestions(false);
+    setNameSuggestions([]);
+    setSelectedCsoRank(null);
+
+    loadCsoRanking(csoGender)
+      .then((data) => {
+        if (!cancelled) {
+          setCsoList(data.players ?? []);
+          setCsoMeta(data.meta ?? null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setCsoError(err?.message ?? 'Nepodařilo se načíst žebříček');
+          setCsoList([]);
+          setCsoMeta(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCsoLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [step, csoGender, useCsoRanking]);
+
+  const handlePlayerNameChange = (v) => {
+    if (editingIndex !== null) setEditName(v);
+    else setPlayerName(v);
+    setSelectedCsoRank(null);
+    if (!useCsoRanking) {
+      setShowSuggestions(false);
+      setNameSuggestions([]);
+      return;
+    }
+    const hits = searchCsoPlayers(csoList, v);
+    setNameSuggestions(hits);
+    setShowSuggestions(v.trim().length >= 2 && hits.length > 0);
+  };
+
+  const selectCsoPlayer = (entry) => {
+    const name = String(entry?.name ?? '').trim();
+    const rankStr = entry?.rank != null ? String(entry.rank) : '';
+    if (editingIndex !== null) {
+      setEditName(name);
+      setEditRanking(rankStr);
+    } else {
+      setPlayerName(name);
+      setPlayerRanking(rankStr);
+    }
+    setSelectedCsoRank(entry?.rank ?? null);
+    setShowSuggestions(false);
+    setNameSuggestions([]);
+    vkOpt?.closeKeyboard?.();
+  };
 
   /** Master Out není podporován – stará hodnota se zobrazí jako DO */
   const effectiveOutMode =
@@ -231,6 +319,9 @@ export default function TournamentSetup({
     }));
     setPlayerName('');
     setPlayerRanking('');
+    setSelectedCsoRank(null);
+    setShowSuggestions(false);
+    setNameSuggestions([]);
     setAddConfirm(true);
     setTimeout(() => setAddConfirm(false), 1800);
     return true;
@@ -249,6 +340,9 @@ export default function TournamentSetup({
     setEditingIndex(idx);
     setEditName(players[idx].name);
     setEditRanking(players[idx].ranking != null ? String(players[idx].ranking) : '');
+    setSelectedCsoRank(null);
+    setShowSuggestions(false);
+    setNameSuggestions([]);
   };
 
   const handleSaveEdit = () => {
@@ -268,6 +362,9 @@ export default function TournamentSetup({
     setEditingIndex(null);
     setEditName('');
     setEditRanking('');
+    setSelectedCsoRank(null);
+    setShowSuggestions(false);
+    setNameSuggestions([]);
     return true;
   };
 
@@ -652,9 +749,95 @@ export default function TournamentSetup({
             </div>
 
             <div className="flex flex-col gap-6 w-full">
+              <div className="rounded-xl border border-slate-700/80 bg-slate-950/60 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">
+                      {t('tournUseCsoRanking') || 'Použít oficiální žebříček ČŠO'}
+                    </p>
+                    <p className="text-[11px] text-slate-500 leading-snug">
+                      {t('tournUseCsoRankingHint') ||
+                        'Umožní našeptávání hráčů z oficiální databáze a automatické doplnění rankingu pro nasazení.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={useCsoRanking}
+                    onClick={() =>
+                      setTournamentDraft((prev) => ({
+                        ...prev,
+                        useCsoRanking: !prev.useCsoRanking,
+                      }))
+                    }
+                    className={`relative h-8 w-14 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer ${
+                      useCsoRanking ? 'bg-emerald-600' : 'bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-1 left-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                        useCsoRanking ? 'translate-x-6' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
               <div className="p-4 border rounded-xl bg-slate-900 border-slate-800">
+                  {useCsoRanking && (
+                  <div className="flex flex-wrap items-center gap-3 mb-4 pb-4 border-b border-slate-800">
+                    <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                      {t('tournCsoRanking') || 'Oficiální žebříček ČŠO'}
+                    </span>
+                    <div className="flex rounded-lg overflow-hidden border border-slate-600">
+                      {(['men', 'women']).map((g) => (
+                        <button
+                          key={g}
+                          type="button"
+                          onClick={() =>
+                            setTournamentDraft((prev) => ({ ...prev, csoRankingGender: g }))
+                          }
+                          className={`px-4 py-2 text-sm font-bold transition-colors ${
+                            csoGender === g
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-slate-900 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {g === 'men'
+                            ? t('tournMen') || 'Muži'
+                            : t('tournWomen') || 'Ženy'}
+                        </button>
+                      ))}
+                    </div>
+                    <a
+                      href={getCsoRankingUrl(csoGender)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`${btnBase} bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm`}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      {t('tournOpenOfficialRanking') || 'Otevřít oficiální žebříček'}
+                    </a>
+                    {csoLoading && (
+                      <span className="text-xs text-slate-500">
+                        {t('tournCsoLoading') || 'Načítám žebříček…'}
+                      </span>
+                    )}
+                    {!csoLoading && !csoError && csoMeta?.updatedAt && (
+                      <span className="text-xs text-slate-500 px-2 py-1 rounded-md bg-slate-800/80 border border-slate-700">
+                        {(t('tournCsoUpdatedAt') || 'Žebříček aktuální k:')}{' '}
+                        <span className="text-slate-300 font-mono">
+                          {formatCsoUpdatedAt(csoMeta.updatedAt)}
+                        </span>
+                      </span>
+                    )}
+                    {csoError && !csoLoading && (
+                      <span className="text-xs text-amber-400">{csoError}</span>
+                    )}
+                  </div>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
+                    <div className="relative">
                       <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
                         {t('playerName') || 'Jméno hráče'}
                       </label>
@@ -662,11 +845,10 @@ export default function TournamentSetup({
                         fieldRef={playerNameFieldRef}
                         id="tournament-setup-player-name"
                         value={editingIndex !== null ? editName : playerName}
-                        onValueChange={(v) =>
-                          editingIndex !== null ? setEditName(v) : setPlayerName(v)
-                        }
+                        onValueChange={handlePlayerNameChange}
                         onEnterPress={() => {
                           vkOpt?.closeKeyboard?.();
+                          setShowSuggestions(false);
                           requestAnimationFrame(() => {
                             playerRankingFieldRef.current?.focus();
                             playerRankingFieldRef.current?.click();
@@ -675,18 +857,44 @@ export default function TournamentSetup({
                         placeholder={t('tournPlayerPlaceholder') || 'Jméno nebo jméno a příjmení'}
                         className={inputBase}
                       />
+                      {useCsoRanking && showSuggestions && nameSuggestions.length > 0 && (
+                        <ul
+                          className="absolute z-20 top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-600 bg-slate-800 shadow-xl"
+                          role="listbox"
+                        >
+                          {nameSuggestions.map((entry) => (
+                            <li key={entry.rank} role="option">
+                              <button
+                                type="button"
+                                className="w-full px-3 py-2 text-left hover:bg-emerald-900/40 flex justify-between gap-2 items-center"
+                                onClick={() => selectCsoPlayer(entry)}
+                              >
+                                <span className="font-medium text-white truncate">{entry.name}</span>
+                                <span className="text-xs text-slate-400 font-mono shrink-0">#{entry.rank}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
                         {t('tournRanking') || 'Ranking'}
+                        {useCsoRanking && selectedCsoRank != null && (
+                          <span className="ml-2 normal-case font-normal text-emerald-400">
+                            ({t('tournCsoFromRanking') || 'z žebříčku'})
+                          </span>
+                        )}
                       </label>
                       <AdminTapTextField
                         fieldRef={playerRankingFieldRef}
                         id="tournament-setup-player-ranking"
                         value={editingIndex !== null ? editRanking : playerRanking}
-                        onValueChange={(v) =>
-                          editingIndex !== null ? setEditRanking(v) : setPlayerRanking(v)
-                        }
+                        onValueChange={(v) => {
+                          if (editingIndex !== null) setEditRanking(v);
+                          else setPlayerRanking(v);
+                          setSelectedCsoRank(null);
+                        }}
                         onEnterPress={() => {
                           vkOpt?.closeKeyboard?.();
                           const ok =
@@ -738,6 +946,9 @@ export default function TournamentSetup({
                         setEditingIndex(null);
                         setEditName('');
                         setEditRanking('');
+                        setSelectedCsoRank(null);
+                        setShowSuggestions(false);
+                        setNameSuggestions([]);
                         setStep2Error('');
                       }}
                       className="mt-2 text-sm text-slate-500 hover:text-slate-300"

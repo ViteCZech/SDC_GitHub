@@ -1,0 +1,43 @@
+name: Update CSO Rankings
+
+on:
+  schedule:
+    # Každý den v 7:00 CEST (5:00 UTC, letní čas)
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-rankings:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: simple-dart-counter/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: simple-dart-counter
+
+      - name: Fetch rankings from Stedar
+        run: npm run update-rankings
+        working-directory: simple-dart-counter
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add simple-dart-counter/public/data/cso-ranking-men.json simple-dart-counter/public/data/cso-ranking-women.json
+          if git diff --staged --quiet; then
+            echo "No ranking changes to commit."
+          else
+            git commit -m "chore: update CSO rankings from Stedar"
+            git push
+          fi

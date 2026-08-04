@@ -85,6 +85,10 @@ function createDefaultTournamentDraft() {
     cloudEnabled: false,
     /** Heslo pro herní tablety (max. 5 znaků, odlišné od PIN); jen při cloudEnabled */
     tabletPassword: '',
+    /** Žebříček ČŠO (Stedar) pro našeptávač v kroku 2: 'men' | 'women' */
+    csoRankingGender: 'men',
+    /** Zapnout oficiální žebříček ČŠO (našeptávač + auto-ranking) v kroku 2 */
+    useCsoRanking: false,
   };
 }
 
