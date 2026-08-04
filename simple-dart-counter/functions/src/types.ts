@@ -1,0 +1,73 @@
+import type { Timestamp } from 'firebase-admin/firestore';
+
+export type TournamentStatus =
+  | 'DRAFT'
+  | 'REGISTRATION_OPEN'
+  | 'REGISTRATION_CLOSED'
+  | 'IN_PROGRESS'
+  | 'FINISHED';
+
+export type RegistrationStatus =
+  | 'PENDING_PAYMENT'
+  | 'CONFIRMED'
+  | 'WAITLIST'
+  | 'CANCELLED'
+  | 'NO_SHOW';
+
+export type PaymentMethod = 'QR' | 'CASH';
+
+export interface TournamentMeta {
+  name?: string;
+  venue?: string;
+  startsAt?: Timestamp | null;
+  /** null / undefined / 0 = neomezená kapacita */
+  capacity?: number | null;
+  waitlistEnabled?: boolean;
+  maxWaitlist?: number | null;
+  registrationDeadline?: Timestamp | null;
+}
+
+export interface TournamentFinance {
+  entryFee?: number | null;
+  currency?: string;
+  paymentMethods?: PaymentMethod[];
+  payoutPercent?: number | null;
+  addedSponsorMoney?: number | null;
+  vsPrefix?: string;
+  bankInfo?: {
+    accountNumber?: string;
+    bic?: string;
+  };
+}
+
+export interface TournamentDocument {
+  status: TournamentStatus;
+  termsAndConditions?: string | null;
+  meta?: TournamentMeta;
+  finance?: TournamentFinance;
+  admin: {
+    ownerUid: string;
+  };
+  counters?: {
+    confirmed?: number;
+    waitlist?: number;
+    pendingPayment?: number;
+  };
+}
+
+export interface RegisterPlayerPayload {
+  tournamentId: string;
+  playerName: string;
+  email?: string;
+  phone?: string;
+  csoRank?: number | null;
+  paymentMethod?: PaymentMethod | null;
+  termsAccepted?: boolean;
+}
+
+export interface RegisterPlayerResult {
+  success: true;
+  registrationId: string;
+  status: 'CONFIRMED' | 'WAITLIST';
+  variableSymbol: string | null;
+}

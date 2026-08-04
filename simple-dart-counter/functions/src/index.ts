@@ -1,0 +1,1 @@
+export { registerPlayer } from './registerPlayer';

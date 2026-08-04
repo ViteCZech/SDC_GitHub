@@ -163,8 +163,75 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
-    match /tournaments/{document=**} {
-      allow read, write: if request.auth != null;
+    /**
+     * Předregistrace turnajů (Fáze 1).
+     * Veřejné read jen pro non-DRAFT turnaje; registrace pouze přes Cloud Function.
+     * Citlivá data registrací (e-mail, telefon) — read jen pro ownera.
+     */
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function tournamentDoc(tournamentId) {
+      return get(/databases/$(database)/documents/tournaments/$(tournamentId)).data;
+    }
+
+    function isTournamentOwner(tournamentId) {
+      return isAuthenticated()
+        && tournamentDoc(tournamentId).keys().hasAny(['admin'])
+        && tournamentDoc(tournamentId).admin.ownerUid == request.auth.uid;
+    }
+
+    function tournamentCoAdminUids(data) {
+      return data.admin.keys().hasAny(['coAdminUids']) ? data.admin.coAdminUids : [];
+    }
+
+    function isTournamentCoAdmin(tournamentId) {
+      return isAuthenticated()
+        && request.auth.uid in tournamentCoAdminUids(tournamentDoc(tournamentId));
+    }
+
+    function isTournamentAdmin(tournamentId) {
+      return isTournamentOwner(tournamentId) || isTournamentCoAdmin(tournamentId);
+    }
+
+    /** Spolupořadatel se přidá sám po ověření invite tokenu (Google login). */
+    function isSelfClaimCoAdmin() {
+      let oldCo = resource.data.admin.keys().hasAny(['coAdminUids'])
+        ? resource.data.admin.coAdminUids
+        : [];
+      let newCo = request.resource.data.admin.keys().hasAny(['coAdminUids'])
+        ? request.resource.data.admin.coAdminUids
+        : [];
+      return isAuthenticated()
+        && resource.data.admin.ownerUid != request.auth.uid
+        && !(request.auth.uid in oldCo)
+        && request.auth.uid in newCo
+        && newCo.size() == oldCo.size() + 1
+        && newCo.hasAll(oldCo)
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['admin', 'updatedAt']);
+    }
+
+    match /tournaments/{tournamentId} {
+      allow read: if resource.data.status != 'DRAFT';
+      allow create: if isAuthenticated()
+        && request.resource.data.admin.ownerUid == request.auth.uid;
+      allow update: if isTournamentOwner(tournamentId) || isSelfClaimCoAdmin();
+      allow delete: if isTournamentOwner(tournamentId);
+
+      match /registrations/{regId} {
+        allow read: if isTournamentAdmin(tournamentId);
+        allow write: if isTournamentAdmin(tournamentId);
+      }
+    }
+
+    match /tournament_pins/{pin} {
+      allow read: if true;
+      allow create: if isAuthenticated()
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if isAuthenticated()
+        && resource.data.ownerUid == request.auth.uid;
     }
   }
 }

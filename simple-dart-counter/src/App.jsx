@@ -39,6 +39,16 @@ import TournamentBracketView from './components/TournamentBracketView';
 import TournamentStatisticsView from './components/TournamentStatisticsView';
 import TabletWaitingRoom from './components/TabletWaitingRoom';
 import TournamentHistory from './components/TournamentHistory';
+import PublicTournamentPage from './components/prereg/PublicTournamentPage';
+import TournamentPreRegSetup from './components/prereg/TournamentPreRegSetup';
+import RegistrationAdminPanel from './components/prereg/RegistrationAdminPanel';
+import MyPreRegTournamentsList from './components/prereg/MyPreRegTournamentsList';
+import { parsePreregRouteFromUrl } from './utils/preregAdmin';
+import { loadAdminInviteSession, saveAdminInviteSession } from './utils/preregStorage';
+import {
+  verifyAdminInviteToken,
+  claimAdminInviteAccess,
+} from './services/tournamentPreRegService';
 import { HomeOnlineMenuTile, HomeOnlineSubmenu } from './components/HomeOnlineMenu';
 import { distributePlayersToFixedGroups, generateGroupMatches } from './utils/tournamentGenerator';
 import {
@@ -57,10 +67,15 @@ import {
 } from './utils/tournamentLogic';
 import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
 
-const APP_VERSION = "v1.9.7";
+const APP_VERSION = "v1.9.9";
 
 function generatePin() {
   return Math.floor(1000 + Math.random() * 9000).toString();
+}
+
+/** Veřejná předregistrace: /t/:tournamentId (?invite=token pro admin) */
+function parsePreregTournamentIdFromPath() {
+  return parsePreregRouteFromUrl()?.tournamentId ?? null;
 }
 
 function createDefaultTournamentDraft() {
@@ -974,7 +989,25 @@ function AppMain({ lang, setLang }) {
   const { openKeyboard, isKeyboardOpen, internalKeyboardEnabled } = useAdminVirtualKeyboard();
   const [user, setUser] = useState(null);
   const [offlineMode, setOfflineMode] = useState(false);
-  const [appState, setAppState] = useState('home');
+  const [appState, setAppState] = useState(() => {
+    const route = parsePreregRouteFromUrl();
+    if (route?.inviteToken) return 'prereg_admin';
+    if (route?.tournamentId) return 'prereg_public';
+    return 'home';
+  });
+  const [preregTournamentId, setPreregTournamentId] = useState(() =>
+    parsePreregTournamentIdFromPath()
+  );
+  /** UUID turnaje v admin panelu předregistrace (vlastník přes Google). */
+  const [activePreRegTournamentId, setActivePreRegTournamentId] = useState(() => {
+    const route = parsePreregRouteFromUrl();
+    return route?.inviteToken ? route.tournamentId : null;
+  });
+  /** Invite token z URL / session pro spolupořaditele. */
+  const [activePreRegInviteToken, setActivePreRegInviteToken] = useState(() => {
+    const route = parsePreregRouteFromUrl();
+    return route?.inviteToken ?? null;
+  });
   /** Podmenu na úvodní obrazovce (např. online hra); při opuštění home se nuluje níže. */
   const [homeSubmenu, setHomeSubmenu] = useState(null);
   /** ID aktivní online hry ve Firestore (GameX01 / GameCricket). */
@@ -1127,16 +1160,63 @@ function AppMain({ lang, setLang }) {
     if (appState !== 'home') setHomeSubmenu(null);
   }, [appState]);
 
-  // Allow deep-link back from static pages like `privacy.html`.
+  // Deep-link: #about nebo /t/:tournamentId (?invite= pro admin panel)
   useEffect(() => {
-    const applyHashRoute = () => {
+    const applyRoutes = async () => {
       const h = String(window.location.hash || '').toLowerCase();
-      if (h === '#about') setAppState('about');
+      if (h === '#about') {
+        setAppState('about');
+        return;
+      }
+
+      const route = parsePreregRouteFromUrl();
+      if (!route) return;
+
+      setPreregTournamentId(route.tournamentId);
+
+      if (route.inviteToken) {
+        const valid = await verifyAdminInviteToken(route.tournamentId, route.inviteToken);
+        if (valid) {
+          saveAdminInviteSession(route.tournamentId, route.inviteToken);
+          setActivePreRegTournamentId(route.tournamentId);
+          setActivePreRegInviteToken(route.inviteToken);
+          setAppState('prereg_admin');
+          window.history.replaceState(null, '', `/t/${encodeURIComponent(route.tournamentId)}`);
+          return;
+        }
+      }
+
+      setAppState('prereg_public');
     };
-    applyHashRoute();
-    window.addEventListener('hashchange', applyHashRoute);
-    return () => window.removeEventListener('hashchange', applyHashRoute);
+
+    void applyRoutes();
+    const onRoute = () => {
+      void applyRoutes();
+    };
+    window.addEventListener('hashchange', onRoute);
+    window.addEventListener('popstate', onRoute);
+    return () => {
+      window.removeEventListener('hashchange', onRoute);
+      window.removeEventListener('popstate', onRoute);
+    };
   }, []);
+
+  /** Po přihlášení Google uplatnit invite token (spolupořaditel). */
+  useEffect(() => {
+    if (!user || user.isAnonymous) return;
+    const tournamentId = activePreRegTournamentId;
+    if (!tournamentId) return;
+
+    const token =
+      activePreRegInviteToken ??
+      loadAdminInviteSession(tournamentId)?.token ??
+      null;
+    if (!token) return;
+
+    void claimAdminInviteAccess(tournamentId, token).catch(() => {
+      /* neplatný / již uplatněný token */
+    });
+  }, [user, activePreRegTournamentId, activePreRegInviteToken]);
 
   const [settings, setSettings] = useState({
     gameType: 'x01',
@@ -2319,6 +2399,53 @@ function AppMain({ lang, setLang }) {
 
   const handleTournamentHubHistory = () => {
     setAppState('tournament_history');
+  };
+
+  const handleTournamentHubPreReg = () => {
+    setActivePreRegTournamentId(null);
+    setActivePreRegInviteToken(null);
+    setAppState('prereg_list');
+  };
+
+  const handlePreRegManage = (tournamentId) => {
+    setActivePreRegTournamentId(tournamentId);
+    setActivePreRegInviteToken(null);
+    setAppState('prereg_admin');
+  };
+
+  const handlePreRegCreateNew = () => {
+    setAppState('prereg_setup');
+  };
+
+  const handlePreRegTournamentCreated = (tournamentId) => {
+    setActivePreRegTournamentId(tournamentId);
+    setActivePreRegInviteToken(null);
+    setAppState('prereg_admin');
+  };
+
+  const handlePreRegImportToSetup = ({ players, tournamentName }) => {
+    setUserRole('admin');
+    let pinToUse = '';
+    setTournamentDraft((prev) => {
+      pinToUse =
+        prev.pin && /^\d{4}$/.test(String(prev.pin)) ? String(prev.pin) : generatePin();
+      writeTournamentWip(pinToUse);
+      const importedPlayers = (players || []).map((p, i) => ({
+        name: String(p.name ?? '').trim(),
+        ranking: p.ranking != null ? Number(p.ranking) : null,
+        id: `p${i + 1}`,
+      }));
+      return {
+        ...createDefaultTournamentDraft(),
+        ...prev,
+        pin: pinToUse,
+        name: tournamentName || prev.name || '',
+        players: importedPlayers,
+      };
+    });
+    setActivePin(pinToUse);
+    setTournamentSetupStep(2);
+    setAppState('tournament_setup');
   };
 
   useEffect(() => {
@@ -4132,6 +4259,7 @@ function AppMain({ lang, setLang }) {
           onTabletJoin={handleTournamentHubTabletJoin}
           onViewerJoin={handleTournamentHubViewerJoin}
           onOpenHistory={handleTournamentHubHistory}
+          onOpenPreReg={handleTournamentHubPreReg}
           onBack={() => setAppState('home')}
         />
       )}
@@ -4413,6 +4541,52 @@ function AppMain({ lang, setLang }) {
           tournamentMatches={tournamentMatches}
           tournamentBracket={tournamentBracket}
           lang={lang}
+        />
+      )}
+
+      {/* --- VEŘEJNÁ PŘEDREGISTRACE /t/:id --- */}
+      {appState === 'prereg_public' && preregTournamentId && (
+        <PublicTournamentPage
+          lang={lang}
+          tournamentId={preregTournamentId}
+          onBack={() => {
+            setAppState('home');
+            setPreregTournamentId(null);
+            window.history.replaceState(null, '', '/');
+          }}
+        />
+      )}
+
+      {/* --- ADMIN PŘEDREGISTRACE --- */}
+      {appState === 'prereg_list' && (
+        <MyPreRegTournamentsList
+          lang={lang}
+          user={user}
+          onBack={() => setAppState('tournament_hub')}
+          onManage={handlePreRegManage}
+          onCreateNew={handlePreRegCreateNew}
+          onGoogleLogin={handleLogin}
+        />
+      )}
+
+      {appState === 'prereg_setup' && (
+        <TournamentPreRegSetup
+          lang={lang}
+          user={user}
+          onBack={() => setAppState('prereg_list')}
+          onCreated={handlePreRegTournamentCreated}
+          onGoogleLogin={handleLogin}
+        />
+      )}
+
+      {appState === 'prereg_admin' && activePreRegTournamentId && (
+        <RegistrationAdminPanel
+          key={`${activePreRegTournamentId}-${user?.uid ?? 'anon'}`}
+          lang={lang}
+          tournamentId={activePreRegTournamentId}
+          onBack={() => setAppState('prereg_list')}
+          onImportToSetup={handlePreRegImportToSetup}
+          onGoogleLogin={handleLogin}
         />
       )}
 
