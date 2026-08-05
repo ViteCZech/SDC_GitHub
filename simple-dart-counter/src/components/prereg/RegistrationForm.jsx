@@ -39,17 +39,24 @@ export default function RegistrationForm({ lang, tournament, onSuccess }) {
     const code = err?.code ?? '';
     const msg = String(err?.message ?? '');
 
+    // Firebase někdy prefixuje "Firebase: " / "functions/" — necháme čitelný text
+    const clean = msg
+      .replace(/^Firebase:\s*/i, '')
+      .replace(/^functions\/[a-z-]+:\s*/i, '')
+      .trim();
+
     if (code === 'failed-precondition') {
-      if (msg.includes('podmínk')) return t('preregErrTerms');
-      if (msg.includes('limit') || msg.includes('Vypršel')) return t('preregErrDeadline');
-      if (msg.includes('otevřeny')) return t('preregErrClosed');
-      return msg || t('preregErrPrecondition');
+      if (clean.includes('podmínk')) return t('preregErrTerms');
+      if (clean.includes('limit') || clean.includes('Vypršel')) return t('preregErrDeadline');
+      if (clean.includes('otevřeny')) return t('preregErrClosed');
+      return clean || t('preregErrPrecondition');
     }
     if (code === 'resource-exhausted') return t('preregErrFull');
     if (code === 'already-exists') return t('preregErrDuplicateEmail');
-    if (code === 'invalid-argument') return msg || t('preregErrInvalid');
+    if (code === 'invalid-argument') return clean || t('preregErrInvalid');
     if (code === 'not-found') return t('preregErrNotFound');
-    return msg || t('preregErrGeneric');
+    if (code === 'internal') return clean || t('preregErrGeneric');
+    return clean || t('preregErrGeneric');
   };
 
   const handleSubmit = async (e) => {
@@ -72,8 +79,14 @@ export default function RegistrationForm({ lang, tournament, onSuccess }) {
 
     setLoading(true);
     try {
+      const tournamentId = String(tournament?.id ?? '').trim();
+      if (!tournamentId) {
+        setError(t('preregErrNotFound'));
+        return;
+      }
+
       const result = await registerPlayerApi({
-        tournamentId: tournament.id,
+        tournamentId,
         playerName: name,
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,

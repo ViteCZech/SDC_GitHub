@@ -1,4 +1,4 @@
-import { initializeApp, getApp } from 'firebase-admin/app';
+import { initializeApp, getApps, getApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
@@ -9,12 +9,19 @@ import type {
   TournamentDocument,
 } from './types';
 
-initializeApp();
+/** Bezpečná inicializace — nesmí spadnout při dvojitém importu modulů. */
+if (getApps().length === 0) {
+  initializeApp();
+}
 
 /** Stejná pojmenovaná DB jako v klientovi (`src/firebase.js`). */
 const db = getFirestore(getApp(), 'eur3');
 
-const ACTIVE_REGISTRATION_STATUSES = ['CONFIRMED', 'WAITLIST', 'PENDING_PAYMENT'] as const;
+const ACTIVE_REGISTRATION_STATUSES = new Set([
+  'CONFIRMED',
+  'WAITLIST',
+  'PENDING_PAYMENT',
+]);
 
 function normalizeEmail(email?: string): string | null {
   const trimmed = email?.trim().toLowerCase();
@@ -22,13 +29,13 @@ function normalizeEmail(email?: string): string | null {
 }
 
 function buildVariableSymbol(prefix: string | undefined, registrationId: string): string {
-  const digitsFromId = registrationId.replace(/\D/g, '');
+  const digitsFromId = String(registrationId ?? '').replace(/\D/g, '');
   const suffix =
     digitsFromId.length >= 6
       ? digitsFromId.slice(-6)
       : String(Date.now() % 1_000_000).padStart(6, '0');
   const combined = `${prefix ?? ''}${suffix}`.replace(/\s/g, '');
-  return combined.slice(0, 10);
+  return combined.slice(0, 10) || String(Date.now()).slice(-6);
 }
 
 function validatePaymentMethod(
@@ -48,7 +55,6 @@ function validatePaymentMethod(
   return paymentMethod;
 }
 
-/** Bezpečně přečte deadline Timestamp / Date / ISO string. */
 function isPastDeadline(deadline: unknown): boolean {
   if (deadline == null) return false;
   try {
@@ -68,33 +74,54 @@ function isPastDeadline(deadline: unknown): boolean {
   }
 }
 
+/**
+ * HttpsError hozený uvnitř runTransaction se často zabalí do obecné chyby → klient vidí jen "internal".
+ * Proto business chyby vracíme jako výsledek a po transakci je vyhodíme ven.
+ */
+type TxOk = { ok: true; result: RegisterPlayerResult };
+type TxFail = { ok: false; code: HttpsError['code']; message: string };
+type TxOutcome = TxOk | TxFail;
+
+function fail(code: HttpsError['code'], message: string): TxFail {
+  return { ok: false, code, message };
+}
+
+/**
+ * Callable v2: onCall((request) => …) — data jsou v request.data
+ */
 export const registerPlayer = onCall(
   { region: 'europe-west1' },
   async (request): Promise<RegisterPlayerResult> => {
     try {
       const data = (request.data ?? {}) as RegisterPlayerPayload;
-      const {
-        tournamentId,
-        playerName,
-        email,
-        phone,
-        csoRank,
-        paymentMethod,
-        termsAccepted = false,
-      } = data;
+      const tournamentId = String(data.tournamentId ?? '').trim();
+      const playerName = String(data.playerName ?? '').trim();
+      const email = data.email;
+      const phone = data.phone;
+      const csoRank = data.csoRank;
+      const paymentMethod = data.paymentMethod;
+      const termsAccepted = !!data.termsAccepted;
 
-      if (!tournamentId || !playerName?.trim()) {
+      logger.info('registerPlayer request', {
+        tournamentId: tournamentId || '(empty)',
+        playerNameLen: playerName.length,
+        hasEmail: !!email,
+        paymentMethod: paymentMethod ?? null,
+        termsAccepted,
+      });
+
+      if (!tournamentId || !playerName) {
         throw new HttpsError('invalid-argument', 'Jméno hráče a ID turnaje jsou povinné.');
       }
 
       const normalizedEmail = normalizeEmail(email);
 
-      return await db.runTransaction(async (transaction) => {
-        const tournamentRef = db.collection('tournaments').doc(String(tournamentId).trim());
+      const outcome = await db.runTransaction(async (transaction): Promise<TxOutcome> => {
+        const tournamentRef = db.collection('tournaments').doc(tournamentId);
         const tournamentDoc = await transaction.get(tournamentRef);
 
         if (!tournamentDoc.exists) {
-          throw new HttpsError('not-found', 'Turnaj nebyl nalezen.');
+          return fail('not-found', 'Turnaj nebyl nalezen.');
         }
 
         const tData = (tournamentDoc.data() ?? {}) as TournamentDocument;
@@ -107,39 +134,41 @@ export const registerPlayer = onCall(
           typeof tData.termsAndConditions === 'string' ? tData.termsAndConditions.trim() : '';
 
         if (terms && !termsAccepted) {
-          throw new HttpsError(
+          return fail(
             'failed-precondition',
             'Pro dokončení registrace je nutné souhlasit s podmínkami turnaje.'
           );
         }
 
         if (status !== 'REGISTRATION_OPEN') {
-          throw new HttpsError(
+          return fail(
             'failed-precondition',
             `Registrace do tohoto turnaje nejsou otevřeny${status ? ` (stav: ${status})` : ''}.`
           );
         }
 
         if (isPastDeadline(meta.registrationDeadline)) {
-          throw new HttpsError('failed-precondition', 'Vypršel časový limit pro přihlášení.');
+          return fail('failed-precondition', 'Vypršel časový limit pro přihlášení.');
         }
 
+        // Jednoduchý query (jen email) — bez composite indexu `email+status` uvnitř transakce
         if (normalizedEmail) {
           const duplicateQuery = tournamentRef
             .collection('registrations')
             .where('player.email', '==', normalizedEmail)
-            .where('status', 'in', [...ACTIVE_REGISTRATION_STATUSES])
-            .limit(1);
+            .limit(20);
           const duplicateSnap = await transaction.get(duplicateQuery);
-          if (!duplicateSnap.empty) {
-            throw new HttpsError('already-exists', 'Na tento e-mail je již registrace podána.');
+          const hasActive = duplicateSnap.docs.some((docSnap) =>
+            ACTIVE_REGISTRATION_STATUSES.has(String(docSnap.data()?.status ?? ''))
+          );
+          if (hasActive) {
+            return fail('already-exists', 'Na tento e-mail je již registrace podána.');
           }
         }
 
         const currentConfirmed = Number(counters.confirmed ?? 0) || 0;
         const rawCapacity = meta.capacity;
-        const parsedCapacity =
-          rawCapacity == null ? null : Number(rawCapacity);
+        const parsedCapacity = rawCapacity == null ? null : Number(rawCapacity);
         const capacityNum =
           parsedCapacity != null && Number.isFinite(parsedCapacity) && parsedCapacity > 0
             ? parsedCapacity
@@ -149,22 +178,30 @@ export const registerPlayer = onCall(
 
         if (capacityNum != null && currentConfirmed >= capacityNum) {
           if (!meta.waitlistEnabled) {
-            throw new HttpsError('resource-exhausted', 'Kapacita turnaje je naplněna.');
+            return fail('resource-exhausted', 'Kapacita turnaje je naplněna.');
           }
           newStatus = 'WAITLIST';
         }
 
-        const resolvedPaymentMethod = validatePaymentMethod(finance, paymentMethod);
-        const entryFee = finance.entryFee ?? null;
+        let resolvedPaymentMethod: PaymentMethod | null;
+        try {
+          resolvedPaymentMethod = validatePaymentMethod(finance, paymentMethod);
+        } catch (e) {
+          if (e instanceof HttpsError) {
+            return fail(e.code, e.message);
+          }
+          throw e;
+        }
 
+        const entryFee = finance.entryFee ?? null;
         const regRef = tournamentRef.collection('registrations').doc();
         const variableSymbol = buildVariableSymbol(finance.vsPrefix, regRef.id);
-
         const now = FieldValue.serverTimestamp();
+
         const newRegistration: Record<string, unknown> = {
           id: regRef.id,
           player: {
-            name: String(playerName).trim(),
+            name: playerName,
             email: normalizedEmail,
             phone: phone?.trim() || null,
             csoRank: csoRank ?? null,
@@ -191,7 +228,6 @@ export const registerPlayer = onCall(
 
         transaction.set(regRef, newRegistration);
 
-        // counters mohou v dokumentu chybět — increment je vytvoří
         if (newStatus === 'CONFIRMED') {
           transaction.update(tournamentRef, {
             'counters.confirmed': FieldValue.increment(1),
@@ -205,32 +241,44 @@ export const registerPlayer = onCall(
         }
 
         return {
-          success: true as const,
-          registrationId: regRef.id,
-          status: newStatus,
-          variableSymbol,
+          ok: true,
+          result: {
+            success: true,
+            registrationId: regRef.id,
+            status: newStatus,
+            variableSymbol,
+          },
         };
       });
+
+      if (!outcome.ok) {
+        throw new HttpsError(outcome.code, outcome.message);
+      }
+
+      logger.info('registerPlayer success', {
+        tournamentId,
+        registrationId: outcome.result.registrationId,
+        status: outcome.result.status,
+      });
+
+      return outcome.result;
     } catch (error) {
+      logger.error('KRITICKÁ CHYBA v registerPlayer:', error);
+
       if (error instanceof HttpsError) {
-        logger.error('Chyba při registraci hráče (HttpsError):', {
-          code: error.code,
-          message: error.message,
-        });
+        // Pro 'internal' Firebase klientům skrývá message — přemapujeme
+        if (error.code === 'internal') {
+          throw new HttpsError(
+            'invalid-argument',
+            `Chyba serveru: ${error.message || 'Registraci se nepodařilo uložit.'}`
+          );
+        }
         throw error;
       }
 
-      logger.error('Chyba při registraci hráče:', error);
-      const message =
-        error instanceof Error
-          ? error.message
-          : typeof error === 'object' && error && 'message' in error
-            ? String((error as { message: unknown }).message)
-            : '';
-      throw new HttpsError(
-        'internal',
-        message || 'Registraci se nepodařilo uložit.'
-      );
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      // Záměrně nepoužíváme 'internal', aby se text dostal až na frontend
+      throw new HttpsError('invalid-argument', `Chyba serveru: ${errorMessage}`);
     }
   }
 );

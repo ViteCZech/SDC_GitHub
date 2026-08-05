@@ -90,11 +90,22 @@ export async function getPublicTournamentData(tournamentId) {
  * @returns {Promise<RegisterPlayerResult>}
  */
 export async function registerPlayerApi(payload) {
+  const tournamentId = String(payload?.tournamentId ?? '').trim();
+  if (!tournamentId) {
+    const error = new Error('Chybí ID turnaje (tournamentId).');
+    error.code = 'invalid-argument';
+    throw error;
+  }
+
   const functions = getFunctions(requireApp(), FUNCTIONS_REGION);
   const registerFn = httpsCallable(functions, 'registerPlayer');
 
   try {
-    const result = await registerFn(payload);
+    const result = await registerFn({
+      ...payload,
+      tournamentId,
+      playerName: String(payload?.playerName ?? '').trim(),
+    });
     return /** @type {RegisterPlayerResult} */ (result.data);
   } catch (err) {
     const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
