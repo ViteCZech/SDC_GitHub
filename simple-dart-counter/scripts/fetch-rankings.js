@@ -66,34 +66,59 @@ function parseRankingTable(html) {
 }
 
 async function fetchAndSave({ gender, file, url }) {
-  console.log(`Stahuji ${gender}: ${url}`);
-  const html = await fetchHtml(url);
-  const players = parseRankingTable(html);
+  console.log(`[${gender}] Stahuji: ${url}`);
+  try {
+    const html = await fetchHtml(url);
+    const players = parseRankingTable(html);
 
-  if (players.length === 0) {
-    throw new Error(`Žádní hráči pro ${gender} – změnila se struktura stránky Stedar?`);
+    if (players.length === 0) {
+      throw new Error(`Žádní hráči pro ${gender} – změnila se struktura stránky Stedar?`);
+    }
+
+    const payload = {
+      meta: {
+        gender,
+        updatedAt: new Date().toISOString(),
+        totalPlayers: players.length,
+      },
+      players,
+    };
+
+    const outPath = join(OUT_DIR, file);
+    writeFileSync(outPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+    console.log(`[${gender}] OK – ${players.length} hráčů → ${outPath}`);
+    return { gender, totalPlayers: players.length };
+  } catch (err) {
+    console.error(`[${gender}] CHYBA:`, err instanceof Error ? err.message : err);
+    if (err instanceof Error && err.stack) console.error(err.stack);
+    throw err;
   }
-
-  const payload = {
-    meta: {
-      gender,
-      updatedAt: new Date().toISOString(),
-      totalPlayers: players.length,
-    },
-    players,
-  };
-
-  const outPath = join(OUT_DIR, file);
-  writeFileSync(outPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
-  console.log(`Uloženo ${players.length} hráčů → ${outPath}`);
 }
 
 async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
+  const results = [];
+  const errors = [];
+
   for (const cfg of RANKINGS) {
-    await fetchAndSave(cfg);
+    try {
+      const result = await fetchAndSave(cfg);
+      results.push(result);
+    } catch (err) {
+      errors.push({ gender: cfg.gender, error: err instanceof Error ? err.message : String(err) });
+    }
   }
-  console.log('Hotovo.');
+
+  if (results.length > 0) {
+    console.log('Úspěšně aktualizováno:', results);
+  }
+
+  if (errors.length > 0) {
+    console.error('Selhalo:', errors);
+    process.exit(1);
+  }
+
+  console.log('Hotovo – oba žebříčky aktualizovány.');
 }
 
 main().catch((err) => {

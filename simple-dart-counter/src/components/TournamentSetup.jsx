@@ -21,6 +21,7 @@ import {
   loadCsoRanking,
   searchCsoPlayers,
 } from '../utils/csoRanking';
+import CsoRankingUpdateButton from './CsoRankingUpdateButton';
 
 /** Ranking z inputu: prázdné nebo 0 → null */
 function parseRankingFromInput(val) {
@@ -52,6 +53,9 @@ export default function TournamentSetup({
   onBack,
   user,
   onGoogleLogin,
+  onNotify,
+  preRegTournamentId,
+  onBackToPreRegAdmin,
 }) {
   const t = (k) => translations[lang]?.[k] || k;
   const vkOpt = useAdminVirtualKeyboardOptional();
@@ -80,6 +84,7 @@ export default function TournamentSetup({
   const [csoList, setCsoList] = useState([]);
   const [csoMeta, setCsoMeta] = useState(null);
   const [csoLoading, setCsoLoading] = useState(false);
+  const [csoReloadKey, setCsoReloadKey] = useState(0);
   const [csoError, setCsoError] = useState(null);
   const [nameSuggestions, setNameSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -133,7 +138,7 @@ export default function TournamentSetup({
     return () => {
       cancelled = true;
     };
-  }, [step, csoGender, useCsoRanking]);
+  }, [step, csoGender, useCsoRanking, csoReloadKey, t]);
 
   const handlePlayerNameChange = (v) => {
     if (editingIndex !== null) setEditName(v);
@@ -527,6 +532,18 @@ export default function TournamentSetup({
         </div>
       )}
       <div className="w-full max-w-[98vw] xl:max-w-7xl mx-auto px-2 sm:px-4 py-4 pb-20">
+        {preRegTournamentId && onBackToPreRegAdmin && (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={onBackToPreRegAdmin}
+              className={`${btnBase} bg-slate-800 text-emerald-400 hover:bg-slate-700 border border-emerald-500/30 text-xs sm:text-sm`}
+            >
+              <ArrowLeft className="w-4 h-4" />
+              {t('preregBackToAdmin') || 'Zpět do správce předregistrací'}
+            </button>
+          </div>
+        )}
         {/* STEP 1 */}
         {step === 1 && (
           <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start animate-in fade-in duration-200">
@@ -831,6 +848,14 @@ export default function TournamentSetup({
                     {csoError && !csoLoading && (
                       <span className="text-xs text-amber-400">{csoError}</span>
                     )}
+                    <CsoRankingUpdateButton
+                      lang={lang}
+                      user={user}
+                      onLogin={onGoogleLogin}
+                      onNotify={onNotify}
+                      compact
+                      onUpdated={() => setCsoReloadKey((k) => k + 1)}
+                    />
                   </div>
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

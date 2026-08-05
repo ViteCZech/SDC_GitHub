@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, CheckCircle, Copy, Loader2, Trophy } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Copy, Eye, EyeOff, Loader2, Trophy } from 'lucide-react';
 import { translations } from '../../translations';
 import { createPreRegTournament } from '../../services/tournamentPreRegService';
 import {
@@ -25,6 +25,10 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
 
   const [name, setName] = useState('');
   const [venue, setVenue] = useState('');
+  const [locationCity, setLocationCity] = useState('');
+  const [locationVenueName, setLocationVenueName] = useState('');
+  const [locationRegion, setLocationRegion] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
   const [startsAt, setStartsAt] = useState('');
   const [capacity, setCapacity] = useState('');
   const [waitlistEnabled, setWaitlistEnabled] = useState(false);
@@ -40,6 +44,7 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
   const [vsPrefix, setVsPrefix] = useState('');
   const [termsAndConditions, setTermsAndConditions] = useState('');
   const [adminPin, setAdminPin] = useState('');
+  const [showAdminPin, setShowAdminPin] = useState(true);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -107,6 +112,10 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
       const result = await createPreRegTournament({
         name: name.trim(),
         venue: parseOptionalString(venue),
+        locationCity: parseOptionalString(locationCity),
+        locationVenueName: parseOptionalString(locationVenueName),
+        locationRegion: parseOptionalString(locationRegion),
+        isPublic,
         startsAt: parseOptionalDateTimeLocal(startsAt),
         capacity: parseOptionalNumber(capacity),
         waitlistEnabled,
@@ -230,6 +239,36 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
               <input value={venue} onChange={(e) => setVenue(e.target.value)} className={inputCls} disabled={loading} />
             </div>
             <div>
+              <label className={labelCls}>{t('preregAdminLocationCity')}</label>
+              <input
+                value={locationCity}
+                onChange={(e) => setLocationCity(e.target.value)}
+                className={inputCls}
+                disabled={loading}
+                placeholder={t('preregAdminLocationCityHint')}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>{t('preregAdminLocationVenue')}</label>
+              <input
+                value={locationVenueName}
+                onChange={(e) => setLocationVenueName(e.target.value)}
+                className={inputCls}
+                disabled={loading}
+                placeholder={t('preregAdminLocationVenueHint')}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>{t('preregAdminLocationRegion')}</label>
+              <input
+                value={locationRegion}
+                onChange={(e) => setLocationRegion(e.target.value)}
+                className={inputCls}
+                disabled={loading}
+                placeholder={t('preregAdminLocationRegionHint')}
+              />
+            </div>
+            <div>
               <label className={labelCls}>{t('preregAdminStartsAt')}</label>
               <input
                 type="datetime-local"
@@ -240,6 +279,15 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
               />
             </div>
           </div>
+          <label className="flex items-center gap-2 text-sm text-slate-300 pt-1">
+            <input
+              type="checkbox"
+              checked={isPublic}
+              onChange={(e) => setIsPublic(e.target.checked)}
+              disabled={loading}
+            />
+            {t('preregAdminIsPublic')}
+          </label>
         </section>
 
         <section className="p-4 rounded-xl border border-slate-800 bg-slate-900/80 space-y-4">
@@ -409,15 +457,27 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
           </h2>
           <div>
             <label className={labelCls}>{t('preregAdminPin')} *</label>
-            <input
-              type="password"
-              inputMode="numeric"
-              value={adminPin}
-              onChange={(e) => setAdminPin(e.target.value)}
-              maxLength={8}
-              className={inputCls}
-              disabled={loading}
-            />
+            <div className="relative">
+              <input
+                type={showAdminPin ? 'text' : 'password'}
+                inputMode="numeric"
+                value={adminPin}
+                onChange={(e) => setAdminPin(e.target.value)}
+                maxLength={8}
+                className={`${inputCls} pr-12 font-mono tracking-widest`}
+                disabled={loading}
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                onClick={() => setShowAdminPin((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-white"
+                tabIndex={-1}
+                aria-label={showAdminPin ? t('preregAdminPinHide') : t('preregAdminPinShow')}
+              >
+                {showAdminPin ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
         </section>
 

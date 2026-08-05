@@ -192,7 +192,7 @@ export default function RegistrationForm({ lang, tournament, onSuccess }) {
       )}
 
       {error && (
-        <div className="p-3 rounded-lg bg-amber-900/30 border border-amber-500/50 text-amber-300 text-sm font-medium">
+        <div className="p-3 rounded-lg bg-red-950/40 border border-red-500/60 text-red-200 text-sm font-medium">
           {error}
         </div>
       )}

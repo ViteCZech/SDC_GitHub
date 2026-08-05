@@ -1357,8 +1357,33 @@ export function generateBracketStructure(groups, promotersCount, baseLegs = 3, m
   if (promotedPlayers.length === 0) return [];
 
   const P = promotedPlayers.length;
-  /** Kapacita pavouka = nejbližší vyšší mocnina 2 (např. 13 → 16). Počet BYE = bracketSize − P. */
-  const bracketSize = nextPowerOfTwo(P);
+
+  /** Dva postupující → přímé finále bez předkola a BYE. */
+  if (P === 2) {
+    const [p1, p2] = promotedPlayers;
+    return [
+      {
+        round: 1,
+        matches: [
+          {
+            id: 'final-m0',
+            status: 'pending',
+            player1Id: p1.playerId,
+            player2Id: p2.playerId,
+            player1Name: p1.playerName,
+            player2Name: p2.playerName,
+            winnerId: null,
+            score: { p1: 0, p2: 0 },
+            winLegs: getBracketWinLegsForRound(0, baseLegs, prelimLegs),
+            isFinal: true,
+          },
+        ],
+      },
+    ];
+  }
+
+  /** Kapacita pavouka = nejbližší vyšší mocnina 2 (min. 4 pro standardní šablonu). */
+  const bracketSize = Math.max(4, nextPowerOfTwo(P));
 
   const template = getBracketSeedingTemplate(bracketSize);
   if (!template || template.length !== bracketSize) {

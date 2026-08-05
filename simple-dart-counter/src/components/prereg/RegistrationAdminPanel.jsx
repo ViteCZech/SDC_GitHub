@@ -28,6 +28,7 @@ import { calculatePrizePool, distributePrizePool, getDistributionTemplate } from
 import { getPublicRegistrationUrl } from '../../utils/preregAdmin';
 import { clearAdminInviteSession } from '../../utils/preregStorage';
 import ImportToTournamentButton from './ImportToTournamentButton';
+import PaymentQrModal from './PaymentQrModal';
 import PreRegPageShell from './PreRegPageShell';
 import CsoPlayerNameField from './CsoPlayerNameField';
 
@@ -159,8 +160,9 @@ function ManualRegistrationModal({ lang, tournament, onClose, onSaved }) {
  *   user: object|null,
  *   onBack: () => void,
  *   onDeleted?: () => void,
- *   onImportToSetup: (payload: { players: object[], tournamentName: string|null }) => void,
+ *   onImportToSetup: (payload: { players: object[], tournamentName: string|null, importMode?: string }) => void,
  *   onGoogleLogin?: () => void,
+ *   requireImportMode?: boolean,
  * }} props
  */
 export default function RegistrationAdminPanel({
@@ -171,6 +173,7 @@ export default function RegistrationAdminPanel({
   onDeleted,
   onImportToSetup,
   onGoogleLogin,
+  requireImportMode = false,
 }) {
   const t = (k) => translations[lang]?.[k] || k;
 
@@ -185,6 +188,8 @@ export default function RegistrationAdminPanel({
   const [needsLogin, setNeedsLogin] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [checkInConfirm, setCheckInConfirm] = useState(null);
+  const [qrModalReg, setQrModalReg] = useState(null);
   const isFetchingTournamentRef = useRef(false);
 
   const isOwner =
@@ -265,6 +270,27 @@ export default function RegistrationAdminPanel({
     } finally {
       setActionId(null);
     }
+  };
+
+  const handleCheckInToggle = (registration) => {
+    const nextCheckedIn = !registration.attendance?.checkedIn;
+    if (nextCheckedIn && !registration.payment?.isPaid) {
+      setCheckInConfirm(registration);
+      return;
+    }
+    runAction(registration.id, () =>
+      toggleRegistrationCheckIn(tournamentId, registration.id, nextCheckedIn)
+    );
+  };
+
+  const handleCheckInPayCashAndConfirm = async () => {
+    if (!checkInConfirm) return;
+    const reg = checkInConfirm;
+    setCheckInConfirm(null);
+    await runAction(reg.id, async () => {
+      await markRegistrationPaid(tournamentId, reg.id, 'CASH');
+      await toggleRegistrationCheckIn(tournamentId, reg.id, true);
+    });
   };
 
   const handleCopyInviteLink = async () => {
@@ -418,10 +444,12 @@ export default function RegistrationAdminPanel({
       <ImportToTournamentButton
         lang={lang}
         registrations={registrations}
-        onImport={(players) =>
+        requireImportMode={requireImportMode}
+        onImport={(payload) =>
           onImportToSetup?.({
-            players,
+            players: payload.players,
             tournamentName: tournament.meta?.name ?? null,
+            importMode: payload.importMode ?? 'fresh',
           })
         }
       />
@@ -506,17 +534,28 @@ export default function RegistrationAdminPanel({
                     {!isCancelled && (
                       <div className="flex flex-wrap gap-1">
                         {!r.payment?.isPaid && r.payment?.method === 'QR' && (
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() =>
-                              runAction(r.id, () => markRegistrationPaid(tournamentId, r.id, 'QR'))
-                            }
-                            className="p-2 rounded-lg bg-slate-800 text-cyan-400 hover:bg-slate-700"
-                            title={t('preregMarkPaidQr')}
-                          >
-                            <QrCode className="w-4 h-4" />
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => setQrModalReg(r)}
+                              className="px-2 py-2 rounded-lg bg-slate-800 text-sky-400 hover:bg-slate-700 text-[10px] sm:text-xs font-bold whitespace-nowrap"
+                              title={t('preregAdminShowQrBtn')}
+                            >
+                              📱 QR
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                runAction(r.id, () => markRegistrationPaid(tournamentId, r.id, 'QR'))
+                              }
+                              className="p-2 rounded-lg bg-slate-800 text-cyan-400 hover:bg-slate-700"
+                              title={t('preregMarkPaidQr')}
+                            >
+                              <QrCode className="w-4 h-4" />
+                            </button>
+                          </>
                         )}
                         {!r.payment?.isPaid && (
                           <button
@@ -534,11 +573,7 @@ export default function RegistrationAdminPanel({
                         <button
                           type="button"
                           disabled={busy}
-                          onClick={() =>
-                            runAction(r.id, () =>
-                              toggleRegistrationCheckIn(tournamentId, r.id, !r.attendance?.checkedIn)
-                            )
-                          }
+                          onClick={() => handleCheckInToggle(r)}
                           className={`p-2 rounded-lg bg-slate-800 hover:bg-slate-700 ${
                             r.attendance?.checkedIn ? 'text-emerald-400' : 'text-slate-400'
                           }`}
@@ -583,6 +618,41 @@ export default function RegistrationAdminPanel({
           onClose={() => setManualOpen(false)}
           onSaved={() => setManualOpen(false)}
         />
+      )}
+
+      {qrModalReg && (
+        <PaymentQrModal
+          lang={lang}
+          tournament={tournament}
+          registration={qrModalReg}
+          onClose={() => setQrModalReg(null)}
+        />
+      )}
+
+      {checkInConfirm && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4">
+            <h3 className="text-lg font-black text-white">{t('preregCheckInUnpaidTitle')}</h3>
+            <p className="text-sm text-slate-400">{t('preregCheckInUnpaidBody')}</p>
+            <p className="text-sm font-bold text-white">{checkInConfirm.player?.name}</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCheckInConfirm(null)}
+                className="flex-1 py-3 rounded-xl font-bold bg-slate-800 text-slate-300 border border-slate-600 hover:bg-slate-700"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleCheckInPayCashAndConfirm}
+                className="flex-1 py-3 rounded-xl font-black text-white bg-emerald-600 hover:bg-emerald-500 text-xs sm:text-sm"
+              >
+                {t('preregCheckInPayCashConfirm')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {deleteConfirmOpen && (

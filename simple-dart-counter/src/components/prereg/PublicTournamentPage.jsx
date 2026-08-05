@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Calendar, Loader2, MapPin, Trophy } from 'lucide-react';
 import { translations } from '../../translations';
 import {
@@ -62,6 +62,13 @@ export default function PublicTournamentPage({ tournamentId, lang, onBack }) {
     saveStoredRegistration(tournamentId, stored);
     setRegistration(stored);
   };
+
+  const confirmationRef = useRef(null);
+  useEffect(() => {
+    if (registration && confirmationRef.current) {
+      confirmationRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [registration]);
 
   const formatDate = (timestamp) => {
     if (!timestamp) return null;
@@ -164,7 +171,10 @@ export default function PublicTournamentPage({ tournamentId, lang, onBack }) {
       )}
 
       {showConfirmation && (
-        <section className="p-5 rounded-xl border border-slate-800 bg-slate-900/80">
+        <section
+          ref={confirmationRef}
+          className="p-5 rounded-xl border border-slate-800 bg-slate-900/80"
+        >
           <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-4">
             {t('preregLobbyTitle')}
           </h2>

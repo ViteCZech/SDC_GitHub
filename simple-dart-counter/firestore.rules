@@ -233,5 +233,11 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated()
         && resource.data.ownerUid == request.auth.uid;
     }
+
+    /** Oficiální žebříčky ČŠO (Stedar) — čtení veřejné, zápis pouze Cloud Functions (Admin SDK). */
+    match /cso_rankings/{gender} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }

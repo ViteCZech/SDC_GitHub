@@ -98,3 +98,9 @@ export function parsePreregRouteFromUrl() {
     inviteToken: inviteToken ? String(inviteToken).trim() : null,
   };
 }
+
+/** Veřejný katalog turnajů: /tournaments */
+export function isPublicTournamentCatalogPath() {
+  if (typeof window === 'undefined') return false;
+  return /^\/tournaments\/?$/i.test(String(window.location.pathname || ''));
+}

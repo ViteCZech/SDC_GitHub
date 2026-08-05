@@ -228,6 +228,23 @@ export async function listOwnerTournaments() {
 }
 
 /**
+ * Veřejný katalog — turnaje s visibility.isPublic == true (bez citlivých admin polí).
+ * @returns {Promise<Array<object>>}
+ */
+export async function getPublicTournamentsList() {
+  const q = query(
+    collection(requireDb(), 'tournaments'),
+    where('visibility.isPublic', '==', true)
+  );
+  const snap = await getDocs(q);
+  const list = snap.docs.map((d) => ({
+    id: d.id,
+    ...sanitizePublicTournament(d.data()),
+  }));
+  return list.filter((t) => t.status && t.status !== 'DRAFT');
+}
+
+/**
  * Vrátí správcovský invite odkaz (existující nebo nově vygenerovaný token).
  * @param {string} tournamentId
  * @returns {Promise<string>}
@@ -324,12 +341,20 @@ export async function createPreRegTournament(input) {
     meta: {
       name: input.name?.trim() || null,
       venue: input.venue ?? null,
+      location: {
+        city: input.locationCity?.trim() || null,
+        venueName: input.locationVenueName?.trim() || null,
+        region: input.locationRegion?.trim() || null,
+      },
       startsAt: input.startsAt ? Timestamp.fromDate(input.startsAt) : null,
       capacity: input.capacity ?? null,
       waitlistEnabled: !!input.waitlistEnabled,
       registrationDeadline: input.registrationDeadline
         ? Timestamp.fromDate(input.registrationDeadline)
         : null,
+    },
+    visibility: {
+      isPublic: input.isPublic !== false,
     },
     finance: {
       entryFee: input.entryFee ?? null,

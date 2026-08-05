@@ -8,14 +8,27 @@
 /** @typedef {'QR'|'CASH'} PaymentMethod */
 
 /**
+ * @typedef {Object} TournamentLocation
+ * @property {string|null} [city]
+ * @property {string|null} [venueName]
+ * @property {string|null} [region]
+ */
+
+/**
  * @typedef {Object} TournamentMeta
  * @property {string} [name]
  * @property {string} [venue]
+ * @property {TournamentLocation} [location]
  * @property {import('firebase/firestore').Timestamp|null} [startsAt]
  * @property {number|null} [capacity] null/0 = neomezeno
  * @property {boolean} [waitlistEnabled]
  * @property {number|null} [maxWaitlist]
  * @property {import('firebase/firestore').Timestamp|null} [registrationDeadline]
+ */
+
+/**
+ * @typedef {Object} TournamentVisibility
+ * @property {boolean} [isPublic]
  */
 
 /**
@@ -35,6 +48,7 @@
  * @property {string|null} [termsAndConditions]
  * @property {TournamentMeta} [meta]
  * @property {TournamentFinance} [finance]
+ * @property {TournamentVisibility} [visibility]
  * @property {{ ownerUid: string }} admin
  * @property {{ confirmed?: number, waitlist?: number, pendingPayment?: number }} [counters]
  */

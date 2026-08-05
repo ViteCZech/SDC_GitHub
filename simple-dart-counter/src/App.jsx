@@ -32,6 +32,7 @@ import GameX01 from './components/GameX01';
 import GameCricket from './components/GameCricket';
 import GameStats from './Stats';
 import TournamentSetup from './components/TournamentSetup';
+import CsoRankingUpdateButton from './components/CsoRankingUpdateButton';
 import TournamentHub from './components/TournamentHub';
 import TournamentBoardAssignment from './components/TournamentBoardAssignment';
 import TournamentGroupsView from './components/TournamentGroupsView';
@@ -40,10 +41,11 @@ import TournamentStatisticsView from './components/TournamentStatisticsView';
 import TabletWaitingRoom from './components/TabletWaitingRoom';
 import TournamentHistory from './components/TournamentHistory';
 import PublicTournamentPage from './components/prereg/PublicTournamentPage';
+import PublicTournamentDirectory from './components/prereg/PublicTournamentDirectory';
 import TournamentPreRegSetup from './components/prereg/TournamentPreRegSetup';
 import RegistrationAdminPanel from './components/prereg/RegistrationAdminPanel';
 import MyPreRegTournamentsList from './components/prereg/MyPreRegTournamentsList';
-import { parsePreregRouteFromUrl } from './utils/preregAdmin';
+import { parsePreregRouteFromUrl, isPublicTournamentCatalogPath } from './utils/preregAdmin';
 import { loadAdminInviteSession, saveAdminInviteSession } from './utils/preregStorage';
 import {
   verifyAdminInviteToken,
@@ -990,14 +992,17 @@ function AppMain({ lang, setLang }) {
   const [user, setUser] = useState(null);
   const [offlineMode, setOfflineMode] = useState(false);
   const [appState, setAppState] = useState(() => {
+    if (isPublicTournamentCatalogPath()) return 'prereg_catalog';
     const route = parsePreregRouteFromUrl();
     if (route?.inviteToken) return 'prereg_admin';
     if (route?.tournamentId) return 'prereg_public';
     return 'home';
   });
   const [preregTournamentId, setPreregTournamentId] = useState(() =>
-    parsePreregTournamentIdFromPath()
+    isPublicTournamentCatalogPath() ? null : parsePreregTournamentIdFromPath()
   );
+  /** Po otevření turnaje z katalogu — zpět vede na /tournaments místo domů. */
+  const [preregReturnToCatalog, setPreregReturnToCatalog] = useState(false);
   /** UUID turnaje v admin panelu předregistrace (vlastník přes Google). */
   const [activePreRegTournamentId, setActivePreRegTournamentId] = useState(() => {
     const route = parsePreregRouteFromUrl();
@@ -1008,7 +1013,9 @@ function AppMain({ lang, setLang }) {
     const route = parsePreregRouteFromUrl();
     return route?.inviteToken ?? null;
   });
-  /** Podmenu na úvodní obrazovce (např. online hra); při opuštění home se nuluje níže. */
+  /** ID předregistračního turnaje, ze kterého proběhl import do živého enginu. */
+  const [preRegImportSourceId, setPreRegImportSourceId] = useState(null);
+  const skipNextNameFocusRef = useRef(false);
   const [homeSubmenu, setHomeSubmenu] = useState(null);
   /** ID aktivní online hry ve Firestore (GameX01 / GameCricket). */
   const [onlineGameId, setOnlineGameId] = useState(null);
@@ -1166,6 +1173,13 @@ function AppMain({ lang, setLang }) {
       const h = String(window.location.hash || '').toLowerCase();
       if (h === '#about') {
         setAppState('about');
+        return;
+      }
+
+      if (isPublicTournamentCatalogPath()) {
+        setAppState('prereg_catalog');
+        setPreregTournamentId(null);
+        setPreregReturnToCatalog(false);
         return;
       }
 
@@ -2414,6 +2428,19 @@ function AppMain({ lang, setLang }) {
     setAppState('prereg_list');
   };
 
+  const handleTournamentHubCatalog = () => {
+    setPreregReturnToCatalog(false);
+    setAppState('prereg_catalog');
+    window.history.pushState(null, '', '/tournaments');
+  };
+
+  const handleOpenCatalogTournament = (tournamentId) => {
+    setPreregTournamentId(tournamentId);
+    setPreregReturnToCatalog(true);
+    setAppState('prereg_public');
+    window.history.pushState(null, '', `/t/${encodeURIComponent(tournamentId)}`);
+  };
+
   const handlePreRegManage = (tournamentId) => {
     setActivePreRegTournamentId(tournamentId);
     setActivePreRegInviteToken(null);
@@ -2430,24 +2457,93 @@ function AppMain({ lang, setLang }) {
     setAppState('prereg_admin');
   };
 
-  const handlePreRegImportToSetup = ({ players, tournamentName }) => {
+  const handlePreRegImportToSetup = ({ players, tournamentName, importMode = 'fresh' }) => {
     setUserRole('admin');
+    if (activePreRegTournamentId) {
+      setPreRegImportSourceId(activePreRegTournamentId);
+    }
+
+    const normalizeName = (n) => String(n ?? '').trim().toLowerCase();
+    const importedPlayers = (players || [])
+      .map((p, i) => ({
+        name: String(p.name ?? '').trim(),
+        ranking: p.ranking != null ? Number(p.ranking) : null,
+        id: `p${i + 1}`,
+      }))
+      .filter((p) => p.name);
+
+    if (importMode === 'merge') {
+      if (tournamentData?.groups?.length) {
+        setTournamentData((prev) => {
+          if (!prev?.groups?.length) return prev;
+          const existingNames = new Set(
+            (prev.players ?? []).map((p) => normalizeName(p.name))
+          );
+          const groups = prev.groups.map((g) => ({
+            ...g,
+            players: [...(g.players ?? [])],
+          }));
+          const addedPlayers = [];
+          let seq = (prev.players ?? []).length;
+
+          for (const p of importedPlayers) {
+            if (existingNames.has(normalizeName(p.name))) continue;
+            existingNames.add(normalizeName(p.name));
+            let minIdx = 0;
+            for (let i = 1; i < groups.length; i++) {
+              if ((groups[i].players?.length ?? 0) < (groups[minIdx].players?.length ?? 0)) {
+                minIdx = i;
+              }
+            }
+            const id = `p-late-${seq + 1}`;
+            seq += 1;
+            const row = { ...p, id };
+            groups[minIdx].players.push(row);
+            addedPlayers.push(row);
+          }
+
+          if (addedPlayers.length === 0) return prev;
+          return {
+            ...prev,
+            groups,
+            players: [...(prev.players ?? []), ...addedPlayers],
+          };
+        });
+        setAppState(
+          appState === 'tournament_setup' || appState === 'tournament_board_assignment'
+            ? 'tournament_groups'
+            : appState
+        );
+        return;
+      }
+
+      setTournamentDraft((prev) => {
+        const existing = prev.players ?? [];
+        const existingNames = new Set(existing.map((p) => normalizeName(p.name)));
+        const toAdd = importedPlayers.filter((p) => !existingNames.has(normalizeName(p.name)));
+        if (toAdd.length === 0) return prev;
+        const merged = [
+          ...existing,
+          ...toAdd.map((p, i) => ({ ...p, id: `p${existing.length + i + 1}` })),
+        ];
+        return { ...prev, name: tournamentName || prev.name || '', players: merged };
+      });
+      setTournamentSetupStep(2);
+      setAppState('tournament_setup');
+      return;
+    }
+
     let pinToUse = '';
     setTournamentDraft((prev) => {
       pinToUse =
         prev.pin && /^\d{4}$/.test(String(prev.pin)) ? String(prev.pin) : generatePin();
       writeTournamentWip(pinToUse);
-      const importedPlayers = (players || []).map((p, i) => ({
-        name: String(p.name ?? '').trim(),
-        ranking: p.ranking != null ? Number(p.ranking) : null,
-        id: `p${i + 1}`,
-      }));
       return {
         ...createDefaultTournamentDraft(),
         ...prev,
         pin: pinToUse,
         name: tournamentName || prev.name || '',
-        players: importedPlayers,
+        players: importedPlayers.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}` })),
       };
     });
     setActivePin(pinToUse);
@@ -3335,6 +3431,7 @@ function AppMain({ lang, setLang }) {
   const beginNameEdit = (fieldKey, afterClear) => {
     if (fieldKey === 'p2Name' && settings.isBot) return;
     const run = () => {
+      skipNextNameFocusRef.current = true;
       setSettings((prev) => {
         if (fieldKey === 'p1Name' && p1Defaults.includes(prev.p1Name)) return { ...prev, p1Name: '' };
         if (fieldKey === 'p2Name' && p2Defaults.includes(prev.p2Name)) return { ...prev, p2Name: '' };
@@ -3342,15 +3439,26 @@ function AppMain({ lang, setLang }) {
       });
       queueMicrotask(() => afterClear?.());
     };
-    if (user && !user.isAnonymous) {
+    const isDefaultName =
+      (fieldKey === 'p1Name' && p1Defaults.includes(settings.p1Name)) ||
+      (fieldKey === 'p2Name' && p2Defaults.includes(settings.p2Name));
+    if (user && !user.isAnonymous && isDefaultName) {
       requestConfirm(t('renameConfirm'), run);
       return;
     }
     run();
   };
 
+  const handleNameFieldFocus = (fieldKey, afterClear) => {
+    if (skipNextNameFocusRef.current) {
+      skipNextNameFocusRef.current = false;
+      return;
+    }
+    beginNameEdit(fieldKey, afterClear);
+  };
+
   const handleNameFieldClick = (fieldKey) => {
-    beginNameEdit(fieldKey, () => openNameKeyboard(fieldKey));
+    handleNameFieldFocus(fieldKey, () => openNameKeyboard(fieldKey));
   };
 
   useEffect(() => {
@@ -4267,6 +4375,7 @@ function AppMain({ lang, setLang }) {
           onViewerJoin={handleTournamentHubViewerJoin}
           onOpenHistory={handleTournamentHubHistory}
           onOpenPreReg={handleTournamentHubPreReg}
+          onOpenCatalog={handleTournamentHubCatalog}
           onBack={() => setAppState('home')}
         />
       )}
@@ -4329,6 +4438,16 @@ function AppMain({ lang, setLang }) {
           setTournamentDraft={setTournamentDraft}
           user={user}
           onGoogleLogin={handleLogin}
+          onNotify={showNotification}
+          preRegTournamentId={preRegImportSourceId}
+          onBackToPreRegAdmin={
+            preRegImportSourceId
+              ? () => {
+                  setActivePreRegTournamentId(preRegImportSourceId);
+                  setAppState('prereg_admin');
+                }
+              : undefined
+          }
           onComplete={(data) => {
             clearTournamentWip();
             const generatedPin = String(data.pin || activePin || generatePin()).trim();
@@ -4555,13 +4674,32 @@ function AppMain({ lang, setLang }) {
       {(appState === 'prereg_list' ||
         appState === 'prereg_setup' ||
         appState === 'prereg_admin' ||
-        appState === 'prereg_public') && (
+        appState === 'prereg_public' ||
+        appState === 'prereg_catalog') && (
         <div className="flex flex-col flex-1 min-h-0 w-full overflow-hidden">
+      {appState === 'prereg_catalog' && (
+        <PublicTournamentDirectory
+          lang={lang}
+          onBack={() => {
+            setAppState('tournament_hub');
+            window.history.replaceState(null, '', '/');
+          }}
+          onOpenTournament={handleOpenCatalogTournament}
+        />
+      )}
+
       {appState === 'prereg_public' && preregTournamentId && (
         <PublicTournamentPage
           lang={lang}
           tournamentId={preregTournamentId}
           onBack={() => {
+            if (preregReturnToCatalog) {
+              setPreregReturnToCatalog(false);
+              setPreregTournamentId(null);
+              setAppState('prereg_catalog');
+              window.history.replaceState(null, '', '/tournaments');
+              return;
+            }
             setAppState('home');
             setPreregTournamentId(null);
             window.history.replaceState(null, '', '/');
@@ -4603,6 +4741,10 @@ function AppMain({ lang, setLang }) {
             setActivePreRegInviteToken(null);
           }}
           onImportToSetup={handlePreRegImportToSetup}
+          requireImportMode={
+            !!preRegImportSourceId &&
+            ((tournamentDraft?.players?.length ?? 0) > 0 || !!tournamentData?.groups?.length)
+          }
           onGoogleLogin={handleLogin}
         />
       )}
@@ -4644,7 +4786,7 @@ function AppMain({ lang, setLang }) {
                           placeholder={t('p1Placeholder')}
                           value={settings.p1Name}
                           onChange={(e) => setSettings((s) => ({ ...s, p1Name: e.target.value }))}
-                          onFocus={() => beginNameEdit('p1Name')}
+                          onFocus={() => handleNameFieldFocus('p1Name')}
                           onBlur={() => restoreDefaultNameIfEmpty('p1Name')}
                         />
                     </div>
@@ -4675,7 +4817,7 @@ function AppMain({ lang, setLang }) {
                           placeholder={t('p2Placeholder')}
                           value={settings.p2Name}
                           onChange={(e) => setSettings((s) => ({ ...s, p2Name: e.target.value }))}
-                          onFocus={() => beginNameEdit('p2Name')}
+                          onFocus={() => handleNameFieldFocus('p2Name')}
                           onBlur={() => restoreDefaultNameIfEmpty('p2Name')}
                         />
                     </div>
@@ -4949,6 +5091,21 @@ function AppMain({ lang, setLang }) {
                 </div>
                 <div className="pt-6 md:pt-0 text-center md:text-left">
                     <p className="text-sm text-slate-400">{t('aboutText')}</p>
+                    {user && !user.isAnonymous && (
+                      <div className="mt-6 p-4 rounded-xl border border-slate-800 bg-slate-950/80 text-left space-y-2">
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                          {t('csoUpdateSectionTitle')}
+                        </p>
+                        <p className="text-[11px] text-slate-500">{t('csoUpdateSectionHint')}</p>
+                        <CsoRankingUpdateButton
+                          lang={lang}
+                          user={user}
+                          onLogin={handleLogin}
+                          onNotify={showNotification}
+                          onUpdated={() => {}}
+                        />
+                      </div>
+                    )}
                     <button onClick={() => window.location.href = `/privacy.html#${lang}`} className="flex items-center justify-center md:justify-start w-full gap-2 mt-8 text-sm font-bold tracking-widest underline uppercase text-emerald-500 hover:text-emerald-400">
                         {typeof t === 'function' ? t('privacyPolicy') : 'Zásady ochrany soukromí'}
                     </button>

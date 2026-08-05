@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Home, Shield, Tablet, Eye, History, ClipboardList } from 'lucide-react';
+import { Home, Shield, Tablet, Eye, History, ClipboardList, Trophy } from 'lucide-react';
 import { translations } from '../translations';
 
 /**
@@ -14,6 +14,7 @@ export default function TournamentHub({
   onViewerJoin,
   onOpenHistory,
   onOpenPreReg,
+  onOpenCatalog,
   onBack,
 }) {
   const th = (k) => translations[lang]?.tournamentHub?.[k] ?? k;
@@ -187,7 +188,7 @@ export default function TournamentHub({
       </h2>
 
       {/* Na šířku: 2×2 na mobilu, jeden řádek na velkých obrazovkách */}
-      <div className="grid w-full grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 landscape:gap-2 [@media(max-height:520px)]:gap-2">
+      <div className="grid w-full grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3 landscape:gap-2 [@media(max-height:520px)]:gap-2">
         <button
           type="button"
           onClick={() => onChooseAdmin?.()}
@@ -241,6 +242,17 @@ export default function TournamentHub({
             <ClipboardList className={tileIcon} />
           </div>
           <span className={tileLabel}>{th('preRegMode')}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onOpenCatalog?.()}
+          className={`${tileBtn} border-slate-700 bg-slate-800/80 hover:bg-slate-800`}
+        >
+          <div className={`${tileIconWrap} bg-sky-500/20 text-sky-400`}>
+            <Trophy className={tileIcon} />
+          </div>
+          <span className={tileLabel}>{th('browseTournaments')}</span>
         </button>
       </div>
 

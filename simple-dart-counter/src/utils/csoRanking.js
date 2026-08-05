@@ -1,3 +1,6 @@
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+
 const CSO_BASE_URL = 'https://www.stedar.org/alms/league/rankings.view?orgId=1';
 
 export const CSO_RANKING_URLS = {
@@ -12,6 +15,50 @@ export const CSO_RANKING_FILES = {
 
 /** @type {Map<'men'|'women', { meta: object, players: Array<{ rank: number, name: string, club?: string }> }>} */
 const cache = new Map();
+
+/**
+ * Vymaže in-memory cache (po ruční aktualizaci z Firestore).
+ * @param {'men'|'women'|null} [gender] null = oba
+ */
+export function clearCsoRankingCache(gender = null) {
+  if (gender === 'men' || gender === 'women') {
+    cache.delete(gender);
+    return;
+  }
+  cache.clear();
+}
+
+/**
+ * @param {'men'|'women'} gender
+ * @returns {Promise<{ meta: object, players: Array<{ rank: number, name: string, club?: string }> }|null>}
+ */
+async function loadCsoRankingFromFirestore(gender) {
+  if (!db) return null;
+  try {
+    const snap = await getDoc(doc(db, 'cso_rankings', gender));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    const players = Array.isArray(data?.players) ? data.players : [];
+    if (players.length === 0) return null;
+    return { meta: data?.meta ?? {}, players };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {'men'|'women'} gender
+ * @returns {Promise<{ meta: object, players: Array<{ rank: number, name: string, club?: string }> }>}
+ */
+async function loadCsoRankingFromStatic(gender) {
+  const res = await fetch(CSO_RANKING_FILES[gender]);
+  if (!res.ok) {
+    throw new Error(`Nepodařilo se načíst žebříček (${res.status})`);
+  }
+  const data = await res.json();
+  const players = Array.isArray(data?.players) ? data.players : [];
+  return { meta: data?.meta ?? {}, players };
+}
 
 /**
  * @param {'men'|'women'|string} gender
@@ -41,20 +88,22 @@ export function formatCsoUpdatedAt(isoString, locale = 'cs-CZ') {
 }
 
 /**
+ * Načte žebříček — priorita Firestore (Cloud Function), fallback statické JSON v public/data.
  * @param {'men'|'women'|string} gender
+ * @param {{ bypassCache?: boolean }} [options]
  * @returns {Promise<{ meta: object, players: Array<{ rank: number, name: string, club?: string }> }>}
  */
-export async function loadCsoRanking(gender) {
+export async function loadCsoRanking(gender, options = {}) {
   const g = gender === 'women' ? 'women' : 'men';
-  if (cache.has(g)) return cache.get(g);
+  if (!options.bypassCache && cache.has(g)) return cache.get(g);
 
-  const res = await fetch(CSO_RANKING_FILES[g]);
-  if (!res.ok) {
-    throw new Error(`Nepodařilo se načíst žebříček (${res.status})`);
+  const fromFirestore = await loadCsoRankingFromFirestore(g);
+  if (fromFirestore) {
+    cache.set(g, fromFirestore);
+    return fromFirestore;
   }
-  const data = await res.json();
-  const players = Array.isArray(data?.players) ? data.players : [];
-  const result = { meta: data?.meta ?? {}, players };
+
+  const result = await loadCsoRankingFromStatic(g);
   cache.set(g, result);
   return result;
 }
