@@ -88,9 +88,15 @@ function fail(code: HttpsError['code'], message: string): TxFail {
 
 /**
  * Callable v2: onCall((request) => …) — data jsou v request.data
+ * invoker: 'public' je nutné na Gen2/Cloud Run — jinak OPTIONS preflight bez CORS hlaviček
+ * (typicky po přechodu Spark → Blaze / novém deployi).
  */
 export const registerPlayer = onCall(
-  { region: 'europe-west1' },
+  {
+    region: 'europe-west1',
+    invoker: 'public',
+    cors: true,
+  },
   async (request): Promise<RegisterPlayerResult> => {
     try {
       const data = (request.data ?? {}) as RegisterPlayerPayload;

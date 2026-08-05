@@ -29,7 +29,13 @@ export const updateCsoRankingsScheduled = onSchedule(
 );
 
 /** Ruční aktualizace z admin UI (vyžaduje přihlášení). */
-export const updateCsoRankingsNow = onCall({ region: REGION }, async (request) => {
+export const updateCsoRankingsNow = onCall(
+  {
+    region: REGION,
+    invoker: 'public',
+    cors: true,
+  },
+  async (request) => {
   if (!request.auth) {
     throw new HttpsError(
       'unauthenticated',
