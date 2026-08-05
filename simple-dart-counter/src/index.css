@@ -34,3 +34,11 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Globální zjemnění nápověd ve všech formulářových polích */
+input::placeholder,
+textarea::placeholder {
+  color: rgba(255, 255, 255, 0.35) !important;
+  font-style: italic;
+  opacity: 1 !important;
+}
