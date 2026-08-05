@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Calendar, Loader2, MapPin, Trophy } from 'lucide-react';
 import { translations } from '../../translations';
 import {
