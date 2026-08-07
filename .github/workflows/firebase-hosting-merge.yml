@@ -9,25 +9,43 @@ jobs:
     steps:
       - name: Stažení kódu
         uses: actions/checkout@v4
-      
+
       - name: Nastavení Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: simple-dart-counter/package-lock.json
-          
-      - name: Instalace a build (lockfile)
+          cache-dependency-path: |
+            simple-dart-counter/package-lock.json
+            simple-dart-counter/functions/package-lock.json
+
+      - name: Instalace a build (web / Hosting)
         run: |
           rm -rf node_modules dist dev-dist
           npm ci
           npm run build
         working-directory: simple-dart-counter
 
-      - name: Nahrání na Firebase
+      - name: Install and Build Functions
+        run: |
+          npm ci
+          npm run build
+        working-directory: simple-dart-counter/functions
+
+      - name: Nahrání Hostingu na Firebase
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SIMPLE_DART_COUNTER_12FF2 }}
           channelId: live
+          projectId: simple-dart-counter-12ff2
           entryPoint: simple-dart-counter
+
+      - name: Autentizace Google Cloud (Functions deploy)
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SIMPLE_DART_COUNTER_12FF2 }}
+
+      - name: Nahrání Cloud Functions
+        run: npx firebase-tools@13 deploy --only functions --project simple-dart-counter-12ff2 --non-interactive
+        working-directory: simple-dart-counter
