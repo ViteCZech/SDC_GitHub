@@ -47,5 +47,5 @@ jobs:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SIMPLE_DART_COUNTER_12FF2 }}
 
       - name: Nahrání Cloud Functions
-        run: npx firebase-tools@13 deploy --only functions --project simple-dart-counter-12ff2 --non-interactive
+        run: npx firebase deploy --only functions --project simple-dart-counter-12ff2
         working-directory: simple-dart-counter
