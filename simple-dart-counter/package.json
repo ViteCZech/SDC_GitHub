@@ -8,7 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "update-rankings": "node scripts/fetch-rankings.js"
+    "update-rankings": "node scripts/fetch-rankings.js",
+    "android:update": "bubblewrap update --skipVersionUpgrade",
+    "android:build": "bubblewrap build --skipPwaValidation"
   },
   "dependencies": {
     "firebase": "^12.11.0",
@@ -18,6 +20,7 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@bubblewrap/cli": "^1.25.0",
     "@eslint/js": "^9.39.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",

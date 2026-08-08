@@ -1,0 +1,47 @@
+{
+  "packageId": "com.viteczech.simpledartcounter",
+  "host": "simple-dart-counter-12ff2.web.app",
+  "name": "Simple Dart Counter",
+  "launcherName": "SDC",
+  "display": "standalone",
+  "themeColor": "#020617",
+  "themeColorDark": "#020617",
+  "navigationColor": "#020617",
+  "navigationColorDark": "#020617",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#020617",
+  "enableNotifications": false,
+  "startUrl": "/",
+  "iconUrl": "https://simple-dart-counter-12ff2.web.app/icon-512.png",
+  "maskableIconUrl": "https://simple-dart-counter-12ff2.web.app/icon-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "android.keystore",
+    "alias": "android"
+  },
+  "appVersion": "1.10.2",
+  "appVersionCode": 1102,
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://simple-dart-counter-12ff2.web.app/manifest.json",
+  "fallbackType": "customtabs",
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "minSdkVersion": 21,
+  "orientation": "any",
+  "fingerprints": [
+    {
+      "name": "upload",
+      "value": "6C:DA:44:95:2C:BC:A4:D3:AD:29:7D:21:E8:1F:9D:A2:5A:85:43:B2:11:43:A4:8A:8F:B7:3A:29:F3:A2:1F"
+    },
+    {
+      "name": "play-signing",
+      "value": "AC:DA:44:95:2C:BC:A4:D3:AD:29:7D:21:E8:1F:9D:A2:5A:85:43:B2:11:43:A4:8A:8F:B7:3A:29:F3:A2:1F"
+    }
+  ],
+  "shortcuts": [],
+  "additionalTrustedOrigins": [
+    "simple-dart-counter-12ff2.firebaseapp.com"
+  ]
+}
