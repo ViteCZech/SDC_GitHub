@@ -1,8 +1,8 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-08-07T06:12:45.914Z",
-    "totalPlayers": 133
+    "updatedAt": "2026-08-09T05:51:58.239Z",
+    "totalPlayers": 134
   },
   "players": [
     {
@@ -539,6 +539,10 @@
     },
     {
       "rank": 117,
+      "name": "Kateřina Čepelová"
+    },
+    {
+      "rank": 117,
       "name": "Renata Slípková"
     },
     {
@@ -569,32 +573,32 @@
       "name": "Gabriela Pacltová"
     },
     {
-      "rank": 127,
+      "rank": 128,
       "name": "Hana Hozová"
     },
     {
-      "rank": 127,
+      "rank": 128,
       "name": "Lucie  Kluková"
     },
     {
-      "rank": 127,
+      "rank": 128,
       "name": "Simona Horváthová st"
     },
     {
-      "rank": 127,
+      "rank": 128,
       "name": "Sára Blahutová"
     },
     {
-      "rank": 127,
+      "rank": 128,
       "name": "Petra Vosková"
     },
     {
-      "rank": 127,
+      "rank": 128,
       "name": "Martina Sládková",
       "club": "Brněnská šipková z.s."
     },
     {
-      "rank": 127,
+      "rank": 128,
       "name": "Gabriela Vítková",
       "club": "Ferrari Darts Kyjov"
     }
