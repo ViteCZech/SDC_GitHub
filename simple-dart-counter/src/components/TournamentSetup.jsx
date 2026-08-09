@@ -22,6 +22,7 @@ import {
   searchCsoPlayers,
 } from '../utils/csoRanking';
 import CsoRankingUpdateButton from './CsoRankingUpdateButton';
+import { useListboxKeyboard } from '../hooks/useListboxKeyboard';
 
 /** Ranking z inputu: prázdné nebo 0 → null */
 function parseRankingFromInput(val) {
@@ -190,6 +191,19 @@ export default function TournamentSetup({
     setNameSuggestions([]);
     vkOpt?.closeKeyboard?.();
   };
+
+  const suggestionsOpen = useCsoRanking && showSuggestions && nameSuggestions.length > 0;
+  const {
+    highlightedIndex: suggestionHighlight,
+    setHighlightedIndex: setSuggestionHighlight,
+    setOptionRef: setSuggestionOptionRef,
+  } = useListboxKeyboard({
+    items: nameSuggestions,
+    isOpen: suggestionsOpen,
+    onSelect: (entry) => selectCsoPlayer(entry),
+    onClose: () => setShowSuggestions(false),
+    enabled: useCsoRanking,
+  });
 
   /** Master Out není podporován – stará hodnota se zobrazí jako DO */
   const effectiveOutMode =
@@ -921,13 +935,20 @@ export default function TournamentSetup({
                         <ul
                           className="absolute z-20 top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-600 bg-slate-800 shadow-xl"
                           role="listbox"
+                          id="tournament-setup-cso-suggestions"
                         >
-                          {nameSuggestions.map((entry) => (
-                            <li key={entry.rank} role="option">
+                          {nameSuggestions.map((entry, index) => (
+                            <li key={entry.rank} role="option" aria-selected={suggestionHighlight === index}>
                               <button
                                 type="button"
-                                className="w-full px-3 py-2 text-left hover:bg-emerald-900/40 flex justify-between gap-2 items-center"
+                                ref={(el) => setSuggestionOptionRef(index, el)}
+                                className={`w-full px-3 py-2 text-left flex justify-between gap-2 items-center ${
+                                  suggestionHighlight === index
+                                    ? 'bg-emerald-900/50'
+                                    : 'hover:bg-emerald-900/40'
+                                }`}
                                 onClick={() => selectCsoPlayer(entry)}
+                                onMouseEnter={() => setSuggestionHighlight(index)}
                               >
                                 <span className="font-medium text-white truncate">{entry.name}</span>
                                 <span className="text-xs text-slate-400 font-mono shrink-0">#{entry.rank}</span>

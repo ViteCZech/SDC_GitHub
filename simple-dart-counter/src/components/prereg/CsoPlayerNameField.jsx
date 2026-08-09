@@ -7,6 +7,7 @@ import {
   loadCsoRanking,
   searchCsoPlayers,
 } from '../../utils/csoRanking';
+import { useListboxKeyboard } from '../../hooks/useListboxKeyboard';
 
 /**
  * Pole jména hráče s volitelným našeptávačem žebříčku ČŠO (Stedar).
@@ -104,6 +105,19 @@ export default function CsoPlayerNameField({
     setNameSuggestions([]);
   };
 
+  const suggestionsOpen = useCsoRanking && showSuggestions && nameSuggestions.length > 0;
+  const {
+    highlightedIndex: suggestionHighlight,
+    setHighlightedIndex: setSuggestionHighlight,
+    setOptionRef: setSuggestionOptionRef,
+  } = useListboxKeyboard({
+    items: nameSuggestions,
+    isOpen: suggestionsOpen,
+    onSelect: (entry) => selectCsoPlayer(entry),
+    onClose: () => setShowSuggestions(false),
+    enabled: useCsoRanking && !disabled,
+  });
+
   const inputCls =
     inputClassName ||
     'w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50';
@@ -189,18 +203,29 @@ export default function CsoPlayerNameField({
             placeholder={t('tournPlayerPlaceholder')}
             className={inputCls}
             autoComplete="name"
+            role="combobox"
+            aria-expanded={suggestionsOpen}
+            aria-controls="cso-player-name-suggestions"
+            aria-autocomplete="list"
           />
-          {useCsoRanking && showSuggestions && nameSuggestions.length > 0 && (
+          {suggestionsOpen && (
             <ul
+              id="cso-player-name-suggestions"
               className="absolute z-30 top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-600 bg-slate-800 shadow-xl"
               role="listbox"
             >
-              {nameSuggestions.map((entry) => (
-                <li key={entry.rank} role="option">
+              {nameSuggestions.map((entry, index) => (
+                <li key={entry.rank} role="option" aria-selected={suggestionHighlight === index}>
                   <button
                     type="button"
-                    className="w-full px-3 py-2 text-left hover:bg-emerald-900/40 flex justify-between gap-2 items-center"
+                    ref={(el) => setSuggestionOptionRef(index, el)}
+                    className={`w-full px-3 py-2 text-left flex justify-between gap-2 items-center ${
+                      suggestionHighlight === index
+                        ? 'bg-emerald-900/50'
+                        : 'hover:bg-emerald-900/40'
+                    }`}
                     onClick={() => selectCsoPlayer(entry)}
+                    onMouseEnter={() => setSuggestionHighlight(index)}
                   >
                     <span className="font-medium text-white truncate text-sm">{entry.name}</span>
                     <span className="text-xs text-slate-400 font-mono shrink-0">#{entry.rank}</span>

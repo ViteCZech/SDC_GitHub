@@ -20,6 +20,8 @@ export function AdminTapTextField({
   id,
   /** Při systémové klávesnici: Enter = potvrzení (volitelně uložení); výchozí je blur pole. */
   onEnterPress,
+  /** Volitelné — šipky / Escape pro našeptávač apod. */
+  onKeyDown: onKeyDownProp,
   /** Ref na nativní input nebo tlačítko (focus / programové otevření klávesnice). */
   fieldRef,
 }) {
@@ -56,6 +58,10 @@ export function AdminTapTextField({
         value={value ?? ''}
         onChange={(e) => onValueChange(e.target.value)}
         onKeyDown={(e) => {
+          if (typeof onKeyDownProp === 'function') {
+            onKeyDownProp(e);
+            if (e.defaultPrevented) return;
+          }
           if (e.key !== 'Enter') return;
           e.preventDefault();
           if (typeof onEnterPress === 'function') {
