@@ -394,6 +394,10 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     preregCatalogEmpty: 'Zatím žádné veřejné turnaje.',
     preregCatalogNoMatch: 'Žádný turnaj neodpovídá filtru.',
     preregCatalogErrLoad: 'Nepodařilo se načíst katalog turnajů.',
+    preregCatalogErrPermission:
+      'Katalog turnajů není dostupný (oprávnění Firestore). Zkuste to později nebo kontaktujte správce.',
+    preregCatalogErrIndex:
+      'Katalog turnajů se připravuje (databázový index). Zkuste to za chvíli znovu.',
     csoUpdateSectionTitle: 'Žebříčky ČŠO (STEDAR)',
     csoUpdateSectionHint:
       'Automatická aktualizace probíhá denně v 7:00. Pokud jsou data zastaralá, spusťte ruční stažení (vyžaduje přihlášení Google).',
@@ -1035,6 +1039,10 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     preregCatalogEmpty: 'No public tournaments yet.',
     preregCatalogNoMatch: 'No tournaments match your filter.',
     preregCatalogErrLoad: 'Failed to load tournament directory.',
+    preregCatalogErrPermission:
+      'Tournament directory is unavailable (Firestore permissions). Try again later or contact the admin.',
+    preregCatalogErrIndex:
+      'Tournament directory is preparing (database index). Please try again in a moment.',
     csoUpdateSectionTitle: 'ČŠO rankings (STEDAR)',
     csoUpdateSectionHint:
       'Automatic update runs daily at 7:00 AM. If data is stale, trigger a manual download (Google sign-in required).',
@@ -1659,6 +1667,10 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
     preregCatalogEmpty: 'Brak publicznych turniejów.',
     preregCatalogNoMatch: 'Żaden turniej nie pasuje do filtra.',
     preregCatalogErrLoad: 'Nie udało się załadować katalogu turniejów.',
+    preregCatalogErrPermission:
+      'Katalog turniejów jest niedostępny (uprawnienia Firestore). Spróbuj później lub skontaktuj się z administratorem.',
+    preregCatalogErrIndex:
+      'Katalog turniejów jest przygotowywany (indeks bazy). Spróbuj ponownie za chwilę.',
     csoUpdateSectionTitle: 'Rankingi ČŠO (STEDAR)',
     csoUpdateSectionHint:
       'Automatyczna aktualizacja codziennie o 7:00. Jeśli dane są nieaktualne, uruchom ręczne pobranie (wymaga logowania Google).',

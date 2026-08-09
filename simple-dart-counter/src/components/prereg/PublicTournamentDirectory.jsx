@@ -167,7 +167,14 @@ export default function PublicTournamentDirectory({ lang, onBack, onOpenTourname
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(String(err?.message ?? t('preregCatalogErrLoad')));
+          const code = err?.code;
+          const msg =
+            code === 'permission-denied'
+              ? t('preregCatalogErrPermission')
+              : code === 'failed-precondition'
+                ? t('preregCatalogErrIndex')
+                : String(err?.message ?? t('preregCatalogErrLoad'));
+          setError(msg);
         }
       })
       .finally(() => {

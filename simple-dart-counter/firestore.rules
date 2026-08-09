@@ -214,7 +214,19 @@ service cloud.firestore {
     }
 
     match /tournaments/{tournamentId} {
-      allow read: if resource.data.status != 'DRAFT';
+      /**
+       * get: ne-DRAFT veřejně; vlastní DRAFT jen majitel.
+       * list: stejná logika — klientské query musí constraintovat status / ownerUid,
+       * jinak Firestore vrátí „Missing or insufficient permissions“.
+       */
+      allow get: if resource.data.status != 'DRAFT'
+        || (isAuthenticated()
+          && resource.data.keys().hasAny(['admin'])
+          && resource.data.admin.ownerUid == request.auth.uid);
+      allow list: if resource.data.status != 'DRAFT'
+        || (isAuthenticated()
+          && resource.data.keys().hasAny(['admin'])
+          && resource.data.admin.ownerUid == request.auth.uid);
       allow create: if isAuthenticated()
         && request.resource.data.admin.ownerUid == request.auth.uid;
       allow update: if isTournamentOwner(tournamentId) || isSelfClaimCoAdmin();

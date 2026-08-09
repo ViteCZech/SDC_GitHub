@@ -240,19 +240,27 @@ export async function listOwnerTournaments() {
 
 /**
  * Veřejný katalog — turnaje s visibility.isPublic == true (bez citlivých admin polí).
+ * Status musí být v query (ne jen client filter), jinak rules odmítnou celý list.
  * @returns {Promise<Array<object>>}
  */
+const PUBLIC_CATALOG_STATUSES = [
+  'REGISTRATION_OPEN',
+  'REGISTRATION_CLOSED',
+  'IN_PROGRESS',
+  'FINISHED',
+];
+
 export async function getPublicTournamentsList() {
   const q = query(
     collection(requireDb(), 'tournaments'),
-    where('visibility.isPublic', '==', true)
+    where('visibility.isPublic', '==', true),
+    where('status', 'in', PUBLIC_CATALOG_STATUSES)
   );
   const snap = await getDocs(q);
-  const list = snap.docs.map((d) => ({
+  return snap.docs.map((d) => ({
     id: d.id,
     ...sanitizePublicTournament(d.data()),
   }));
-  return list.filter((t) => t.status && t.status !== 'DRAFT');
 }
 
 /**
