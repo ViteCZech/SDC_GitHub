@@ -4,6 +4,9 @@ import { app } from '../firebase';
 /** Region musí odpovídat nasazení Cloud Functions. */
 const FUNCTIONS_REGION = 'europe-west1';
 
+/** Scraping Stedar + zápis do Firestore může trvat déle než výchozí timeout. */
+const CALLABLE_TIMEOUT_MS = 120_000;
+
 function requireApp() {
   if (!app) throw new Error('Firebase není inicializováno.');
   return app;
@@ -15,7 +18,9 @@ function requireApp() {
  */
 export async function updateCsoRankingsNow() {
   const functions = getFunctions(requireApp(), FUNCTIONS_REGION);
-  const fn = httpsCallable(functions, 'updateCsoRankingsNow');
+  const fn = httpsCallable(functions, 'updateCsoRankingsNow', {
+    timeout: CALLABLE_TIMEOUT_MS,
+  });
   const result = await fn();
   return result.data;
 }

@@ -34,6 +34,9 @@ export const updateCsoRankingsNow = onCall(
     region: REGION,
     invoker: 'public',
     cors: true,
+    /** Stedar fetch + parse + Firestore zápis obou žebříčků. */
+    timeoutSeconds: 120,
+    memory: '512MiB',
   },
   async (request) => {
   if (!request.auth) {

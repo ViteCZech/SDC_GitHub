@@ -99,12 +99,12 @@ export default function TournamentSetup({
 
   useEffect(() => {
     if (step !== 2 || !useCsoRanking) {
-      setCsoList([]);
+      setCsoList((prev) => (prev.length === 0 ? prev : []));
       setCsoMeta(null);
       setCsoLoading(false);
       setCsoError(null);
       setShowSuggestions(false);
-      setNameSuggestions([]);
+      setNameSuggestions((prev) => (prev.length === 0 ? prev : []));
       setSelectedCsoRank(null);
       return;
     }
@@ -114,7 +114,7 @@ export default function TournamentSetup({
     setCsoError(null);
     setCsoMeta(null);
     setShowSuggestions(false);
-    setNameSuggestions([]);
+    setNameSuggestions((prev) => (prev.length === 0 ? prev : []));
     setSelectedCsoRank(null);
 
     loadCsoRanking(csoGender)
@@ -126,7 +126,9 @@ export default function TournamentSetup({
       })
       .catch((err) => {
         if (!cancelled) {
-          setCsoError(err?.message ?? t('tournCsoLoadError'));
+          const fallback =
+            translations[lang]?.tournCsoLoadError || 'Nepodařilo se načíst žebříček';
+          setCsoError(err?.message ?? fallback);
           setCsoList([]);
           setCsoMeta(null);
         }
@@ -138,7 +140,8 @@ export default function TournamentSetup({
     return () => {
       cancelled = true;
     };
-  }, [step, csoGender, useCsoRanking, csoReloadKey, t]);
+    // `lang` místo `t` — `t` je nová funkce při každém renderu a způsobovalo nekonečný re-render (zamrznutí UI).
+  }, [step, csoGender, useCsoRanking, csoReloadKey, lang]);
 
   const handlePlayerNameChange = (v) => {
     if (editingIndex !== null) setEditName(v);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState, startTransition } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { translations } from '../translations';
 import { updateCsoRankingsNow } from '../services/csoRankingService';
@@ -6,6 +6,7 @@ import { clearCsoRankingCache } from '../utils/csoRanking';
 
 /**
  * Tlačítko pro ruční stažení žebříčků ze Stedar (Cloud Function).
+ * Volání běží asynchronně; UI zůstává responsivní díky loading stavu a startTransition při reloadu.
  * @param {{
  *   lang: string,
  *   user: object|null,
@@ -34,39 +35,57 @@ export default function CsoRankingUpdateButton({
   };
 
   const [loading, setLoading] = useState(false);
+  const inFlightRef = useRef(false);
   const isLoggedIn = user && !user.isAnonymous;
 
-  const handleClick = async () => {
+  const handleClick = () => {
+    if (inFlightRef.current || loading) return;
+
     if (!isLoggedIn) {
       onNotify?.(t('csoUpdateLoginRequired'), 'error');
       onLogin?.();
       return;
     }
 
+    inFlightRef.current = true;
     setLoading(true);
-    try {
-      const result = await updateCsoRankingsNow();
-      clearCsoRankingCache();
-      onUpdated?.(result);
-      onNotify?.(
-        t('csoUpdateSuccess', {
-          total: result?.totalPlayers ?? 0,
-          updatedAt: result?.updatedAt
-            ? new Date(result.updatedAt).toLocaleString(lang === 'pl' ? 'pl-PL' : lang === 'en' ? 'en-GB' : 'cs-CZ')
-            : '',
-        }),
-        'success'
-      );
-    } catch (err) {
-      const code = err?.code;
-      const msg =
-        code === 'functions/unauthenticated'
-          ? t('csoUpdateLoginRequired')
-          : err?.message || t('csoUpdateError');
-      onNotify?.(msg, 'error');
-    } finally {
-      setLoading(false);
-    }
+
+    // Odloží síťové volání za paint spinneru, aby UI nestihlo zamrznout před indikací načítání.
+    window.setTimeout(() => {
+      void (async () => {
+        try {
+          const result = await updateCsoRankingsNow();
+          clearCsoRankingCache();
+          onNotify?.(
+            t('csoUpdateSuccess', {
+              total: result?.totalPlayers ?? 0,
+              updatedAt: result?.updatedAt
+                ? new Date(result.updatedAt).toLocaleString(
+                    lang === 'pl' ? 'pl-PL' : lang === 'en' ? 'en-GB' : 'cs-CZ'
+                  )
+                : '',
+            }),
+            'success'
+          );
+          // Reload žebříčku mimo urgentní update, ať notifikace a spinner stihnou vyrenderovat.
+          startTransition(() => {
+            onUpdated?.(result);
+          });
+        } catch (err) {
+          const code = err?.code;
+          const msg =
+            code === 'functions/unauthenticated'
+              ? t('csoUpdateLoginRequired')
+              : code === 'functions/deadline-exceeded'
+                ? t('csoUpdateError')
+                : err?.message || t('csoUpdateError');
+          onNotify?.(msg, 'error');
+        } finally {
+          inFlightRef.current = false;
+          setLoading(false);
+        }
+      })();
+    }, 0);
   };
 
   const btnCls = compact
@@ -78,6 +97,7 @@ export default function CsoRankingUpdateButton({
       type="button"
       onClick={handleClick}
       disabled={loading}
+      aria-busy={loading}
       className={btnCls}
       title={t('csoUpdateBtnHint')}
     >
