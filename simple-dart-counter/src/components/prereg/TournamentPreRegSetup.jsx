@@ -9,6 +9,7 @@ import {
   parseOptionalString,
 } from '../../utils/preregAdmin';
 import PreRegPageShell from './PreRegPageShell';
+import DateTimeLocalFields from './DateTimeLocalFields';
 
 /**
  * @param {{
@@ -270,12 +271,13 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
             </div>
             <div>
               <label className={labelCls}>{t('preregAdminStartsAt')}</label>
-              <input
-                type="datetime-local"
+              <DateTimeLocalFields
                 value={startsAt}
-                onChange={(e) => handleStartsAtChange(e.target.value)}
-                className={inputCls}
+                onChange={handleStartsAtChange}
+                inputClassName={inputCls}
                 disabled={loading}
+                dateLabel={t('preregAdminDate')}
+                timeLabel={t('preregAdminTime')}
               />
             </div>
           </div>
@@ -317,13 +319,14 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
           </label>
           <div>
             <label className={labelCls}>{t('preregAdminDeadline')}</label>
-            <input
-              type="datetime-local"
+            <DateTimeLocalFields
               value={registrationDeadline}
-              onChange={(e) => handleDeadlineChange(e.target.value)}
+              onChange={handleDeadlineChange}
               max={startsAt || undefined}
-              className={inputCls}
+              inputClassName={inputCls}
               disabled={loading}
+              dateLabel={t('preregAdminDate')}
+              timeLabel={t('preregAdminTime')}
             />
             {startsAt && (
               <p className="text-[10px] text-slate-500 mt-1">{t('preregAdminDeadlineHint')}</p>
