@@ -35,28 +35,18 @@ export function clearCsoRankingCache(gender = null) {
  */
 async function loadCsoRankingFromFirestore(gender, options = {}) {
   if (!db) return null;
+  const ref = doc(db, 'cso_rankings', gender);
   try {
-    const ref = doc(db, 'cso_rankings', gender);
     const snap = options.fromServer ? await getDocFromServer(ref) : await getDoc(ref);
     if (!snap.exists()) return null;
     const data = snap.data();
     const players = Array.isArray(data?.players) ? data.players : [];
     if (players.length === 0) return null;
     return { meta: data?.meta ?? {}, players };
-  } catch {
-    // Offline / server unavailable — zkus lokální cache SDK, pak fallback na static JSON.
-    if (options.fromServer) {
-      try {
-        const snap = await getDoc(doc(db, 'cso_rankings', gender));
-        if (!snap.exists()) return null;
-        const data = snap.data();
-        const players = Array.isArray(data?.players) ? data.players : [];
-        if (players.length === 0) return null;
-        return { meta: data?.meta ?? {}, players };
-      } catch {
-        return null;
-      }
-    }
+  } catch (err) {
+    console.warn('[csoRanking] Firestore read failed', gender, err?.code || err?.message || err);
+    // Po ruční aktualizaci neber starý offline snapshot — ať se nesplete se static JSON.
+    if (options.fromServer) return null;
     return null;
   }
 }

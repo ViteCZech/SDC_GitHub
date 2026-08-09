@@ -1,4 +1,4 @@
-import React, { useRef, useState, startTransition } from 'react';
+import React, { useRef, useState } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { translations } from '../translations';
 import { updateCsoRankingsNow } from '../services/csoRankingService';
@@ -6,7 +6,7 @@ import { clearCsoRankingCache, formatCsoUpdatedAt } from '../utils/csoRanking';
 
 /**
  * Tlačítko pro ruční stažení žebříčků ze Stedar (Cloud Function).
- * Volání běží asynchronně; UI zůstává responsivní díky loading stavu a startTransition při reloadu.
+ * Volání běží asynchronně; UI zůstává responsivní díky loading stavu.
  * @param {{
  *   lang: string,
  *   user: object|null,
@@ -56,6 +56,8 @@ export default function CsoRankingUpdateButton({
         try {
           const result = await updateCsoRankingsNow();
           clearCsoRankingCache();
+          // Nejdřív aktualizuj meta/badge z odpovědi CF (nespoléhej jen na re-fetch, ten může spadnout na static JSON).
+          onUpdated?.(result);
           onNotify?.(
             t('csoUpdateSuccess', {
               total: result?.totalPlayers ?? 0,
@@ -63,10 +65,6 @@ export default function CsoRankingUpdateButton({
             }),
             'success'
           );
-          // Reload žebříčku mimo urgentní update, ať notifikace a spinner stihnou vyrenderovat.
-          startTransition(() => {
-            onUpdated?.(result);
-          });
         } catch (err) {
           const code = err?.code;
           const msg =

@@ -110,18 +110,36 @@ export default function TournamentSetup({
     }
 
     let cancelled = false;
+    const isReload = csoReloadKey > 0;
     setCsoLoading(true);
     setCsoError(null);
-    setCsoMeta(null);
+    // Při reloadu po Stedar update nemaž meta — jinak badge blikne na starý static JSON.
+    if (!isReload) {
+      setCsoMeta(null);
+    }
     setShowSuggestions(false);
     setNameSuggestions((prev) => (prev.length === 0 ? prev : []));
     setSelectedCsoRank(null);
 
-    loadCsoRanking(csoGender, { bypassCache: csoReloadKey > 0 })
+    loadCsoRanking(csoGender, { bypassCache: isReload })
       .then((data) => {
         if (!cancelled) {
           setCsoList(data.players ?? []);
-          setCsoMeta(data.meta ?? null);
+          setCsoMeta((prev) => {
+            const next = data.meta ?? null;
+            if (!next) return prev;
+            // Po CF update může re-fetch spadnout na static JSON bez Stedar generatedAt —
+            // nenech přepsat čerstvé datum z odpovědi funkce.
+            if (isReload && prev?.generatedAt && !next?.generatedAt) {
+              return {
+                ...next,
+                updatedAt: prev.updatedAt,
+                generatedAt: prev.generatedAt,
+                effectiveDate: prev.effectiveDate ?? null,
+              };
+            }
+            return next;
+          });
         }
       })
       .catch((err) => {
@@ -130,7 +148,7 @@ export default function TournamentSetup({
             translations[lang]?.tournCsoLoadError || 'Nepodařilo se načíst žebříček';
           setCsoError(err?.message ?? fallback);
           setCsoList([]);
-          setCsoMeta(null);
+          if (!isReload) setCsoMeta(null);
         }
       })
       .finally(() => {
@@ -857,7 +875,24 @@ export default function TournamentSetup({
                       onLogin={onGoogleLogin}
                       onNotify={onNotify}
                       compact
-                      onUpdated={() => setCsoReloadKey((k) => k + 1)}
+                      onUpdated={(result) => {
+                        // Okamžitě zobraz datum ze Stedar (odpověď CF), ať badge nesedí na starém static JSON.
+                        const side =
+                          csoGender === 'women' ? result?.women : result?.men;
+                        const updatedAt = side?.updatedAt || result?.updatedAt;
+                        if (updatedAt) {
+                          setCsoMeta((prev) => ({
+                            ...(prev || {}),
+                            gender: csoGender,
+                            updatedAt,
+                            // generatedAt = pin proti přepsání starým static JSON při re-fetchi
+                            generatedAt: updatedAt,
+                            totalPlayers:
+                              side?.totalPlayers ?? prev?.totalPlayers ?? null,
+                          }));
+                        }
+                        setCsoReloadKey((k) => k + 1);
+                      }}
                     />
                   </div>
                   )}
