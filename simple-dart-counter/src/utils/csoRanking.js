@@ -1,4 +1,4 @@
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const CSO_BASE_URL = 'https://www.stedar.org/alms/league/rankings.view?orgId=1';
@@ -30,18 +30,33 @@ export function clearCsoRankingCache(gender = null) {
 
 /**
  * @param {'men'|'women'} gender
+ * @param {{ fromServer?: boolean }} [options]
  * @returns {Promise<{ meta: object, players: Array<{ rank: number, name: string, club?: string }> }|null>}
  */
-async function loadCsoRankingFromFirestore(gender) {
+async function loadCsoRankingFromFirestore(gender, options = {}) {
   if (!db) return null;
   try {
-    const snap = await getDoc(doc(db, 'cso_rankings', gender));
+    const ref = doc(db, 'cso_rankings', gender);
+    const snap = options.fromServer ? await getDocFromServer(ref) : await getDoc(ref);
     if (!snap.exists()) return null;
     const data = snap.data();
     const players = Array.isArray(data?.players) ? data.players : [];
     if (players.length === 0) return null;
     return { meta: data?.meta ?? {}, players };
   } catch {
+    // Offline / server unavailable — zkus lokální cache SDK, pak fallback na static JSON.
+    if (options.fromServer) {
+      try {
+        const snap = await getDoc(doc(db, 'cso_rankings', gender));
+        if (!snap.exists()) return null;
+        const data = snap.data();
+        const players = Array.isArray(data?.players) ? data.players : [];
+        if (players.length === 0) return null;
+        return { meta: data?.meta ?? {}, players };
+      } catch {
+        return null;
+      }
+    }
     return null;
   }
 }
@@ -51,7 +66,10 @@ async function loadCsoRankingFromFirestore(gender) {
  * @returns {Promise<{ meta: object, players: Array<{ rank: number, name: string, club?: string }> }>}
  */
 async function loadCsoRankingFromStatic(gender) {
-  const res = await fetch(CSO_RANKING_FILES[gender]);
+  const sep = CSO_RANKING_FILES[gender].includes('?') ? '&' : '?';
+  const res = await fetch(`${CSO_RANKING_FILES[gender]}${sep}_ts=${Date.now()}`, {
+    cache: 'no-store',
+  });
   if (!res.ok) {
     throw new Error(`Nepodařilo se načíst žebříček (${res.status})`);
   }
@@ -69,14 +87,33 @@ export function getCsoRankingUrl(gender) {
 }
 
 /**
- * Naformátuje ISO timestamp z meta.updatedAt pro zobrazení v UI (DD.MM.YYYY HH:mm).
+ * Naformátuje datum žebříčku ze Stedar / meta.updatedAt pro UI.
+ * Preferuje kalendářní den ze Stedar (bez TZ posunu), u ISO s časem zobrazí i hodiny.
  * @param {string|undefined|null} isoString
  * @param {string} [locale='cs-CZ']
  * @returns {string|null}
  */
 export function formatCsoUpdatedAt(isoString, locale = 'cs-CZ') {
   if (!isoString) return null;
-  const d = new Date(isoString);
+  const raw = String(isoString).trim();
+
+  // Stedar „YYYY-MM-DD“ nebo ISO půlnoc/poledne → jen datum (žebříček „k datumu“)
+  const dateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:T12:00:00(?:\.000)?Z)?$/);
+  if (dateOnly) {
+    const [, y, m, d] = dateOnly;
+    return `${d}.${m}.${y}`;
+  }
+
+  // Stedar / ISO s časem — vezmi komponenty z řetězce (bez TZ posunu dne)
+  const withTime = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/
+  );
+  if (withTime) {
+    const [, y, m, d, h, mi] = withTime;
+    return `${d}.${m}.${y} ${h.padStart(2, '0')}:${mi}`;
+  }
+
+  const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return null;
   return new Intl.DateTimeFormat(locale, {
     day: '2-digit',
@@ -97,7 +134,9 @@ export async function loadCsoRanking(gender, options = {}) {
   const g = gender === 'women' ? 'women' : 'men';
   if (!options.bypassCache && cache.has(g)) return cache.get(g);
 
-  const fromFirestore = await loadCsoRankingFromFirestore(g);
+  const fromFirestore = await loadCsoRankingFromFirestore(g, {
+    fromServer: !!options.bypassCache,
+  });
   if (fromFirestore) {
     cache.set(g, fromFirestore);
     return fromFirestore;

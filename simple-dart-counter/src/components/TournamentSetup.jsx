@@ -117,7 +117,7 @@ export default function TournamentSetup({
     setNameSuggestions((prev) => (prev.length === 0 ? prev : []));
     setSelectedCsoRank(null);
 
-    loadCsoRanking(csoGender)
+    loadCsoRanking(csoGender, { bypassCache: csoReloadKey > 0 })
       .then((data) => {
         if (!cancelled) {
           setCsoList(data.players ?? []);

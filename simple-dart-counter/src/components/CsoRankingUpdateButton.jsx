@@ -2,7 +2,7 @@ import React, { useRef, useState, startTransition } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { translations } from '../translations';
 import { updateCsoRankingsNow } from '../services/csoRankingService';
-import { clearCsoRankingCache } from '../utils/csoRanking';
+import { clearCsoRankingCache, formatCsoUpdatedAt } from '../utils/csoRanking';
 
 /**
  * Tlačítko pro ruční stažení žebříčků ze Stedar (Cloud Function).
@@ -59,11 +59,7 @@ export default function CsoRankingUpdateButton({
           onNotify?.(
             t('csoUpdateSuccess', {
               total: result?.totalPlayers ?? 0,
-              updatedAt: result?.updatedAt
-                ? new Date(result.updatedAt).toLocaleString(
-                    lang === 'pl' ? 'pl-PL' : lang === 'en' ? 'en-GB' : 'cs-CZ'
-                  )
-                : '',
+              updatedAt: formatCsoUpdatedAt(result?.updatedAt, lang === 'pl' ? 'pl-PL' : lang === 'en' ? 'en-GB' : 'cs-CZ') || '',
             }),
             'success'
           );
