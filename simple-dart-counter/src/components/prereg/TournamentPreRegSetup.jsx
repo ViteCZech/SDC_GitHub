@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, CheckCircle, Copy, Eye, EyeOff, Loader2, Trophy } from 'lucide-react';
+import { CheckCircle, Copy, Eye, EyeOff, Loader2, Trophy } from 'lucide-react';
 import { translations } from '../../translations';
 import { createPreRegTournament } from '../../services/tournamentPreRegService';
 import {
@@ -198,10 +198,6 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
   return (
     <PreRegPageShell>
       <div className="space-y-6">
-      <button type="button" onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm">
-        <ArrowLeft className="w-4 h-4" /> {t('tournBack')}
-      </button>
-
       <header>
         <div className="flex items-center gap-2 text-emerald-400 mb-2">
           <Trophy className="w-6 h-6" />

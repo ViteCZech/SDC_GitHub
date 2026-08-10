@@ -585,11 +585,6 @@ export default function TournamentSetup({
             <div className="lg:col-span-12 flex items-start justify-between gap-3 flex-wrap">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  {onBack && (
-                    <button onClick={onBack} className={`${btnBase} bg-slate-800 text-slate-300 hover:bg-slate-700`}>
-                      <ArrowLeft className="w-5 h-5" /> {t('tournBack') || 'Zpět'}
-                    </button>
-                  )}
                   <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400">
                     {stepLabels.tournStep1}
                   </h2>
@@ -781,13 +776,6 @@ export default function TournamentSetup({
                 {stepLabels.tournStep2}
               </h2>
               <div className="hidden sm:flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className={`${btnBase} bg-slate-800 text-slate-300 hover:bg-slate-700`}
-                >
-                  <ArrowLeft className="w-5 h-5" /> {t('tournBack') || 'Zpět'}
-                </button>
                 <button
                   type="button"
                   onClick={() => setStep(3)}
@@ -1123,10 +1111,7 @@ export default function TournamentSetup({
                 </div>
               </div>
             </div>
-            <div className="w-full flex justify-between gap-2 mt-4 sm:hidden">
-              <button type="button" onClick={() => setStep(1)} className={`${btnBase} bg-slate-800 text-slate-300 hover:bg-slate-700`}>
-                <ArrowLeft className="w-5 h-5" /> {t('tournBack') || 'Zpět'}
-              </button>
+            <div className="w-full flex justify-end gap-2 mt-4 sm:hidden">
               <button
                 type="button"
                 onClick={() => setStep(3)}
@@ -1146,16 +1131,7 @@ export default function TournamentSetup({
             <div
               className={`space-y-4 ${fmtBracketOnly ? 'lg:col-span-12 max-w-3xl lg:mx-auto w-full' : 'lg:col-span-5'}`}
             >
-              <div className="flex items-center justify-between gap-2 mb-0 lg:mb-0">
-                <div className="w-24 sm:w-40 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
-                    className={`${btnBase} w-full bg-slate-800 text-slate-300 hover:bg-slate-700`}
-                  >
-                    <ArrowLeft className="w-5 h-5" /> {t('tournBack') || 'Zpět'}
-                  </button>
-                </div>
+              <div className="flex items-center justify-end gap-2 mb-0 lg:mb-0">
                 <h2 className="flex-1 text-center text-xl font-black tracking-widest uppercase text-emerald-400 px-2">
                   {stepLabels.tournStep3}
                 </h2>

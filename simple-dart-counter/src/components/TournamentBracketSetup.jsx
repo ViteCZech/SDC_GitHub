@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, Target } from 'lucide-react';
+import { Target } from 'lucide-react';
 import { translations } from '../translations';
 
 function isPowerOfTwo(n) {
@@ -65,18 +65,7 @@ export default function TournamentBracketSetup({
   return (
     <main className="flex flex-col flex-1 w-full overflow-y-auto bg-slate-950">
       <div className="w-full max-w-2xl lg:max-w-5xl xl:max-w-6xl mx-auto p-4 pb-24 space-y-6">
-        <div className="flex items-center justify-between gap-2">
-          <div className="w-24 sm:w-40 shrink-0">
-            {onBack ? (
-              <button
-                type="button"
-                onClick={onBack}
-                className={`${btnBase} w-full bg-slate-800 text-slate-300 hover:bg-slate-700`}
-              >
-                <ArrowLeft className="w-5 h-5" /> {t('tournBackToGroups') || 'Zpět ke skupinám'}
-              </button>
-            ) : null}
-          </div>
+        <div className="flex items-center justify-end gap-2">
           <h2 className="flex-1 text-center text-xl font-black tracking-widest uppercase text-emerald-400 px-2">
             {t('tournBracketSetupTitle') || 'Nastavení vyřazovacího pavouka'}
           </h2>

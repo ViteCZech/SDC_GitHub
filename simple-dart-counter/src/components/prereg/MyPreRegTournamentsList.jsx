@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Calendar, ClipboardList, Loader2, Plus, Search, Trophy, Users } from 'lucide-react';
+import { Calendar, ClipboardList, Loader2, Plus, Search, Trophy, Users } from 'lucide-react';
 import { translations } from '../../translations';
 import { listOwnerTournaments } from '../../services/tournamentPreRegService';
 import { normalizeForSearch } from '../../utils/csoRanking';
@@ -161,10 +161,6 @@ export default function MyPreRegTournamentsList({
   return (
     <PreRegPageShell wide={false}>
       <div className="space-y-6">
-      <button type="button" onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm">
-        <ArrowLeft className="w-4 h-4" /> {t('tournBack')}
-      </button>
-
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 text-emerald-400 mb-1">

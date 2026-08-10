@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Home, Pencil, Bell, Minus, Plus } from 'lucide-react';
+import { Pencil, Bell, Minus, Plus } from 'lucide-react';
 import { distributePlayersToFixedGroups } from '../utils/tournamentGenerator';
 import {
   calculateTournamentTimePrediction,
@@ -576,13 +576,7 @@ export default function TournamentGroupsView({
         <main className="flex flex-col flex-1 w-full overflow-y-auto bg-slate-950 p-4 pb-24">
           <div className="max-w-lg mx-auto w-full text-center py-16 px-4">
             <p className="text-slate-400 mb-10">{th('hubNoLocalData')}</p>
-            <button
-              type="button"
-              onClick={onBack}
-              className="flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 mx-auto"
-            >
-              <Home className="w-5 h-5" /> {t('backMenu') || 'Zpět do menu'}
-            </button>
+            <p className="text-xs text-slate-500">{t('navUseHeaderHint') || 'Použijte Domů / Zpět v horní liště.'}</p>
           </div>
         </main>
       );
@@ -650,12 +644,6 @@ export default function TournamentGroupsView({
               {t('tournResumeToBracket') || '➡️ Přejít na Pavouka'}
             </button>
           )}
-          <button
-            onClick={onBack}
-            className="mt-6 flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
-          >
-            <Home className="w-5 h-5" /> {t('backMenu')}
-          </button>
         </div>
       </main>
     );
@@ -846,13 +834,6 @@ export default function TournamentGroupsView({
             </button>
           </div>
         )}
-
-        <button
-          onClick={onBack}
-          className="mt-6 flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 transition-colors"
-        >
-          <Home className="w-5 h-5" /> {t('backMenu') || 'Zpět do menu'}
-        </button>
       </div>
     </main>
   );

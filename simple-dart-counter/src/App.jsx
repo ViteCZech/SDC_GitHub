@@ -22,7 +22,7 @@ import {
 import { 
   AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, 
   DownloadCloud, FileText, History, Home, Info, Keyboard as KeyboardIcon, 
-  Maximize, Minimize, Mic, MicOff, MousePointer2, Play, RefreshCw, RotateCcw, 
+  Maximize, Minimize, Mic, MicOff, MousePointer2, Pause, Play, RefreshCw, RotateCcw, 
   Target, Trash2, Trophy, Undo2, Unplug, User, Cloud, X, BarChart2, List, Swords, ClipboardList
 } from 'lucide-react';
 
@@ -45,6 +45,10 @@ import PublicTournamentDirectory from './components/prereg/PublicTournamentDirec
 import TournamentPreRegSetup from './components/prereg/TournamentPreRegSetup';
 import RegistrationAdminPanel from './components/prereg/RegistrationAdminPanel';
 import MyPreRegTournamentsList from './components/prereg/MyPreRegTournamentsList';
+import AppNavBar from './components/AppNavBar';
+import PauseMenuOverlay from './components/PauseMenuOverlay';
+import ActiveSessionBanner from './components/ActiveSessionBanner';
+import { resolveAppNav, shouldParkTournamentSession } from './utils/appNavigation';
 import { parsePreregRouteFromUrl, isPublicTournamentCatalogPath } from './utils/preregAdmin';
 import { loadAdminInviteSession, saveAdminInviteSession } from './utils/preregStorage';
 import {
@@ -1017,6 +1021,14 @@ function AppMain({ lang, setLang }) {
   const [preRegImportSourceId, setPreRegImportSourceId] = useState(null);
   const skipNextNameFocusRef = useRef(false);
   const [homeSubmenu, setHomeSubmenu] = useState(null);
+  /** Pause overlay na herní obrazovce. */
+  const [pauseMenuOpen, setPauseMenuOpen] = useState(false);
+  /**
+   * Zaparkovaná relace pro resume lištu na Domů.
+   * match + mountKept: herní strom zůstane namountovaný (skrytý), ať se neztratí stav GameX01/Cricket.
+   * tournament: návrat do admin/viewer stavu turnaje.
+   */
+  const [parkedSession, setParkedSession] = useState(null);
   /** ID aktivní online hry ve Firestore (GameX01 / GameCricket). */
   const [onlineGameId, setOnlineGameId] = useState(null);
   /** Na tomto zařízení: hostitel = p1, hostující host = p2 (null = neonline). */
@@ -2415,8 +2427,186 @@ function AppMain({ lang, setLang }) {
     setTournamentMatches([]);
     setTournamentBracket([]);
     setTournamentMatchContext(null);
+    setParkedSession(null);
     setAppState('tournament_hub');
   };
+
+  const dismissParkedSession = React.useCallback(() => {
+    setParkedSession((prev) => {
+      if (prev?.kind === 'match' && prev.mountKept && appState !== 'playing') {
+        if (tournamentMatchContextRef.current) {
+          clearPlayingTournamentMatchWithoutResult();
+          setTournamentMatchContext(null);
+        }
+      }
+      return null;
+    });
+  }, [appState, clearPlayingTournamentMatchWithoutResult]);
+
+  const resumeParkedSession = React.useCallback(() => {
+    setParkedSession((prev) => {
+      if (!prev) return null;
+      if (prev.kind === 'match') {
+        setAppState('playing');
+        setHomeSubmenu(null);
+        return null;
+      }
+      if (prev.kind === 'tournament') {
+        if (prev.userRole) setUserRole(prev.userRole);
+        if (prev.returnSetupStep != null) setTournamentSetupStep(prev.returnSetupStep);
+        setAppState(prev.returnAppState || 'tournament_groups');
+        setHomeSubmenu(null);
+        return null;
+      }
+      return null;
+    });
+  }, []);
+
+  const goHomeFromNav = React.useCallback(() => {
+    setPauseMenuOpen(false);
+    setHomeSubmenu(null);
+
+    if (appState === 'playing') {
+      const title =
+        settings?.p1Name && settings?.p2Name
+          ? `${settings.p1Name} vs ${settings.p2Name}`
+          : t('navResumeMatch') || 'Pokračovat v zápase';
+      setParkedSession({
+        kind: 'match',
+        mountKept: true,
+        title,
+        isTournament: !!tournamentMatchContextRef.current,
+        isOnline: !!onlineGameId,
+      });
+      setAppState('home');
+      return;
+    }
+
+    if (shouldParkTournamentSession(appState, userRole, !!tournamentData)) {
+      setParkedSession({
+        kind: 'tournament',
+        returnAppState: appState,
+        returnSetupStep: tournamentSetupStep,
+        userRole,
+        title: tournamentData?.name || tournamentData?.tournamentName || undefined,
+      });
+      setAppState('home');
+      return;
+    }
+
+    setAppState('home');
+  }, [
+    appState,
+    userRole,
+    tournamentData,
+    tournamentSetupStep,
+    settings?.p1Name,
+    settings?.p2Name,
+    onlineGameId,
+    t,
+  ]);
+
+  const handleNavBackTarget = React.useCallback(
+    (backTarget) => {
+      if (!backTarget) return;
+      if (backTarget.type === 'clearHomeSubmenu') {
+        setHomeSubmenu(null);
+        return;
+      }
+      if (backTarget.type === 'state') {
+        if (backTarget.state === 'home') {
+          goHomeFromNav();
+          return;
+        }
+        setAppState(backTarget.state);
+        return;
+      }
+      if (backTarget.type === 'setupStep') {
+        setTournamentSetupStep(backTarget.step);
+        return;
+      }
+      if (backTarget.type === 'setupStepAndState') {
+        setTournamentSetupStep(backTarget.step);
+        setAppState(backTarget.state);
+        return;
+      }
+      if (backTarget.type === 'leaveTournamentSetup') {
+        setUserRole(null);
+        setAppState('tournament_hub');
+        return;
+      }
+      if (backTarget.type === 'leaveViewer' || backTarget.type === 'leaveTablet') {
+        handleSpectatorDisconnect();
+        return;
+      }
+      if (backTarget.type === 'preregBackToCatalog') {
+        setPreregReturnToCatalog(false);
+        setPreregTournamentId(null);
+        setAppState('prereg_catalog');
+        window.history.replaceState(null, '', '/tournaments');
+      }
+    },
+    [goHomeFromNav]
+  );
+
+  const leavePlayingToTournamentBoard = React.useCallback(() => {
+    setPauseMenuOpen(false);
+    setParkedSession(null);
+    const ctx = tournamentMatchContextRef.current;
+    clearPlayingTournamentMatchWithoutResult();
+    setTournamentMatchContext(null);
+    setAppState(
+      ctx?.type === 'tablet'
+        ? 'tournament_tablet'
+        : ctx?.type === 'bracket'
+          ? 'tournament_bracket'
+          : 'tournament_groups'
+    );
+  }, [clearPlayingTournamentMatchWithoutResult]);
+
+  const leavePlayingToSetup = React.useCallback(() => {
+    setPauseMenuOpen(false);
+    setParkedSession(null);
+    if (tournamentMatchContextRef.current) {
+      leavePlayingToTournamentBoard();
+      return;
+    }
+    if (onlineGameId) {
+      handleOnlineExitMatchRequest();
+      return;
+    }
+    setAppState('setup');
+  }, [onlineGameId, leavePlayingToTournamentBoard, handleOnlineExitMatchRequest]);
+
+  const navResolved = React.useMemo(
+    () =>
+      resolveAppNav({
+        appState,
+        tournamentSetupStep,
+        homeSubmenu,
+        preregReturnToCatalog,
+        userRole,
+        hasTournamentData: !!tournamentData,
+        canGoToBoardAssignment: canNavigateToStep(4),
+      }),
+    [appState, tournamentSetupStep, homeSubmenu, preregReturnToCatalog, userRole, tournamentData, hasBracketGenerated, isTournamentLive]
+  );
+
+  /** Guard: turnajové obrazovky bez dat → hub + toast */
+  useEffect(() => {
+    const needsData = [
+      'tournament_board_assignment',
+      'tournament_groups',
+      'tournament_bracket',
+      'tournament_stats',
+    ].includes(appState);
+    if (!needsData || tournamentData) return;
+    if (userRole === 'viewer' || userRole === 'tablet') return;
+    showNotificationRef.current(t('navTournamentMissing') || 'Turnaj už není k dispozici.', 'error');
+    setParkedSession(null);
+    setUserRole(null);
+    setAppState('tournament_hub');
+  }, [appState, tournamentData, userRole, t]);
 
   const handleTournamentHubHistory = () => {
     setAppState('tournament_history');
@@ -2780,6 +2970,8 @@ function AppMain({ lang, setLang }) {
         processedOnlineMatchHistoryRef.current.add(oid);
       }
       const fullRecord = { ...record, gameType: settings.gameType, startScore: settings.startScore, outMode: settings.outMode };
+      setParkedSession((prev) => (prev?.kind === 'match' ? null : prev));
+      setPauseMenuOpen(false);
       if (tournamentMatchContext) {
         fullRecord.tournamentMatchId = tournamentMatchContext.match?.matchId;
         fullRecord.tournamentGroupId = tournamentMatchContext.match?.groupId;
@@ -3735,6 +3927,10 @@ function AppMain({ lang, setLang }) {
                   setAppState('playing');
                 }}
                 onBack={() => {
+                  if (appState !== 'match_finished') {
+                    setSelectedMatchDetail(null);
+                    return;
+                  }
                   if (matchFinishRestoreState && selectedMatchDetail?.id && !isTournament) {
                     setMatchHistory(prev => prev.filter(m => m.id !== selectedMatchDetail.id));
                   }
@@ -3759,30 +3955,52 @@ function AppMain({ lang, setLang }) {
                   );
                 }}
                 onClose={() => {
+                  if (appState !== 'match_finished') {
+                    setSelectedMatchDetail(null);
+                    return;
+                  }
                   const wasBracket = tournamentMatchContextRef.current?.type === 'bracket';
                   const wasTablet = tournamentMatchContextRef.current?.type === 'tablet';
                   setMatchFinishRestoreState(null);
                   setSelectedMatchDetail(null);
                   setTournamentMatchContext(null);
-                  setAppState(
-                    isTournament
-                      ? wasTablet
+                  setParkedSession(null);
+                  if (isTournament && tournamentData) {
+                    setParkedSession({
+                      kind: 'tournament',
+                      returnAppState: wasTablet
                         ? 'tournament_tablet'
                         : wasBracket
                           ? 'tournament_bracket'
-                          : 'tournament_groups'
-                      : 'setup'
-                  );
+                          : 'tournament_groups',
+                      returnSetupStep: tournamentSetupStep,
+                      userRole,
+                      title: tournamentData?.name || tournamentData?.tournamentName || undefined,
+                    });
+                  }
+                  setAppState('home');
+                  setHomeSubmenu(null);
                 }}
               />
           </div>
       );
   }
 
-  if (appState === 'playing') {
+  const matchParkedKept =
+    parkedSession?.kind === 'match' && parkedSession.mountKept === true;
+  const showPlayingVisible = appState === 'playing';
+  const mountMatchSurface = showPlayingVisible || matchParkedKept;
+
+  let matchSurfaceNode = null;
+  if (mountMatchSurface) {
       const isTournamentPlaying = !!tournamentMatchContext;
-      return (
-          <div className="bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden">
+      matchSurfaceNode = (
+          <div
+            className={`bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden ${
+              showPlayingVisible ? '' : 'hidden'
+            }`}
+            aria-hidden={!showPlayingVisible}
+          >
               {showTournamentPinBar && (
                   <div className="shrink-0 w-full z-[5000] bg-slate-950 border-b border-slate-800 text-slate-300 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] flex flex-wrap justify-between items-center text-sm gap-x-2 gap-y-1">
                       <div className="min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 flex-1">
@@ -3848,40 +4066,12 @@ function AppMain({ lang, setLang }) {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => {
-                        if (onlineGameId) {
-                          handleOnlineExitMatchRequest();
-                          return;
-                        }
-                        if (isTournamentPlaying) {
-                          const ctx = tournamentMatchContextRef.current;
-                          clearPlayingTournamentMatchWithoutResult();
-                          setTournamentMatchContext(null);
-                          setAppState(
-                            ctx?.type === 'tablet'
-                              ? 'tournament_tablet'
-                              : ctx?.type === 'bracket'
-                                ? 'tournament_bracket'
-                                : 'tournament_groups'
-                          );
-                        } else {
-                          setAppState('setup');
-                        }
-                      }}
-                      className="p-2 transition-colors rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
-                      aria-label={onlineGameId ? t('onlineExitMatchTitle') : 'Home'}
-                      title={onlineGameId ? t('onlineExitMatchTitle') : undefined}
+                      onClick={() => setPauseMenuOpen(true)}
+                      className="p-2 transition-colors rounded-lg hover:bg-slate-800 text-slate-400 hover:text-amber-300"
+                      aria-label={t('navPause') || 'Pauza'}
+                      title={t('navPause') || 'Pauza'}
                     >
-                      <Home className="w-5 h-5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleHardResetApp}
-                      title={t('headerHardResetTitle')}
-                      aria-label={t('headerHardResetAria')}
-                      className="p-2 transition-colors rounded-lg hover:bg-red-950/60 text-red-400/90 hover:text-red-300 border border-transparent hover:border-red-500/35"
-                    >
-                      <RotateCcw className="w-5 h-5" />
+                      <Pause className="w-5 h-5" />
                     </button>
                   </div>
                   <div className="flex flex-col items-center">
@@ -3992,8 +4182,75 @@ function AppMain({ lang, setLang }) {
       );
   }
 
+  if (showPlayingVisible) {
+    const isTournamentPlaying = !!tournamentMatchContext;
+    const pauseActions = [];
+    pauseActions.push({
+      id: 'resume',
+      label: t('navResumePlay') || 'Pokračovat ve hře',
+      icon: 'play',
+      variant: 'primary',
+      onClick: () => setPauseMenuOpen(false),
+    });
+    if (onlineGameId) {
+      pauseActions.push({
+        id: 'exitOnline',
+        label: t('onlineExitMatchTitle') || 'Opustit zápas',
+        icon: 'exit',
+        variant: 'danger',
+        onClick: () => {
+          setPauseMenuOpen(false);
+          handleOnlineExitMatchRequest();
+        },
+      });
+    } else if (isTournamentPlaying) {
+      pauseActions.push({
+        id: 'backBoard',
+        label: t('navBackToTournament') || 'Zpět na turnaj',
+        icon: 'settings',
+        variant: 'default',
+        onClick: leavePlayingToTournamentBoard,
+      });
+      pauseActions.push({
+        id: 'home',
+        label: t('navHome') || 'Domů',
+        icon: 'home',
+        variant: 'default',
+        onClick: goHomeFromNav,
+      });
+    } else {
+      pauseActions.push({
+        id: 'setup',
+        label: t('navEditSetup') || 'Upravit nastavení / Zrušit zápas',
+        icon: 'settings',
+        variant: 'default',
+        onClick: leavePlayingToSetup,
+      });
+      pauseActions.push({
+        id: 'home',
+        label: t('navHome') || 'Domů',
+        icon: 'home',
+        variant: 'default',
+        onClick: goHomeFromNav,
+      });
+    }
+
+    return (
+      <>
+        {matchSurfaceNode}
+        <PauseMenuOverlay
+          open={pauseMenuOpen}
+          onClose={() => setPauseMenuOpen(false)}
+          title={t('navPause') || 'Pauza'}
+          actions={pauseActions}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden">
+      {matchSurfaceNode}
       {showTournamentPinBar && (
         <div className="shrink-0 w-full z-[5000] bg-slate-950 border-b border-slate-800 text-slate-300 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] flex flex-wrap justify-between items-center text-sm gap-x-2 gap-y-1">
           <div className="min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 flex-1">
@@ -4055,37 +4312,57 @@ function AppMain({ lang, setLang }) {
           </div>
         </div>
       )}
-      <header className="relative z-20 flex items-center justify-between p-2 border-b h-14 bg-slate-900 border-slate-800 shrink-0">
-        <div className="flex items-center gap-1 sm:gap-2">
-            {appState === 'home' ? (
-                <div className="text-[10px] font-mono text-slate-500 border border-slate-800 rounded px-1.5 py-0.5">{APP_VERSION}</div>
-            ) : (
-                <button
-                  type="button"
-                  onClick={() => setAppState('home')}
-                  className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
-                  aria-label="Home"
-                >
-                  <Home className="w-6 h-6" />
-                </button>
-            )}
+      <AppNavBar
+        showBack={navResolved.showBack}
+        showHome={navResolved.showHome}
+        onBack={() => handleNavBackTarget(navResolved.backTarget)}
+        onHome={goHomeFromNav}
+        backLabel={t('navBack') || t('tournBack') || 'Zpět'}
+        homeLabel={t('navHome') || 'Domů'}
+        leftExtra={
+          appState === 'home' ? (
+            <div className="text-[10px] font-mono text-slate-500 border border-slate-800 rounded px-1.5 py-0.5">
+              {APP_VERSION}
+            </div>
+          ) : null
+        }
+        right={
+          <>
             <button
-              type="button"
-              onClick={handleHardResetApp}
-              title={t('headerHardResetTitle')}
-              aria-label={t('headerHardResetAria')}
-              className="p-2 rounded-lg hover:bg-red-950/60 text-red-400/90 hover:text-red-300 border border-transparent hover:border-red-500/35"
+              onClick={toggleFullscreen}
+              className="p-2 transition-colors rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700"
             >
-              <RotateCcw className="w-6 h-6" />
+              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             </button>
-        </div>
-        <div className="flex items-center gap-2">
-            <button onClick={toggleFullscreen} className="p-2 transition-colors rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700">
-                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-            </button>
-            <div className="flex p-1 border rounded-lg bg-slate-800 border-slate-700">{['cs','en','pl'].map(l=><button key={l} onClick={()=>setLang(l)} className={`p-1 rounded transition-all ${lang===l?'bg-slate-600 opacity-100 shadow-sm':'opacity-40 grayscale'}`}><FlagIcon lang={l} /></button>)}</div>
-        </div>
-      </header>
+            <div className="flex p-1 border rounded-lg bg-slate-800 border-slate-700">
+              {['cs', 'en', 'pl'].map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  className={`p-1 rounded transition-all ${
+                    lang === l ? 'bg-slate-600 opacity-100 shadow-sm' : 'opacity-40 grayscale'
+                  }`}
+                >
+                  <FlagIcon lang={l} />
+                </button>
+              ))}
+            </div>
+          </>
+        }
+      />
+      {appState === 'home' && (
+        <ActiveSessionBanner
+          session={parkedSession}
+          onResume={resumeParkedSession}
+          onDismiss={dismissParkedSession}
+          resumeLabel={
+            parkedSession?.kind === 'tournament'
+              ? t('navResumeTournament') || 'Vstoupit do administrace turnaje'
+              : t('navResumeMatch') || 'Pokračovat v zápase'
+          }
+          dismissLabel={t('close') || 'Zavřít'}
+        />
+      )}
       {showTournamentStepper && (
         <nav className="flex overflow-x-auto whitespace-nowrap bg-slate-900 p-3 text-sm font-semibold border-b border-slate-800 shrink-0">
           {(userRole === 'viewer'
@@ -4315,12 +4592,6 @@ function AppMain({ lang, setLang }) {
                     >
                       <Play className="fill-current w-7 h-7" /> {t('newGame')}
                     </button>
-                    <button
-                      onClick={handleHardResetApp}
-                      className="w-full py-2.5 text-[11px] font-bold tracking-widest uppercase rounded-xl border border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-300 transition-colors"
-                    >
-                      {t('resetApp') || 'Resetovat aplikaci'}
-                    </button>
 
                     {(!user || user.isAnonymous) ? (
                         <button onClick={handleLogin} className="flex items-center justify-center w-full gap-3 p-3 mt-2 transition-transform border shadow-md bg-slate-900 hover:bg-slate-800 border-slate-700 rounded-xl active:scale-95 md:mt-0">
@@ -4411,21 +4682,13 @@ function AppMain({ lang, setLang }) {
       )}
 
       {appState === 'tournament_viewer_preparing' && userRole === 'viewer' && (
-        <main className="flex flex-col md:flex-row md:items-center md:justify-between md:gap-8 flex-1 w-full max-w-lg md:max-w-4xl lg:max-w-5xl mx-auto overflow-y-auto bg-slate-950 p-4 pb-24 justify-center min-h-[50vh]">
-          <p className="text-center md:text-left text-lg sm:text-xl font-bold text-slate-200 px-2 md:px-0 md:flex-1">
+        <main className="flex flex-col items-center justify-center flex-1 w-full max-w-lg md:max-w-4xl lg:max-w-5xl mx-auto overflow-y-auto bg-slate-950 p-4 pb-24 min-h-[50vh]">
+          <p className="text-center text-lg sm:text-xl font-bold text-slate-200 px-2">
             {t('tournament.preparing')}
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              setUserRole(null);
-              setActivePin('');
-              setAppState('tournament_hub');
-            }}
-            className="mt-8 md:mt-0 w-full md:w-auto md:min-w-[12rem] shrink-0 py-4 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
-          >
-            {translations[lang]?.tournBack ?? 'Zpět'}
-          </button>
+          <p className="mt-3 text-center text-xs text-slate-500 px-4">
+            {t('navUseHeaderHint') || 'Použijte Domů / Zpět v horní liště.'}
+          </p>
         </main>
       )}
 
@@ -4639,23 +4902,6 @@ function AppMain({ lang, setLang }) {
             onBracketDataCommit={handleBracketDataCommit}
             lang={lang}
           />
-          <div className="w-full max-w-[98vw] mx-auto px-2 sm:px-4 mt-4">
-            <button
-              type="button"
-              onClick={() =>
-                setAppState(
-                  isTournamentBracketOnlyFormat(tournamentData?.tournamentFormat)
-                    ? 'home'
-                    : 'tournament_groups'
-                )
-              }
-              className="w-full py-4 rounded-xl font-bold bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700"
-            >
-              {isTournamentBracketOnlyFormat(tournamentData?.tournamentFormat)
-                ? t('backMenu') || 'Zpět do menu'
-                : t('tournBackToGroups') || 'Zpět ke skupinám'}
-            </button>
-          </div>
         </main>
       )}
 
@@ -5108,6 +5354,13 @@ function AppMain({ lang, setLang }) {
                     )}
                     <button onClick={() => window.location.href = `/privacy.html#${lang}`} className="flex items-center justify-center md:justify-start w-full gap-2 mt-8 text-sm font-bold tracking-widest underline uppercase text-emerald-500 hover:text-emerald-400">
                         {typeof t === 'function' ? t('privacyPolicy') : 'Zásady ochrany soukromí'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleHardResetApp}
+                      className="mt-4 w-full py-2.5 text-[11px] font-bold tracking-widest uppercase rounded-xl border border-red-500/30 bg-red-950/20 text-red-300/90 hover:bg-red-950/40 transition-colors"
+                    >
+                      {t('resetApp') || 'Resetovat aplikaci'}
                     </button>
                     <div className="text-center md:text-left text-[10px] text-slate-500 pt-8 md:pt-6 border-t border-slate-800 mt-6 md:mt-8">&copy; {new Date().getFullYear()} Vít (ViteCZech).<br/> Všechna práva vyhrazena.</div>
                 </div>

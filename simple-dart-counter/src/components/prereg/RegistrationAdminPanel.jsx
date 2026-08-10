@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowLeft,
   Banknote,
   Check,
   Copy,
@@ -337,9 +336,6 @@ export default function RegistrationAdminPanel({
     return (
       <PreRegPageShell wide={false}>
         <p className="text-amber-400">{error || t('preregErrNotFound')}</p>
-        <button type="button" onClick={onBack} className="mt-4 text-slate-400 hover:text-white text-sm">
-          {t('tournBack')}
-        </button>
       </PreRegPageShell>
     );
   }
@@ -347,10 +343,6 @@ export default function RegistrationAdminPanel({
   return (
     <PreRegPageShell>
       <div className="space-y-6">
-      <button type="button" onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm">
-        <ArrowLeft className="w-4 h-4" /> {t('tournBack')}
-      </button>
-
       <header className="space-y-3">
         <div className="space-y-1">
           <h1 className="text-2xl font-black text-white">{tournament.meta?.name || t('preregUntitled')}</h1>

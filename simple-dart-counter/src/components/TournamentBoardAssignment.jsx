@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { distributePlayersToFixedGroups } from '../utils/tournamentGenerator';
 import { isTournamentBracketOnlyFormat } from '../utils/tournamentLogic';
 import { translations } from '../translations';
@@ -241,12 +241,6 @@ export default function TournamentBoardAssignment({
           </div>
           <div className="hidden md:flex items-center gap-2 shrink-0">
             <button
-              onClick={onBack}
-              className={`${btnBase} bg-slate-800 text-slate-300 hover:bg-slate-700`}
-            >
-              <ArrowLeft className="w-5 h-5" /> {t('tournBack')}
-            </button>
-            <button
               onClick={validateAndSubmit}
               className={`${btnBase} bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500`}
             >
@@ -333,10 +327,7 @@ export default function TournamentBoardAssignment({
           </div>
         )}
 
-        <div className="flex justify-between gap-2 mt-8 md:hidden">
-          <button onClick={onBack} className={`${btnBase} bg-slate-800 text-slate-300 hover:bg-slate-700`}>
-            <ArrowLeft className="w-5 h-5" /> {t('tournBack')}
-          </button>
+        <div className="flex justify-end gap-2 mt-8 md:hidden">
           <button
             onClick={validateAndSubmit}
             className={`${btnBase} bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500`}

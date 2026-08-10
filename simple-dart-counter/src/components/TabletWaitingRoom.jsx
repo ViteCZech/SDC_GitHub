@@ -321,17 +321,6 @@ export default function TabletWaitingRoom({
               lang={lang}
             />
           </div>
-          {onBack ? (
-            <div className="shrink-0 px-3 py-3 md:px-6 border-t border-slate-800/80 bg-slate-950">
-              <button
-                type="button"
-                onClick={onBack}
-                className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 max-w-3xl mx-auto"
-              >
-                {translations[lang]?.backMenu ?? 'Zpět do menu'}
-              </button>
-            </div>
-          ) : null}
         </main>
       ) : phase === 2 && match ? (
         <main className="flex flex-1 flex-col min-h-0 h-full max-h-[calc(100dvh-2.5rem-3.5rem)] w-full max-w-6xl mx-auto overflow-hidden bg-slate-950 px-3 pt-1 pb-2 md:px-6 md:pb-3">
@@ -538,15 +527,6 @@ export default function TabletWaitingRoom({
             </button>
           )}
 
-          {onBack && (
-            <button
-              type="button"
-              onClick={onBack}
-              className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 max-w-3xl mx-auto"
-            >
-              {translations[lang]?.backMenu ?? 'Zpět do menu'}
-            </button>
-          )}
           </div>
         </main>
       );

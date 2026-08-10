@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Home, Cloud, HardDrive, ArrowLeft, Trash2 } from 'lucide-react';
+import { Cloud, HardDrive, ArrowLeft, Trash2 } from 'lucide-react';
 import { collection, deleteDoc, doc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { translations } from '../translations';
@@ -338,14 +338,6 @@ export default function TournamentHistory({ lang = 'cs', user, onBack }) {
           })}
         </ul>
       )}
-
-      <button
-        type="button"
-        onClick={onBack}
-        className="flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 mt-auto"
-      >
-        <Home className="w-5 h-5" /> {t('backMenu')}
-      </button>
     </main>
   );
 }

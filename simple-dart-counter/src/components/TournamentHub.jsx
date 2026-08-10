@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Home, Shield, Tablet, Eye, History, ClipboardList, Trophy } from 'lucide-react';
+import { Shield, Tablet, Eye, History, ClipboardList, Trophy } from 'lucide-react';
 import { translations } from '../translations';
 
 /**
@@ -112,13 +112,6 @@ export default function TournamentHub({
             {translations[lang]?.tournBack ?? 'Zpět'}
           </button>
         </div>
-        <button
-          type="button"
-          onClick={onBack}
-          className="mt-2 md:mt-4 flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 [@media(max-height:520px)]:mt-2 [@media(max-height:520px)]:py-3"
-        >
-          <Home className="w-5 h-5 [@media(max-height:520px)]:w-4 [@media(max-height:520px)]:h-4" /> {translations[lang]?.backMenu ?? 'Zpět do menu'}
-        </button>
       </main>
     );
   }
@@ -162,13 +155,6 @@ export default function TournamentHub({
             </button>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onBack}
-          className="mt-2 flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 [@media(max-height:520px)]:mt-2 [@media(max-height:520px)]:py-3"
-        >
-          <Home className="w-5 h-5 [@media(max-height:520px)]:w-4 [@media(max-height:520px)]:h-4" /> {translations[lang]?.backMenu ?? 'Zpět do menu'}
-        </button>
       </main>
     );
   }
@@ -255,14 +241,6 @@ export default function TournamentHub({
           <span className={tileLabel}>{th('browseTournaments')}</span>
         </button>
       </div>
-
-      <button
-        type="button"
-        onClick={onBack}
-        className="mt-8 sm:mt-10 flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 [@media(max-height:520px)]:mt-4 [@media(max-height:520px)]:py-3"
-      >
-        <Home className="w-5 h-5 [@media(max-height:520px)]:w-4 [@media(max-height:520px)]:h-4" /> {translations[lang]?.backMenu ?? 'Zpět do menu'}
-      </button>
     </main>
   );
 }

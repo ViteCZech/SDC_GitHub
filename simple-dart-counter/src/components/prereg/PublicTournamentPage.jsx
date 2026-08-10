@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Calendar, Loader2, MapPin, Trophy } from 'lucide-react';
+import { Calendar, Loader2, MapPin, Trophy } from 'lucide-react';
 import { translations } from '../../translations';
 import {
   getPublicTournamentData,
@@ -102,15 +102,6 @@ export default function PublicTournamentPage({ tournamentId, lang, onBack }) {
     return (
       <PreRegPageShell wide={false}>
         <div className="space-y-4">
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex items-center gap-2 text-slate-400 hover:text-white text-sm"
-          >
-            <ArrowLeft className="w-4 h-4" /> {t('tournBack')}
-          </button>
-        )}
         <div className="p-6 rounded-xl border border-amber-500/50 bg-amber-900/20 text-amber-200 text-center">
           {error || t('preregErrNotFound')}
         </div>
@@ -127,16 +118,6 @@ export default function PublicTournamentPage({ tournamentId, lang, onBack }) {
   return (
     <PreRegPageShell wide={false}>
       <div className="space-y-6">
-      {onBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex items-center gap-2 text-slate-400 hover:text-white text-sm"
-        >
-          <ArrowLeft className="w-4 h-4" /> {t('tournBack')}
-        </button>
-      )}
-
       <header className="space-y-3">
         <div className="flex items-center gap-2 text-emerald-400">
           <Trophy className="w-6 h-6" />
