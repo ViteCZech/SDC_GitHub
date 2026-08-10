@@ -9,6 +9,8 @@ export interface CsoPlayer {
   rank: number;
   name: string;
   club?: string;
+  /** Stedar „Reg. #“ — stabilní ID hráče v ČŠO. */
+  regNumber?: string;
 }
 
 export interface CsoRankingPageMeta {
@@ -148,13 +150,17 @@ export function parseRankingTable(html: string): CsoPlayer[] {
     if (!Number.isFinite(rank)) return;
 
     const name = $(cells[1]).text().trim();
+    const regRaw = $(cells[2]).text().trim();
     const club = $(cells[3]).text().trim();
     if (!name) return;
+
+    const regNumber = regRaw && regRaw !== '–' && regRaw !== '-' ? regRaw : undefined;
 
     players.push({
       rank,
       name,
       ...(club ? { club } : {}),
+      ...(regNumber ? { regNumber } : {}),
     });
   });
 

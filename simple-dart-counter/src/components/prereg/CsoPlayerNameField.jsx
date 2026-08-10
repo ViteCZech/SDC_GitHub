@@ -8,6 +8,7 @@ import {
   loadCsoRanking,
   searchCsoPlayers,
 } from '../../utils/csoRanking';
+import { resolveCsoPlayerId } from '../../utils/playerIdentity';
 import { useListboxKeyboard } from '../../hooks/useListboxKeyboard';
 import CsoRankingUpdateButton from '../CsoRankingUpdateButton';
 
@@ -20,6 +21,7 @@ import CsoRankingUpdateButton from '../CsoRankingUpdateButton';
  *   onPlayerNameChange: (name: string) => void,
  *   csoRank: string,
  *   onCsoRankChange: (rank: string) => void,
+ *   onCsoPlayerIdChange?: (id: string|null) => void,
  *   inputClassName?: string,
  *   disabled?: boolean,
  *   showRankingField?: boolean,
@@ -34,6 +36,7 @@ export default function CsoPlayerNameField({
   onPlayerNameChange,
   csoRank,
   onCsoRankChange,
+  onCsoPlayerIdChange,
   inputClassName = '',
   disabled = false,
   showRankingField = true,
@@ -112,6 +115,7 @@ export default function CsoPlayerNameField({
   const handleNameChange = (v) => {
     onPlayerNameChange(v);
     setSelectedCsoRank(null);
+    onCsoPlayerIdChange?.(resolveCsoPlayerId({ name: v }));
     if (!useCsoRanking) {
       setShowSuggestions(false);
       setNameSuggestions([]);
@@ -127,6 +131,7 @@ export default function CsoPlayerNameField({
     const rankStr = entry?.rank != null ? String(entry.rank) : '';
     onPlayerNameChange(name);
     onCsoRankChange(rankStr);
+    onCsoPlayerIdChange?.(resolveCsoPlayerId({ ...entry, name }));
     setSelectedCsoRank(entry?.rank ?? null);
     setShowSuggestions(false);
     setNameSuggestions([]);

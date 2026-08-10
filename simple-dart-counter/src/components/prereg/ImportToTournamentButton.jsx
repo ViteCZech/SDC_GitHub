@@ -30,6 +30,8 @@ export default function ImportToTournamentButton({
       .map((r) => ({
         name: r.player?.name ?? '',
         ranking: null,
+        csoPlayerId: r.player?.csoPlayerId ?? null,
+        nameKey: r.player?.nameKey ?? null,
       }))
       .filter((p) => p.name.trim());
 

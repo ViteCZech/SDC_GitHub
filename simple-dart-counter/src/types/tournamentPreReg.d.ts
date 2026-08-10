@@ -56,7 +56,7 @@
 /**
  * @typedef {Object} RegistrationDocument
  * @property {string} id
- * @property {{ name: string, email: string|null, phone: string|null, csoRank: number|null }} player
+ * @property {{ name: string, email: string|null, phone: string|null, csoRank: number|null, csoPlayerId?: string|null, nameKey?: string|null }} player
  * @property {RegistrationStatus} status
  * @property {{ method: PaymentMethod|null, variableSymbol: string|null, amount: number|null, isPaid: boolean, verifiedByAdmin: boolean }} payment
  * @property {{ checkedIn: boolean }} attendance

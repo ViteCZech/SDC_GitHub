@@ -71,6 +71,7 @@ export async function getPublicTournamentData(tournamentId) {
  * @property {string} [email]
  * @property {string} [phone]
  * @property {number|null} [csoRank]
+ * @property {string|null} [csoPlayerId]
  * @property {'QR'|'CASH'|null} [paymentMethod]
  * @property {boolean} [termsAccepted]
  */
@@ -511,13 +512,16 @@ export async function createManualRegistration(tournamentId, input) {
     const variableSymbol = buildVariableSymbol(tData.finance?.vsPrefix, regRef.id);
     const now = serverTimestamp();
 
+    const playerName = input.playerName.trim();
     transaction.set(regRef, {
       id: regRef.id,
       player: {
-        name: input.playerName.trim(),
+        name: playerName,
         email: input.email?.trim()?.toLowerCase() || null,
         phone: input.phone?.trim() || null,
         csoRank: input.csoRank ?? null,
+        csoPlayerId: input.csoPlayerId ?? null,
+        nameKey: input.nameKey ?? null,
       },
       status: newStatus,
       payment: {

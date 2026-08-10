@@ -25,7 +25,13 @@ import {
   searchCsoPlayers,
 } from '../utils/csoRanking';
 import CsoRankingUpdateButton from './CsoRankingUpdateButton';
+import PlayerDuplicateModal from './PlayerDuplicateModal';
 import { useListboxKeyboard } from '../hooks/useListboxKeyboard';
+import {
+  findDuplicatePlayer,
+  playersAreSame,
+  resolveCsoPlayerId,
+} from '../utils/playerIdentity';
 
 /** Ranking z inputu: prázdné nebo 0 → null */
 function parseRankingFromInput(val) {
@@ -93,6 +99,9 @@ export default function TournamentSetup({
   const [nameSuggestions, setNameSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedCsoRank, setSelectedCsoRank] = useState(null);
+  const [pendingCsoPlayerId, setPendingCsoPlayerId] = useState(null);
+  const [dupModal, setDupModal] = useState(null); // { mode: 'add'|'edit'|'select', name, csoPlayerId, ranking, existingIndex }
+  const [highlightPlayerIndex, setHighlightPlayerIndex] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const tournamentNameFieldRef = useRef(null);
   const playerNameFieldRef = useRef(null);
@@ -181,6 +190,7 @@ export default function TournamentSetup({
     if (editingIndex !== null) setEditName(v);
     else setPlayerName(v);
     setSelectedCsoRank(null);
+    setPendingCsoPlayerId(resolveCsoPlayerId({ name: v }));
     if (!useCsoRanking) {
       setShowSuggestions(false);
       setNameSuggestions([]);
@@ -194,6 +204,7 @@ export default function TournamentSetup({
   const selectCsoPlayer = (entry) => {
     const name = String(entry?.name ?? '').trim();
     const rankStr = entry?.rank != null ? String(entry.rank) : '';
+    const csoId = resolveCsoPlayerId({ ...entry, name });
     if (editingIndex !== null) {
       setEditName(name);
       setEditRanking(rankStr);
@@ -201,10 +212,27 @@ export default function TournamentSetup({
       setPlayerName(name);
       setPlayerRanking(rankStr);
     }
+    setPendingCsoPlayerId(csoId);
     setSelectedCsoRank(entry?.rank ?? null);
     setShowSuggestions(false);
     setNameSuggestions([]);
     vkOpt?.closeKeyboard?.();
+
+    const excludeIdx = editingIndex !== null ? editingIndex : undefined;
+    const dup = findDuplicatePlayer(
+      players,
+      { name, csoPlayerId: csoId },
+      { excludeIndex: excludeIdx }
+    );
+    if (dup) {
+      setDupModal({
+        mode: editingIndex !== null ? 'edit' : 'select',
+        name,
+        csoPlayerId: csoId,
+        ranking: useCsoRanking ? null : parseRankingFromInput(rankStr),
+        existingIndex: dup.index,
+      });
+    }
   };
 
   const suggestionsOpen = useCsoRanking && showSuggestions && nameSuggestions.length > 0;
@@ -302,24 +330,60 @@ export default function TournamentSetup({
     setValidationError('');
   };
 
-  const isDuplicateName = (name, excludeIdx) =>
-    players.some((p, i) => i !== excludeIdx && p.name.trim().toLowerCase() === name.trim().toLowerCase());
+  const isBlockingDuplicatePair = (a, b) => {
+    if (!playersAreSame(a, b)) return false;
+    // „Přidat i přesto“ — neblokovat generování rozpisu
+    return !(a?.duplicateOk || b?.duplicateOk);
+  };
 
   const getDuplicateFlags = () => {
     const dupName = {};
-    const names = players.map((p) => p.name.trim().toLowerCase());
-    players.forEach((_, i) => {
-      dupName[i] = names.filter((n, j) => j !== i && n === names[i]).length > 0;
+    players.forEach((p, i) => {
+      dupName[i] = players.some(
+        (other, j) => j !== i && playersAreSame(p, other)
+      );
     });
     return { dupName };
   };
 
   const hasAnyDuplicates = () => {
-    const { dupName } = getDuplicateFlags();
-    return Object.values(dupName).some(Boolean);
+    for (let i = 0; i < players.length; i++) {
+      for (let j = i + 1; j < players.length; j++) {
+        if (isBlockingDuplicatePair(players[i], players[j])) return true;
+      }
+    }
+    return false;
   };
 
-  const handleAddPlayer = () => {
+  const clearPlayerForm = () => {
+    setPlayerName('');
+    setPlayerRanking('');
+    setPendingCsoPlayerId(null);
+    setSelectedCsoRank(null);
+    setShowSuggestions(false);
+    setNameSuggestions([]);
+  };
+
+  const commitAddPlayer = (name, ranking, csoPlayerId, { duplicateOk = false } = {}) => {
+    setTournamentDraft((prev) => ({
+      ...prev,
+      players: [
+        ...(prev.players || []),
+        {
+          name,
+          ranking,
+          csoPlayerId: csoPlayerId || resolveCsoPlayerId({ name }),
+          ...(duplicateOk ? { duplicateOk: true } : {}),
+        },
+      ],
+    }));
+    clearPlayerForm();
+    setAddConfirm(true);
+    setTimeout(() => setAddConfirm(false), 1800);
+    return true;
+  };
+
+  const handleAddPlayer = (opts = {}) => {
     setStep2Error('');
     const name = playerName.trim();
     if (!name) return false;
@@ -346,10 +410,12 @@ export default function TournamentSetup({
             typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
               ? crypto.randomUUID()
               : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+          const fullName = `${fn}_${ln}_${i + 1}`;
           return {
             id: uid,
-            name: `${fn}_${ln}_${i + 1}`,
+            name: fullName,
             ranking,
+            csoPlayerId: resolveCsoPlayerId({ name: fullName }),
           };
         });
 
@@ -357,29 +423,27 @@ export default function TournamentSetup({
           ...prev,
           players: [...(prev.players || []), ...generatedPlayers],
         }));
-        setPlayerName('');
-        setPlayerRanking('');
+        clearPlayerForm();
         return true;
       }
     }
 
     const finalRanking = useCsoRanking ? null : parseRankingFromInput(playerRanking);
-    if (isDuplicateName(name, -1)) {
-      setStep2Error(t('tournErrDupName') || 'Toto jméno je již přihlášeno.');
-      return false;
+    const csoId = pendingCsoPlayerId || resolveCsoPlayerId({ name });
+    if (!opts.force) {
+      const dup = findDuplicatePlayer(players, { name, csoPlayerId: csoId });
+      if (dup) {
+        setDupModal({
+          mode: 'add',
+          name,
+          csoPlayerId: csoId,
+          ranking: finalRanking,
+          existingIndex: dup.index,
+        });
+        return false;
+      }
     }
-    setTournamentDraft((prev) => ({
-      ...prev,
-      players: [...(prev.players || []), { name, ranking: finalRanking }],
-    }));
-    setPlayerName('');
-    setPlayerRanking('');
-    setSelectedCsoRank(null);
-    setShowSuggestions(false);
-    setNameSuggestions([]);
-    setAddConfirm(true);
-    setTimeout(() => setAddConfirm(false), 1800);
-    return true;
+    return commitAddPlayer(name, finalRanking, csoId, { duplicateOk: !!opts.force });
   };
 
   const handleDeletePlayer = (idx) => {
@@ -401,28 +465,56 @@ export default function TournamentSetup({
           ? String(players[idx].ranking)
           : ''
     );
+    setPendingCsoPlayerId(players[idx].csoPlayerId || resolveCsoPlayerId(players[idx]));
     setSelectedCsoRank(null);
     setShowSuggestions(false);
     setNameSuggestions([]);
+    setHighlightPlayerIndex(idx);
+    window.setTimeout(() => setHighlightPlayerIndex(null), 3500);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = (opts = {}) => {
     if (editingIndex === null) return false;
     setStep2Error('');
     const name = editName.trim();
     if (!name) return false;
     const finalRanking = useCsoRanking ? null : parseRankingFromInput(editRanking);
-    if (isDuplicateName(name, editingIndex)) {
-      setStep2Error(t('tournErrDupName') || 'Toto jméno je již přihlášeno.');
-      return false;
+    const csoId = pendingCsoPlayerId || resolveCsoPlayerId({ name });
+    if (!opts.force) {
+      const dup = findDuplicatePlayer(
+        players,
+        { name, csoPlayerId: csoId },
+        { excludeIndex: editingIndex }
+      );
+      if (dup) {
+        setDupModal({
+          mode: 'edit',
+          name,
+          csoPlayerId: csoId,
+          ranking: finalRanking,
+          existingIndex: dup.index,
+        });
+        return false;
+      }
     }
     setTournamentDraft((prev) => ({
       ...prev,
-      players: (prev.players || []).map((p, i) => (i === editingIndex ? { name, ranking: finalRanking } : p)),
+      players: (prev.players || []).map((p, i) =>
+        i === editingIndex
+          ? {
+              ...p,
+              name,
+              ranking: finalRanking,
+              csoPlayerId: csoId,
+              ...(opts.force ? { duplicateOk: true } : {}),
+            }
+          : p
+      ),
     }));
     setEditingIndex(null);
     setEditName('');
     setEditRanking('');
+    setPendingCsoPlayerId(null);
     setSelectedCsoRank(null);
     setShowSuggestions(false);
     setNameSuggestions([]);
@@ -545,10 +637,12 @@ export default function TournamentSetup({
           gender: csoGender,
           useCsoRanking: true,
         });
-        snapPlayers = built.players.map(({ name, ranking, id }) => ({
+        snapPlayers = built.players.map(({ name, ranking, id, csoPlayerId, duplicateOk }) => ({
           name,
           ranking,
           ...(id ? { id } : {}),
+          ...(csoPlayerId ? { csoPlayerId } : {}),
+          ...(duplicateOk ? { duplicateOk: true } : {}),
         }));
         rankingSnapshot = built.rankingSnapshot;
         setCsoList(rankingData.players ?? []);
@@ -1158,10 +1252,13 @@ export default function TournamentSetup({
                         .map((p) => (
                           <li
                             key={p._origIdx}
+                            id={`tourn-player-${p._origIdx}`}
                             className={`flex items-center justify-between gap-2 p-3 rounded-lg border ${
-                              dupName[p._origIdx]
-                                ? 'bg-amber-900/20 border-amber-500/60'
-                                : 'bg-slate-800 border-slate-700'
+                              highlightPlayerIndex === p._origIdx
+                                ? 'bg-emerald-900/40 border-emerald-500 ring-2 ring-emerald-500/50'
+                                : dupName[p._origIdx]
+                                  ? 'bg-amber-900/20 border-amber-500/60'
+                                  : 'bg-slate-800 border-slate-700'
                             }`}
                           >
                             <div className="flex flex-col gap-0.5 min-w-0">
@@ -1594,6 +1691,61 @@ export default function TournamentSetup({
           </div>
         )}
       </div>
+
+      <PlayerDuplicateModal
+        open={!!dupModal}
+        playerName={dupModal?.name || ''}
+        title={t('playerDupTitle')}
+        message={(t('playerDupMessageList') || 'Hráč {name} už je v seznamu hráčů zapsán.').replace(
+          '{name}',
+          dupModal?.name || ''
+        )}
+        cancelLabel={t('playerDupCancel')}
+        addAnywayLabel={t('playerDupAddAnyway')}
+        goToExistingLabel={t('playerDupGoExisting')}
+        onCancel={() => {
+          if (dupModal?.mode === 'select') {
+            clearPlayerForm();
+            if (editingIndex !== null) {
+              setEditingIndex(null);
+              setEditName('');
+              setEditRanking('');
+            }
+          }
+          setDupModal(null);
+        }}
+        onAddAnyway={() => {
+          const modal = dupModal;
+          setDupModal(null);
+          if (!modal) return;
+          if (modal.mode === 'edit') {
+            handleSaveEdit({ force: true });
+            return;
+          }
+          // add | select — přidej s override
+          if (modal.mode === 'select') {
+            commitAddPlayer(modal.name, modal.ranking, modal.csoPlayerId, { duplicateOk: true });
+            return;
+          }
+          handleAddPlayer({ force: true });
+        }}
+        onGoToExisting={() => {
+          const idx = dupModal?.existingIndex;
+          setDupModal(null);
+          clearPlayerForm();
+          setEditingIndex(null);
+          setEditName('');
+          setEditRanking('');
+          if (idx == null) return;
+          handleEditPlayer(idx);
+          window.setTimeout(() => {
+            document.getElementById(`tourn-player-${idx}`)?.scrollIntoView({
+              behavior: 'smooth',
+              block: 'nearest',
+            });
+          }, 50);
+        }}
+      />
     </main>
   );
 }

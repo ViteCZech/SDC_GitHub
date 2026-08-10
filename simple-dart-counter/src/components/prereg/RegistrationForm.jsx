@@ -52,7 +52,18 @@ export default function RegistrationForm({ lang, tournament, onSuccess }) {
       return clean || t('preregErrPrecondition');
     }
     if (code === 'resource-exhausted') return t('preregErrFull');
-    if (code === 'already-exists') return t('preregErrDuplicateEmail');
+    if (code === 'already-exists') {
+      const dupPrefix = 'PLAYER_NAME_DUPLICATE:';
+      const dupIdx = clean.indexOf(dupPrefix);
+      if (dupIdx >= 0) {
+        const dupName = clean.slice(dupIdx + dupPrefix.length).trim() || playerName.trim();
+        return (t('preregErrDuplicatePlayer') || 'Hráč {name} již je v tomto turnaji zaregistrován.').replace(
+          '{name}',
+          dupName
+        );
+      }
+      return t('preregErrDuplicateEmail');
+    }
     if (code === 'invalid-argument') return clean || t('preregErrInvalid');
     if (code === 'not-found') return t('preregErrNotFound');
     if (code === 'internal') return clean || t('preregErrGeneric');

@@ -77,6 +77,7 @@ import {
   stripPlayerRankingsForLive,
   withRankingsLocked,
 } from './utils/tournamentRanking';
+import { normalizePlayerNameKey, resolveCsoPlayerId } from './utils/playerIdentity';
 import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
 
 const APP_VERSION = "v1.10.1";
@@ -2767,14 +2768,18 @@ function AppMain({ lang, setLang }) {
       setPreRegImportSourceId(activePreRegTournamentId);
     }
 
-    const normalizeName = (n) => String(n ?? '').trim().toLowerCase();
+    const normalizeName = (n) => normalizePlayerNameKey(n);
     // Předregistrace neukládá pevný rank — import jen jména; rank se bere živě / při losu.
     const importedPlayers = (players || [])
-      .map((p, i) => ({
-        name: String(p.name ?? '').trim(),
-        ranking: null,
-        id: `p${i + 1}`,
-      }))
+      .map((p, i) => {
+        const name = String(p.name ?? '').trim();
+        return {
+          name,
+          ranking: null,
+          id: `p${i + 1}`,
+          csoPlayerId: p.csoPlayerId || resolveCsoPlayerId(p) || resolveCsoPlayerId({ name }),
+        };
+      })
       .filter((p) => p.name);
 
     if (importMode === 'merge') {

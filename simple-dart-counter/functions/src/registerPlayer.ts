@@ -2,6 +2,12 @@ import { initializeApp, getApps, getApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
+import {
+  ACTIVE_PREREG_STATUSES,
+  normalizePlayerNameKey,
+  playersAreSame,
+  resolveCsoPlayerId,
+} from './playerIdentity';
 import type {
   PaymentMethod,
   RegisterPlayerPayload,
@@ -17,11 +23,7 @@ if (getApps().length === 0) {
 /** Stejná pojmenovaná DB jako v klientovi (`src/firebase.js`). */
 const db = getFirestore(getApp(), 'eur3');
 
-const ACTIVE_REGISTRATION_STATUSES = new Set([
-  'CONFIRMED',
-  'WAITLIST',
-  'PENDING_PAYMENT',
-]);
+const ACTIVE_REGISTRATION_STATUSES = ACTIVE_PREREG_STATUSES;
 
 function normalizeEmail(email?: string): string | null {
   const trimmed = email?.trim().toLowerCase();
@@ -105,6 +107,7 @@ export const registerPlayer = onCall(
       const email = data.email;
       const phone = data.phone;
       const csoRank = data.csoRank;
+      const csoPlayerIdInput = data.csoPlayerId ?? null;
       const paymentMethod = data.paymentMethod;
       const termsAccepted = !!data.termsAccepted;
 
@@ -121,6 +124,11 @@ export const registerPlayer = onCall(
       }
 
       const normalizedEmail = normalizeEmail(email);
+      const nameKey = normalizePlayerNameKey(playerName);
+      const csoPlayerId = resolveCsoPlayerId({
+        name: playerName,
+        csoPlayerId: csoPlayerIdInput,
+      });
 
       const outcome = await db.runTransaction(async (transaction): Promise<TxOutcome> => {
         const tournamentRef = db.collection('tournaments').doc(tournamentId);
@@ -172,6 +180,28 @@ export const registerPlayer = onCall(
           }
         }
 
+        // Duplicita jména / ČŠO ID (ranking se neporovnává)
+        const regsSnap = await transaction.get(
+          tournamentRef.collection('registrations').limit(500)
+        );
+        const candidate = { name: playerName, csoPlayerId };
+        for (const docSnap of regsSnap.docs) {
+          const reg = docSnap.data() ?? {};
+          if (!ACTIVE_REGISTRATION_STATUSES.has(String(reg.status ?? ''))) continue;
+          const p = (reg.player ?? {}) as {
+            name?: string;
+            csoPlayerId?: string | null;
+            nameKey?: string | null;
+          };
+          const existing = {
+            name: p.name,
+            csoPlayerId: p.csoPlayerId ?? (p.nameKey ? `name:${p.nameKey}` : null),
+          };
+          if (playersAreSame(existing, candidate)) {
+            return fail('already-exists', `PLAYER_NAME_DUPLICATE:${playerName}`);
+          }
+        }
+
         const currentConfirmed = Number(counters.confirmed ?? 0) || 0;
         const rawCapacity = meta.capacity;
         const parsedCapacity = rawCapacity == null ? null : Number(rawCapacity);
@@ -211,6 +241,8 @@ export const registerPlayer = onCall(
             email: normalizedEmail,
             phone: phone?.trim() || null,
             csoRank: csoRank ?? null,
+            csoPlayerId: csoPlayerId ?? null,
+            nameKey: nameKey || null,
           },
           status: newStatus,
           payment: {

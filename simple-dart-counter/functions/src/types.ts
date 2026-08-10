@@ -61,6 +61,8 @@ export interface RegisterPlayerPayload {
   email?: string;
   phone?: string;
   csoRank?: number | null;
+  /** Stabilní ČŠO ID (`cso:…` / `name:…`), pokud je známé. */
+  csoPlayerId?: string | null;
   paymentMethod?: PaymentMethod | null;
   termsAccepted?: boolean;
 }

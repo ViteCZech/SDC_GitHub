@@ -34,10 +34,26 @@ import ImportToTournamentButton from './ImportToTournamentButton';
 import PaymentQrModal from './PaymentQrModal';
 import PreRegPageShell from './PreRegPageShell';
 import CsoPlayerNameField from './CsoPlayerNameField';
+import PlayerDuplicateModal from '../PlayerDuplicateModal';
+import {
+  findDuplicateRegistration,
+  normalizePlayerNameKey,
+  resolveCsoPlayerId,
+} from '../../utils/playerIdentity';
 
 const FILTERS = ['ALL', 'CONFIRMED', 'WAITLIST', 'CANCELLED'];
 
-function ManualRegistrationModal({ lang, tournament, user, onGoogleLogin, onNotify, onClose, onSaved }) {
+function ManualRegistrationModal({
+  lang,
+  tournament,
+  registrations = [],
+  user,
+  onGoogleLogin,
+  onNotify,
+  onClose,
+  onSaved,
+  onGoToExisting,
+}) {
   const t = (k) => translations[lang]?.[k] || k;
   const methods = tournament?.finance?.paymentMethods ?? [];
 
@@ -45,35 +61,61 @@ function ManualRegistrationModal({ lang, tournament, user, onGoogleLogin, onNoti
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [csoRank, setCsoRank] = useState('');
+  const [csoPlayerId, setCsoPlayerId] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState(methods[0] ?? null);
   const [isPaid, setIsPaid] = useState(false);
   const [checkedIn, setCheckedIn] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [dupModal, setDupModal] = useState(null); // { reg, force?: boolean }
 
   const inputCls =
     'w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50';
 
-  const handleSave = async () => {
+  const buildCandidate = () => {
+    const name = playerName.trim();
+    const id =
+      csoPlayerId ||
+      resolveCsoPlayerId({ name, csoPlayerId: null });
+    return { name, csoPlayerId: id };
+  };
+
+  const persistRegistration = async () => {
+    const name = playerName.trim();
+    const candidate = buildCandidate();
+    await createManualRegistration(tournament.id, {
+      playerName: name,
+      email: email.trim() || null,
+      phone: phone.trim() || null,
+      csoRank: null,
+      csoPlayerId: candidate.csoPlayerId,
+      nameKey: normalizePlayerNameKey(name) || null,
+      paymentMethod,
+      isPaid,
+      checkedIn,
+    });
+    onSaved?.();
+    onClose?.();
+  };
+
+  const handleSave = async (opts = {}) => {
     if (!playerName.trim()) {
       setError(t('preregErrNameRequired'));
       return;
     }
-    setLoading(true);
     setError('');
+
+    if (!opts.force) {
+      const dup = findDuplicateRegistration(registrations, buildCandidate());
+      if (dup) {
+        setDupModal({ reg: dup });
+        return;
+      }
+    }
+
+    setLoading(true);
     try {
-      await createManualRegistration(tournament.id, {
-        playerName: playerName.trim(),
-        email: email.trim() || null,
-        phone: phone.trim() || null,
-        // Plovoucí ranking — pozice se neukládá napevno, UI bere živý žebříček podle jména.
-        csoRank: null,
-        paymentMethod,
-        isPaid,
-        checkedIn,
-      });
-      onSaved?.();
-      onClose?.();
+      await persistRegistration();
     } catch (err) {
       setError(String(err?.message ?? t('preregErrGeneric')));
     } finally {
@@ -94,9 +136,13 @@ function ManualRegistrationModal({ lang, tournament, user, onGoogleLogin, onNoti
         <CsoPlayerNameField
           lang={lang}
           playerName={playerName}
-          onPlayerNameChange={setPlayerName}
+          onPlayerNameChange={(name) => {
+            setPlayerName(name);
+            setCsoPlayerId(resolveCsoPlayerId({ name }));
+          }}
           csoRank={csoRank}
           onCsoRankChange={setCsoRank}
+          onCsoPlayerIdChange={setCsoPlayerId}
           inputClassName={inputCls}
           disabled={loading}
           showRankingField={false}
@@ -150,13 +196,37 @@ function ManualRegistrationModal({ lang, tournament, user, onGoogleLogin, onNoti
 
         <button
           type="button"
-          onClick={handleSave}
+          onClick={() => handleSave()}
           disabled={loading}
           className="w-full py-3 rounded-xl font-black uppercase tracking-wide bg-emerald-600 text-white disabled:opacity-50"
         >
           {loading ? t('preregSubmitting') : t('save')}
         </button>
       </div>
+
+      <PlayerDuplicateModal
+        open={!!dupModal}
+        playerName={playerName.trim()}
+        title={t('playerDupTitle')}
+        message={(t('playerDupMessageList') || 'Hráč {name} už je v seznamu hráčů zapsán.').replace(
+          '{name}',
+          playerName.trim()
+        )}
+        cancelLabel={t('playerDupCancel')}
+        addAnywayLabel={t('playerDupAddAnyway')}
+        goToExistingLabel={t('playerDupGoExisting')}
+        onCancel={() => setDupModal(null)}
+        onAddAnyway={() => {
+          setDupModal(null);
+          handleSave({ force: true });
+        }}
+        onGoToExisting={() => {
+          const reg = dupModal?.reg;
+          setDupModal(null);
+          onClose?.();
+          if (reg) onGoToExisting?.(reg);
+        }}
+      />
     </div>
   );
 }
@@ -192,6 +262,7 @@ export default function RegistrationAdminPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
+  const [highlightRegId, setHighlightRegId] = useState(null);
   const [actionId, setActionId] = useState(null);
   const [copyFeedback, setCopyFeedback] = useState('');
   const [needsLogin, setNeedsLogin] = useState(false);
@@ -527,8 +598,17 @@ export default function RegistrationAdminPanel({
             {filtered.map((r) => {
               const busy = actionId === r.id;
               const isCancelled = r.status === 'CANCELLED';
+              const highlighted = highlightRegId === r.id;
               return (
-                <tr key={r.id} className="border-t border-slate-800 bg-slate-900/40">
+                <tr
+                  key={r.id}
+                  id={`prereg-reg-${r.id}`}
+                  className={`border-t border-slate-800 ${
+                    highlighted
+                      ? 'bg-amber-900/40 ring-2 ring-inset ring-amber-500/60'
+                      : 'bg-slate-900/40'
+                  }`}
+                >
                   <td className="p-3">
                     <div className="font-bold text-white">{r.player?.name}</div>
                     {(() => {
@@ -649,11 +729,27 @@ export default function RegistrationAdminPanel({
         <ManualRegistrationModal
           lang={lang}
           tournament={tournament}
+          registrations={registrations}
           user={user}
           onGoogleLogin={onGoogleLogin}
           onNotify={onNotify}
           onClose={() => setManualOpen(false)}
           onSaved={() => setManualOpen(false)}
+          onGoToExisting={(reg) => {
+            setHighlightRegId(reg?.id ?? null);
+            if (reg?.status && FILTERS.includes(reg.status)) {
+              setFilter(reg.status);
+            } else {
+              setFilter('ALL');
+            }
+            window.setTimeout(() => {
+              document.getElementById(`prereg-reg-${reg?.id}`)?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+              });
+            }, 80);
+            window.setTimeout(() => setHighlightRegId(null), 4500);
+          }}
         />
       )}
 
