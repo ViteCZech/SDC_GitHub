@@ -8,6 +8,7 @@ import {
   playersAreSame,
   resolveCsoPlayerId,
 } from './playerIdentity';
+import { PLAYER_REG_LINKS_COLLECTION } from './playerRegLinks';
 import type {
   PaymentMethod,
   RegisterPlayerPayload,
@@ -297,6 +298,34 @@ export const registerPlayer = onCall(
 
       if (!outcome.ok) {
         throw new HttpsError(outcome.code, outcome.message);
+      }
+
+      // Index pro hráčský přehled (bez collectionGroup — Enterprise Edition)
+      try {
+        const authUid =
+          request.auth && request.auth.token?.firebase?.sign_in_provider !== 'anonymous'
+            ? request.auth.uid
+            : null;
+        const linkId = `${tournamentId}_${outcome.result.registrationId}`;
+        await db.collection(PLAYER_REG_LINKS_COLLECTION).doc(linkId).set(
+          {
+            tournamentId,
+            registrationId: outcome.result.registrationId,
+            authUid: authUid ?? null,
+            email: normalizedEmail,
+            status: outcome.result.status,
+            playerName,
+            updatedAt: FieldValue.serverTimestamp(),
+            createdAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch (linkErr) {
+        logger.warn('player_registration_links write failed', {
+          tournamentId,
+          registrationId: outcome.result.registrationId,
+          error: linkErr instanceof Error ? linkErr.message : String(linkErr),
+        });
       }
 
       logger.info('registerPlayer success', {

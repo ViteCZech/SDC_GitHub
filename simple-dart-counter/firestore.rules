@@ -251,5 +251,13 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
+
+    /**
+     * Index hráčských přihlášek pro „Mé přihlášky“.
+     * Zápis/čtení jen přes Cloud Functions (Admin SDK) — klient nemá přístup.
+     */
+    match /player_registration_links/{linkId} {
+      allow read, write: if false;
+    }
   }
 }

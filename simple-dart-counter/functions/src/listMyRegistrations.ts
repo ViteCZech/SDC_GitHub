@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase-admin/app';
-import { getFirestore, type DocumentData, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
+import { getFirestore, type DocumentData, type DocumentSnapshot, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
+import { PLAYER_REG_LINKS_COLLECTION } from './playerRegLinks';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 
@@ -8,6 +9,13 @@ if (getApps().length === 0) {
 }
 
 const db = getFirestore(getApp(), 'eur3');
+
+const PUBLIC_CATALOG_STATUSES = [
+  'REGISTRATION_OPEN',
+  'REGISTRATION_CLOSED',
+  'IN_PROGRESS',
+  'FINISHED',
+];
 
 type MyRegistrationItem = {
   tournamentId: string;
@@ -80,9 +88,52 @@ function startsAtMs(meta: Record<string, unknown> | null | undefined): number {
   return new Date(iso).getTime() || 0;
 }
 
+function itemKey(tournamentId: string, registrationId: string): string {
+  return `${tournamentId}_${registrationId}`;
+}
+
+async function loadItemFromRegistration(
+  tournamentId: string,
+  regSnap: DocumentSnapshot
+): Promise<MyRegistrationItem | null> {
+  if (!regSnap.exists) return null;
+  const data = regSnap.data() ?? {};
+  const status = String(data.status ?? '');
+  if (status === 'CANCELLED' || status === 'NO_SHOW') return null;
+
+  const tourSnap = await db.collection('tournaments').doc(tournamentId).get();
+  const tournament = sanitizeTournament(tournamentId, tourSnap.data());
+  if (!tournament) return null;
+
+  const player = (data.player ?? {}) as {
+    name?: string;
+    email?: string | null;
+  };
+  const payment = (data.payment ?? {}) as {
+    variableSymbol?: string | null;
+    isPaid?: boolean;
+  };
+  const attendance = (data.attendance ?? {}) as { checkedIn?: boolean };
+
+  return {
+    tournamentId,
+    registrationId: regSnap.id,
+    status,
+    playerName: player.name ? String(player.name) : null,
+    email: player.email ? String(player.email) : null,
+    variableSymbol: payment.variableSymbol ?? null,
+    isPaid: !!payment.isPaid,
+    checkedIn: !!attendance.checkedIn,
+    tournament,
+  };
+}
+
 /**
- * Hráčský přehled přihlášek — podle authUid a/nebo e-mailu z Google účtu.
- * Registrace nejsou čitelné klientem (rules) → Admin SDK + collectionGroup.
+ * Hráčský přehled přihlášek.
+ * Enterprise Edition neumožňuje fieldOverrides / collectionGroup single-field indexy,
+ * proto:
+ * 1) top-level `player_registration_links` (rychlá cesta),
+ * 2) fallback: podkolekce registrací u veřejných turnajů (starší přihlášky).
  */
 export const listMyRegistrations = onCall(
   {
@@ -117,66 +168,74 @@ export const listMyRegistrations = onCall(
     });
 
     try {
-      const byPath = new Map<string, QueryDocumentSnapshot>();
+      const found = new Map<string, MyRegistrationItem>();
 
+      // 1) Rychlý index
+      const linkSnaps: QueryDocumentSnapshot[] = [];
       const byUid = await db
-        .collectionGroup('registrations')
-        .where('player.authUid', '==', uid)
+        .collection(PLAYER_REG_LINKS_COLLECTION)
+        .where('authUid', '==', uid)
         .limit(100)
         .get();
-      for (const docSnap of byUid.docs) {
-        byPath.set(docSnap.ref.path, docSnap);
-      }
+      linkSnaps.push(...byUid.docs);
 
       if (tokenEmail) {
         const byEmail = await db
-          .collectionGroup('registrations')
-          .where('player.email', '==', tokenEmail)
+          .collection(PLAYER_REG_LINKS_COLLECTION)
+          .where('email', '==', tokenEmail)
           .limit(100)
           .get();
-        for (const docSnap of byEmail.docs) {
-          byPath.set(docSnap.ref.path, docSnap);
+        linkSnaps.push(...byEmail.docs);
+      }
+
+      for (const link of linkSnaps) {
+        const L = link.data() ?? {};
+        const tournamentId = String(L.tournamentId ?? '');
+        const registrationId = String(L.registrationId ?? '');
+        if (!tournamentId || !registrationId) continue;
+        const key = itemKey(tournamentId, registrationId);
+        if (found.has(key)) continue;
+
+        const regSnap = await db
+          .collection('tournaments')
+          .doc(tournamentId)
+          .collection('registrations')
+          .doc(registrationId)
+          .get();
+        if (!regSnap.exists) continue;
+        const item = await loadItemFromRegistration(tournamentId, regSnap);
+        if (item) found.set(key, item);
+      }
+
+      // 2) Fallback pro starší registrace bez linku — jen veřejný katalog
+      const tours = await db
+        .collection('tournaments')
+        .where('visibility.isPublic', '==', true)
+        .where('status', 'in', PUBLIC_CATALOG_STATUSES)
+        .limit(80)
+        .get();
+
+      for (const tourDoc of tours.docs) {
+        const tournamentId = tourDoc.id;
+        const regCol = tourDoc.ref.collection('registrations');
+
+        const addFromQuery = async (field: string, value: string) => {
+          const snap = await regCol.where(field, '==', value).limit(5).get();
+          for (const regSnap of snap.docs) {
+            const key = itemKey(tournamentId, regSnap.id);
+            if (found.has(key)) continue;
+            const item = await loadItemFromRegistration(tournamentId, regSnap);
+            if (item) found.set(key, item);
+          }
+        };
+
+        await addFromQuery('player.authUid', uid);
+        if (tokenEmail) {
+          await addFromQuery('player.email', tokenEmail);
         }
       }
 
-      const items: MyRegistrationItem[] = [];
-
-      for (const docSnap of byPath.values()) {
-        const data = docSnap.data() ?? {};
-        const status = String(data.status ?? '');
-        if (status === 'CANCELLED' || status === 'NO_SHOW') continue;
-
-        const parent = docSnap.ref.parent.parent;
-        const tournamentId = parent?.id;
-        if (!tournamentId) continue;
-
-        const tourSnap = await parent.get();
-        const tournament = sanitizeTournament(tournamentId, tourSnap.data());
-        if (!tournament) continue;
-
-        const player = (data.player ?? {}) as {
-          name?: string;
-          email?: string | null;
-        };
-        const payment = (data.payment ?? {}) as {
-          variableSymbol?: string | null;
-          isPaid?: boolean;
-        };
-        const attendance = (data.attendance ?? {}) as { checkedIn?: boolean };
-
-        items.push({
-          tournamentId,
-          registrationId: docSnap.id,
-          status,
-          playerName: player.name ? String(player.name) : null,
-          email: player.email ? String(player.email) : null,
-          variableSymbol: payment.variableSymbol ?? null,
-          isPaid: !!payment.isPaid,
-          checkedIn: !!attendance.checkedIn,
-          tournament,
-        });
-      }
-
+      const items = [...found.values()];
       items.sort((a, b) => {
         const ma = startsAtMs(a.tournament?.meta);
         const mb = startsAtMs(b.tournament?.meta);
