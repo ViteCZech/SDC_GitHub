@@ -1,7 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-08-09T05:51:58.239Z",
+    "updatedAt": "2026-08-10T04:03:00.000Z",
+    "effectiveDate": "2026-08-10",
+    "generatedAt": "2026-08-10 04:03",
+    "fetchedAt": "2026-08-10T06:16:08.651Z",
     "totalPlayers": 134
   },
   "players": [
@@ -184,12 +187,12 @@
     },
     {
       "rank": 39,
-      "name": "Hana Schmidtová"
+      "name": "Radka Langová",
+      "club": "Pivní Baroni"
     },
     {
       "rank": 40,
-      "name": "Radka Langová",
-      "club": "Pivní Baroni"
+      "name": "Hana Schmidtová"
     },
     {
       "rank": 41,
@@ -202,17 +205,17 @@
     },
     {
       "rank": 43,
-      "name": "Eliška Panošová",
-      "club": "Spolek neratovických šipkařů"
-    },
-    {
-      "rank": 44,
       "name": "Kateřina Vorochtová"
     },
     {
-      "rank": 45,
+      "rank": 44,
       "name": "Barbora Dlabalová",
       "club": "DC Bull's-eye Riviéra F-M"
+    },
+    {
+      "rank": 44,
+      "name": "Eliška Panošová",
+      "club": "Spolek neratovických šipkařů"
     },
     {
       "rank": 46,
@@ -312,15 +315,15 @@
     },
     {
       "rank": 67,
-      "name": "Růžena Rýdelová"
-    },
-    {
-      "rank": 67,
       "name": "Anna Votavová",
       "club": "ŠK Pivnice Radegast"
     },
     {
-      "rank": 67,
+      "rank": 68,
+      "name": "Růžena Rýdelová"
+    },
+    {
+      "rank": 68,
       "name": "Lenka Křivková"
     },
     {
@@ -472,39 +475,39 @@
     },
     {
       "rank": 105,
-      "name": "Vlasta Nováková",
-      "club": "Spolek neratovických šipkařů"
-    },
-    {
-      "rank": 106,
       "name": "Jana Juráková"
     },
     {
-      "rank": 106,
+      "rank": 105,
       "name": "Petra Chytilová"
     },
     {
-      "rank": 106,
+      "rank": 105,
       "name": "Karla Wetterová"
     },
     {
-      "rank": 106,
+      "rank": 105,
       "name": "Klára Goldschmidtová"
     },
     {
-      "rank": 110,
+      "rank": 109,
       "name": "Andrea Homolová",
       "club": "Bumerang Team Plzeň"
     },
     {
-      "rank": 110,
+      "rank": 109,
       "name": "Iva Macháčková",
       "club": "Pojď mi hop"
     },
     {
-      "rank": 112,
+      "rank": 111,
       "name": "Jana Ullrichová",
       "club": "DARTS CLUB ORLOVÁ"
+    },
+    {
+      "rank": 111,
+      "name": "Vlasta Nováková",
+      "club": "Spolek neratovických šipkařů"
     },
     {
       "rank": 113,
