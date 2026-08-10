@@ -29,7 +29,7 @@ export default function ImportToTournamentButton({
     eligible
       .map((r) => ({
         name: r.player?.name ?? '',
-        ranking: r.player?.csoRank != null ? Number(r.player.csoRank) : null,
+        ranking: null,
       }))
       .filter((p) => p.name.trim());
 

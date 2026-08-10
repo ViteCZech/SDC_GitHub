@@ -71,6 +71,12 @@ import {
   calculateLiveTournamentEndPrediction,
   isEntireTournamentFinished,
 } from './utils/tournamentLogic';
+import {
+  hasDrawRankingSnapshot,
+  isTournamentRankingLocked,
+  stripPlayerRankingsForLive,
+  withRankingsLocked,
+} from './utils/tournamentRanking';
 import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
 
 const APP_VERSION = "v1.10.1";
@@ -2063,6 +2069,58 @@ function AppMain({ lang, setLang }) {
         })
       ));
 
+  /** Po prvním zápase trvale uzamknout ranking snapshot. */
+  useEffect(() => {
+    if (!isTournamentLive) return;
+    setTournamentData((prev) => withRankingsLocked(prev));
+  }, [isTournamentLive]);
+
+  /**
+   * Zruší aktivní los + snapshot a vrátí hráče do draftu v režimu živého žebříčku.
+   * Blokováno po prvním odehraném zápase.
+   */
+  const resetDrawToLiveRanking = React.useCallback(() => {
+    if (isTournamentRankingLocked(tournamentData, isTournamentLive)) return false;
+
+    const prev = tournamentData;
+    const snapshotGender = prev?.rankingSnapshot?.gender;
+    const snapshotUseCso = prev?.rankingSnapshot?.useCsoRanking;
+    const sourcePlayers =
+      prev?.players?.length > 0
+        ? prev.players
+        : tournamentDraft?.players?.length > 0
+          ? tournamentDraft.players
+          : [];
+
+    if (sourcePlayers.length > 0) {
+      setTournamentDraft((d) => ({
+        ...d,
+        name: prev?.name || d.name || '',
+        pin: prev?.pin || d.pin || '',
+        cloudEnabled: prev?.cloudEnabled ?? d.cloudEnabled,
+        tabletPassword: prev?.tabletPassword ?? d.tabletPassword,
+        format:
+          prev?.tournamentFormat === 'bracket_only' ? 'bracket_only' : d.format || 'groups_bracket',
+        players: stripPlayerRankingsForLive(sourcePlayers),
+        useCsoRanking:
+          snapshotUseCso != null ? !!snapshotUseCso : d.useCsoRanking,
+        csoRankingGender:
+          snapshotGender === 'women' || snapshotGender === 'men'
+            ? snapshotGender
+            : d.csoRankingGender || 'men',
+        boardAssignments: {},
+      }));
+    }
+
+    setTournamentData(null);
+    setTournamentMatches([]);
+    setTournamentBracket([]);
+    try {
+      safeStorage.removeItem('dartsTournamentData');
+    } catch {}
+    return true;
+  }, [tournamentData, tournamentDraft?.players, isTournamentLive]);
+
   const [tournamentEndEstimateTick, setTournamentEndEstimateTick] = useState(0);
   useEffect(() => {
     const hasTourney = !!(tournamentData?.pin || tournamentData?.tournamentId);
@@ -2210,6 +2268,15 @@ function AppMain({ lang, setLang }) {
     if (!canNavigateToStep(s)) return;
     if (s === 7) { setAppState('tournament_stats'); return; }
     if (s <= 3) {
+      if (
+        !isTournamentLive &&
+        (hasDrawRankingSnapshot(tournamentData) ||
+          (tournamentMatches?.length ?? 0) > 0 ||
+          (Array.isArray(tournamentBracket) && tournamentBracket.length > 0) ||
+          (tournamentData?.groups?.length ?? 0) > 0)
+      ) {
+        resetDrawToLiveRanking();
+      }
       setAppState('tournament_setup');
       setTournamentSetupStep(s);
       return;
@@ -2526,6 +2593,16 @@ function AppMain({ lang, setLang }) {
         return;
       }
       if (backTarget.type === 'setupStepAndState') {
+        if (
+          backTarget.state === 'tournament_setup' &&
+          !isTournamentLive &&
+          (hasDrawRankingSnapshot(tournamentData) ||
+            (tournamentMatches?.length ?? 0) > 0 ||
+            (Array.isArray(tournamentBracket) && tournamentBracket.length > 0) ||
+            tournamentData)
+        ) {
+          resetDrawToLiveRanking();
+        }
         setTournamentSetupStep(backTarget.step);
         setAppState(backTarget.state);
         return;
@@ -2546,7 +2623,7 @@ function AppMain({ lang, setLang }) {
         window.history.replaceState(null, '', '/tournaments');
       }
     },
-    [goHomeFromNav]
+    [goHomeFromNav, handleSpectatorDisconnect, resetDrawToLiveRanking, isTournamentLive, tournamentData, tournamentMatches, tournamentBracket]
   );
 
   const leavePlayingToTournamentBoard = React.useCallback(() => {
@@ -2654,16 +2731,18 @@ function AppMain({ lang, setLang }) {
     }
 
     const normalizeName = (n) => String(n ?? '').trim().toLowerCase();
+    // Předregistrace neukládá pevný rank — import jen jména; rank se bere živě / při losu.
     const importedPlayers = (players || [])
       .map((p, i) => ({
         name: String(p.name ?? '').trim(),
-        ranking: p.ranking != null ? Number(p.ranking) : null,
+        ranking: null,
         id: `p${i + 1}`,
       }))
       .filter((p) => p.name);
 
     if (importMode === 'merge') {
-      if (tournamentData?.groups?.length) {
+      if (isTournamentRankingLocked(tournamentData, isTournamentLive) && tournamentData?.groups?.length) {
+        // Po prvním zápase: late add do skupin bez přelosování / změny snapshotu
         setTournamentData((prev) => {
           if (!prev?.groups?.length) return prev;
           const existingNames = new Set(
@@ -2687,7 +2766,7 @@ function AppMain({ lang, setLang }) {
             }
             const id = `p-late-${seq + 1}`;
             seq += 1;
-            const row = { ...p, id };
+            const row = { ...p, id, ranking: null };
             groups[minIdx].players.push(row);
             addedPlayers.push(row);
           }
@@ -2707,6 +2786,29 @@ function AppMain({ lang, setLang }) {
         return;
       }
 
+      // Před live: sloučit do draftu a zrušit los → živý ranking
+      if (tournamentData || (tournamentMatches?.length ?? 0) > 0 || (tournamentBracket?.length ?? 0) > 0) {
+        const existing = stripPlayerRankingsForLive(
+          tournamentData?.players?.length ? tournamentData.players : tournamentDraft.players
+        );
+        const existingNames = new Set(existing.map((p) => normalizeName(p.name)));
+        const toAdd = importedPlayers.filter((p) => !existingNames.has(normalizeName(p.name)));
+        resetDrawToLiveRanking();
+        setTournamentDraft((prev) => ({
+          ...createDefaultTournamentDraft(),
+          ...prev,
+          name: tournamentName || prev.name || tournamentData?.name || '',
+          players: [
+            ...existing,
+            ...toAdd.map((p, i) => ({ ...p, id: `p${existing.length + i + 1}`, ranking: null })),
+          ],
+          useCsoRanking: true,
+        }));
+        setTournamentSetupStep(2);
+        setAppState('tournament_setup');
+        return;
+      }
+
       setTournamentDraft((prev) => {
         const existing = prev.players ?? [];
         const existingNames = new Set(existing.map((p) => normalizeName(p.name)));
@@ -2714,15 +2816,22 @@ function AppMain({ lang, setLang }) {
         if (toAdd.length === 0) return prev;
         const merged = [
           ...existing,
-          ...toAdd.map((p, i) => ({ ...p, id: `p${existing.length + i + 1}` })),
+          ...toAdd.map((p, i) => ({ ...p, id: `p${existing.length + i + 1}`, ranking: null })),
         ];
-        return { ...prev, name: tournamentName || prev.name || '', players: merged };
+        return {
+          ...prev,
+          name: tournamentName || prev.name || '',
+          players: merged,
+          useCsoRanking: true,
+        };
       });
       setTournamentSetupStep(2);
       setAppState('tournament_setup');
       return;
     }
 
+    // fresh = nové rozlosování: zruš snapshot/los, živý ranking
+    resetDrawToLiveRanking();
     let pinToUse = '';
     setTournamentDraft((prev) => {
       pinToUse =
@@ -2733,7 +2842,9 @@ function AppMain({ lang, setLang }) {
         ...prev,
         pin: pinToUse,
         name: tournamentName || prev.name || '',
-        players: importedPlayers.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}` })),
+        players: importedPlayers.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}`, ranking: null })),
+        useCsoRanking: true,
+        boardAssignments: {},
       };
     });
     setActivePin(pinToUse);
@@ -4712,6 +4823,14 @@ function AppMain({ lang, setLang }) {
               : undefined
           }
           onComplete={(data) => {
+            if (isTournamentLive || tournamentData?.rankingsLocked) {
+              showNotification(
+                t('tournLiveLockedHint') ||
+                  'Turnaj už má odehrané zápasy — los a ranking nelze měnit.',
+                'error'
+              );
+              return;
+            }
             clearTournamentWip();
             const generatedPin = String(data.pin || activePin || generatePin()).trim();
             let playersWithIds = (data.players || []).map((p, i) => ({

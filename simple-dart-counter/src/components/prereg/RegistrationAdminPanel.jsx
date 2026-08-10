@@ -26,6 +26,10 @@ import {
 import { calculatePrizePool, distributePrizePool, getDistributionTemplate } from '../../utils/prizePool';
 import { getPublicRegistrationUrl } from '../../utils/preregAdmin';
 import { clearAdminInviteSession } from '../../utils/preregStorage';
+import {
+  loadCsoRanking,
+  resolvePlayerLiveRankFromLists,
+} from '../../utils/csoRanking';
 import ImportToTournamentButton from './ImportToTournamentButton';
 import PaymentQrModal from './PaymentQrModal';
 import PreRegPageShell from './PreRegPageShell';
@@ -62,7 +66,8 @@ function ManualRegistrationModal({ lang, tournament, onClose, onSaved }) {
         playerName: playerName.trim(),
         email: email.trim() || null,
         phone: phone.trim() || null,
-        csoRank: csoRank.trim() ? Number(csoRank) : null,
+        // Plovoucí ranking — pozice se neukládá napevno, UI bere živý žebříček podle jména.
+        csoRank: null,
         paymentMethod,
         isPaid,
         checkedIn,
@@ -94,6 +99,7 @@ function ManualRegistrationModal({ lang, tournament, onClose, onSaved }) {
           onCsoRankChange={setCsoRank}
           inputClassName={inputCls}
           disabled={loading}
+          showRankingField={false}
         />
 
         <input
@@ -190,11 +196,34 @@ export default function RegistrationAdminPanel({
   const [checkInConfirm, setCheckInConfirm] = useState(null);
   const [qrModalReg, setQrModalReg] = useState(null);
   const isFetchingTournamentRef = useRef(false);
+  const [csoMen, setCsoMen] = useState([]);
+  const [csoWomen, setCsoWomen] = useState([]);
 
   const isOwner =
     !!user?.uid &&
     !user?.isAnonymous &&
     tournament?.admin?.ownerUid === user.uid;
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([loadCsoRanking('men'), loadCsoRanking('women')])
+      .then(([men, women]) => {
+        if (cancelled) return;
+        setCsoMen(men?.players ?? []);
+        setCsoWomen(women?.players ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCsoMen([]);
+          setCsoWomen([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const liveRankFor = (name) => resolvePlayerLiveRankFromLists(name, csoMen, csoWomen);
 
   useEffect(() => {
     if (!tournamentId) return;
@@ -495,9 +524,15 @@ export default function RegistrationAdminPanel({
                 <tr key={r.id} className="border-t border-slate-800 bg-slate-900/40">
                   <td className="p-3">
                     <div className="font-bold text-white">{r.player?.name}</div>
-                    {r.player?.csoRank != null && (
-                      <div className="text-xs text-slate-500 font-mono">#{r.player.csoRank}</div>
-                    )}
+                    {(() => {
+                      const live = liveRankFor(r.player?.name);
+                      if (live == null) return null;
+                      return (
+                        <div className="text-xs text-emerald-500/90 font-mono" title={t('tournCsoLiveRank') || 'živý žebříček'}>
+                          #{live}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="p-3 text-slate-400 text-xs">
                     {r.player?.email && <div>{r.player.email}</div>}

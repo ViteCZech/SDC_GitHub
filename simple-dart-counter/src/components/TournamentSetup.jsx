@@ -16,9 +16,11 @@ import {
 import { AdminTapTextField } from './AdminTapField';
 import { useAdminVirtualKeyboardOptional } from '../context/AdminVirtualKeyboardContext';
 import {
+  buildDrawRankingSnapshot,
   formatCsoUpdatedAt,
   getCsoRankingUrl,
   loadCsoRanking,
+  resolvePlayerLiveRank,
   searchCsoPlayers,
 } from '../utils/csoRanking';
 import CsoRankingUpdateButton from './CsoRankingUpdateButton';
@@ -90,6 +92,7 @@ export default function TournamentSetup({
   const [nameSuggestions, setNameSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedCsoRank, setSelectedCsoRank] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const tournamentNameFieldRef = useRef(null);
   const playerNameFieldRef = useRef(null);
   const playerRankingFieldRef = useRef(null);
@@ -97,6 +100,17 @@ export default function TournamentSetup({
   const players = tournamentDraft.players || [];
   const csoGender = tournamentDraft.csoRankingGender === 'women' ? 'women' : 'men';
   const useCsoRanking = !!tournamentDraft.useCsoRanking;
+
+  /** Plovoucí rank pro UI — při zapnutém ČŠO vždy z aktuálního žebříčku. */
+  const getDisplayRanking = (player) => {
+    if (useCsoRanking) {
+      return resolvePlayerLiveRank(player?.name, csoList);
+    }
+    if (player?.ranking != null && !Number.isNaN(Number(player.ranking))) {
+      return Number(player.ranking);
+    }
+    return null;
+  };
 
   useEffect(() => {
     if (step !== 2 || !useCsoRanking) {
@@ -348,7 +362,7 @@ export default function TournamentSetup({
       }
     }
 
-    const finalRanking = parseRankingFromInput(playerRanking);
+    const finalRanking = useCsoRanking ? null : parseRankingFromInput(playerRanking);
     if (isDuplicateName(name, -1)) {
       setStep2Error(t('tournErrDupName') || 'Toto jméno je již přihlášeno.');
       return false;
@@ -379,7 +393,13 @@ export default function TournamentSetup({
   const handleEditPlayer = (idx) => {
     setEditingIndex(idx);
     setEditName(players[idx].name);
-    setEditRanking(players[idx].ranking != null ? String(players[idx].ranking) : '');
+    setEditRanking(
+      useCsoRanking
+        ? ''
+        : players[idx].ranking != null
+          ? String(players[idx].ranking)
+          : ''
+    );
     setSelectedCsoRank(null);
     setShowSuggestions(false);
     setNameSuggestions([]);
@@ -390,7 +410,7 @@ export default function TournamentSetup({
     setStep2Error('');
     const name = editName.trim();
     if (!name) return false;
-    const finalRanking = parseRankingFromInput(editRanking);
+    const finalRanking = useCsoRanking ? null : parseRankingFromInput(editRanking);
     if (isDuplicateName(name, editingIndex)) {
       setStep2Error(t('tournErrDupName') || 'Toto jméno je již přihlášeno.');
       return false;
@@ -461,18 +481,23 @@ export default function TournamentSetup({
   const isCustomInvalid =
     isCustomFormat && grpFmtStep && (!customSplitOk || !customAdvanceOk);
 
-  /** Seřazení hráčů podle rankingu. */
+  /** Seřazení hráčů podle rankingu (při ČŠO z živého žebříčku — finální snapshot až při generate). */
   const getSortedPlayersForTournament = () =>
     [...players]
+      .map((p) => ({
+        name: p.name,
+        ranking: useCsoRanking ? resolvePlayerLiveRank(p.name, csoList) : p.ranking ?? null,
+        id: p.id,
+      }))
       .sort((a, b) => {
         const ra = a.ranking != null ? Number(a.ranking) : Infinity;
         const rb = b.ranking != null ? Number(b.ranking) : Infinity;
         return ra - rb;
       })
-      .map((p) => ({ name: p.name, ranking: p.ranking }));
+      .map((p) => ({ name: p.name, ranking: p.ranking, ...(p.id ? { id: p.id } : {}) }));
 
-  const handleGenerate = () => {
-    if (players.length < minPlayersRequired || hasAnyDuplicates() || isCustomInvalid) return;
+  const handleGenerate = async () => {
+    if (players.length < minPlayersRequired || hasAnyDuplicates() || isCustomInvalid || isGenerating) return;
     try {
       const parsedBoards = Number(tournamentDraft.numBoards);
       if (!Number.isFinite(parsedBoards) || parsedBoards <= 0) {
@@ -507,6 +532,37 @@ export default function TournamentSetup({
           return;
         }
       }
+
+      setIsGenerating(true);
+      let snapPlayers;
+      let rankingSnapshot;
+      if (useCsoRanking) {
+        const rankingData = await loadCsoRanking(csoGender, { bypassCache: true });
+        const built = buildDrawRankingSnapshot({
+          players,
+          rankingData,
+          gender: csoGender,
+          useCsoRanking: true,
+        });
+        snapPlayers = built.players.map(({ name, ranking, id }) => ({
+          name,
+          ranking,
+          ...(id ? { id } : {}),
+        }));
+        rankingSnapshot = built.rankingSnapshot;
+        setCsoList(rankingData.players ?? []);
+        setCsoMeta(rankingData.meta ?? null);
+      } else {
+        const built = buildDrawRankingSnapshot({
+          players: getSortedPlayersForTournament(),
+          rankingData: null,
+          gender: null,
+          useCsoRanking: false,
+        });
+        snapPlayers = built.players;
+        rankingSnapshot = built.rankingSnapshot;
+      }
+
       const numGroups =
         tournamentDraft.numGroups ?? selectedVariant?.numGroups ?? listValidGroupCounts(players.length)[0] ?? 1;
       const advPerGroup = tournamentDraft.advancePerGroup ?? selectedVariant?.advancePerGroup ?? 2;
@@ -527,7 +583,9 @@ export default function TournamentSetup({
         prelimLegs: needsPrelim ? (tournamentDraft.prelimLegs ?? 2) : null,
         numBoards: parsedBoards,
         totalBoards: parsedBoards,
-        players: getSortedPlayersForTournament(),
+        players: snapPlayers,
+        rankingSnapshot,
+        rankingsLocked: false,
         pin: pinToSave,
         cloudEnabled: !!tournamentDraft.cloudEnabled && isLoggedIn,
         tabletPassword:
@@ -539,9 +597,12 @@ export default function TournamentSetup({
     } catch (error) {
       console.error(error);
       showNotification(
-        'Kritická chyba při generování rozpisu. Zkontrolujte, zda parametry turnaje dávají smysl.',
+        t('tournCsoLoadError') ||
+          'Kritická chyba při generování rozpisu. Zkontrolujte, zda parametry turnaje dávají smysl.',
         'error'
       );
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -804,10 +865,17 @@ export default function TournamentSetup({
                     role="switch"
                     aria-checked={useCsoRanking}
                     onClick={() =>
-                      setTournamentDraft((prev) => ({
-                        ...prev,
-                        useCsoRanking: !prev.useCsoRanking,
-                      }))
+                      setTournamentDraft((prev) => {
+                        const nextOn = !prev.useCsoRanking;
+                        return {
+                          ...prev,
+                          useCsoRanking: nextOn,
+                          // Při zapnutí ČŠO smaž uložené ranky — UI bere živý žebříček.
+                          players: nextOn
+                            ? (prev.players || []).map((p) => ({ ...p, ranking: null }))
+                            : prev.players,
+                        };
+                      })
                     }
                     className={`relative h-8 w-14 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer ${
                       useCsoRanking ? 'bg-emerald-600' : 'bg-slate-700'
@@ -911,6 +979,17 @@ export default function TournamentSetup({
                         onEnterPress={() => {
                           vkOpt?.closeKeyboard?.();
                           setShowSuggestions(false);
+                          if (useCsoRanking) {
+                            const ok =
+                              editingIndex !== null ? handleSaveEdit() : handleAddPlayer();
+                            if (ok) {
+                              requestAnimationFrame(() => {
+                                playerNameFieldRef.current?.focus();
+                                playerNameFieldRef.current?.click();
+                              });
+                            }
+                            return;
+                          }
                           requestAnimationFrame(() => {
                             playerRankingFieldRef.current?.focus();
                             playerRankingFieldRef.current?.click();
@@ -949,12 +1028,24 @@ export default function TournamentSetup({
                     <div>
                       <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
                         {t('tournRanking') || 'Ranking'}
-                        {useCsoRanking && selectedCsoRank != null && (
+                        {useCsoRanking && (
                           <span className="ml-2 normal-case font-normal text-emerald-400">
-                            ({t('tournCsoFromRanking')})
+                            ({t('tournCsoLiveRank') || 'živý žebříček'})
                           </span>
                         )}
                       </label>
+                      {useCsoRanking ? (
+                        <div className={`${inputBase} w-full font-mono text-emerald-300 flex items-center`}>
+                          {(() => {
+                            const liveName = editingIndex !== null ? editName : playerName;
+                            const live =
+                              selectedCsoRank != null
+                                ? selectedCsoRank
+                                : resolvePlayerLiveRank(liveName, csoList);
+                            return live != null ? `#${live}` : '–';
+                          })()}
+                        </div>
+                      ) : (
                       <AdminTapTextField
                         fieldRef={playerRankingFieldRef}
                         id="tournament-setup-player-ranking"
@@ -979,6 +1070,7 @@ export default function TournamentSetup({
                         placeholder="–"
                         className={`${inputBase} w-full font-mono`}
                       />
+                      )}
                     </div>
                   </div>
                   <div className="mt-3">
@@ -1056,9 +1148,11 @@ export default function TournamentSetup({
                       return [...players]
                         .map((p, i) => ({ ...p, _origIdx: i }))
                         .sort((a, b) => {
-                          const ra = a.ranking != null ? Number(a.ranking) : Infinity;
-                          const rb = b.ranking != null ? Number(b.ranking) : Infinity;
-                          return ra - rb;
+                          const ra = getDisplayRanking(a);
+                          const rb = getDisplayRanking(b);
+                          const na = ra != null ? ra : Infinity;
+                          const nb = rb != null ? rb : Infinity;
+                          return na - nb;
                         })
                         .map((p) => (
                           <li
@@ -1073,7 +1167,11 @@ export default function TournamentSetup({
                               <div className="flex items-center gap-2">
                                 <UserPlus className="w-4 h-4 text-slate-500 shrink-0" />
                                 <span className="font-bold text-white line-clamp-2 leading-tight">{p.name}</span>
-                                {p.ranking != null && <span className="text-xs text-slate-500 font-mono">({p.ranking})</span>}
+                                {getDisplayRanking(p) != null && (
+                                  <span className="text-xs text-slate-500 font-mono">
+                                    ({getDisplayRanking(p)})
+                                  </span>
+                                )}
                               </div>
                               {dupName[p._origIdx] && (
                                 <span className="text-[10px] text-amber-400 font-medium">
@@ -1139,11 +1237,18 @@ export default function TournamentSetup({
                   <button
                     type="button"
                     onClick={handleGenerate}
-                    disabled={players.length < minPlayersRequired || hasAnyDuplicates() || isCustomInvalid}
+                    disabled={
+                      players.length < minPlayersRequired ||
+                      hasAnyDuplicates() ||
+                      isCustomInvalid ||
+                      isGenerating
+                    }
                     className={`${btnBase} w-full bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
                     <Target className="w-5 h-5" />
-                    {t('tournGenerate') || 'Vygenerovat turnaj'}
+                    {isGenerating
+                      ? t('tournCsoLoading') || 'Načítám…'
+                      : t('tournGenerate') || 'Vygenerovat turnaj'}
                   </button>
                 </div>
               </div>

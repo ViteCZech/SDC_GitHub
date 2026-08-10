@@ -150,6 +150,104 @@ export function normalizeForSearch(str) {
 }
 
 /**
+ * Přesná shoda jména v žebříčku (bez diakritiky / case).
+ * Pro plovoucí ranking — ne fuzzy, ať se nepřiřadí špatná pozice.
+ * @param {Array<{ rank: number, name: string, club?: string }>} players
+ * @param {string} name
+ * @returns {{ rank: number, name: string, club?: string }|null}
+ */
+export function findCsoPlayerByName(players, name) {
+  const n = normalizeForSearch(name);
+  if (!n || !Array.isArray(players)) return null;
+  const hit = players.find((p) => normalizeForSearch(p?.name) === n);
+  return hit ?? null;
+}
+
+/**
+ * @param {string} name
+ * @param {Array<{ rank: number, name: string }>|null|undefined} players
+ * @returns {number|null}
+ */
+export function resolvePlayerLiveRank(name, players) {
+  const hit = findCsoPlayerByName(players, name);
+  if (hit?.rank == null || Number.isNaN(Number(hit.rank))) return null;
+  return Number(hit.rank);
+}
+
+/**
+ * Najde rank v jednom nebo více žebříčcích (např. muži + ženy).
+ * @param {string} name
+ * @param {...Array<{ rank: number, name: string }>} lists
+ * @returns {number|null}
+ */
+export function resolvePlayerLiveRankFromLists(name, ...lists) {
+  for (const list of lists) {
+    const rank = resolvePlayerLiveRank(name, list);
+    if (rank != null) return rank;
+  }
+  return null;
+}
+
+/**
+ * Při generování losu: živý žebříček → trvalý snímek ranků hráčů.
+ * @param {{
+ *   players: Array<{ id?: string, name: string, ranking?: number|null }>,
+ *   rankingData?: { meta?: object, players?: Array<{ rank: number, name: string }> }|null,
+ *   gender?: 'men'|'women'|string|null,
+ *   useCsoRanking?: boolean,
+ * }} opts
+ * @returns {{
+ *   players: Array<{ id?: string, name: string, ranking: number|null }>,
+ *   rankingSnapshot: {
+ *     gender: 'men'|'women'|null,
+ *     useCsoRanking: boolean,
+ *     snappedAt: number,
+ *     sourceMeta: object|null,
+ *   },
+ * }}
+ */
+export function buildDrawRankingSnapshot(opts) {
+  const useCso = !!opts?.useCsoRanking;
+  const gender =
+    opts?.gender === 'women' ? 'women' : opts?.gender === 'men' ? 'men' : useCso ? 'men' : null;
+  const list = opts?.rankingData?.players ?? [];
+  const players = (opts?.players || []).map((p) => {
+    const name = String(p?.name ?? '').trim();
+    let ranking = null;
+    if (useCso) {
+      ranking = resolvePlayerLiveRank(name, list);
+    } else if (p?.ranking != null && !Number.isNaN(Number(p.ranking))) {
+      ranking = Number(p.ranking);
+    }
+    return {
+      ...p,
+      name,
+      ranking,
+    };
+  });
+
+  // Seřadit: nižší rank = lepší; bez ranku na konec (abecedně)
+  players.sort((a, b) => {
+    const ha = a.ranking != null;
+    const hb = b.ranking != null;
+    if (ha && hb) return a.ranking - b.ranking;
+    if (ha && !hb) return -1;
+    if (!ha && hb) return 1;
+    return String(a.name).localeCompare(String(b.name), 'cs');
+  });
+
+  return {
+    players,
+    rankingSnapshot: {
+      gender,
+      useCsoRanking: useCso,
+      snappedAt: Date.now(),
+      sourceMeta: opts?.rankingData?.meta ?? null,
+    },
+  };
+}
+
+/**
  * Fuzzy vyhledávání hráčů podle jména (tokeny, bez diakritiky).
  * @param {Array<{ rank: number, name: string, club?: string }>} players
  * @param {string} query
