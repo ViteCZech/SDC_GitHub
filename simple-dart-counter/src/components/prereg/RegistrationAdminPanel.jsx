@@ -37,7 +37,7 @@ import CsoPlayerNameField from './CsoPlayerNameField';
 
 const FILTERS = ['ALL', 'CONFIRMED', 'WAITLIST', 'CANCELLED'];
 
-function ManualRegistrationModal({ lang, tournament, onClose, onSaved }) {
+function ManualRegistrationModal({ lang, tournament, user, onGoogleLogin, onNotify, onClose, onSaved }) {
   const t = (k) => translations[lang]?.[k] || k;
   const methods = tournament?.finance?.paymentMethods ?? [];
 
@@ -100,6 +100,9 @@ function ManualRegistrationModal({ lang, tournament, onClose, onSaved }) {
           inputClassName={inputCls}
           disabled={loading}
           showRankingField={false}
+          user={user}
+          onGoogleLogin={onGoogleLogin}
+          onNotify={onNotify}
         />
 
         <input
@@ -178,6 +181,7 @@ export default function RegistrationAdminPanel({
   onDeleted,
   onImportToSetup,
   onGoogleLogin,
+  onNotify,
   requireImportMode = false,
 }) {
   const t = (k) => translations[lang]?.[k] || k;
@@ -206,7 +210,10 @@ export default function RegistrationAdminPanel({
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadCsoRanking('men'), loadCsoRanking('women')])
+    Promise.all([
+      loadCsoRanking('men', { bypassCache: true }),
+      loadCsoRanking('women', { bypassCache: true }),
+    ])
       .then(([men, women]) => {
         if (cancelled) return;
         setCsoMen(men?.players ?? []);
@@ -642,6 +649,9 @@ export default function RegistrationAdminPanel({
         <ManualRegistrationModal
           lang={lang}
           tournament={tournament}
+          user={user}
+          onGoogleLogin={onGoogleLogin}
+          onNotify={onNotify}
           onClose={() => setManualOpen(false)}
           onSaved={() => setManualOpen(false)}
         />

@@ -18,6 +18,7 @@ import { useAdminVirtualKeyboardOptional } from '../context/AdminVirtualKeyboard
 import {
   buildDrawRankingSnapshot,
   formatCsoUpdatedAt,
+  getCsoRankingDisplayDate,
   getCsoRankingUrl,
   loadCsoRanking,
   resolvePlayerLiveRank,
@@ -136,7 +137,7 @@ export default function TournamentSetup({
     setNameSuggestions((prev) => (prev.length === 0 ? prev : []));
     setSelectedCsoRank(null);
 
-    loadCsoRanking(csoGender, { bypassCache: isReload })
+    loadCsoRanking(csoGender, { bypassCache: true })
       .then((data) => {
         if (!cancelled) {
           setCsoList(data.players ?? []);
@@ -928,11 +929,11 @@ export default function TournamentSetup({
                         {t('tournCsoLoading')}
                       </span>
                     )}
-                    {!csoLoading && !csoError && csoMeta?.updatedAt && (
+                    {!csoLoading && !csoError && getCsoRankingDisplayDate(csoMeta) && (
                       <span className="text-xs text-slate-500 px-2 py-1 rounded-md bg-slate-800/80 border border-slate-700">
                         {t('tournCsoUpdatedAt')}{' '}
                         <span className="text-slate-300 font-mono">
-                          {formatCsoUpdatedAt(csoMeta.updatedAt)}
+                          {formatCsoUpdatedAt(getCsoRankingDisplayDate(csoMeta))}
                         </span>
                       </span>
                     )}

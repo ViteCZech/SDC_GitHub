@@ -5176,6 +5176,7 @@ function AppMain({ lang, setLang }) {
             ((tournamentDraft?.players?.length ?? 0) > 0 || !!tournamentData?.groups?.length)
           }
           onGoogleLogin={handleLogin}
+          onNotify={showNotification}
         />
       )}
         </div>

@@ -3,14 +3,17 @@ import { ExternalLink } from 'lucide-react';
 import { translations } from '../../translations';
 import {
   formatCsoUpdatedAt,
+  getCsoRankingDisplayDate,
   getCsoRankingUrl,
   loadCsoRanking,
   searchCsoPlayers,
 } from '../../utils/csoRanking';
 import { useListboxKeyboard } from '../../hooks/useListboxKeyboard';
+import CsoRankingUpdateButton from '../CsoRankingUpdateButton';
 
 /**
  * Pole jména hráče s volitelným našeptávačem žebříčku ČŠO (Stedar).
+ * Plovoucí ranking: při otevření čte čerstvá data z Firestore (server).
  * @param {{
  *   lang: string,
  *   playerName: string,
@@ -20,6 +23,9 @@ import { useListboxKeyboard } from '../../hooks/useListboxKeyboard';
  *   inputClassName?: string,
  *   disabled?: boolean,
  *   showRankingField?: boolean,
+ *   user?: object|null,
+ *   onGoogleLogin?: () => void,
+ *   onNotify?: (message: string, type?: 'success'|'error') => void,
  * }} props
  */
 export default function CsoPlayerNameField({
@@ -31,6 +37,9 @@ export default function CsoPlayerNameField({
   inputClassName = '',
   disabled = false,
   showRankingField = true,
+  user = null,
+  onGoogleLogin,
+  onNotify,
 }) {
   const t = (k) => translations[lang]?.[k] || k;
 
@@ -40,6 +49,7 @@ export default function CsoPlayerNameField({
   const [csoMeta, setCsoMeta] = useState(null);
   const [csoLoading, setCsoLoading] = useState(false);
   const [csoError, setCsoError] = useState(null);
+  const [csoReloadKey, setCsoReloadKey] = useState(0);
   const [nameSuggestions, setNameSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedCsoRank, setSelectedCsoRank] = useState(null);
@@ -56,21 +66,38 @@ export default function CsoPlayerNameField({
     }
 
     let cancelled = false;
+    const isReload = csoReloadKey > 0;
     setCsoLoading(true);
     setCsoError(null);
+    if (!isReload) {
+      setCsoMeta(null);
+    }
 
-    loadCsoRanking(csoGender)
+    // Plovoucí ranking: vždy ze serveru Firestore, ať badge není ze staré memory/IndexedDB cache.
+    loadCsoRanking(csoGender, { bypassCache: true })
       .then((data) => {
         if (!cancelled) {
           setCsoList(data.players ?? []);
-          setCsoMeta(data.meta ?? null);
+          setCsoMeta((prev) => {
+            const next = data.meta ?? null;
+            if (!next) return prev;
+            if (isReload && prev?.generatedAt && !next?.generatedAt) {
+              return {
+                ...next,
+                updatedAt: prev.updatedAt,
+                generatedAt: prev.generatedAt,
+                effectiveDate: prev.effectiveDate ?? null,
+              };
+            }
+            return next;
+          });
         }
       })
       .catch((err) => {
         if (!cancelled) {
           setCsoError(err?.message ?? t('tournCsoLoadError'));
           setCsoList([]);
-          setCsoMeta(null);
+          if (!isReload) setCsoMeta(null);
         }
       })
       .finally(() => {
@@ -80,7 +107,7 @@ export default function CsoPlayerNameField({
     return () => {
       cancelled = true;
     };
-  }, [useCsoRanking, csoGender, lang]);
+  }, [useCsoRanking, csoGender, lang, csoReloadKey]);
 
   const handleNameChange = (v) => {
     onPlayerNameChange(v);
@@ -117,6 +144,8 @@ export default function CsoPlayerNameField({
     onClose: () => setShowSuggestions(false),
     enabled: useCsoRanking && !disabled,
   });
+
+  const displayDate = getCsoRankingDisplayDate(csoMeta);
 
   const inputCls =
     inputClassName ||
@@ -179,21 +208,41 @@ export default function CsoPlayerNameField({
               {t('tournOpenOfficialRanking')}
             </a>
             {csoLoading && <span className="text-[10px] text-slate-500">{t('tournCsoLoading')}</span>}
-            {!csoLoading && !csoError && csoMeta?.updatedAt && (
+            {!csoLoading && !csoError && displayDate && (
               <span className="text-[10px] text-slate-500">
-                {t('tournCsoUpdatedAt')} {formatCsoUpdatedAt(csoMeta.updatedAt)}
+                {t('tournCsoUpdatedAt')}{' '}
+                <span className="text-slate-300 font-mono">{formatCsoUpdatedAt(displayDate)}</span>
               </span>
             )}
             {csoError && !csoLoading && (
               <span className="text-[10px] text-amber-400">{csoError}</span>
             )}
+            <CsoRankingUpdateButton
+              lang={lang}
+              user={user}
+              onLogin={onGoogleLogin}
+              onNotify={onNotify}
+              compact
+              onUpdated={(result) => {
+                const updatedAt = result?.updatedAt;
+                if (updatedAt) {
+                  setCsoMeta((prev) => ({
+                    ...(prev || {}),
+                    updatedAt,
+                    generatedAt: updatedAt,
+                    effectiveDate: prev?.effectiveDate ?? null,
+                  }));
+                }
+                setCsoReloadKey((k) => k + 1);
+              }}
+            />
           </div>
         )}
       </div>
 
       <div className={showRankingField ? 'grid grid-cols-1 sm:grid-cols-2 gap-3' : ''}>
         <div className="relative">
-          <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
             {t('preregPlayerName')} *
           </label>
           <input
@@ -227,7 +276,7 @@ export default function CsoPlayerNameField({
                     onClick={() => selectCsoPlayer(entry)}
                     onMouseEnter={() => setSuggestionHighlight(index)}
                   >
-                    <span className="font-medium text-white truncate text-sm">{entry.name}</span>
+                    <span className="font-medium text-white truncate">{entry.name}</span>
                     <span className="text-xs text-slate-400 font-mono shrink-0">#{entry.rank}</span>
                   </button>
                 </li>
@@ -238,10 +287,10 @@ export default function CsoPlayerNameField({
 
         {showRankingField && (
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
               {t('tournRanking')}
-              {useCsoRanking && selectedCsoRank != null && (
-                <span className="ml-1 normal-case font-normal text-emerald-400">
+              {selectedCsoRank != null && (
+                <span className="ml-2 normal-case font-normal text-emerald-400">
                   ({t('tournCsoFromRanking')})
                 </span>
               )}
@@ -252,9 +301,9 @@ export default function CsoPlayerNameField({
                 onCsoRankChange(e.target.value.replace(/\D/g, ''));
                 setSelectedCsoRank(null);
               }}
-              disabled={disabled}
+              disabled={disabled || useCsoRanking}
               placeholder="–"
-              className={`${inputCls} font-mono`}
+              className={`${inputCls} font-mono ${useCsoRanking ? 'opacity-70' : ''}`}
               inputMode="numeric"
             />
           </div>

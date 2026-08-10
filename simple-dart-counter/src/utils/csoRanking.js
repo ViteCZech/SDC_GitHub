@@ -115,6 +115,16 @@ export function formatCsoUpdatedAt(isoString, locale = 'cs-CZ') {
 }
 
 /**
+ * Datum žebříčku pro UI — preferuj Stedar Generated / Effective před sync timestampem.
+ * @param {{ updatedAt?: string|null, generatedAt?: string|null, effectiveDate?: string|null }|null|undefined} meta
+ * @returns {string|null}
+ */
+export function getCsoRankingDisplayDate(meta) {
+  if (!meta || typeof meta !== 'object') return null;
+  return meta.generatedAt || meta.effectiveDate || meta.updatedAt || null;
+}
+
+/**
  * Načte žebříček — priorita Firestore (Cloud Function), fallback statické JSON v public/data.
  * @param {'men'|'women'|string} gender
  * @param {{ bypassCache?: boolean }} [options]
@@ -130,6 +140,16 @@ export async function loadCsoRanking(gender, options = {}) {
   if (fromFirestore) {
     cache.set(g, fromFirestore);
     return fromFirestore;
+  }
+
+  // Při vynuceném serverovém čtení nespadni tiše na starý static JSON, pokud Firestore selhal —
+  // zkus ještě jednou běžný getDoc (offline cache), pak teprve static.
+  if (options.bypassCache) {
+    const cachedFs = await loadCsoRankingFromFirestore(g, { fromServer: false });
+    if (cachedFs) {
+      cache.set(g, cachedFs);
+      return cachedFs;
+    }
   }
 
   const result = await loadCsoRankingFromStatic(g);
