@@ -14,10 +14,11 @@ import PreRegPageShell from './PreRegPageShell';
  * @param {{
  *   tournamentId: string,
  *   lang: string,
+ *   user?: object|null,
  *   onBack?: () => void,
  * }} props
  */
-export default function PublicTournamentPage({ tournamentId, lang, onBack }) {
+export default function PublicTournamentPage({ tournamentId, lang, user = null, onBack }) {
   const t = (k) => translations[lang]?.[k] || k;
 
   const [loading, setLoading] = useState(true);
@@ -171,6 +172,7 @@ export default function PublicTournamentPage({ tournamentId, lang, onBack }) {
           <RegistrationForm
             lang={lang}
             tournament={tournament}
+            defaultEmail={!user?.isAnonymous ? user?.email || '' : ''}
             onSuccess={handleRegistrationSuccess}
           />
         </section>

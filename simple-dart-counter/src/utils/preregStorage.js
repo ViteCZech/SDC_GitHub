@@ -49,6 +49,49 @@ export function clearStoredRegistration(tournamentId) {
   } catch {}
 }
 
+/**
+ * Všechny přihlášky uložené v tomto prohlížeči (device-scoped).
+ * @returns {Array<StoredRegistration & { tournamentId: string }>}
+ */
+export function listAllStoredRegistrations() {
+  const out = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(STORAGE_PREFIX)) continue;
+      const tournamentId = key.slice(STORAGE_PREFIX.length);
+      if (!tournamentId) continue;
+      const data = loadStoredRegistration(tournamentId);
+      if (data?.registrationId) {
+        out.push({ tournamentId, ...data });
+      }
+    }
+  } catch {
+    /* private mode */
+  }
+  return out;
+}
+
+const PREFERRED_CITY_KEY = 'dartsPreregPreferredCity';
+
+/** @returns {string} */
+export function loadPreferredCity() {
+  try {
+    return String(localStorage.getItem(PREFERRED_CITY_KEY) ?? '').trim();
+  } catch {
+    return '';
+  }
+}
+
+/** @param {string} city */
+export function savePreferredCity(city) {
+  try {
+    const v = String(city ?? '').trim();
+    if (!v) localStorage.removeItem(PREFERRED_CITY_KEY);
+    else localStorage.setItem(PREFERRED_CITY_KEY, v);
+  } catch {}
+}
+
 const ADMIN_INVITE_PREFIX = 'dartsPreregAdminInvite_';
 
 /**

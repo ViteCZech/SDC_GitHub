@@ -234,6 +234,11 @@ export const registerPlayer = onCall(
         const variableSymbol = buildVariableSymbol(finance.vsPrefix, regRef.id);
         const now = FieldValue.serverTimestamp();
 
+        const authUid =
+          request.auth && request.auth.token?.firebase?.sign_in_provider !== 'anonymous'
+            ? request.auth.uid
+            : null;
+
         const newRegistration: Record<string, unknown> = {
           id: regRef.id,
           player: {
@@ -243,6 +248,7 @@ export const registerPlayer = onCall(
             csoRank: csoRank ?? null,
             csoPlayerId: csoPlayerId ?? null,
             nameKey: nameKey || null,
+            ...(authUid ? { authUid } : {}),
           },
           status: newStatus,
           payment: {

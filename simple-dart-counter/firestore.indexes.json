@@ -25,5 +25,26 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "registrations",
+      "fieldPath": "player.email",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" },
+        { "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" }
+      ]
+    },
+    {
+      "collectionGroup": "registrations",
+      "fieldPath": "player.authUid",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" },
+        { "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" }
+      ]
+    }
+  ]
 }

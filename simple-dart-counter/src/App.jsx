@@ -5087,6 +5087,8 @@ function AppMain({ lang, setLang }) {
       {appState === 'prereg_catalog' && (
         <PublicTournamentDirectory
           lang={lang}
+          user={user}
+          onGoogleLogin={handleLogin}
           onBack={() => {
             setAppState('tournament_hub');
             window.history.replaceState(null, '', '/');
@@ -5098,6 +5100,7 @@ function AppMain({ lang, setLang }) {
       {appState === 'prereg_public' && preregTournamentId && (
         <PublicTournamentPage
           lang={lang}
+          user={user}
           tournamentId={preregTournamentId}
           onBack={() => {
             if (preregReturnToCatalog) {

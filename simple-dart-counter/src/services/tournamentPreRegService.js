@@ -119,6 +119,27 @@ export async function registerPlayerApi(payload) {
   }
 }
 
+/**
+ * Přihlášky přihlášeného hráče (Cloud Function — collectionGroup).
+ * @returns {Promise<Array<object>>}
+ */
+export async function listMyRegistrationsApi() {
+  const functions = getFunctions(requireApp(), FUNCTIONS_REGION);
+  const fn = httpsCallable(functions, 'listMyRegistrations');
+  try {
+    const result = await fn({});
+    const items = /** @type {{ items?: object[] }} */ (result.data)?.items;
+    return Array.isArray(items) ? items : [];
+  } catch (err) {
+    const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
+    const message =
+      err && typeof err === 'object' && 'message' in err ? String(err.message) : '';
+    const error = new Error(message || 'list_my_registrations_failed');
+    error.code = code.replace(/^functions\//, '') || 'list_my_registrations_failed';
+    throw error;
+  }
+}
+
 function requireAuthUid() {
   const uid = auth?.currentUser?.uid;
   if (!uid || auth?.currentUser?.isAnonymous) {

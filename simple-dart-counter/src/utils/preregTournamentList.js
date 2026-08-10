@@ -36,6 +36,45 @@ export function sortByNearestStart(a, b) {
 }
 
 /**
+ * Nejdřív turnaje v preferovaném městě (textová shoda), pak podle termínu.
+ * Bez GPS — poloha v katalogu je jen město / podnik / kraj.
+ * @param {string} preferredCity
+ * @returns {(a: object, b: object) => number}
+ */
+export function sortByPreferredCityThenStart(preferredCity) {
+  const key = String(preferredCity ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+  const cityScore = (item) => {
+    if (!key) return 1;
+    const city = String(item?.meta?.location?.city ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+    const region = String(item?.meta?.location?.region ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+    if (!city && !region) return 2;
+    if (city === key || region === key) return 0;
+    if (city.includes(key) || key.includes(city) || region.includes(key)) return 1;
+    return 2;
+  };
+
+  return (a, b) => {
+    const sa = cityScore(a);
+    const sb = cityScore(b);
+    if (sa !== sb) return sa - sb;
+    return sortByNearestStart(a, b);
+  };
+}
+
+/**
  * @param {object} tournament
  * @returns {'OPEN'|'FULL'|'ACTIVE'|'FINISHED'|'OTHER'}
  */

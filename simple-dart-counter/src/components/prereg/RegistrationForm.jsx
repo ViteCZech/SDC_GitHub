@@ -12,7 +12,7 @@ import {
  *   onSuccess: (result: object, formSnapshot: object) => void,
  * }} props
  */
-export default function RegistrationForm({ lang, tournament, onSuccess }) {
+export default function RegistrationForm({ lang, tournament, onSuccess, defaultEmail = '' }) {
   const t = (k) => translations[lang]?.[k] || k;
 
   const paymentOptions = useMemo(() => {
@@ -28,7 +28,7 @@ export default function RegistrationForm({ lang, tournament, onSuccess }) {
   const entryFee = tournament?.finance?.entryFee ?? null;
 
   const [playerName, setPlayerName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => String(defaultEmail ?? '').trim());
   const [phone, setPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState(paymentOptions[0] ?? null);
   const [termsAccepted, setTermsAccepted] = useState(false);
