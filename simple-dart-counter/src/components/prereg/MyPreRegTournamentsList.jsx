@@ -1,5 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Calendar, ClipboardList, Loader2, Plus, Search, Trophy, Users } from 'lucide-react';
+import {
+  Calendar,
+  ClipboardList,
+  History,
+  Loader2,
+  Play,
+  Plus,
+  Search,
+  Shield,
+  Trophy,
+  Users,
+  Zap,
+} from 'lucide-react';
 import { translations } from '../../translations';
 import { listOwnerTournaments } from '../../services/tournamentPreRegService';
 import { normalizeForSearch } from '../../utils/csoRanking';
@@ -84,6 +96,10 @@ function sortByNearestStart(a, b) {
  *   onManage: (tournamentId: string) => void,
  *   onCreateNew: () => void,
  *   onGoogleLogin?: () => void,
+ *   onQuickStart?: () => void,
+ *   onOpenHistory?: () => void,
+ *   onContinueLive?: () => void,
+ *   liveTournament?: null | { name?: string, pin?: string, isLive?: boolean },
  * }} props
  */
 export default function MyPreRegTournamentsList({
@@ -93,8 +109,13 @@ export default function MyPreRegTournamentsList({
   onManage,
   onCreateNew,
   onGoogleLogin,
+  onQuickStart,
+  onOpenHistory,
+  onContinueLive,
+  liveTournament = null,
 }) {
   const t = (k) => translations[lang]?.[k] || k;
+  const th = (k) => translations[lang]?.tournamentHub?.[k] ?? k;
   const ownerUid = user && !user.isAnonymous ? user.uid : null;
 
   const [tournaments, setTournaments] = useState([]);
@@ -165,9 +186,10 @@ export default function MyPreRegTournamentsList({
         <div>
           <div className="flex items-center gap-2 text-emerald-400 mb-1">
             <ClipboardList className="w-5 h-5" />
-            <span className="text-xs font-black uppercase tracking-widest">{t('preregListTitle')}</span>
+            <span className="text-xs font-black uppercase tracking-widest">{th('hostTournaments')}</span>
           </div>
           <h1 className="text-2xl font-black text-white">{t('preregListHeading')}</h1>
+          <p className="text-sm text-slate-500 mt-1">{th('hostTournamentsHint')}</p>
           {!loading && ownerUid && tournaments.length > 0 && (
             <p className="text-xs text-slate-500 mt-1">
               {t('preregListCount')
@@ -176,15 +198,88 @@ export default function MyPreRegTournamentsList({
             </p>
           )}
         </div>
+      </header>
+
+      {/* Aktivní / rozpracovaný turnaj na tomto zařízení */}
+      {liveTournament && onContinueLive && (
+        <button
+          type="button"
+          onClick={onContinueLive}
+          className="w-full text-left p-4 rounded-xl border border-amber-500/40 bg-amber-950/30 hover:bg-amber-950/50 transition-colors"
+        >
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
+              <Play className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-black uppercase tracking-widest text-amber-400/90">
+                {liveTournament.isLive ? th('continueLive') : th('continueSetup')}
+              </p>
+              <p className="text-sm font-bold text-white truncate mt-0.5">
+                {liveTournament.name || th('continueUnnamed')}
+                {liveTournament.pin ? (
+                  <span className="ml-2 font-mono text-amber-300/80">PIN {liveTournament.pin}</span>
+                ) : null}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">{th('continueLiveHint')}</p>
+            </div>
+          </div>
+        </button>
+      )}
+
+      {/* Rychlé akce organizátora */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
           type="button"
           onClick={onCreateNew}
           disabled={!ownerUid}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-500 text-white text-sm disabled:opacity-40"
+          className="flex items-start gap-3 p-4 rounded-xl border border-emerald-500/40 bg-emerald-950/20 hover:bg-emerald-950/40 text-left disabled:opacity-40"
         >
-          <Plus className="w-4 h-4" /> {t('preregListCreateBtn')}
+          <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
+            <Plus className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-sm font-black text-white uppercase tracking-wide">{t('preregListCreateBtn')}</p>
+            <p className="text-xs text-slate-400 mt-1 leading-snug">{th('createWithRegistrationHint')}</p>
+          </div>
         </button>
-      </header>
+        {onQuickStart && (
+          <button
+            type="button"
+            onClick={onQuickStart}
+            className="flex items-start gap-3 p-4 rounded-xl border border-slate-700 bg-slate-900/80 hover:bg-slate-800 text-left"
+          >
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-sm font-black text-white uppercase tracking-wide">{th('quickStart')}</p>
+              <p className="text-xs text-slate-400 mt-1 leading-snug">{th('quickStartHint')}</p>
+            </div>
+          </button>
+        )}
+      </div>
+
+      {onOpenHistory && (
+        <button
+          type="button"
+          onClick={onOpenHistory}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-left"
+        >
+          <History className="w-5 h-5 text-slate-400 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-slate-200">{th('historyMode')}</p>
+            <p className="text-xs text-slate-500">{th('historyModeHint')}</p>
+          </div>
+        </button>
+      )}
+
+      <div className="pt-2 border-t border-slate-800">
+        <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-2">
+          <Shield className="w-3.5 h-3.5" />
+          {th('registrationSection')}
+        </h2>
+      </div>
 
       {!ownerUid && (
         <div className="p-4 rounded-xl border border-amber-500/50 bg-amber-900/20 space-y-3">

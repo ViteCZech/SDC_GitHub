@@ -2432,6 +2432,43 @@ function AppMain({ lang, setLang }) {
     setAppState('tournament_setup');
   };
 
+  /** Rychlý start = vždy nový průvodce (ne pokračování v live). */
+  const handleTournamentQuickStart = () => {
+    const startFresh = () => {
+      setParkedSession(null);
+      setTournamentData(null);
+      setTournamentMatches([]);
+      setTournamentBracket([]);
+      try {
+        safeStorage.removeItem('dartsTournamentData');
+      } catch {}
+      setUserRole('admin');
+      const pinToUse = generatePin();
+      setTournamentDraft({
+        ...createDefaultTournamentDraft(),
+        pin: pinToUse,
+      });
+      writeTournamentWip(pinToUse);
+      setActivePin(pinToUse);
+      setTournamentSetupStep(1);
+      setAppState('tournament_setup');
+    };
+
+    if (tournamentData || isTournamentLive) {
+      requestConfirm(
+        translations[lang]?.tournamentHub?.quickStartReplaceConfirm ||
+          'Na tomto zařízení už je rozpracovaný / živý turnaj. Opravdu ho chcete opustit a spustit rychlý start?',
+        startFresh,
+        {
+          confirmLabel: translations[lang]?.tournamentHub?.quickStart || 'Rychlý start',
+          cancelLabel: t('cancel') || 'Zrušit',
+        }
+      );
+      return;
+    }
+    startFresh();
+  };
+
   const handleTournamentHubTabletJoin = async (pin, board, tabletPassword = '') => {
     if (!pin) {
       showNotification(
@@ -5081,6 +5118,34 @@ function AppMain({ lang, setLang }) {
           onManage={handlePreRegManage}
           onCreateNew={handlePreRegCreateNew}
           onGoogleLogin={handleLogin}
+          onQuickStart={handleTournamentQuickStart}
+          onOpenHistory={handleTournamentHubHistory}
+          onContinueLive={
+            tournamentData || parkedSession?.kind === 'tournament'
+              ? () => {
+                  if (parkedSession?.kind === 'tournament') {
+                    resumeParkedSession();
+                    return;
+                  }
+                  handleTournamentHubAdmin();
+                }
+              : undefined
+          }
+          liveTournament={
+            tournamentData
+              ? {
+                  name: tournamentData.name || tournamentData.tournamentName,
+                  pin: tournamentData.pin || activePin,
+                  isLive: isTournamentLive,
+                }
+              : parkedSession?.kind === 'tournament'
+                ? {
+                    name: parkedSession.title,
+                    pin: undefined,
+                    isLive: true,
+                  }
+                : null
+          }
         />
       )}
 

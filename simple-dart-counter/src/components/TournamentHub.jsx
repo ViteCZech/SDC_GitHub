@@ -1,24 +1,25 @@
 import React, { useState } from 'react';
-import { Shield, Tablet, Eye, History, ClipboardList, Trophy } from 'lucide-react';
+import { CalendarPlus, Eye, Tablet, Trophy, Users } from 'lucide-react';
 import { translations } from '../translations';
 
 /**
- * Rozcestník rolí před vstupem do turnajového režimu (bez Firebase – pouze UI).
- * Formát turnaje (Skupiny a Pavouk / Jen Pavouk) a přepínač „Síťová hra / tablety“ (cloud)
- * se volí v kroku 1 průvodce TournamentSetup – vyžaduje přihlášení Google.
+ * Rozcestník turnaje — 3 role:
+ * 1) Pořádat (Moje turnaje / registrace / rychlý start)
+ * 2) Připojit se (tablet + divák)
+ * 3) Procházet veřejný katalog
  */
 export default function TournamentHub({
   lang = 'cs',
-  onChooseAdmin,
   onTabletJoin,
   onViewerJoin,
-  onOpenHistory,
   onOpenPreReg,
   onOpenCatalog,
-  onBack,
+  // Rychlý start + historie se volají z Moje turnaje (MyPreRegTournamentsList).
+  onChooseAdmin: _onChooseAdmin,
+  onOpenHistory: _onOpenHistory,
 }) {
   const th = (k) => translations[lang]?.tournamentHub?.[k] ?? k;
-  const [panel, setPanel] = useState(null);
+  const [panel, setPanel] = useState(null); // null | 'join' | 'tablet' | 'viewer'
   const [pin, setPin] = useState('');
   const [board, setBoard] = useState('');
   const [tabletPassword, setTabletPassword] = useState('');
@@ -34,12 +35,18 @@ export default function TournamentHub({
   };
 
   const shellMain =
-    'flex flex-col flex-1 w-full max-w-md md:max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto overflow-y-auto bg-slate-950 px-3 pt-3 pb-20 sm:px-6 sm:pt-4 sm:pb-24 min-h-0';
+    'flex flex-col flex-1 w-full max-w-md md:max-w-4xl lg:max-w-5xl mx-auto overflow-y-auto bg-slate-950 px-3 pt-3 pb-20 sm:px-6 sm:pt-4 sm:pb-24 min-h-0';
   const shortH =
     '[@media(max-height:520px)]:px-2 [@media(max-height:520px)]:pt-2 [@media(max-height:520px)]:pb-16 [@media(max-height:520px)]:sm:px-4 [@media(max-height:520px)]:sm:pt-3';
 
   const fieldInput =
     'w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/60 [@media(max-height:520px)]:py-2 [@media(max-height:520px)]:text-base';
+
+  const tileBtn =
+    'flex flex-col items-stretch gap-3 p-5 rounded-2xl border transition-transform active:scale-[0.99] text-left min-h-0 [@media(max-height:520px)]:gap-2 [@media(max-height:520px)]:p-3 [@media(max-height:520px)]:rounded-xl';
+  const tileIconWrap =
+    'flex items-center justify-center rounded-xl shrink-0 p-2.5 w-fit';
+  const tileIcon = 'w-7 h-7 [@media(max-height:520px)]:w-6 [@media(max-height:520px)]:h-6';
 
   if (panel === 'tablet') {
     return (
@@ -106,7 +113,12 @@ export default function TournamentHub({
           </button>
           <button
             type="button"
-            onClick={resetForm}
+            onClick={() => {
+              setPin('');
+              setBoard('');
+              setTabletPassword('');
+              setPanel('join');
+            }}
             className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 [@media(max-height:520px)]:py-2.5"
           >
             {translations[lang]?.tournBack ?? 'Zpět'}
@@ -148,7 +160,10 @@ export default function TournamentHub({
             </button>
             <button
               type="button"
-              onClick={resetForm}
+              onClick={() => {
+                setPin('');
+                setPanel('join');
+              }}
               className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 [@media(max-height:520px)]:py-2.5"
             >
               {translations[lang]?.tournBack ?? 'Zpět'}
@@ -159,75 +174,98 @@ export default function TournamentHub({
     );
   }
 
-  const tileBtn =
-    'flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border transition-transform active:scale-95 text-center min-h-0 [@media(max-height:520px)]:gap-1.5 [@media(max-height:520px)]:p-3 [@media(max-height:520px)]:rounded-xl';
-  const tileIconWrap =
-    'flex items-center justify-center rounded-xl shrink-0 [@media(max-height:520px)]:p-1.5 p-2';
-  const tileIcon = 'w-7 h-7 [@media(max-height:520px)]:w-6 [@media(max-height:520px)]:h-6';
-  const tileLabel =
-    'text-xs sm:text-sm font-black text-white uppercase tracking-wide leading-tight [@media(max-height:520px)]:text-[11px] px-0.5 break-words';
+  if (panel === 'join') {
+    return (
+      <main className={`${shellMain} ${shortH}`}>
+        <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400 mb-2 [@media(max-height:520px)]:text-base">
+          {th('joinSection')}
+        </h2>
+        <p className="text-sm text-slate-500 mb-6 [@media(max-height:520px)]:mb-3 [@media(max-height:520px)]:text-xs">
+          {th('joinSectionHint')}
+        </p>
+        <div className="grid w-full grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <button
+            type="button"
+            onClick={() => setPanel('tablet')}
+            className={`${tileBtn} border-slate-700 bg-slate-800/80 hover:bg-slate-800`}
+          >
+            <div className={`${tileIconWrap} bg-cyan-500/20 text-cyan-400`}>
+              <Tablet className={tileIcon} />
+            </div>
+            <div>
+              <div className="text-sm font-black text-white uppercase tracking-wide">{th('tabletMode')}</div>
+              <div className="text-xs text-slate-500 mt-1 leading-snug">{th('tabletModeHint')}</div>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPanel('viewer')}
+            className={`${tileBtn} border-slate-700 bg-slate-800/80 hover:bg-slate-800`}
+          >
+            <div className={`${tileIconWrap} bg-violet-500/20 text-violet-400`}>
+              <Eye className={tileIcon} />
+            </div>
+            <div>
+              <div className="text-sm font-black text-white uppercase tracking-wide">{th('viewerMode')}</div>
+              <div className="text-xs text-slate-500 mt-1 leading-snug">{th('viewerModeHint')}</div>
+            </div>
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={resetForm}
+          className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
+        >
+          {translations[lang]?.tournBack ?? 'Zpět'}
+        </button>
+      </main>
+    );
+  }
 
   return (
     <main className={`${shellMain} ${shortH}`}>
-      <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400 mb-8 [@media(max-height:520px)]:text-base [@media(max-height:520px)]:mb-3 [@media(max-height:520px)]:tracking-wide">
+      <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400 mb-2 [@media(max-height:520px)]:text-base [@media(max-height:520px)]:mb-1">
         {translations[lang]?.tournament ?? 'Turnaj'}
       </h2>
+      <p className="text-sm text-slate-500 mb-8 [@media(max-height:520px)]:mb-4 [@media(max-height:520px)]:text-xs">
+        {th('hubIntro')}
+      </p>
 
-      {/* Na šířku: 2×2 na mobilu, jeden řádek na velkých obrazovkách */}
-      <div className="grid w-full grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3 landscape:gap-2 [@media(max-height:520px)]:gap-2">
-        <button
-          type="button"
-          onClick={() => onChooseAdmin?.()}
-          className={`${tileBtn} border-slate-700 bg-slate-800/80 hover:bg-slate-800`}
-        >
-          <div className={`${tileIconWrap} bg-amber-500/20 text-amber-400`}>
-            <Shield className={tileIcon} />
-          </div>
-          <span className={tileLabel}>{th('adminMode')}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setPanel('tablet')}
-          className={`${tileBtn} border-slate-700 bg-slate-800/80 hover:bg-slate-800`}
-        >
-          <div className={`${tileIconWrap} bg-cyan-500/20 text-cyan-400`}>
-            <Tablet className={tileIcon} />
-          </div>
-          <span className={tileLabel}>{th('tabletMode')}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setPanel('viewer')}
-          className={`${tileBtn} border-slate-700 bg-slate-800/80 hover:bg-slate-800`}
-        >
-          <div className={`${tileIconWrap} bg-violet-500/20 text-violet-400`}>
-            <Eye className={tileIcon} />
-          </div>
-          <span className={tileLabel}>{th('viewerMode')}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onOpenHistory?.()}
-          className={`${tileBtn} border-2 border-dashed border-slate-600 bg-slate-900/50 hover:bg-slate-900`}
-        >
-          <div className={`${tileIconWrap} bg-slate-600/30 text-slate-300`}>
-            <History className={tileIcon} />
-          </div>
-          <span className={`${tileLabel} text-slate-300`}>{th('historyMode')}</span>
-        </button>
-
+      <div className="grid w-full grid-cols-1 gap-3 sm:gap-4">
         <button
           type="button"
           onClick={() => onOpenPreReg?.()}
+          className={`${tileBtn} border-emerald-500/40 bg-emerald-950/30 hover:bg-emerald-950/50`}
+        >
+          <div className="flex items-start gap-4">
+            <div className={`${tileIconWrap} bg-emerald-500/20 text-emerald-400`}>
+              <CalendarPlus className={tileIcon} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-base sm:text-lg font-black text-white uppercase tracking-wide">
+                {th('hostTournaments')}
+              </div>
+              <div className="text-sm text-slate-400 mt-1 leading-snug">{th('hostTournamentsHint')}</div>
+            </div>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setPanel('join')}
           className={`${tileBtn} border-slate-700 bg-slate-800/80 hover:bg-slate-800`}
         >
-          <div className={`${tileIconWrap} bg-emerald-500/20 text-emerald-400`}>
-            <ClipboardList className={tileIcon} />
+          <div className="flex items-start gap-4">
+            <div className={`${tileIconWrap} bg-cyan-500/20 text-cyan-400`}>
+              <Users className={tileIcon} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-base sm:text-lg font-black text-white uppercase tracking-wide">
+                {th('joinSection')}
+              </div>
+              <div className="text-sm text-slate-400 mt-1 leading-snug">{th('joinSectionHint')}</div>
+            </div>
           </div>
-          <span className={tileLabel}>{th('preRegMode')}</span>
         </button>
 
         <button
@@ -235,10 +273,17 @@ export default function TournamentHub({
           onClick={() => onOpenCatalog?.()}
           className={`${tileBtn} border-slate-700 bg-slate-800/80 hover:bg-slate-800`}
         >
-          <div className={`${tileIconWrap} bg-sky-500/20 text-sky-400`}>
-            <Trophy className={tileIcon} />
+          <div className="flex items-start gap-4">
+            <div className={`${tileIconWrap} bg-sky-500/20 text-sky-400`}>
+              <Trophy className={tileIcon} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-base sm:text-lg font-black text-white uppercase tracking-wide">
+                {th('browseTournaments')}
+              </div>
+              <div className="text-sm text-slate-400 mt-1 leading-snug">{th('browseTournamentsHint')}</div>
+            </div>
           </div>
-          <span className={tileLabel}>{th('browseTournaments')}</span>
         </button>
       </div>
     </main>
