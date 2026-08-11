@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { translations } from '../translations';
 import TournamentStatisticsView from './TournamentStatisticsView';
+import { TABLET_CHECKIN_DEFAULT_SECONDS } from '../utils/tabletCheckInTimeout';
 
-const CHECKIN_SECONDS = 180;
+const CHECKIN_SECONDS = TABLET_CHECKIN_DEFAULT_SECONDS;
 
 function formatMmSs(totalSec) {
   const s = Math.max(0, Math.floor(totalSec));
@@ -45,6 +46,7 @@ export default function TabletWaitingRoom({
   const [secondsLeft, setSecondsLeft] = useState(CHECKIN_SECONDS);
   const [timerExpired, setTimerExpired] = useState(false);
   const timeoutSentRef = useRef(false);
+  const lastResumeTokenRef = useRef(null);
 
   const allPresent = presentP1 && presentP2 && presentRef;
   const matchKey = match ? String(match.matchId ?? match.id ?? '') : '';
@@ -86,6 +88,7 @@ export default function TabletWaitingRoom({
       resetCheckIn();
       setTimerExpired(false);
       timeoutSentRef.current = false;
+      lastResumeTokenRef.current = null;
     }
   }, [match, phase, resetCheckIn]);
 
@@ -95,14 +98,31 @@ export default function TabletWaitingRoom({
     resetCheckIn();
     setTimerExpired(false);
     timeoutSentRef.current = false;
+    lastResumeTokenRef.current = null;
   }, [tournamentFinished, resetCheckIn]);
 
+  /** Nový zápas → výchozí 3 min (ne při admin resume stejného zápasu). */
   useEffect(() => {
-    if (phase !== 2 || !matchKey) return;
+    if (!matchKey) return;
+    lastResumeTokenRef.current = null;
     setSecondsLeft(CHECKIN_SECONDS);
     setTimerExpired(false);
     timeoutSentRef.current = false;
-  }, [phase, matchKey]);
+  }, [matchKey]);
+
+  /** Admin potvrdil varování → restart check-in s kratším limitem. */
+  useEffect(() => {
+    const resume = match?.tabletCheckInResume;
+    const token = resume?.token != null ? Number(resume.token) : 0;
+    const secs = Number(resume?.seconds);
+    if (!token || !Number.isFinite(secs) || secs <= 0) return;
+    if (lastResumeTokenRef.current === token) return;
+    lastResumeTokenRef.current = token;
+    timeoutSentRef.current = false;
+    setTimerExpired(false);
+    setSecondsLeft(Math.floor(secs));
+    setPhase(2);
+  }, [match?.tabletCheckInResume, matchKey]);
 
   useEffect(() => {
     if (phase !== 2 || !match) return undefined;

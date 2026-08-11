@@ -314,7 +314,103 @@ function groupCompletedMergeUnchanged(local, merged) {
   ) {
     return false;
   }
+  if (
+    JSON.stringify(local?.tabletTimeoutRoleWarningCounts ?? null) !==
+    JSON.stringify(merged?.tabletTimeoutRoleWarningCounts ?? null)
+  ) {
+    return false;
+  }
+  if ((local?.tabletTimeoutWarningCount ?? null) !== (merged?.tabletTimeoutWarningCount ?? null)) {
+    return false;
+  }
+  if (
+    (local?.tabletTimeoutAdminAckedCount ?? null) !== (merged?.tabletTimeoutAdminAckedCount ?? null)
+  ) {
+    return false;
+  }
+  if (
+    JSON.stringify(local?.tabletCheckInResume ?? null) !==
+    JSON.stringify(merged?.tabletCheckInResume ?? null)
+  ) {
+    return false;
+  }
   return true;
+}
+
+/**
+ * Sloučení tablet check-in / timeout polí z cloudu do lokálního zápasu (admin).
+ * Ignoruje zastaralé timeout_warning, pokud admin už dané varování potvrdil.
+ */
+function applyTabletCheckInCloudPatch(local, cloud, patch) {
+  const localAcked = Number(local.tabletTimeoutAdminAckedCount) || 0;
+  const cloudAcked = Number(cloud.tabletTimeoutAdminAckedCount) || 0;
+  const cloudWarn = Number(cloud.tabletTimeoutWarningCount) || 0;
+  const localWarn = Number(local.tabletTimeoutWarningCount) || 0;
+
+  if (cloudAcked > localAcked) {
+    patch.tabletTimeoutAdminAckedCount = cloudAcked;
+  }
+
+  if (cloudWarn > localWarn) {
+    patch.tabletTimeoutWarningCount = cloudWarn;
+  }
+
+  if (cloud.tabletTimeoutRoleWarningCounts && typeof cloud.tabletTimeoutRoleWarningCounts === 'object') {
+    const lr = local.tabletTimeoutRoleWarningCounts || {};
+    const cr = cloud.tabletTimeoutRoleWarningCounts;
+    const mergedRoles = {
+      p1: Math.max(Number(lr.p1) || 0, Number(cr.p1) || 0),
+      p2: Math.max(Number(lr.p2) || 0, Number(cr.p2) || 0),
+      referee: Math.max(Number(lr.referee) || 0, Number(cr.referee) || 0),
+    };
+    if (JSON.stringify(mergedRoles) !== JSON.stringify({
+      p1: Number(lr.p1) || 0,
+      p2: Number(lr.p2) || 0,
+      referee: Number(lr.referee) || 0,
+    })) {
+      patch.tabletTimeoutRoleWarningCounts = mergedRoles;
+    }
+  }
+
+  const effectiveAcked = Math.max(localAcked, cloudAcked, Number(patch.tabletTimeoutAdminAckedCount) || 0);
+  const effectiveWarn = Math.max(localWarn, cloudWarn, Number(patch.tabletTimeoutWarningCount) || 0);
+
+  if (cloud.tabletStatus === 'timeout_warning') {
+    const warnLevel = effectiveWarn || 1;
+    if (warnLevel > effectiveAcked) {
+      patch.tabletStatus = 'timeout_warning';
+      if (effectiveWarn > localWarn) patch.tabletTimeoutWarningCount = effectiveWarn;
+      if (
+        cloud.tabletCheckInPresent != null &&
+        JSON.stringify(cloud.tabletCheckInPresent) !== JSON.stringify(local.tabletCheckInPresent ?? null)
+      ) {
+        patch.tabletCheckInPresent = cloud.tabletCheckInPresent;
+      }
+      if (cloud.tabletCheckInResume == null && local.tabletCheckInResume != null) {
+        patch.tabletCheckInResume = null;
+      }
+    }
+  } else if (cloud.tabletStatus != null && cloud.tabletStatus !== local.tabletStatus) {
+    patch.tabletStatus = cloud.tabletStatus;
+  }
+
+  if (cloud.whoStarts != null && cloud.whoStarts !== local.whoStarts) {
+    patch.whoStarts = cloud.whoStarts;
+  }
+
+  const localResumeToken = Number(local.tabletCheckInResume?.token) || 0;
+  const cloudResumeToken = Number(cloud.tabletCheckInResume?.token) || 0;
+  if (cloudResumeToken > localResumeToken) {
+    patch.tabletCheckInResume = cloud.tabletCheckInResume;
+  }
+
+  if (
+    cloud.tabletCheckInPresent != null &&
+    cloud.tabletStatus !== 'timeout_warning' &&
+    JSON.stringify(cloud.tabletCheckInPresent) !== JSON.stringify(local.tabletCheckInPresent ?? null)
+  ) {
+    patch.tabletCheckInPresent = cloud.tabletCheckInPresent;
+  }
 }
 
 /**
@@ -350,18 +446,7 @@ export function mergeAdminGroupMatchesFromTabletCloud(prevLocal, cloudList) {
     if (isCloudMatchTerminal(local)) return local;
 
     const patch = {};
-    if (cloud.tabletStatus != null && cloud.tabletStatus !== local.tabletStatus) {
-      patch.tabletStatus = cloud.tabletStatus;
-    }
-    if (cloud.whoStarts != null && cloud.whoStarts !== local.whoStarts) {
-      patch.whoStarts = cloud.whoStarts;
-    }
-    if (
-      cloud.tabletCheckInPresent != null &&
-      JSON.stringify(cloud.tabletCheckInPresent) !== JSON.stringify(local.tabletCheckInPresent ?? null)
-    ) {
-      patch.tabletCheckInPresent = cloud.tabletCheckInPresent;
-    }
+    applyTabletCheckInCloudPatch(local, cloud, patch);
     if (Object.keys(patch).length === 0) return local;
     changed = true;
     return { ...local, ...patch };
@@ -414,18 +499,7 @@ export function mergeAdminBracketFromTabletCloud(prevLocal, cloudBracket) {
       if (isCloudMatchTerminal(local)) return local;
 
       const patch = {};
-      if (cloud.tabletStatus != null && cloud.tabletStatus !== local.tabletStatus) {
-        patch.tabletStatus = cloud.tabletStatus;
-      }
-      if (cloud.whoStarts != null && cloud.whoStarts !== local.whoStarts) {
-        patch.whoStarts = cloud.whoStarts;
-      }
-      if (
-        cloud.tabletCheckInPresent != null &&
-        JSON.stringify(cloud.tabletCheckInPresent) !== JSON.stringify(local.tabletCheckInPresent ?? null)
-      ) {
-        patch.tabletCheckInPresent = cloud.tabletCheckInPresent;
-      }
+      applyTabletCheckInCloudPatch(local, cloud, patch);
       // Admin / synchronizace: doplnění chybějícího soupeře v čekajícím zápase (např. ruční oprava v cloudu).
       const mergeMissingSlot = (idKey, nameKey, altIdKey, altNameKey) => {
         const lid = local[idKey] ?? local[altIdKey];

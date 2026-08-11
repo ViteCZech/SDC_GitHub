@@ -28,6 +28,11 @@ import {
 
 import { translations } from './translations';
 import { matchesRematchPhrase, normalizeSpeechCommand, SPEECH_LANG_MAP } from './voiceSpeech';
+import {
+  TABLET_CHECKIN_MAX_WARNINGS,
+  bumpRoleWarningCounts,
+  checkInSecondsAfterWarningAck,
+} from './utils/tabletCheckInTimeout';
 import GameX01 from './components/GameX01';
 import GameCricket from './components/GameCricket';
 import GameStats from './Stats';
@@ -1439,8 +1444,6 @@ function AppMain({ lang, setLang }) {
   const [tournamentBracket, setTournamentBracket] = useState(
     () => getInitialTournamentBootstrapOnce().bracket ?? []
   );
-  /** Admin potvrdil přečtení výstrahy u zápasů s tabletStatus timeout_warning (klíče g:id / b:id). */
-  const [adminTabletTimeoutAckKeys, setAdminTabletTimeoutAckKeys] = useState([]);
   const hasBracketGenerated = Array.isArray(tournamentBracket) && (tournamentBracket?.length ?? 0) > 0;
   /** Režim přístupu k turnaji (cloud rozcestník); null = zatím nevybráno v hubu */
   const [userRole, setUserRole] = useState(null);
@@ -1606,64 +1609,99 @@ function AppMain({ lang, setLang }) {
       }
       return '';
     };
+    const formatPersonWarn = (name, n) =>
+      String(t('adminTabletPresentationTimeoutPersonWarn'))
+        .replace('{name}', name)
+        .replace('{n}', String(Math.max(1, Number(n) || 1)));
     const missingFromPresent = (m, phaseKey) => {
       const p1 = pname(m.player1Id) || m.player1Name || m.p1Name || '?';
       const p2 = pname(m.player2Id) || m.player2Name || m.p2Name || '?';
       const refName = refereeNameForMatch(m, phaseKey);
       const present = m.tabletCheckInPresent;
+      const roles = m.tabletTimeoutRoleWarningCounts || {};
       const refLabel = refName
         ? `${t('adminTabletPresentationTimeoutRefereeRole')}: ${refName}`
         : t('adminTabletPresentationTimeoutRefereeRole');
+      const pushMissing = (list, wasPresent, label, roleKey) => {
+        if (present && typeof present === 'object' && wasPresent) return;
+        list.push(formatPersonWarn(label, roles[roleKey] || 1));
+      };
+      const missing = [];
       if (present && typeof present === 'object') {
-        const missing = [];
-        if (!present.p1) missing.push(p1);
-        if (!present.p2) missing.push(p2);
-        if (!present.referee) missing.push(refLabel);
-        return missing.length > 0 ? missing : [p1, p2, refLabel];
+        pushMissing(missing, present.p1, p1, 'p1');
+        pushMissing(missing, present.p2, p2, 'p2');
+        pushMissing(missing, present.referee, refLabel, 'referee');
+        if (missing.length > 0) return missing;
       }
-      // Starší timeouty bez detailu check-inu — uveď všechny role.
-      return [p1, p2, refLabel];
+      return [
+        formatPersonWarn(p1, roles.p1 || 1),
+        formatPersonWarn(p2, roles.p2 || 1),
+        formatPersonWarn(refLabel, roles.referee || 1),
+      ];
     };
     const groupLabelFor = (m) => {
       const gid = m.groupId ?? m.group;
       if (gid == null || gid === '') return t('adminTabletPresentationTimeoutGroup');
       return String(t('adminTabletPresentationTimeoutGroupNamed')).replace('{id}', String(gid));
     };
+    const isPendingWarning = (m) => {
+      if (m?.tabletStatus !== 'timeout_warning') return false;
+      const warn = Math.min(
+        TABLET_CHECKIN_MAX_WARNINGS,
+        Math.max(1, Number(m.tabletTimeoutWarningCount) || 1)
+      );
+      const acked = Number(m.tabletTimeoutAdminAckedCount) || 0;
+      return acked < warn;
+    };
 
     for (const m of tournamentMatches || []) {
-      if (m?.tabletStatus !== 'timeout_warning') continue;
+      if (!isPendingWarning(m)) continue;
       if (!m.player1Id || !m.player2Id) continue;
       if (m.matchId == null && m.id == null) continue;
       const mid = m.matchId ?? m.id;
       const p1 = pname(m.player1Id) || m.player1Name || m.p1Name || '?';
       const p2 = pname(m.player2Id) || m.player2Name || m.p2Name || '?';
+      const warningCount = Math.min(
+        TABLET_CHECKIN_MAX_WARNINGS,
+        Math.max(1, Number(m.tabletTimeoutWarningCount) || 1)
+      );
       entries.push({
         key: `g:${String(mid)}`,
+        matchId: mid,
+        matchType: 'group',
         phaseKey: 'group',
         roundIndex: null,
         board: m.board,
         groupLabel: groupLabelFor(m),
         label: `${p1} vs ${p2}`,
         missingNames: missingFromPresent(m, 'group'),
+        warningCount,
       });
     }
     if (Array.isArray(tournamentBracket)) {
       tournamentBracket.forEach((round, ri) => {
         for (const m of round?.matches || []) {
-          if (m?.tabletStatus !== 'timeout_warning' || m.isBye) continue;
+          if (!isPendingWarning(m) || m.isBye) continue;
           if (!m.player1Id || !m.player2Id) continue;
           if (m.id == null && m.matchId == null) continue;
           const mid = m.id ?? m.matchId;
           const p1 = pname(m.player1Id) || m.player1Name || m.p1Name || '?';
           const p2 = pname(m.player2Id) || m.player2Name || m.p2Name || '?';
+          const warningCount = Math.min(
+            TABLET_CHECKIN_MAX_WARNINGS,
+            Math.max(1, Number(m.tabletTimeoutWarningCount) || 1)
+          );
           entries.push({
             key: `b:${String(mid)}`,
+            matchId: mid,
+            matchType: 'bracket',
             phaseKey: 'bracket',
             roundIndex: ri,
             board: m.board,
             groupLabel: null,
             label: `${p1} vs ${p2}`,
             missingNames: missingFromPresent(m, 'bracket'),
+            warningCount,
           });
         }
       });
@@ -1671,15 +1709,7 @@ function AppMain({ lang, setLang }) {
     return entries;
   }, [tournamentData, tournamentMatches, tournamentBracket, tournamentGroups, lang]);
 
-  useEffect(() => {
-    const active = new Set(adminTabletTimeoutWarningEntries.map((e) => e.key));
-    setAdminTabletTimeoutAckKeys((prev) => prev.filter((k) => active.has(k)));
-  }, [adminTabletTimeoutWarningEntries]);
-
-  const adminTabletTimeoutPending = React.useMemo(
-    () => adminTabletTimeoutWarningEntries.filter((e) => !adminTabletTimeoutAckKeys.includes(e.key)),
-    [adminTabletTimeoutWarningEntries, adminTabletTimeoutAckKeys]
-  );
+  const adminTabletTimeoutPending = adminTabletTimeoutWarningEntries;
 
   const adminTabletTimeoutBannerStates = [
     'tournament_board_assignment',
@@ -3387,6 +3417,7 @@ function AppMain({ lang, setLang }) {
   const handleTabletTimeoutWarning = async (matchType, matchId, checkInPresent) => {
     const pin = String(activePin ?? '').trim();
     if (!/^\d{4}$/.test(pin) || !matchId) return;
+    const am = tabletAssignedMatchRef.current;
     const present =
       checkInPresent && typeof checkInPresent === 'object'
         ? {
@@ -3394,7 +3425,10 @@ function AppMain({ lang, setLang }) {
             p2: !!checkInPresent.presentP2,
             referee: !!checkInPresent.presentRef,
           }
-        : null;
+        : { p1: false, p2: false, referee: false };
+    const prevCount = Number(am?.tabletTimeoutWarningCount) || 0;
+    const nextCount = Math.min(TABLET_CHECKIN_MAX_WARNINGS, prevCount + 1);
+    const roleCounts = bumpRoleWarningCounts(am?.tabletTimeoutRoleWarningCounts, present);
     try {
       await updateCloudMatchFromTablet(
         pin,
@@ -3402,7 +3436,10 @@ function AppMain({ lang, setLang }) {
         matchId,
         {
           tabletStatus: 'timeout_warning',
-          ...(present ? { tabletCheckInPresent: present } : {}),
+          tabletCheckInPresent: present,
+          tabletTimeoutWarningCount: nextCount,
+          tabletTimeoutRoleWarningCounts: roleCounts,
+          tabletCheckInResume: null,
         },
         { tabletPassword: loadStoredTabletPassword() }
       );
@@ -3410,6 +3447,90 @@ function AppMain({ lang, setLang }) {
       console.warn('Tablet timeout warning sync', err);
     }
   };
+
+  /** Admin potvrdil timeout banner: 1./2. → restart check-inu (90s / 60s), 3. → bez resetu. */
+  const acknowledgeAdminTabletTimeoutWarnings = React.useCallback(() => {
+    const pending = adminTabletTimeoutPending;
+    if (!pending.length) return;
+
+    const byId = new Map(pending.map((e) => [String(e.matchId), e]));
+    const resumeTokenBase = Date.now();
+    let resumeTokenSeq = 0;
+
+    const patchMatch = (m, mid, entry) => {
+      const count = Math.min(
+        TABLET_CHECKIN_MAX_WARNINGS,
+        Math.max(1, Number(entry.warningCount) || Number(m.tabletTimeoutWarningCount) || 1)
+      );
+      const resumeSeconds = checkInSecondsAfterWarningAck(count);
+      if (resumeSeconds != null) {
+        resumeTokenSeq += 1;
+        return {
+          ...m,
+          tabletStatus: null,
+          tabletTimeoutAdminAckedCount: count,
+          tabletTimeoutWarningCount: count,
+          tabletCheckInResume: {
+            token: resumeTokenBase + resumeTokenSeq,
+            seconds: resumeSeconds,
+          },
+        };
+      }
+      return {
+        ...m,
+        tabletTimeoutAdminAckedCount: count,
+        tabletTimeoutWarningCount: count,
+        tabletCheckInResume: null,
+      };
+    };
+
+    const hasGroup = pending.some((e) => e.matchType === 'group');
+    const hasBracket = pending.some((e) => e.matchType === 'bracket');
+
+    let nextMatches = tournamentMatches;
+    let nextBracket = tournamentBracket;
+
+    if (hasGroup) {
+      nextMatches = (tournamentMatches || []).map((m) => {
+        const mid = m.matchId ?? m.id;
+        const entry = byId.get(String(mid));
+        if (!entry || entry.matchType !== 'group') return m;
+        return patchMatch(m, mid, entry);
+      });
+      setTournamentMatches(nextMatches);
+    }
+    if (hasBracket) {
+      nextBracket = (tournamentBracket || []).map((round) => ({
+        ...round,
+        matches: (round?.matches || []).map((m) => {
+          const mid = m.id ?? m.matchId;
+          const entry = byId.get(String(mid));
+          if (!entry || entry.matchType !== 'bracket') return m;
+          return patchMatch(m, mid, entry);
+        }),
+      }));
+      setTournamentBracket(nextBracket);
+    }
+
+    const pin = String(activePin ?? '').trim();
+    if (tournamentData?.cloudEnabled && /^\d{4}$/.test(pin) && user && !user.isAnonymous) {
+      const snap = tournamentSyncPayloadRef.current;
+      syncTournamentToCloud(pin, {
+        tournamentData: snap?.tournamentData ?? tournamentData,
+        groups: snap?.groups ?? tournamentGroups,
+        groupMatches: nextMatches,
+        tournamentBracket: nextBracket,
+      }).catch((err) => console.warn('Timeout ack cloud sync failed:', err));
+    }
+  }, [
+    adminTabletTimeoutPending,
+    tournamentMatches,
+    tournamentBracket,
+    tournamentData,
+    tournamentGroups,
+    activePin,
+    user,
+  ]);
 
   const handleTabletStartGame = async (matchId, startingPlayerId) => {
     const am = tabletAssignedMatchRef.current;
@@ -4783,6 +4904,9 @@ function AppMain({ lang, setLang }) {
                       Array.isArray(e.missingNames) && e.missingNames.length > 0
                         ? e.missingNames.join(', ')
                         : '—';
+                    const warnLabel = String(t('adminTabletPresentationTimeoutWarnLevel'))
+                      .replace('{n}', String(e.warningCount || 1))
+                      .replace('{max}', String(TABLET_CHECKIN_MAX_WARNINGS));
                     let whereLabel = '';
                     if (e.phaseKey === 'group') {
                       whereLabel = e.groupLabel || t('adminTabletPresentationTimeoutGroup');
@@ -4796,6 +4920,8 @@ function AppMain({ lang, setLang }) {
                     return (
                       <li key={e.key} className="leading-snug">
                         <span>
+                          {warnLabel}
+                          {' · '}
                           {whereLabel}
                           {boardPart ? ` · ${boardPart}` : ''}
                           {': '}
@@ -4824,6 +4950,9 @@ function AppMain({ lang, setLang }) {
                     Array.isArray(e.missingNames) && e.missingNames.length > 0
                       ? e.missingNames.join(', ')
                       : '—';
+                  const warnLabel = String(t('adminTabletPresentationTimeoutWarnLevel'))
+                    .replace('{n}', String(e.warningCount || 1))
+                    .replace('{max}', String(TABLET_CHECKIN_MAX_WARNINGS));
                   let whereLabel = '';
                   if (e.phaseKey === 'group') {
                     whereLabel = e.groupLabel || t('adminTabletPresentationTimeoutGroup');
@@ -4834,17 +4963,21 @@ function AppMain({ lang, setLang }) {
                     );
                     whereLabel = `${t('adminTabletPresentationTimeoutBracket')} (${rk})`;
                   }
-                  return `• ${whereLabel}${boardPart}: ${e.label}\n  ${t('adminTabletPresentationTimeoutMissing')}: ${missing}`;
+                  const nextSec = checkInSecondsAfterWarningAck(e.warningCount || 1);
+                  const nextHint =
+                    nextSec != null
+                      ? String(t('adminTabletPresentationTimeoutNextTimer')).replace(
+                          '{sec}',
+                          String(nextSec)
+                        )
+                      : t('adminTabletPresentationTimeoutNoMoreTimer');
+                  return `• ${warnLabel} · ${whereLabel}${boardPart}: ${e.label}\n  ${t('adminTabletPresentationTimeoutMissing')}: ${missing}\n  ${nextHint}`;
                 });
                 const msg = `${t('adminTabletPresentationTimeoutConfirmBody')}\n\n${lines.join('\n')}`;
                 requestConfirm(
                   msg,
                   () => {
-                    setAdminTabletTimeoutAckKeys((prev) => {
-                      const s = new Set(prev);
-                      for (const it of pending) s.add(it.key);
-                      return Array.from(s);
-                    });
+                    acknowledgeAdminTabletTimeoutWarnings();
                   },
                   {
                     title: t('adminTabletPresentationTimeoutConfirmTitle'),

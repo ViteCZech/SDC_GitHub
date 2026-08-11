@@ -623,7 +623,7 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     tournTabletTimeoutAlert: 'ČAS VYPRŠEL!',
     adminTabletPresentationTimeoutTitle: 'HRÁČI NEDODRŽELI ČAS PREZENCE U TERČE',
     adminTabletPresentationTimeoutLead:
-      'Vypršel časový limit pro přihlášení k zápasu na přiděleném terči. Níže je skupina/pavouk, terč a kdo se nepřihlásil včas (včetně rozhodčího).',
+      'Vypršel časový limit pro přihlášení k zápasu. Po potvrzení se u 1. varování obnoví čekání na 50 % času, u 2. na 1 minutu; po 3. varování se čas již neresetuje.',
     adminTabletPresentationTimeoutGroup: 'Skupina',
     adminTabletPresentationTimeoutGroupNamed: 'Skupina {id}',
     adminTabletPresentationTimeoutBracket: 'Pavouk',
@@ -631,6 +631,12 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     adminTabletPresentationTimeoutBoard: 'terč {n}',
     adminTabletPresentationTimeoutMissing: 'Nepřihlásili se včas',
     adminTabletPresentationTimeoutRefereeRole: 'rozhodčí',
+    adminTabletPresentationTimeoutWarnLevel: 'Varování {n}/{max}',
+    adminTabletPresentationTimeoutPersonWarn: '{name} ({n}. varování)',
+    adminTabletPresentationTimeoutNextTimer:
+      'Po potvrzení se na tabletu obnoví check-in na {sec} s.',
+    adminTabletPresentationTimeoutNoMoreTimer:
+      'Poslední (3.) varování — po potvrzení se časovač již neresetuje.',
     adminTabletPresentationTimeoutAckButton: 'Potvrdit přečtení',
     adminTabletPresentationTimeoutConfirmTitle: 'Potvrzení administrátora',
     adminTabletPresentationTimeoutConfirmBody:
@@ -1331,7 +1337,7 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     tournTabletTimeoutAlert: 'TIME EXPIRED!',
     adminTabletPresentationTimeoutTitle: 'PLAYERS MISSED CHECK-IN AT THE BOARD',
     adminTabletPresentationTimeoutLead:
-      'The check-in time limit for the assigned match on the board has expired. Below: stage/bracket, board, and who missed check-in (including the referee).',
+      'Check-in time expired. After you acknowledge: 1st warning resumes at 50% time, 2nd at 1 minute; after the 3rd warning the timer is not reset.',
     adminTabletPresentationTimeoutGroup: 'Group stage',
     adminTabletPresentationTimeoutGroupNamed: 'Group {id}',
     adminTabletPresentationTimeoutBracket: 'Bracket',
@@ -1339,6 +1345,12 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     adminTabletPresentationTimeoutBoard: 'board {n}',
     adminTabletPresentationTimeoutMissing: 'Missed check-in',
     adminTabletPresentationTimeoutRefereeRole: 'referee',
+    adminTabletPresentationTimeoutWarnLevel: 'Warning {n}/{max}',
+    adminTabletPresentationTimeoutPersonWarn: '{name} (warning #{n})',
+    adminTabletPresentationTimeoutNextTimer:
+      'After confirm, tablet check-in restarts for {sec} s.',
+    adminTabletPresentationTimeoutNoMoreTimer:
+      'Final (3rd) warning — timer will not reset after confirm.',
     adminTabletPresentationTimeoutAckButton: 'Acknowledge',
     adminTabletPresentationTimeoutConfirmTitle: 'Administrator confirmation',
     adminTabletPresentationTimeoutConfirmBody:
@@ -2021,7 +2033,7 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
     tournTabletTimeoutAlert: 'CZAS MINĄŁ!',
     adminTabletPresentationTimeoutTitle: 'GRACZE NIE DOSTAWILI SIĘ NA TARCZĘ W TERMINIE',
     adminTabletPresentationTimeoutLead:
-      'Upłynął limit czasu na meldunek do meczu na przypisanej tarczy. Poniżej: grupa/drabinka, tarcza oraz kto nie zameldował się na czas (w tym sędzia).',
+      'Czas meldunku minął. Po potwierdzeniu: 1. ostrzeżenie wznawia 50% czasu, 2. — 1 minutę; po 3. ostrzeżeniu timer już się nie resetuje.',
     adminTabletPresentationTimeoutGroup: 'Faza grupowa',
     adminTabletPresentationTimeoutGroupNamed: 'Grupa {id}',
     adminTabletPresentationTimeoutBracket: 'Drabinka',
@@ -2029,6 +2041,12 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
     adminTabletPresentationTimeoutBoard: 'tarcza {n}',
     adminTabletPresentationTimeoutMissing: 'Nie zameldowali się na czas',
     adminTabletPresentationTimeoutRefereeRole: 'sędzia',
+    adminTabletPresentationTimeoutWarnLevel: 'Ostrzeżenie {n}/{max}',
+    adminTabletPresentationTimeoutPersonWarn: '{name} ({n}. ostrzeżenie)',
+    adminTabletPresentationTimeoutNextTimer:
+      'Po potwierdzeniu meldunek na tablecie wróci na {sec} s.',
+    adminTabletPresentationTimeoutNoMoreTimer:
+      'Ostatnie (3.) ostrzeżenie — po potwierdzeniu timer się nie resetuje.',
     adminTabletPresentationTimeoutAckButton: 'Potwierdzam przeczytanie',
     adminTabletPresentationTimeoutConfirmTitle: 'Potwierdzenie administratora',
     adminTabletPresentationTimeoutConfirmBody:
