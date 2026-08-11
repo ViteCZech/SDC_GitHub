@@ -279,6 +279,12 @@ function GroupCard({
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const getPlayerName = (id) => group.players.find((p) => p.id === id)?.name || id || 'Neznámý';
   const withdrawCandidates = (group.players || []).filter((p) => !p?.isWithdrawn);
+  const groupFullyDone =
+    (Array.isArray(groupMatches) &&
+      groupMatches.length > 0 &&
+      groupMatches.every((m) => m.status === 'completed')) ||
+    !!group.boardReleased;
+  const hasBoard = Array.isArray(group.boards) && group.boards.length > 0;
 
   return (
     <div className="bg-slate-800 rounded-xl px-1.5 py-2 sm:px-2 sm:py-3 flex flex-col gap-2 sm:gap-3">
@@ -288,9 +294,13 @@ function GroupCard({
           <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-300 shrink-0 whitespace-nowrap">
             {t('tournGroup') || 'Skupina'} {group.groupId}
           </h3>
-          {!isReviewMode && group.boards && group.boards.length > 0 ? (
+          {!isReviewMode && hasBoard && !groupFullyDone ? (
             <span className="bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-bold shrink-0 whitespace-nowrap">
               🎯 {t('tournBoard') || 'Terč'} {group.boards[0]}
+            </span>
+          ) : !isReviewMode && groupFullyDone ? (
+            <span className="bg-slate-700/80 text-slate-300 px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-bold shrink-0 whitespace-nowrap">
+              ✓ {t('tournBracketStatusDone') || 'Dohráno'}
             </span>
           ) : !isReviewMode ? (
             <span className="bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-bold animate-pulse shrink-0 whitespace-nowrap truncate max-w-[9rem] sm:max-w-none">
@@ -468,7 +478,9 @@ export default function TournamentGroupsView({
       return gm.length > 0 && gm.every((m) => m.status === 'completed');
     };
     const completed = groups.filter((g) => isCompleted(g.groupId)).length;
-    const waiting = groups.filter((g) => (!g.boards || g.boards.length === 0)).length;
+    const waiting = groups.filter(
+      (g) => (!g.boards || g.boards.length === 0) && !isCompleted(g.groupId) && !g.boardReleased
+    ).length;
     const playing = groups.filter((g) => (g.boards?.length ?? 0) > 0 && !isCompleted(g.groupId)).length;
     return { total: groups.length, playing, waiting, completed };
   }, [groups, tournamentMatches]);
