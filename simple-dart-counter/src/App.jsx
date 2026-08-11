@@ -1175,12 +1175,13 @@ function AppMain({ lang, setLang }) {
     setOnlineGameId(null);
     setMyOnlineRole(null);
     if (!tournamentMatchContextRef.current) {
+      setHomeSubmenu('online');
       setAppState('home');
     }
   }, []);
 
   const handleOnlineGameStart = React.useCallback((gameData, gameId, role, localStream = null) => {
-    const legs = Math.min(21, Math.max(1, Number(gameData?.legs) || 1));
+    const legs = Math.min(30, Math.max(1, Number(gameData?.legs) || 1));
     const gt = gameData?.gameType === 'cricket' ? 'cricket' : 'x01';
     const r = role === 'p2' ? 'p2' : 'p1';
     setOnlineLocalStream(localStream || null);
@@ -3337,6 +3338,16 @@ function AppMain({ lang, setLang }) {
       const fullRecord = { ...record, gameType: settings.gameType, startScore: settings.startScore, outMode: settings.outMode };
       setParkedSession((prev) => (prev?.kind === 'match' ? null : prev));
       setPauseMenuOpen(false);
+      // Online: jen uložit historii — bez obrazovky odvetného zápasu (návrat řeší onOnlineSessionEnded → lobby).
+      if (oid) {
+        setMatchHistory((prev) => [fullRecord, ...prev]);
+        if (db && user && !user.isAnonymous) {
+          try {
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'matches'), fullRecord);
+          } catch {}
+        }
+        return;
+      }
       if (tournamentMatchContext) {
         fullRecord.tournamentMatchId = tournamentMatchContext.match?.matchId;
         fullRecord.tournamentGroupId = tournamentMatchContext.match?.groupId;
@@ -4630,7 +4641,6 @@ function AppMain({ lang, setLang }) {
                         : () => {
                             if (onlineGameId) {
                               handleOnlineSessionEnded();
-                              setAppState('home');
                               return;
                             }
                             setAppState('setup');
@@ -4666,7 +4676,6 @@ function AppMain({ lang, setLang }) {
                         : () => {
                             if (onlineGameId) {
                               handleOnlineSessionEnded();
-                              setAppState('home');
                               return;
                             }
                             setAppState('setup');

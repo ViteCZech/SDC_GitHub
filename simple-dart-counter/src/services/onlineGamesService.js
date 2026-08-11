@@ -75,7 +75,7 @@ function randomFourDigitPin() {
  * @param {object} opts
  * @param {string} opts.hostName
  * @param {'x01'|'cricket'} opts.gameType
- * @param {number} opts.legs 1–5
+ * @param {number} opts.legs 1–30
  * @param {boolean} opts.isPublic
  * @param {number} [opts.startScore] pro X01
  * @param {'double'|'single'|'master'} [opts.outMode] pro X01
@@ -86,7 +86,7 @@ export async function createOnlineGame(opts) {
   await ensureAnonymousAuth();
   const hostName = String(opts.hostName || '').trim() || 'Host';
   const gameType = opts.gameType === 'cricket' ? 'cricket' : 'x01';
-  const legs = Math.min(5, Math.max(1, Number(opts.legs) || 1));
+  const legs = Math.min(30, Math.max(1, Math.floor(Number(opts.legs) || 1)));
   const isPublic = !!opts.isPublic;
   const startPlayer = opts.startPlayer === 'p2' ? 'p2' : 'p1';
   const startScore = gameType === 'x01' ? Number(opts.startScore) || 501 : null;

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 const fieldLabel = 'block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5';
 const fieldInput =
@@ -8,23 +9,41 @@ const radioBase =
 const radioSelected = 'border-emerald-500/70 bg-slate-800/80';
 const radioUnselected = 'border-slate-700';
 
+const LEGS_MIN = 1;
+const LEGS_MAX = 30;
+
+function clampLegs(n) {
+  const v = Math.floor(Number(n));
+  if (!Number.isFinite(v)) return LEGS_MIN;
+  return Math.min(LEGS_MAX, Math.max(LEGS_MIN, v));
+}
+
 /**
  * Formulář hostitele před vytvořením záznamu ve Firebase.
  */
 export default function HostSetupForm({ t, defaultHostName, onSubmit, busy }) {
   const [hostName, setHostName] = useState(() => String(defaultHostName || '').trim() || '');
   const [legs, setLegs] = useState(3);
+  const [legsDraft, setLegsDraft] = useState('3');
   const [isPublic, setIsPublic] = useState(true);
   const [startScore, setStartScore] = useState(501);
   const [outMode, setOutMode] = useState('double');
 
+  const commitLegs = (raw) => {
+    const next = clampLegs(raw === '' || raw == null ? legs : raw);
+    setLegs(next);
+    setLegsDraft(String(next));
+    return next;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!hostName.trim() || busy) return;
+    const finalLegs = commitLegs(legsDraft);
     onSubmit({
       hostName: hostName.trim(),
       gameType: 'x01',
-      legs,
+      legs: finalLegs,
       isPublic,
       /** Domluva „kdo začíná“ proběhne až v zápase (oba přihlášeni). */
       startPlayer: 'p1',
@@ -86,18 +105,44 @@ export default function HostSetupForm({ t, defaultHostName, onSubmit, busy }) {
         <label className={fieldLabel} htmlFor="online-legs">
           {t('onlineLegsLabel')}
         </label>
-        <select
-          id="online-legs"
-          value={legs}
-          onChange={(e) => setLegs(Number(e.target.value))}
-          className={fieldInput}
-        >
-          {[1, 2, 3, 4, 5].map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-stretch gap-2">
+          <button
+            type="button"
+            aria-label={t('onlineLegsDecrease') || '−'}
+            disabled={legs <= LEGS_MIN || busy}
+            onClick={() => commitLegs(legs - 1)}
+            className="flex w-12 shrink-0 items-center justify-center rounded-xl border border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700 disabled:opacity-40"
+          >
+            <ChevronDown className="h-5 w-5" />
+          </button>
+          <input
+            id="online-legs"
+            type="number"
+            inputMode="numeric"
+            min={LEGS_MIN}
+            max={LEGS_MAX}
+            value={legsDraft}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/[^\d]/g, '').slice(0, 2);
+              setLegsDraft(raw);
+              if (raw !== '') setLegs(clampLegs(raw));
+            }}
+            onBlur={() => commitLegs(legsDraft)}
+            className={`${fieldInput} text-center font-mono text-lg font-black tabular-nums`}
+          />
+          <button
+            type="button"
+            aria-label={t('onlineLegsIncrease') || '+'}
+            disabled={legs >= LEGS_MAX || busy}
+            onClick={() => commitLegs(legs + 1)}
+            className="flex w-12 shrink-0 items-center justify-center rounded-xl border border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700 disabled:opacity-40"
+          >
+            <ChevronUp className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="mt-1.5 text-[10px] font-semibold text-slate-500">
+          {t('onlineLegsRangeHint')}
+        </p>
       </div>
 
       <div className="space-y-2 landscape:col-span-2">
