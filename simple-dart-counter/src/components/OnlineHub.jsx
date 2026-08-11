@@ -9,12 +9,17 @@ import {
   cancelOnlineGame,
   findWaitingGameByPin,
   joinOnlineGame,
+  getOnlineGameById,
   ONLINE_AUTH_FAILED,
   ONLINE_JOIN_ERROR_GUEST_NAME,
   ONLINE_JOIN_ERROR_NOT_AVAILABLE,
   subscribePublicWaitingGames,
 } from '../services/onlineGamesService';
-import { persistLastOnlineSession, clearLastOnlineSession } from '../online/onlineReconnectStorage';
+import {
+  persistLastOnlineSession,
+  clearLastOnlineSession,
+  readLastOnlineSession,
+} from '../online/onlineReconnectStorage';
 
 const tabBtn =
   'flex-1 py-3 text-center text-xs font-black uppercase tracking-widest rounded-xl border transition-colors';
@@ -67,6 +72,8 @@ export default function OnlineHub({
   const [guestJoinBusy, setGuestJoinBusy] = useState(false);
   const [hostWaitingHeader, setHostWaitingHeader] = useState(null);
   const [guestJoinHeader, setGuestJoinHeader] = useState(null);
+  const [resumeOffer, setResumeOffer] = useState(null);
+  const [resumeBusy, setResumeBusy] = useState(false);
 
   const startOnlineGame = useCallback(
     (gameData, gameId, myRole, localStream = null) => {
@@ -76,6 +83,117 @@ export default function OnlineHub({
     },
     [onOnlineGameStart]
   );
+
+  const handleHostGameStart = useCallback(
+    (doc, gid, localStream) => {
+      startOnlineGame(doc, gid, 'p1', localStream);
+    },
+    [startOnlineGame]
+  );
+
+  const handleLeaveWaiting = useCallback(() => {
+    setWaitingSession((prev) => {
+      const gid = prev?.gameId;
+      clearLastOnlineSession();
+      if (gid) {
+        void cancelOnlineGame(gid).catch((e) => console.warn('cancelOnlineGame', e));
+      }
+      return null;
+    });
+  }, []);
+
+  const openHostWaiting = useCallback((payload) => {
+    setGuestJoinDraft(null);
+    persistLastOnlineSession(payload.gameId, 'p1');
+    setWaitingSession({
+      role: 'host',
+      gameId: payload.gameId,
+      pin: payload.pin ?? null,
+      hostName: payload.hostName,
+      gameFormat: payload.gameFormat,
+      legs: payload.legs,
+      isPublic: payload.isPublic,
+    });
+  }, []);
+
+  /** Nabídka návratu do čekárny / rozehrané hry (localStorage + Firestore). */
+  useEffect(() => {
+    let cancelled = false;
+    if (waitingSession || guestJoinDraft) {
+      setResumeOffer(null);
+      return undefined;
+    }
+    const meta = readLastOnlineSession();
+    if (!meta?.gameId) {
+      setResumeOffer(null);
+      return undefined;
+    }
+    (async () => {
+      try {
+        const data = await getOnlineGameById(meta.gameId);
+        if (cancelled) return;
+        if (!data) {
+          clearLastOnlineSession();
+          setResumeOffer(null);
+          return;
+        }
+        const st = data.status;
+        const role = meta.role === 'p2' ? 'p2' : 'p1';
+        if (st === 'waiting' && role === 'p1') {
+          setResumeOffer({ kind: 'waiting', role, data });
+          return;
+        }
+        if (st === 'playing') {
+          if (role === 'p2' && !String(data.guestName || '').trim()) {
+            clearLastOnlineSession();
+            setResumeOffer(null);
+            return;
+          }
+          setResumeOffer({ kind: 'playing', role, data });
+          return;
+        }
+        clearLastOnlineSession();
+        setResumeOffer(null);
+      } catch {
+        if (!cancelled) setResumeOffer(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [waitingSession, guestJoinDraft]);
+
+  const handleResumeOffer = async () => {
+    if (!resumeOffer?.data?.id) return;
+    setResumeBusy(true);
+    setFormError(null);
+    try {
+      const data = resumeOffer.data;
+      const gid = data.id;
+      const role = resumeOffer.role === 'p2' ? 'p2' : 'p1';
+      if (resumeOffer.kind === 'waiting' && role === 'p1') {
+        openHostWaiting({
+          gameId: gid,
+          pin: data.pin ?? null,
+          hostName: data.hostName,
+          gameFormat: data.gameFormat,
+          legs: data.legs,
+          isPublic: !!data.isPublic,
+        });
+        setResumeOffer(null);
+        return;
+      }
+      if (resumeOffer.kind === 'playing') {
+        setResumeOffer(null);
+        startOnlineGame(data, gid, role, null);
+      }
+    } catch (e) {
+      console.error(e);
+      setFormError(t('onlineResumeFailed'));
+    } finally {
+      setResumeBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!resumeHostWaitingSession?.gameId) return;
@@ -141,20 +259,6 @@ export default function OnlineHub({
   ]);
 
   const defaultHostName = settings?.p1Name || '';
-
-  const openHostWaiting = (payload) => {
-    setGuestJoinDraft(null);
-    persistLastOnlineSession(payload.gameId, 'p1');
-    setWaitingSession({
-      role: 'host',
-      gameId: payload.gameId,
-      pin: payload.pin ?? null,
-      hostName: payload.hostName,
-      gameFormat: payload.gameFormat,
-      legs: payload.legs,
-      isPublic: payload.isPublic,
-    });
-  };
 
   const openGuestJoinDraft = (row) => {
     setWaitingSession(null);
@@ -257,15 +361,8 @@ export default function OnlineHub({
         session={waitingSession}
         hideFooterLeave
         onHostWaitingHeaderState={setHostWaitingHeader}
-        onLeave={() => {
-          const gid = waitingSession?.gameId;
-          clearLastOnlineSession();
-          setWaitingSession(null);
-          if (gid) {
-            void cancelOnlineGame(gid).catch((e) => console.warn('cancelOnlineGame', e));
-          }
-        }}
-        onOnlineGameStart={(doc, gid, localStream) => startOnlineGame(doc, gid, 'p1', localStream)}
+        onLeave={handleLeaveWaiting}
+        onOnlineGameStart={handleHostGameStart}
       />
     );
   }
@@ -291,6 +388,24 @@ export default function OnlineHub({
 
   return (
     <div className="flex w-full max-w-lg flex-col gap-4 mx-auto">
+      {resumeOffer && (
+        <div className="rounded-xl border border-cyan-500/50 bg-cyan-950/30 px-4 py-3 space-y-2">
+          <p className="text-sm font-bold text-cyan-100">
+            {resumeOffer.kind === 'waiting'
+              ? t('onlineResumeWaitingHint')
+              : t('onlineResumePlayingHint')}
+          </p>
+          <button
+            type="button"
+            disabled={resumeBusy}
+            onClick={() => void handleResumeOffer()}
+            className="w-full py-3 rounded-xl font-black uppercase tracking-wider text-sm bg-cyan-600 text-white hover:bg-cyan-500 disabled:opacity-50 transition-colors"
+          >
+            {resumeBusy ? t('onlineJoining') : t('onlineResumeButton')}
+          </button>
+        </div>
+      )}
+
       <div className="flex gap-2 rounded-2xl border border-slate-800 bg-slate-950/80 p-1">
         <button
           type="button"

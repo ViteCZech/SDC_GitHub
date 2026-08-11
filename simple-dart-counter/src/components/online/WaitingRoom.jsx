@@ -21,7 +21,17 @@ export default function WaitingRoom({
 }) {
   const pairHandledRef = useRef(false);
   const lastStatusRef = useRef(null);
+  const lastPlayingDocRef = useRef(null);
+  const startingGameRef = useRef(false);
+  const onStartRef = useRef(onOnlineGameStart);
+  const handoffRef = useRef(null);
+  const onLeaveRef = useRef(onLeave);
+  const tRef = useRef(t);
   const [pairBanner, setPairBanner] = useState(null);
+
+  onStartRef.current = onOnlineGameStart;
+  onLeaveRef.current = onLeave;
+  tRef.current = t;
 
   const isHost = session?.role === 'host';
   const {
@@ -40,13 +50,29 @@ export default function WaitingRoom({
     stopAll,
   } = useLobbyMedia({ t, active: isHost });
 
+  handoffRef.current = handoffStream;
+
+  const enterGameNow = (docData) => {
+    if (startingGameRef.current) return;
+    const data = docData || lastPlayingDocRef.current;
+    if (!data || !session?.gameId) return;
+    startingGameRef.current = true;
+    const start = onStartRef.current;
+    if (typeof start === 'function') {
+      start(data, session.gameId, typeof handoffRef.current === 'function' ? handoffRef.current() : null);
+    }
+  };
+
   useEffect(() => {
     pairHandledRef.current = false;
+    startingGameRef.current = false;
+    lastPlayingDocRef.current = null;
+    lastStatusRef.current = null;
     setPairBanner(null);
   }, [session?.gameId]);
 
   useEffect(() => {
-    if (!isHost || !session?.gameId || typeof onOnlineGameStart !== 'function') {
+    if (!isHost || !session?.gameId) {
       return undefined;
     }
     let cancelled = false;
@@ -55,16 +81,17 @@ export default function WaitingRoom({
     const unsub = subscribeOnlineGame(
       session.gameId,
       (docData) => {
-        if (cancelled || pairHandledRef.current || !docData) return;
+        if (cancelled || !docData || startingGameRef.current) return;
         lastStatusRef.current = docData.status ?? null;
         if (docData.status === 'playing' && String(docData.guestName || '').trim()) {
+          lastPlayingDocRef.current = docData;
+          if (pairHandledRef.current) return;
           pairHandledRef.current = true;
           const name = String(docData.guestName).trim();
-          setPairBanner(String(t('onlineOpponentJoined')).replace(/\{name\}/g, name));
+          setPairBanner(String(tRef.current('onlineOpponentJoined')).replace(/\{name\}/g, name));
           pairTimer = window.setTimeout(() => {
-            if (!cancelled) {
-              onOnlineGameStart(docData, session.gameId, handoffStream());
-            }
+            if (cancelled || startingGameRef.current) return;
+            enterGameNow(docData);
           }, 2000);
         }
       },
@@ -73,14 +100,19 @@ export default function WaitingRoom({
 
     return () => {
       cancelled = true;
-      if (pairTimer) window.clearTimeout(pairTimer);
+      // Nezrušovat timer, pokud už přecházíme do hry — jinak hostitel zůstane v čekárně.
+      if (pairTimer && !startingGameRef.current) {
+        window.clearTimeout(pairTimer);
+      }
       try {
         unsub();
       } catch {
         /* ignore */
       }
     };
-  }, [isHost, session?.gameId, onOnlineGameStart, handoffStream]);
+    // Callbacky a t přes refs — nestabilní props nesmí restartovat subscribe / zrušit start.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only resubscribe on game id
+  }, [isHost, session?.gameId]);
 
   // Heartbeat hostitele i ve waiting (aby lobby mohla filtrovat mrtvé hry).
   useEffect(() => {
@@ -98,6 +130,7 @@ export default function WaitingRoom({
     if (!isHost || !session?.gameId) return undefined;
     const gid = session.gameId;
     return () => {
+      if (startingGameRef.current) return;
       const st = lastStatusRef.current;
       if (st === 'waiting') {
         void cancelOnlineGame(gid).catch(() => console.warn('cancelOnlineGame(unmount)'));
@@ -112,11 +145,11 @@ export default function WaitingRoom({
       leave: () => {
         if (pairBanner) return;
         stopAll();
-        onLeave?.();
+        onLeaveRef.current?.();
       },
     });
     return () => onHostWaitingHeaderState(null);
-  }, [pairBanner, stopAll, onLeave, onHostWaitingHeaderState]);
+  }, [pairBanner, stopAll, onHostWaitingHeaderState]);
 
   const showPin = isHost && !session?.isPublic && session?.pin;
   const hint = isHost ? t('onlineWaitingHostHint') : t('onlineWaitingGuestHint');
@@ -128,8 +161,15 @@ export default function WaitingRoom({
       </h2>
 
       {pairBanner && (
-        <div className="rounded-xl border border-emerald-500/60 bg-emerald-950/40 px-4 py-3 text-center text-sm font-black text-emerald-200">
-          {pairBanner}
+        <div className="rounded-xl border border-emerald-500/60 bg-emerald-950/40 px-4 py-3 text-center space-y-3">
+          <p className="text-sm font-black text-emerald-200">{pairBanner}</p>
+          <button
+            type="button"
+            onClick={() => enterGameNow()}
+            className="w-full py-3 rounded-xl font-black uppercase tracking-wider text-sm bg-emerald-600 text-white hover:bg-emerald-500 transition-colors"
+          >
+            {t('onlineEnterGameNow')}
+          </button>
         </div>
       )}
 

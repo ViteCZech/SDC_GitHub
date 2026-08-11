@@ -36,7 +36,13 @@ export function HomeOnlineSubmenu({
       <header className="flex shrink-0 items-center gap-2 border-b border-slate-800 pb-2">
         <button
           type="button"
-          onClick={onBack}
+          onClick={() => {
+            // Korektní odchod z čekárny / guest draftu před návratem do menu.
+            if (secondary && !secondary.disabled) {
+              secondary.onClick?.();
+            }
+            onBack();
+          }}
           className="rounded-xl p-2.5 text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
           title={t('backToMenu')}
           aria-label={t('backToMenu')}
