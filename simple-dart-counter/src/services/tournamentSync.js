@@ -308,6 +308,12 @@ function groupCompletedMergeUnchanged(local, merged) {
   if (JSON.stringify(local?.result ?? null) !== JSON.stringify(merged?.result ?? null)) return false;
   if (JSON.stringify(local?.score ?? null) !== JSON.stringify(merged?.score ?? null)) return false;
   if (JSON.stringify(local?.legDetails ?? null) !== JSON.stringify(merged?.legDetails ?? null)) return false;
+  if (
+    JSON.stringify(local?.tabletCheckInPresent ?? null) !==
+    JSON.stringify(merged?.tabletCheckInPresent ?? null)
+  ) {
+    return false;
+  }
   return true;
 }
 
@@ -349,6 +355,12 @@ export function mergeAdminGroupMatchesFromTabletCloud(prevLocal, cloudList) {
     }
     if (cloud.whoStarts != null && cloud.whoStarts !== local.whoStarts) {
       patch.whoStarts = cloud.whoStarts;
+    }
+    if (
+      cloud.tabletCheckInPresent != null &&
+      JSON.stringify(cloud.tabletCheckInPresent) !== JSON.stringify(local.tabletCheckInPresent ?? null)
+    ) {
+      patch.tabletCheckInPresent = cloud.tabletCheckInPresent;
     }
     if (Object.keys(patch).length === 0) return local;
     changed = true;
@@ -407,6 +419,12 @@ export function mergeAdminBracketFromTabletCloud(prevLocal, cloudBracket) {
       }
       if (cloud.whoStarts != null && cloud.whoStarts !== local.whoStarts) {
         patch.whoStarts = cloud.whoStarts;
+      }
+      if (
+        cloud.tabletCheckInPresent != null &&
+        JSON.stringify(cloud.tabletCheckInPresent) !== JSON.stringify(local.tabletCheckInPresent ?? null)
+      ) {
+        patch.tabletCheckInPresent = cloud.tabletCheckInPresent;
       }
       // Admin / synchronizace: doplnění chybějícího soupeře v čekajícím zápase (např. ruční oprava v cloudu).
       const mergeMissingSlot = (idKey, nameKey, altIdKey, altNameKey) => {

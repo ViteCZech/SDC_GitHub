@@ -1589,17 +1589,62 @@ function AppMain({ lang, setLang }) {
     const td = tournamentData;
     const entries = [];
     const pname = (pid) => resolveTournamentPlayerName(pid, td) || String(pid ?? '');
+    const refereeNameForMatch = (m, phaseKey) => {
+      if (m?.referee?.name && String(m.referee.name).trim()) return String(m.referee.name).trim();
+      if (m?.refereeName && String(m.refereeName).trim()) return String(m.refereeName).trim();
+      if (m?.chalkerId) {
+        const fromTd = pname(m.chalkerId);
+        if (fromTd) return fromTd;
+        if (phaseKey === 'group') {
+          const gid = m.groupId ?? m.group;
+          const grp =
+            (tournamentGroups || []).find((g) => String(g.groupId ?? g.id) === String(gid)) ||
+            (td?.groups || []).find((g) => String(g.groupId ?? g.id) === String(gid));
+          const fromGroup = (grp?.players || []).find((p) => String(p.id) === String(m.chalkerId))?.name;
+          if (fromGroup) return String(fromGroup);
+        }
+      }
+      return '';
+    };
+    const missingFromPresent = (m, phaseKey) => {
+      const p1 = pname(m.player1Id) || m.player1Name || m.p1Name || '?';
+      const p2 = pname(m.player2Id) || m.player2Name || m.p2Name || '?';
+      const refName = refereeNameForMatch(m, phaseKey);
+      const present = m.tabletCheckInPresent;
+      const refLabel = refName
+        ? `${t('adminTabletPresentationTimeoutRefereeRole')}: ${refName}`
+        : t('adminTabletPresentationTimeoutRefereeRole');
+      if (present && typeof present === 'object') {
+        const missing = [];
+        if (!present.p1) missing.push(p1);
+        if (!present.p2) missing.push(p2);
+        if (!present.referee) missing.push(refLabel);
+        return missing.length > 0 ? missing : [p1, p2, refLabel];
+      }
+      // Starší timeouty bez detailu check-inu — uveď všechny role.
+      return [p1, p2, refLabel];
+    };
+    const groupLabelFor = (m) => {
+      const gid = m.groupId ?? m.group;
+      if (gid == null || gid === '') return t('adminTabletPresentationTimeoutGroup');
+      return String(t('adminTabletPresentationTimeoutGroupNamed')).replace('{id}', String(gid));
+    };
+
     for (const m of tournamentMatches || []) {
       if (m?.tabletStatus !== 'timeout_warning') continue;
       if (!m.player1Id || !m.player2Id) continue;
       if (m.matchId == null && m.id == null) continue;
       const mid = m.matchId ?? m.id;
+      const p1 = pname(m.player1Id) || m.player1Name || m.p1Name || '?';
+      const p2 = pname(m.player2Id) || m.player2Name || m.p2Name || '?';
       entries.push({
         key: `g:${String(mid)}`,
         phaseKey: 'group',
         roundIndex: null,
         board: m.board,
-        label: `${pname(m.player1Id)} vs ${pname(m.player2Id)}`,
+        groupLabel: groupLabelFor(m),
+        label: `${p1} vs ${p2}`,
+        missingNames: missingFromPresent(m, 'group'),
       });
     }
     if (Array.isArray(tournamentBracket)) {
@@ -1609,18 +1654,22 @@ function AppMain({ lang, setLang }) {
           if (!m.player1Id || !m.player2Id) continue;
           if (m.id == null && m.matchId == null) continue;
           const mid = m.id ?? m.matchId;
+          const p1 = pname(m.player1Id) || m.player1Name || m.p1Name || '?';
+          const p2 = pname(m.player2Id) || m.player2Name || m.p2Name || '?';
           entries.push({
             key: `b:${String(mid)}`,
             phaseKey: 'bracket',
             roundIndex: ri,
             board: m.board,
-            label: `${pname(m.player1Id)} vs ${pname(m.player2Id)}`,
+            groupLabel: null,
+            label: `${p1} vs ${p2}`,
+            missingNames: missingFromPresent(m, 'bracket'),
           });
         }
       });
     }
     return entries;
-  }, [tournamentData, tournamentMatches, tournamentBracket]);
+  }, [tournamentData, tournamentMatches, tournamentBracket, tournamentGroups, lang]);
 
   useEffect(() => {
     const active = new Set(adminTabletTimeoutWarningEntries.map((e) => e.key));
@@ -3335,15 +3384,26 @@ function AppMain({ lang, setLang }) {
     }
   };
 
-  const handleTabletTimeoutWarning = async (matchType, matchId) => {
+  const handleTabletTimeoutWarning = async (matchType, matchId, checkInPresent) => {
     const pin = String(activePin ?? '').trim();
     if (!/^\d{4}$/.test(pin) || !matchId) return;
+    const present =
+      checkInPresent && typeof checkInPresent === 'object'
+        ? {
+            p1: !!checkInPresent.presentP1,
+            p2: !!checkInPresent.presentP2,
+            referee: !!checkInPresent.presentRef,
+          }
+        : null;
     try {
       await updateCloudMatchFromTablet(
         pin,
         matchType,
         matchId,
-        { tabletStatus: 'timeout_warning' },
+        {
+          tabletStatus: 'timeout_warning',
+          ...(present ? { tabletCheckInPresent: present } : {}),
+        },
         { tabletPassword: loadStoredTabletPassword() }
       );
     } catch (err) {
@@ -4713,28 +4773,37 @@ function AppMain({ lang, setLang }) {
                 <p className="mt-1 text-xs font-semibold leading-snug text-red-100/95 sm:text-sm">
                   {t('adminTabletPresentationTimeoutLead')}
                 </p>
-                <ul className="mt-2 list-inside list-disc space-y-0.5 text-xs font-bold text-white sm:text-sm">
+                <ul className="mt-2 list-inside list-disc space-y-1.5 text-xs font-bold text-white sm:text-sm">
                   {adminTabletTimeoutPending.map((e) => {
                     const boardPart =
                       e.board != null && e.board !== ''
-                        ? ` (${String(t('adminTabletPresentationTimeoutBoard')).replace('{n}', String(e.board))})`
+                        ? String(t('adminTabletPresentationTimeoutBoard')).replace('{n}', String(e.board))
                         : '';
+                    const missing =
+                      Array.isArray(e.missingNames) && e.missingNames.length > 0
+                        ? e.missingNames.join(', ')
+                        : '—';
+                    let whereLabel = '';
                     if (e.phaseKey === 'group') {
-                      return (
-                        <li key={e.key}>
-                          {t('adminTabletPresentationTimeoutGroup')}: {e.label}
-                          {boardPart}
-                        </li>
+                      whereLabel = e.groupLabel || t('adminTabletPresentationTimeoutGroup');
+                    } else {
+                      const rk = String(t('adminTabletPresentationTimeoutRound')).replace(
+                        '{n}',
+                        String((e.roundIndex ?? 0) + 1)
                       );
+                      whereLabel = `${t('adminTabletPresentationTimeoutBracket')} (${rk})`;
                     }
-                    const rk = String(t('adminTabletPresentationTimeoutRound')).replace(
-                      '{n}',
-                      String((e.roundIndex ?? 0) + 1)
-                    );
                     return (
-                      <li key={e.key}>
-                        {t('adminTabletPresentationTimeoutBracket')} ({rk}): {e.label}
-                        {boardPart}
+                      <li key={e.key} className="leading-snug">
+                        <span>
+                          {whereLabel}
+                          {boardPart ? ` · ${boardPart}` : ''}
+                          {': '}
+                          {e.label}
+                        </span>
+                        <span className="mt-0.5 block font-semibold text-amber-100/95 list-none pl-0">
+                          {t('adminTabletPresentationTimeoutMissing')}: {missing}
+                        </span>
                       </li>
                     );
                   })}
@@ -4749,16 +4818,23 @@ function AppMain({ lang, setLang }) {
                 const lines = pending.map((e) => {
                   const boardPart =
                     e.board != null && e.board !== ''
-                      ? ` (${String(t('adminTabletPresentationTimeoutBoard')).replace('{n}', String(e.board))})`
+                      ? ` · ${String(t('adminTabletPresentationTimeoutBoard')).replace('{n}', String(e.board))}`
                       : '';
+                  const missing =
+                    Array.isArray(e.missingNames) && e.missingNames.length > 0
+                      ? e.missingNames.join(', ')
+                      : '—';
+                  let whereLabel = '';
                   if (e.phaseKey === 'group') {
-                    return `• ${t('adminTabletPresentationTimeoutGroup')}: ${e.label}${boardPart}`;
+                    whereLabel = e.groupLabel || t('adminTabletPresentationTimeoutGroup');
+                  } else {
+                    const rk = String(t('adminTabletPresentationTimeoutRound')).replace(
+                      '{n}',
+                      String((e.roundIndex ?? 0) + 1)
+                    );
+                    whereLabel = `${t('adminTabletPresentationTimeoutBracket')} (${rk})`;
                   }
-                  const rk = String(t('adminTabletPresentationTimeoutRound')).replace(
-                    '{n}',
-                    String((e.roundIndex ?? 0) + 1)
-                  );
-                  return `• ${t('adminTabletPresentationTimeoutBracket')} (${rk}): ${e.label}${boardPart}`;
+                  return `• ${whereLabel}${boardPart}: ${e.label}\n  ${t('adminTabletPresentationTimeoutMissing')}: ${missing}`;
                 });
                 const msg = `${t('adminTabletPresentationTimeoutConfirmBody')}\n\n${lines.join('\n')}`;
                 requestConfirm(

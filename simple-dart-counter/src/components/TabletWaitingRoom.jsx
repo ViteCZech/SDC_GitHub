@@ -123,7 +123,11 @@ export default function TabletWaitingRoom({
     const mid = match.matchId ?? match.id;
     const mt = match.matchType === 'bracket' ? 'bracket' : 'group';
     if (typeof onTabletTimeoutWarning === 'function' && mid) {
-      onTabletTimeoutWarning(mt, mid);
+      onTabletTimeoutWarning(mt, mid, {
+        presentP1: !!presentP1,
+        presentP2: !!presentP2,
+        presentRef: !!presentRef,
+      });
     }
   }, [
     secondsLeft,
