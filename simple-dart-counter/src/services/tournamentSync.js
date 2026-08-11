@@ -64,7 +64,20 @@ function stripUndefinedDeep(val) {
 function groupMatchKey(m) {
   if (!m) return '';
   if (m.matchId != null && String(m.matchId) !== '') return `mid:${m.matchId}`;
+  if (m.id != null && String(m.id) !== '') return `mid:${m.id}`;
   return `g:${m.groupId ?? m.group}-${m.player1Id}-${m.player2Id}-${m.round ?? 'x'}`;
+}
+
+/** Všechny možné klíče zápasu — kvůli matchId vs id mezi adminem a tabletem. */
+function groupMatchKeys(m) {
+  if (!m) return [];
+  const keys = [];
+  if (m.matchId != null && String(m.matchId) !== '') keys.push(`mid:${String(m.matchId)}`);
+  if (m.id != null && String(m.id) !== '') keys.push(`mid:${String(m.id)}`);
+  keys.push(`g:${m.groupId ?? m.group}-${m.player1Id}-${m.player2Id}-${m.round ?? 'x'}`);
+  // bez round (někdy chybí na jedné straně)
+  keys.push(`g:${m.groupId ?? m.group}-${m.player1Id}-${m.player2Id}`);
+  return [...new Set(keys.filter(Boolean))];
 }
 
 function bracketMatchKey(m) {
@@ -72,6 +85,14 @@ function bracketMatchKey(m) {
   const id = m.id ?? m.matchId;
   if (id != null && String(id) !== '') return `bid:${id}`;
   return '';
+}
+
+function findCloudGroupMatch(cloudByKey, local) {
+  for (const k of groupMatchKeys(local)) {
+    const hit = cloudByKey.get(k);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 function findGroupMatchIndex(matches, matchId) {
@@ -114,10 +135,32 @@ export async function syncTournamentToCloud(pin, tournamentState) {
 
   const tournamentData = safeState.tournamentData ?? null;
   const groups = Array.isArray(safeState.groups) ? safeState.groups : [];
-  const groupMatches = Array.isArray(safeState.groupMatches) ? safeState.groupMatches : [];
-  const tournamentBracket = Array.isArray(safeState.tournamentBracket)
+  let groupMatches = Array.isArray(safeState.groupMatches) ? safeState.groupMatches : [];
+  let tournamentBracket = Array.isArray(safeState.tournamentBracket)
     ? safeState.tournamentBracket
     : [];
+
+  const ref = doc(db, COLLECTION, id);
+
+  // Než admin přepíše dokument, slouč výsledky z tabletu z aktuálního cloudu
+  // (zabrání race: starý lokální stav přepíše právě uložený výsledek z tabletu).
+  try {
+    const existing = await getDoc(ref);
+    const exists = typeof existing.exists === 'function' ? existing.exists() : existing.exists;
+    if (exists) {
+      const cloud = existing.data() || {};
+      groupMatches = mergeAdminGroupMatchesFromTabletCloud(
+        groupMatches,
+        Array.isArray(cloud.groupMatches) ? cloud.groupMatches : []
+      );
+      tournamentBracket = mergeAdminBracketFromTabletCloud(
+        tournamentBracket,
+        Array.isArray(cloud.tournamentBracket) ? cloud.tournamentBracket : []
+      );
+    }
+  } catch (err) {
+    console.warn('syncTournamentToCloud: cloud merge before write failed', err);
+  }
 
   const status = deriveTournamentStatus({
     tournamentData,
@@ -125,7 +168,6 @@ export async function syncTournamentToCloud(pin, tournamentState) {
     tournamentBracket,
   });
 
-  const ref = doc(db, COLLECTION, id);
   const withMeta = {
     tournamentData,
     groups,
@@ -276,20 +318,30 @@ export function mergeAdminGroupMatchesFromTabletCloud(prevLocal, cloudList) {
   if (!Array.isArray(prevLocal) || !Array.isArray(cloudList)) return prevLocal;
   const cloudByKey = new Map();
   for (const m of cloudList) {
-    cloudByKey.set(groupMatchKey(m), m);
+    for (const k of groupMatchKeys(m)) {
+      if (k) cloudByKey.set(k, m);
+    }
   }
   let changed = false;
   const next = prevLocal.map((local) => {
-    const key = groupMatchKey(local);
-    const cloud = cloudByKey.get(key);
+    const cloud = findCloudGroupMatch(cloudByKey, local);
     if (!cloud) return local;
 
     if (isCloudMatchTerminal(cloud)) {
+      // Preferuj novější dokončení, pokud jsou obě strany hotové
+      if (isCloudMatchTerminal(local)) {
+        const lc = Number(local.completedAt) || 0;
+        const cc = Number(cloud.completedAt) || 0;
+        if (lc > cc) return local;
+      }
       const merged = { ...local, ...cloud };
       if (groupCompletedMergeUnchanged(local, merged)) return local;
       changed = true;
       return merged;
     }
+
+    // Cloud není hotový — lokální dokončený výsledek nesahej
+    if (isCloudMatchTerminal(local)) return local;
 
     const patch = {};
     if (cloud.tabletStatus != null && cloud.tabletStatus !== local.tabletStatus) {
@@ -315,6 +367,10 @@ export function mergeAdminBracketFromTabletCloud(prevLocal, cloudBracket) {
     for (const m of round?.matches || []) {
       const k = bracketMatchKey(m);
       if (k) cloudByKey.set(k, m);
+      const alt = m?.matchId != null && m?.id != null && String(m.matchId) !== String(m.id)
+        ? `bid:${m.matchId}`
+        : '';
+      if (alt) cloudByKey.set(alt, m);
     }
   }
   let anyChanged = false;
@@ -324,15 +380,26 @@ export function mergeAdminBracketFromTabletCloud(prevLocal, cloudBracket) {
     let roundChanged = false;
     const newMatches = round.matches.map((local) => {
       const k = bracketMatchKey(local);
-      const cloud = k ? cloudByKey.get(k) : null;
+      const cloud = k
+        ? cloudByKey.get(k) ||
+          (local.matchId != null ? cloudByKey.get(`bid:${local.matchId}`) : null) ||
+          (local.id != null ? cloudByKey.get(`bid:${local.id}`) : null)
+        : null;
       if (!cloud) return local;
 
       if (isCloudMatchTerminal(cloud)) {
+        if (isCloudMatchTerminal(local)) {
+          const lc = Number(local.completedAt) || 0;
+          const cc = Number(cloud.completedAt) || 0;
+          if (lc > cc) return local;
+        }
         const merged = { ...local, ...cloud };
         if (groupCompletedMergeUnchanged(local, merged)) return local;
         roundChanged = true;
         return merged;
       }
+
+      if (isCloudMatchTerminal(local)) return local;
 
       const patch = {};
       if (cloud.tabletStatus != null && cloud.tabletStatus !== local.tabletStatus) {

@@ -1449,8 +1449,9 @@ function AppMain({ lang, setLang }) {
   const userRoleRef = useRef(userRole);
   userRoleRef.current = userRole;
 
-  /** Po přijetí sloučených dat z tabletu přes onSnapshot: přeruší jedno debounced odeslání, aby se neposlal starý stav zpět (echo loop). */
+  /** Po přijetí sloučených dat z tabletu přes onSnapshot: přeruší outbound sync, aby se neposlal starý stav zpět (echo loop). */
   const isIncomingCloudUpdate = useRef(false);
+  const inboundCloudSyncGen = useRef(0);
   /** Vždy nejnovější payload pro sync do cloudu (žádné stale closure v debounced setTimeout). */
   const tournamentSyncPayloadRef = useRef({
     tournamentData: null,
@@ -1661,6 +1662,52 @@ function AppMain({ lang, setLang }) {
     tournamentBracket: tournamentBracket ?? [],
   };
 
+  /** Admin: poslech cloudu jen pro sloučení změn z tabletu (check-in, výsledek), bez přepsání celého turnaje. */
+  useEffect(() => {
+    if (userRole !== 'admin') return;
+    if (!tournamentData?.cloudEnabled || !user || user.isAnonymous) return;
+    if (!db) return;
+    const pin = String(activePin ?? '').trim();
+    if (!/^\d{4}$/.test(pin)) return;
+    const ref = doc(db, ACTIVE_TOURNAMENTS_COLL, pin);
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        const exists = typeof snap.exists === 'function' ? snap.exists() : snap.exists;
+        if (!exists) return;
+        const d = snap.data();
+        if (!d || typeof d !== 'object') return;
+
+        // Označ inbound hned — sync timer nesmí mezi callbackem a renderem přepsat cloud starým stavem
+        const gen = ++inboundCloudSyncGen.current;
+        isIncomingCloudUpdate.current = true;
+
+        setTournamentMatches((prev) => {
+          const next = mergeAdminGroupMatchesFromTabletCloud(
+            prev,
+            Array.isArray(d.groupMatches) ? d.groupMatches : []
+          );
+          return next;
+        });
+        setTournamentBracket((prev) => {
+          const cloudBr = Array.isArray(d.tournamentBracket) ? d.tournamentBracket : [];
+          const merged = mergeAdminBracketFromTabletCloud(prev, cloudBr);
+          if (merged === prev) return prev;
+          return propagateBracketWinners(merged);
+        });
+
+        // Po sloučení ještě chvíli blokuj outbound sync (React setState je async)
+        window.setTimeout(() => {
+          if (inboundCloudSyncGen.current === gen) {
+            isIncomingCloudUpdate.current = false;
+          }
+        }, 2200);
+      },
+      (err) => console.warn('Admin tournament listener:', err)
+    );
+    return () => unsub();
+  }, [userRole, activePin, tournamentData?.cloudEnabled, user]);
+
   /** Pravidelná synchronizace turnaje do Firestore (admin + platný PIN), debounce kvůli šetření zápisů. */
   useEffect(() => {
     if (userRole !== 'admin') return;
@@ -1670,7 +1717,6 @@ function AppMain({ lang, setLang }) {
 
     const timer = setTimeout(() => {
       if (isIncomingCloudUpdate.current) {
-        isIncomingCloudUpdate.current = false;
         return;
       }
       const snap = tournamentSyncPayloadRef.current;
@@ -1694,43 +1740,6 @@ function AppMain({ lang, setLang }) {
     tournamentMatches,
     tournamentBracket,
   ]);
-
-  /** Admin: poslech cloudu jen pro sloučení změn z tabletu (check-in, výsledek), bez přepsání celého turnaje. */
-  useEffect(() => {
-    if (userRole !== 'admin') return;
-    if (!tournamentData?.cloudEnabled || !user || user.isAnonymous) return;
-    if (!db) return;
-    const pin = String(activePin ?? '').trim();
-    if (!/^\d{4}$/.test(pin)) return;
-    const ref = doc(db, ACTIVE_TOURNAMENTS_COLL, pin);
-    const unsub = onSnapshot(
-      ref,
-      (snap) => {
-        const exists = typeof snap.exists === 'function' ? snap.exists() : snap.exists;
-        if (!exists) return;
-        const d = snap.data();
-        if (!d || typeof d !== 'object') return;
-        isIncomingCloudUpdate.current = false;
-        setTournamentMatches((prev) => {
-          const next = mergeAdminGroupMatchesFromTabletCloud(
-            prev,
-            Array.isArray(d.groupMatches) ? d.groupMatches : []
-          );
-          if (next !== prev) isIncomingCloudUpdate.current = true;
-          return next;
-        });
-        setTournamentBracket((prev) => {
-          const cloudBr = Array.isArray(d.tournamentBracket) ? d.tournamentBracket : [];
-          const merged = mergeAdminBracketFromTabletCloud(prev, cloudBr);
-          if (merged === prev) return prev;
-          isIncomingCloudUpdate.current = true;
-          return propagateBracketWinners(merged);
-        });
-      },
-      (err) => console.warn('Admin tournament listener:', err)
-    );
-    return () => unsub();
-  }, [userRole, activePin]);
 
   /** Přímý pavouk: uložit pavouk do stejného JSON jako turnaj (F5). */
   useEffect(() => {
