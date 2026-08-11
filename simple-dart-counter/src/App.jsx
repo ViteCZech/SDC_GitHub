@@ -558,6 +558,8 @@ const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch, isTo
     const t = (k) => translations[lang]?.[k] || k;
     const [isMicRematch, setIsMicRematch] = useState(false);
     const [savingMatch, setSavingMatch] = useState(false);
+    const [saveError, setSaveError] = useState(null); // string | null
+    const [pendingSavePayload, setPendingSavePayload] = useState(null); // { matchId, resultData } | null
     const isMicRematchRef = useRef(false);
     const onStartMatchRef = useRef(onStartMatch);
     useEffect(() => {
@@ -626,8 +628,105 @@ const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch, isTo
     const mainP2 = isMultiSet ? (data.p2Sets || 0) : (data.setScores?.[0]?.p2 ?? data.p2Legs ?? 0);
     const legsBreakdown = isMultiSet && data.setScores?.length ? `(${data.setScores.map(s => `${s.p1}:${s.p2}`).join(', ')})` : '';
 
+    const buildTournamentSavePayload = () => {
+      const fr = data?.finalResult;
+      const p1Legs = Number(fr?.player1?.legsWon ?? data?.p1Legs) || 0;
+      const p2Legs = Number(fr?.player2?.legsWon ?? data?.p2Legs) || 0;
+      const statsPayload =
+        stats && data?.gameType !== 'cricket'
+          ? {
+              p1Avg: stats.p1Avg,
+              p2Avg: stats.p2Avg,
+              p1DartsTotal: stats.p1DartsTotal,
+              p2DartsTotal: stats.p2DartsTotal,
+              p1High: stats.p1High,
+              p2High: stats.p2High,
+              p1HighCheckout: stats.p1HighCheckout,
+              p2HighCheckout: stats.p2HighCheckout,
+              legDetails: stats.legDetails,
+            }
+          : {};
+      return {
+        matchId: data?.tournamentMatchId ?? data?.id,
+        resultData: { p1Legs, p2Legs, ...statsPayload },
+      };
+    };
+
+    const runTournamentSave = async (payload) => {
+      if (!payload || savingMatch) return;
+      setSavingMatch(true);
+      setSaveError(null);
+      try {
+        await onTournamentMatchComplete?.(payload.matchId, payload.resultData);
+        setPendingSavePayload(null);
+      } catch (error) {
+        console.error('KRITICKÁ CHYBA PŘI ULOŽENÍ ZÁPASU:', error);
+        const msg = String(
+          error?.message ||
+            error ||
+            translations[lang]?.tablet?.saveMatchError ||
+            'Uložení zápasu selhalo.'
+        );
+        setSaveError(msg);
+        setPendingSavePayload(payload);
+        // Zůstat na obrazovce se skóre — nepřesměrovávat
+      } finally {
+        setSavingMatch(false);
+      }
+    };
+
     return (
         <div className="flex flex-col h-full w-full bg-slate-950 fixed inset-0 z-[1000] overflow-hidden">
+            {saveError && (
+              <div
+                className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center p-4 bg-black/80"
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="match-save-error-title"
+              >
+                <div className="w-full max-w-md rounded-2xl border-2 border-red-500/60 bg-slate-900 shadow-2xl p-5 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-xl bg-red-500/20 text-red-400 shrink-0">
+                      <AlertTriangle className="w-6 h-6" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3
+                        id="match-save-error-title"
+                        className="text-lg font-black text-white tracking-tight"
+                      >
+                        {t('tournSaveMatchErrorTitle') || 'Chyba při ukládání zápasu'}
+                      </h3>
+                      <p className="text-sm text-red-200 mt-2 leading-snug break-words whitespace-pre-wrap">
+                        {`${t('tournSaveMatchErrorPrefix') || 'Chyba při ukládání zápasu:'} ${saveError}`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      disabled={savingMatch}
+                      onClick={() =>
+                        runTournamentSave(pendingSavePayload || buildTournamentSavePayload())
+                      }
+                      className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl font-black text-sm uppercase tracking-wide bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${savingMatch ? 'animate-spin' : ''}`} />
+                      {savingMatch
+                        ? t('tournSavingMatch') || 'UKLÁDÁM…'
+                        : t('tournSaveMatchRetry') || 'Zkusit znovu'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingMatch}
+                      onClick={() => setSaveError(null)}
+                      className="w-full py-3.5 px-4 rounded-xl font-bold text-sm border border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700"
+                    >
+                      {t('tournSaveMatchCloseError') || 'Zavřít'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="relative z-20 flex items-center justify-center w-full px-4 pb-4 border-b shrink-0 pt-14 sm:p-4 bg-slate-950 border-slate-900/50">
                 <div className="absolute z-50 flex gap-2 mt-5 -translate-y-1/2 left-4 top-1/2 sm:mt-0">
                     <button onClick={onBack || onClose} className="p-2 transition-colors border rounded-lg shadow-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border-slate-700"><ArrowLeft className="w-5 h-5" /></button>
@@ -722,40 +821,7 @@ const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch, isTo
                                 <button
                                     type="button"
                                     disabled={savingMatch}
-                                    onClick={async () => {
-                                      if (savingMatch) return;
-                                      const fr = data?.finalResult;
-                                      const p1Legs = Number(fr?.player1?.legsWon ?? data?.p1Legs) || 0;
-                                      const p2Legs = Number(fr?.player2?.legsWon ?? data?.p2Legs) || 0;
-
-                                      const statsPayload =
-                                        stats && data?.gameType !== 'cricket'
-                                          ? {
-                                              p1Avg: stats.p1Avg,
-                                              p2Avg: stats.p2Avg,
-                                              p1DartsTotal: stats.p1DartsTotal,
-                                              p2DartsTotal: stats.p2DartsTotal,
-                                              p1High: stats.p1High,
-                                              p2High: stats.p2High,
-                                              p1HighCheckout: stats.p1HighCheckout,
-                                              p2HighCheckout: stats.p2HighCheckout,
-                                              legDetails: stats.legDetails,
-                                            }
-                                          : {};
-
-                                      const resultData = { p1Legs, p2Legs, ...statsPayload };
-                                      setSavingMatch(true);
-                                      try {
-                                        await onTournamentMatchComplete?.(
-                                          data?.tournamentMatchId ?? data?.id,
-                                          resultData
-                                        );
-                                      } catch {
-                                        /* parent zobrazí toast; zůstaneme na obrazovce */
-                                      } finally {
-                                        setSavingMatch(false);
-                                      }
-                                    }}
+                                    onClick={() => runTournamentSave(buildTournamentSavePayload())}
                                     className="flex items-center justify-center w-full gap-3 py-4 text-lg font-black text-white transition-all shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <CheckCircle className="w-6 h-6" />{' '}
@@ -3920,11 +3986,11 @@ function AppMain({ lang, setLang }) {
                     };
 
                     if (!/^\d{4}$/.test(pin)) {
-                      showNotification(
-                        translations[lang]?.tournamentHub?.enterPin || 'Zadejte PIN turnaje',
-                        'error'
+                      const pinErr = new Error(
+                        translations[lang]?.tournamentHub?.enterPin || 'Zadejte PIN turnaje'
                       );
-                      throw new Error('missing_pin');
+                      console.error('KRITICKÁ CHYBA PŘI ULOŽENÍ ZÁPASU:', pinErr);
+                      throw pinErr;
                     }
 
                     try {
@@ -3936,15 +4002,7 @@ function AppMain({ lang, setLang }) {
                         { tabletPassword: loadStoredTabletPassword() }
                       );
                     } catch (err) {
-                      showNotification(
-                        String(
-                          err?.message ||
-                            translations[lang]?.tablet?.saveMatchError ||
-                            translations[lang]?.tournamentHub?.syncError ||
-                            'Uložení zápasu selhalo. Zkuste to znovu.'
-                        ),
-                        'error'
-                      );
+                      console.error('KRITICKÁ CHYBA PŘI ULOŽENÍ ZÁPASU:', err);
                       throw err;
                     }
 
