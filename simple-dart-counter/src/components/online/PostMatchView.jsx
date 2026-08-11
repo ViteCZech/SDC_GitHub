@@ -98,7 +98,10 @@ export default function PostMatchView({ lang, record, startScore, onLeaveSession
   const runLeave = () => {
     if (leaveOnceRef.current) return;
     leaveOnceRef.current = true;
-    void Promise.resolve(onLeaveRef.current()).catch(() => {});
+    void Promise.resolve(onLeaveRef.current())
+      .catch(() => {
+        leaveOnceRef.current = false;
+      });
   };
 
   useEffect(() => {

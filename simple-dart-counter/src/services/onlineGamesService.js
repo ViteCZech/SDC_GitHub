@@ -317,6 +317,12 @@ export async function completeOnlineGameSession(gameId, pendingMatchRecordForHis
   const id = String(gameId || '').trim();
   if (!id) throw new Error('no_db');
   const ref = doc(db, ONLINE_GAMES_COLLECTION, id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return { alreadyDone: true };
+  const prevStatus = snap.data()?.status;
+  if (prevStatus === 'completed' || prevStatus === 'obsolete' || prevStatus === 'abandoned') {
+    return { alreadyDone: true };
+  }
   const payload = {
     status: 'completed',
     liveGameState: deleteField(),
@@ -327,6 +333,7 @@ export async function completeOnlineGameSession(gameId, pendingMatchRecordForHis
     payload.pendingMatchRecordForHistory = pendingMatchRecordForHistory;
   }
   await updateDoc(ref, payload);
+  return { alreadyDone: false };
 }
 
 /**

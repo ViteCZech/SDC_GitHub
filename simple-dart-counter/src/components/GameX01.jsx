@@ -276,7 +276,8 @@ export default function GameX01({
 
   const [currentInput, setCurrentInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [editingMove, setEditingMove] = useState(null); 
+  const [editingMove, setEditingMove] = useState(null);
+  const [onlineKeypadOpen, setOnlineKeypadOpen] = useState(false); 
   const [finishData, setFinishData] = useState(null);
   const [setScores, setSetScores] = useState(() => restoredGameState?.setScores || []);
   /** Online: po výhře legu čeká na potvrzení (OK) poražený hráč — data z Firebase `liveGameState.legTransition`. */
@@ -478,12 +479,20 @@ export default function GameX01({
         }
       }
       if (doc.status === 'completed') {
-        setOnlineFirestoreSessionCompleted(true);
+        setOnlineVideoSessionCompleted(true);
       }
       if (doc.status === 'obsolete') {
-        setOnlineFirestoreSessionCompleted(true);
+        setOnlineVideoSessionCompleted(true);
         opponentHeartbeatMsRef.current = null;
         setIsOpponentOffline(false);
+        if (!peerAbandonNotifyRef.current) {
+          peerAbandonNotifyRef.current = true;
+          if (typeof onOnlinePeerAbandoned === 'function') {
+            onOnlinePeerAbandoned();
+          } else if (typeof onOnlineSessionEnded === 'function') {
+            onOnlineSessionEnded();
+          }
+        }
       }
       if (
         doc.status === 'abandoned' &&
@@ -513,7 +522,7 @@ export default function GameX01({
         unsub();
       } catch {}
     };
-  }, [onlineGameId, settings.gameType, myOnlineRole, onOnlinePeerAbandoned, onOnlineDocStartPlayer]);
+  }, [onlineGameId, settings.gameType, myOnlineRole, onOnlinePeerAbandoned, onOnlineDocStartPlayer, onOnlineSessionEnded]);
 
   useEffect(() => {
     if (!onlineGameId || settings.gameType !== 'x01' || !myOnlineRole) return undefined;
@@ -524,6 +533,32 @@ export default function GameX01({
     const id = setInterval(tick, 5000);
     return () => clearInterval(id);
   }, [onlineGameId, settings.gameType, myOnlineRole]);
+
+  useEffect(() => {
+    if (!onlineGameId || settings.gameType !== 'x01') return;
+    const locked =
+      Boolean(onlineGameId) &&
+      settings.gameType === 'x01' &&
+      Boolean(myOnlineRole) &&
+      gameState.currentPlayer !== myOnlineRole &&
+      !gameState.winner &&
+      !onlineLegTransition &&
+      !onlineMatchTransition &&
+      !postMatchStatsActive;
+    if (locked || (myOnlineRole && gameState.currentPlayer !== myOnlineRole) || gameState.winner) {
+      setOnlineKeypadOpen(false);
+    }
+  }, [
+    onlineGameId,
+    settings.gameType,
+    myOnlineRole,
+    gameState.currentPlayer,
+    gameState.winner,
+    onlineLegTransition,
+    onlineMatchTransition,
+    postMatchStatsActive,
+  ]);
+
 
   useEffect(() => {
     if (!onlineGameId || settings.gameType !== 'x01' || !myOnlineRole) return undefined;
@@ -810,6 +845,7 @@ export default function GameX01({
     }
 
     setCurrentInput('');
+    if (onlineGameId && settings.gameType === 'x01') setOnlineKeypadOpen(false);
   };
   processTurnRef.current = processTurn;
 
@@ -914,6 +950,16 @@ export default function GameX01({
       e?.preventDefault?.();
       e?.stopPropagation?.();
       return;
+    }
+    if (
+      onlineGameId &&
+      settings.gameType === 'x01' &&
+      myOnlineRole === pKey &&
+      gameState.currentPlayer === pKey &&
+      !gameState.winner &&
+      !isOnlineInputLocked()
+    ) {
+      setOnlineKeypadOpen(true);
     }
     handleScoreClick(pKey);
   };
@@ -1131,18 +1177,21 @@ export default function GameX01({
     if (!postMatchStatsActiveRef.current) return;
     const rec = pendingOnlineMatchRecordRef.current;
     onlineSessionEndOnceRef.current = true;
+    let alreadyDone = false;
     try {
-      await completeOnlineGameSession(onlineGameId, rec);
-    } catch {
-      console.warn('completeOnlineGameSession');
-      onlineSessionEndOnceRef.current = false;
-      return;
+      const result = await completeOnlineGameSession(onlineGameId, rec);
+      alreadyDone = !!result?.alreadyDone;
+    } catch (err) {
+      console.warn('completeOnlineGameSession', err);
+      // I tak odejdi lokálně — druhý hráč už mohl session uzavřít.
     }
     try {
-      // Obsolete / neplatné zápasy nikdy nezapisujeme do historie/statistik.
-      if (onlineDocStatusStateRef.current === 'obsolete') {
-        // skip
-      } else if (rec && typeof onMatchComplete === 'function') {
+      if (
+        !alreadyDone &&
+        onlineDocStatusStateRef.current !== 'obsolete' &&
+        rec &&
+        typeof onMatchComplete === 'function'
+      ) {
         await onMatchComplete(rec, null);
       }
     } catch {}
@@ -1438,7 +1487,11 @@ export default function GameX01({
     );
 
   const btnGameBase = "text-white font-bold py-2 rounded text-[10px] sm:text-xs transition-all select-none touch-manipulation active:scale-95";
-  const numBtnBase = "h-full w-full bg-slate-800 text-2xl sm:text-3xl landscape:text-3xl leading-none font-bold rounded-xl border border-slate-700/50 hover:bg-slate-700 active:bg-slate-600 select-none touch-manipulation flex items-center justify-center";
+  const isOnlineX01 = Boolean(onlineGameId) && settings.gameType === 'x01';
+  const showOnlineKeypadPanel = !isOnlineX01 || onlineKeypadOpen;
+  const numBtnBase = isOnlineX01
+    ? "min-h-[2.75rem] sm:min-h-[3.25rem] w-full bg-slate-800 text-xl sm:text-2xl leading-none font-bold rounded-xl border border-slate-700/50 hover:bg-slate-700 active:bg-slate-600 select-none touch-manipulation flex items-center justify-center"
+    : "h-full w-full bg-slate-800 text-2xl sm:text-3xl landscape:text-3xl leading-none font-bold rounded-xl border border-slate-700/50 hover:bg-slate-700 active:bg-slate-600 select-none touch-manipulation flex items-center justify-center";
   const isSuccessMsg = errorMsg && ['!', 'Přihlášeno', 'Uloženo', 'Zálohováno', 'Recognized'].some(w => String(errorMsg).includes(w));
 
   const renderUnifiedHistory = () => {
@@ -1475,7 +1528,10 @@ export default function GameX01({
             )}
 
             <div
-              onClick={() => setEditingMove(move)}
+              onClick={() => {
+                if (onlineGameId && myOnlineRole && move.player !== myOnlineRole) return;
+                setEditingMove(move);
+              }}
               className={`cursor-pointer hover:bg-slate-800/50 rounded px-1 md:px-3 flex items-center gap-1 md:gap-2 ${move.player === 'p1' ? 'text-right' : 'text-left'} ${move.isBust ? 'opacity-50' : ''}`}
             >
               <div className={`${isCheckout ? 'text-2xl md:text-3xl lg:text-4xl' : 'text-xl md:text-2xl lg:text-3xl'} font-bold font-mono ${cls} flex items-baseline gap-1 md:gap-2`}>
@@ -1691,7 +1747,7 @@ export default function GameX01({
         >
             {!gameState.winner ? (
                 <div
-                  className={`relative flex flex-col gap-1 shrink-0 transition-opacity w-full h-full justify-center ${
+                  className={`relative flex flex-col gap-1 shrink-0 transition-opacity w-full ${isOnlineX01 ? 'justify-start' : 'h-full justify-center'} ${
                     settings.isBot && gameState.currentPlayer === 'p2' ? 'opacity-50 pointer-events-none' : ''
                   }`}
                 >
@@ -1702,6 +1758,35 @@ export default function GameX01({
                         </p>
                       </div>
                     )}
+                    {isOnlineX01 && !showOnlineKeypadPanel && !onlineInputLocked && (
+                      <div className="flex flex-col gap-2 w-full shrink-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setOnlineKeypadOpen(true)}
+                            className="flex-1 py-3 sm:py-4 rounded-xl font-black uppercase tracking-wider text-sm sm:text-base bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg active:scale-[0.99]"
+                          >
+                            {t('onlineOpenKeypad')}
+                          </button>
+                          <button onClick={toggleMic} className={`w-12 h-12 rounded flex items-center justify-center border transition-all shrink-0 ${isMicActive ? (isListening ? 'bg-red-600 border-red-500 animate-pulse text-white' : 'bg-red-900/50 border-red-500/50 text-red-200') : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'}`}>{isMicActive ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}</button>
+                          <button onClick={handleUndoClick} className="flex items-center justify-center w-12 h-12 border rounded bg-slate-800 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700 shrink-0"><Undo2 className="w-6 h-6" /></button>
+                        </div>
+                        <p className="text-[10px] text-center text-slate-500 font-semibold">
+                          {t('onlineKeypadHint')}
+                        </p>
+                      </div>
+                    )}
+                    {showOnlineKeypadPanel && (
+                      <>
+                      {isOnlineX01 && (
+                        <button
+                          type="button"
+                          onClick={() => { setOnlineKeypadOpen(false); setCurrentInput(''); }}
+                          className="w-full py-2 rounded-lg border border-slate-600 bg-slate-800 text-slate-200 text-xs font-black uppercase tracking-widest hover:bg-slate-700 shrink-0"
+                        >
+                          {t('onlineCloseKeypad')}
+                        </button>
+                      )}
                     <div className={`flex items-center gap-1 p-1 sm:p-1.5 rounded-lg border bg-opacity-10 border-opacity-10 ${gameState.currentPlayer === 'p1' ? 'bg-emerald-900 border-emerald-500' : 'bg-purple-900 border-purple-500'}`}>
                     <span className={`text-[8px] font-bold uppercase px-1 ${gameState.currentPlayer === 'p1' ? 'text-emerald-600/60' : 'text-purple-600/60'}`}>{translations[lang]?.quickCheckout || 'Zavřeno'}</span>
                     {[1, 2, 3].map(d => {
@@ -1721,7 +1806,7 @@ export default function GameX01({
                         {quickButtons.map((val, i) => <button key={i} onPointerDown={() => handleQuickBtnDown(i)} onPointerUp={() => handleQuickBtnUp(val)} onPointerLeave={() => { if(longPressTimer.current) { clearTimeout(longPressTimer.current); setLongPressIdx(null); } }} className={`bg-slate-800 text-slate-300 text-xs sm:text-sm font-bold min-h-[2.5rem] sm:min-h-[3rem] rounded-lg sm:rounded-xl border border-slate-700/50 shadow-md transition-all select-none touch-manipulation ${longPressIdx === i ? 'bg-emerald-900 border-emerald-400 shaking' : ''}`}>{val}</button>)}
                     </div>
                     
-                    <div className="flex-1 min-h-0 h-full grid grid-cols-4 grid-rows-3 gap-2 landscape:gap-2">
+                    <div className={`${isOnlineX01 ? 'grid shrink-0' : 'flex-1 min-h-0 h-full grid'} grid-cols-4 grid-rows-3 gap-2 landscape:gap-2`}>
                       {[7, 8, 9].map(n => (
                         <button key={n} onClick={() => setCurrentInput(p => p.length < 3 ? p + n : p)} className={numBtnBase}>
                           {n}
@@ -1784,6 +1869,8 @@ export default function GameX01({
                         );
                       })()}
                     </div>
+                      </>
+                    )}
                 </div>
             ) : (
                 <div className={`relative w-full h-full flex flex-col items-center justify-center ${gameState.winner === 'p1' ? 'bg-emerald-900/40 border-emerald-500/50' : 'bg-purple-900/40 border-purple-500/50'} border-2 p-4 rounded-xl text-center animate-in zoom-in duration-300 shadow-2xl shadow-black/50`}>
