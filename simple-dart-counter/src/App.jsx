@@ -1794,8 +1794,15 @@ function AppMain({ lang, setLang }) {
     const pin = String(activePin ?? '').trim();
     if (!/^\d{4}$/.test(pin)) return;
 
-    const timer = setTimeout(() => {
+    let cancelled = false;
+    let timer = null;
+
+    const attemptSync = () => {
+      if (cancelled) return;
+      // Po sloučení z tabletu je outbound krátce zamčený — nesmíme sync přeskočit natrvalo
+      // (jinak např. auto-přiřazení terče po dohrání skupiny zůstane jen lokálně).
       if (isIncomingCloudUpdate.current) {
+        timer = window.setTimeout(attemptSync, 400);
         return;
       }
       const snap = tournamentSyncPayloadRef.current;
@@ -1807,9 +1814,13 @@ function AppMain({ lang, setLang }) {
       }).catch((err) => {
         console.warn('Tournament cloud sync failed:', err);
       });
-    }, 1500);
+    };
 
-    return () => clearTimeout(timer);
+    timer = window.setTimeout(attemptSync, 1500);
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
   }, [
     userRole,
     user,
@@ -3139,22 +3150,22 @@ function AppMain({ lang, setLang }) {
       const completedId = completedWithBoard.groupId;
       const waitingId = firstWaiting.groupId;
 
-      setTournamentData((prev) => {
-        if (!prev?.groups) return prev;
-        const nextGroups = prev.groups.map((g) => {
-          if (g.groupId === completedId) {
-            return { ...g, boards: [], boardReleased: true };
-          }
-          if (g.groupId === waitingId) {
-            return { ...g, boards: [boardNum] };
-          }
-          return g;
-        });
-        const next = { ...prev, groups: nextGroups };
+      const nextGroups = groups.map((g) => {
+        if (g.groupId === completedId) {
+          return { ...g, boards: [], boardReleased: true };
+        }
+        if (g.groupId === waitingId) {
+          return { ...g, boards: [boardNum] };
+        }
+        return g;
+      });
+      const nextTd = { ...tournamentData, groups: nextGroups };
+
+      setTournamentData(() => {
         try {
-          safeStorage.setItem('dartsTournamentData', JSON.stringify(next));
+          safeStorage.setItem('dartsTournamentData', JSON.stringify(nextTd));
         } catch {}
-        return next;
+        return nextTd;
       });
 
       setTournamentDraft((prev) => ({
@@ -3166,6 +3177,18 @@ function AppMain({ lang, setLang }) {
         },
       }));
 
+      // Okamžitý cloud sync — tablet jinak zůstane na dohrané skupině (debounce + inbound lock).
+      const pin = String(activePin ?? '').trim();
+      if (nextTd?.cloudEnabled && /^\d{4}$/.test(pin) && user && !user.isAnonymous) {
+        const snap = tournamentSyncPayloadRef.current;
+        syncTournamentToCloud(pin, {
+          tournamentData: nextTd,
+          groups: nextGroups,
+          groupMatches: snap?.groupMatches ?? tournamentMatches,
+          tournamentBracket: snap?.tournamentBracket ?? tournamentBracket,
+        }).catch((err) => console.warn('Board reassignment cloud sync failed:', err));
+      }
+
       const msg =
         (translations[lang]?.tournBoardReassigned || 'Systém: Skupina {X} dohrála. Terč {Y} byl automaticky přiřazen Skupině {Z}.')
           .replace('{X}', completedId)
@@ -3173,7 +3196,7 @@ function AppMain({ lang, setLang }) {
           .replace('{Z}', waitingId);
       showNotification(msg, 'success');
     }
-  }, [userRole, tournamentData?.groups, tournamentMatches, lang]);
+  }, [userRole, tournamentData, tournamentMatches, tournamentBracket, activePin, user, lang]);
 
   useEffect(() => {
     if (userRole !== 'admin') return;

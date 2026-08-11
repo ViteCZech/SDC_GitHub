@@ -140,6 +140,12 @@ export async function syncTournamentToCloud(pin, tournamentState) {
     ? safeState.tournamentBracket
     : [];
 
+  // Drž top-level `groups` a `tournamentData.groups` ve shodě (tablet bere obojí).
+  const tournamentDataSynced =
+    tournamentData && groups.length > 0
+      ? { ...tournamentData, groups }
+      : tournamentData;
+
   const ref = doc(db, COLLECTION, id);
 
   // Než admin přepíše dokument, slouč výsledky z tabletu z aktuálního cloudu
@@ -163,13 +169,13 @@ export async function syncTournamentToCloud(pin, tournamentState) {
   }
 
   const status = deriveTournamentStatus({
-    tournamentData,
+    tournamentData: tournamentDataSynced,
     groupMatches,
     tournamentBracket,
   });
 
   const withMeta = {
-    tournamentData,
+    tournamentData: tournamentDataSynced,
     groups,
     groupMatches,
     tournamentBracket,
