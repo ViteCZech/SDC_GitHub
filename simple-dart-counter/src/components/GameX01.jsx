@@ -343,8 +343,13 @@ export default function GameX01({
     useEffect(() => {
       gameStateRef.current = gameState; isMicActiveRef.current = isMicActive;
       currentInputRef.current = currentInput; finishDataRef.current = finishData;
-      if (historyRef.current) historyRef.current.scrollTop = historyRef.current.scrollHeight; 
-  }, [gameState, isMicActive, currentInput, finishData]);
+      // Po novém kole posun historie na nejnovější řádek
+      requestAnimationFrame(() => {
+        if (historyRef.current) {
+          historyRef.current.scrollTop = historyRef.current.scrollHeight;
+        }
+      });
+  }, [gameState.history?.length, gameState, isMicActive, currentInput, finishData]);
 
   useEffect(() => {
     onlineGameIdRef.current = onlineGameId;
@@ -1437,7 +1442,23 @@ export default function GameX01({
   const isSuccessMsg = errorMsg && ['!', 'Přihlášeno', 'Uloženo', 'Zálohováno', 'Recognized'].some(w => String(errorMsg).includes(w));
 
   const renderUnifiedHistory = () => {
-    const rounds = []; let cR = {}; [...gameState.history].reverse().forEach(move => { const rN = Math.ceil(move.turn / 2); if (!cR[rN]) { const n = { id: rN, p1: null, p2: null }; cR[rN] = n; rounds.push(n); } if (move.player === 'p1') cR[rN].p1 = move; else cR[rN].p2 = move; });
+    const rounds = [];
+    const cR = {};
+    [...gameState.history].reverse().forEach((move) => {
+      const rN = Math.ceil(move.turn / 2);
+      if (!cR[rN]) {
+        const n = { id: rN, p1: null, p2: null };
+        cR[rN] = n;
+        rounds.push(n);
+      }
+      if (move.player === 'p1') cR[rN].p1 = move;
+      else cR[rN].p2 = move;
+    });
+    // Finální stav: jen poslední ~4 kola (automatický posun po novém kole)
+    const VISIBLE_ROUNDS = 4;
+    const visibleRounds =
+      rounds.length > VISIBLE_ROUNDS ? rounds.slice(-VISIBLE_ROUNDS) : rounds;
+
     const renderMove = (move) => {
         if (!move) return <div className="h-8 md:h-12"></div>;
         const isCheckout = move.remaining === 0 && !move.isBust;
@@ -1479,7 +1500,30 @@ export default function GameX01({
           </div>
         );
     };
-    return (<div ref={historyRef} className="border rounded-lg history-container bg-slate-900/50 border-slate-800">{rounds.map(r => <div key={r.id} className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center border-b border-slate-800/60 py-2 md:py-3 last:border-0">{renderMove(r.p1)}<div className="flex items-center justify-center w-6 h-6 md:w-8 md:h-8 rounded-full bg-slate-800 border border-slate-700 shadow-sm text-[10px] md:text-xs font-bold text-slate-500">{r.id}</div>{renderMove(r.p2)}</div>)}{rounds.length === 0 && <div className="py-10 text-xs text-center text-slate-600 md:text-sm">- Zatím bez hodů -</div>}</div>);
+    return (
+      <div
+        ref={historyRef}
+        className="h-full min-h-0 overflow-y-auto overscroll-contain border rounded-lg history-container bg-slate-900/50 border-slate-800"
+      >
+        {visibleRounds.map((r) => (
+          <div
+            key={r.id}
+            className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center border-b border-slate-800/60 py-2 md:py-3 last:border-0"
+          >
+            {renderMove(r.p1)}
+            <div className="flex items-center justify-center w-6 h-6 md:w-8 md:h-8 rounded-full bg-slate-800 border border-slate-700 shadow-sm text-[10px] md:text-xs font-bold text-slate-500">
+              {r.id}
+            </div>
+            {renderMove(r.p2)}
+          </div>
+        ))}
+        {visibleRounds.length === 0 && (
+          <div className="py-10 text-xs text-center text-slate-600 md:text-sm">
+            - Zatím bez hodů -
+          </div>
+        )}
+      </div>
+    );
   };
 
   const activeScore = gameState.currentPlayer === 'p1' ? gameState.p1Score : gameState.p2Score;
@@ -1802,7 +1846,7 @@ export default function GameX01({
           }`}
         >
             <div className="bg-slate-800/80 p-1.5 border-b border-slate-700 text-[9px] font-black uppercase text-center text-slate-500 tracking-widest hidden landscape:block">Historie náhozů</div>
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden p-1">
                 {renderUnifiedHistory()}
             </div>
         </div>

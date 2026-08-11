@@ -129,8 +129,9 @@ export const submitTabletMatchUpdate = onCall(
       throw new HttpsError('invalid-argument', 'Chybí data zápasu.');
     }
 
-    // Bezpečnost: tablet nesmí přepsat celý dokument / citlivá pole turnaje
-    const forbidden = ['tournamentData', 'groups', 'groupMatches', 'tournamentBracket', 'status'];
+    // Bezpečnost: tablet nesmí přes matchUpdates přepsat celý dokument turnaje.
+    // Pozn.: `status` u zápasu je povolené (completed / playing / …).
+    const forbidden = ['tournamentData', 'groups', 'groupMatches', 'tournamentBracket'];
     for (const key of forbidden) {
       if (Object.prototype.hasOwnProperty.call(patches, key)) {
         throw new HttpsError('invalid-argument', 'Nepovolená pole v aktualizaci zápasu.');
