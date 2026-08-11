@@ -1,11 +1,11 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-08-10T04:03:00.000Z",
-    "effectiveDate": "2026-08-10",
-    "generatedAt": "2026-08-10 04:03",
-    "fetchedAt": "2026-08-10T06:16:08.651Z",
-    "totalPlayers": 134
+    "updatedAt": "2026-08-11T04:03:00.000Z",
+    "effectiveDate": "2026-08-11",
+    "generatedAt": "2026-08-11 04:03",
+    "fetchedAt": "2026-08-11T05:57:51.849Z",
+    "totalPlayers": 135
   },
   "players": [
     {
@@ -271,12 +271,12 @@
     },
     {
       "rank": 57,
-      "name": "Ludmila  Klaubová",
-      "club": "Plaská Zvěř"
+      "name": "Michaela  Kolářová"
     },
     {
-      "rank": 58,
-      "name": "Michaela  Kolářová"
+      "rank": 57,
+      "name": "Ludmila  Klaubová",
+      "club": "Plaská Zvěř"
     },
     {
       "rank": 59,
@@ -525,83 +525,88 @@
     },
     {
       "rank": 113,
+      "name": "Michaela Zelenková",
+      "club": "Steel Darts Club Petrovice"
+    },
+    {
+      "rank": 113,
       "name": "Pavla Jurigová",
       "club": "Guru-Caffé Nekonečný příběh ..."
     },
     {
-      "rank": 117,
+      "rank": 118,
       "name": "Silvie Hronová"
     },
     {
-      "rank": 117,
+      "rank": 118,
       "name": "Eliška Steinová"
     },
     {
-      "rank": 117,
+      "rank": 118,
       "name": "Michaela Zahradníková"
     },
     {
-      "rank": 117,
+      "rank": 118,
       "name": "Kateřina Čepelová"
     },
     {
-      "rank": 117,
+      "rank": 118,
       "name": "Renata Slípková"
     },
     {
-      "rank": 117,
+      "rank": 118,
       "name": "Renata Nejezchlebová st.",
       "club": "DC Steelový Šílenci Teplice"
     },
     {
-      "rank": 117,
+      "rank": 118,
       "name": "Petra Nykodemová"
     },
     {
-      "rank": 117,
+      "rank": 118,
       "name": "Helena Krausová",
       "club": "Mouchy v medu"
     },
     {
-      "rank": 117,
+      "rank": 118,
       "name": "Kateřina Šildbergerová",
       "club": "Pojď mi hop"
     },
     {
-      "rank": 117,
+      "rank": 118,
       "name": "Lucie Škardová"
     },
     {
-      "rank": 117,
+      "rank": 118,
       "name": "Gabriela Pacltová"
     },
     {
-      "rank": 128,
+      "rank": 129,
       "name": "Hana Hozová"
     },
     {
-      "rank": 128,
+      "rank": 129,
       "name": "Lucie  Kluková"
     },
     {
-      "rank": 128,
+      "rank": 129,
       "name": "Simona Horváthová st"
     },
     {
-      "rank": 128,
+      "rank": 129,
       "name": "Sára Blahutová"
     },
     {
-      "rank": 128,
+      "rank": 129,
       "name": "Petra Vosková"
     },
     {
-      "rank": 128,
+      "rank": 129,
       "name": "Martina Sládková",
       "club": "Brněnská šipková z.s."
     },
     {
-      "rank": 128,
+      "rank": 129,
       "name": "Gabriela Vítková",
       "club": "Ferrari Darts Kyjov"
     }
