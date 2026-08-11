@@ -132,8 +132,9 @@ const TOURNAMENT_WIP_KEY = 'dartsTournamentSetupWip';
 const SESSION_ROLE_KEY = 'dartsSessionRole';
 const SESSION_PIN_KEY = 'dartsSessionPin';
 const SESSION_BOARD_KEY = 'dartsSessionBoard';
+const SESSION_TABLET_PW_KEY = 'dartsSessionTabletPw';
 
-function persistSpectatorSession(role, pin, boardStr = '') {
+function persistSpectatorSession(role, pin, boardStr = '', tabletPassword = '') {
   if (role !== 'viewer' && role !== 'tablet') return;
   const p = String(pin ?? '').trim();
   if (!/^\d{4}$/.test(p)) return;
@@ -141,8 +142,12 @@ function persistSpectatorSession(role, pin, boardStr = '') {
   safeStorage.setItem(SESSION_PIN_KEY, p);
   if (role === 'tablet') {
     safeStorage.setItem(SESSION_BOARD_KEY, String(boardStr ?? '').trim());
+    const tp = String(tabletPassword ?? '').trim().slice(0, 5);
+    if (tp) safeStorage.setItem(SESSION_TABLET_PW_KEY, tp);
+    else safeStorage.removeItem(SESSION_TABLET_PW_KEY);
   } else {
     safeStorage.removeItem(SESSION_BOARD_KEY);
+    safeStorage.removeItem(SESSION_TABLET_PW_KEY);
   }
 }
 
@@ -150,6 +155,15 @@ function clearSpectatorSession() {
   safeStorage.removeItem(SESSION_ROLE_KEY);
   safeStorage.removeItem(SESSION_PIN_KEY);
   safeStorage.removeItem(SESSION_BOARD_KEY);
+  safeStorage.removeItem(SESSION_TABLET_PW_KEY);
+}
+
+function loadStoredTabletPassword() {
+  try {
+    return String(safeStorage.getItem(SESSION_TABLET_PW_KEY) ?? '').trim().slice(0, 5);
+  } catch {
+    return '';
+  }
 }
 
 function writeTournamentWip(pin) {
@@ -543,6 +557,7 @@ const FlagIcon = ({ lang }) => {
 const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch, isTournamentMode, onTournamentMatchComplete, onUndoAndResume }) => {
     const t = (k) => translations[lang]?.[k] || k;
     const [isMicRematch, setIsMicRematch] = useState(false);
+    const [savingMatch, setSavingMatch] = useState(false);
     const isMicRematchRef = useRef(false);
     const onStartMatchRef = useRef(onStartMatch);
     useEffect(() => {
@@ -706,7 +721,9 @@ const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch, isTo
                             <>
                                 <button
                                     type="button"
-                                    onClick={() => {
+                                    disabled={savingMatch}
+                                    onClick={async () => {
+                                      if (savingMatch) return;
                                       const fr = data?.finalResult;
                                       const p1Legs = Number(fr?.player1?.legsWon ?? data?.p1Legs) || 0;
                                       const p2Legs = Number(fr?.player2?.legsWon ?? data?.p2Legs) || 0;
@@ -727,11 +744,24 @@ const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch, isTo
                                           : {};
 
                                       const resultData = { p1Legs, p2Legs, ...statsPayload };
-                                      onTournamentMatchComplete?.(data?.tournamentMatchId ?? data?.id, resultData);
+                                      setSavingMatch(true);
+                                      try {
+                                        await onTournamentMatchComplete?.(
+                                          data?.tournamentMatchId ?? data?.id,
+                                          resultData
+                                        );
+                                      } catch {
+                                        /* parent zobrazí toast; zůstaneme na obrazovce */
+                                      } finally {
+                                        setSavingMatch(false);
+                                      }
                                     }}
-                                    className="flex items-center justify-center w-full gap-3 py-4 text-lg font-black text-white transition-all shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-xl active:scale-95"
+                                    className="flex items-center justify-center w-full gap-3 py-4 text-lg font-black text-white transition-all shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    <CheckCircle className="w-6 h-6" /> {t('tournSaveMatch') || 'ULOŽIT ZÁPAS'}
+                                    <CheckCircle className="w-6 h-6" />{' '}
+                                    {savingMatch
+                                      ? t('tournSavingMatch') || 'UKLÁDÁM…'
+                                      : t('tournSaveMatch') || 'ULOŽIT ZÁPAS'}
                                 </button>
                                 <button
                                     type="button"
@@ -2497,7 +2527,7 @@ function AppMain({ lang, setLang }) {
     setActivePin(p);
     setUserRole('tablet');
     setTournamentDraft((prev) => ({ ...prev, hubTabletBoard: b }));
-    persistSpectatorSession('tablet', p, b);
+    persistSpectatorSession('tablet', p, b, tp);
     setAppState('tournament_tablet');
   };
 
@@ -3214,13 +3244,17 @@ function AppMain({ lang, setLang }) {
     const pin = String(activePin ?? '').trim();
     if (!am || !/^\d{4}$/.test(pin)) return;
     try {
-      await updateCloudMatchFromTablet(pin, am.matchType, am.matchId ?? am.id, {
-        tabletStatus: 'checked_in',
-      });
-    } catch {
-      console.warn('Tablet check-in cloud sync');
+      await updateCloudMatchFromTablet(
+        pin,
+        am.matchType,
+        am.matchId ?? am.id,
+        { tabletStatus: 'checked_in' },
+        { tabletPassword: loadStoredTabletPassword() }
+      );
+    } catch (err) {
+      console.warn('Tablet check-in cloud sync', err);
       showNotification(
-        translations[lang]?.tournamentHub?.syncError || 'Chyba synchronizace s cloudem.',
+        String(err?.message || translations[lang]?.tournamentHub?.syncError || 'Chyba synchronizace s cloudem.'),
         'error'
       );
     }
@@ -3230,10 +3264,16 @@ function AppMain({ lang, setLang }) {
     const pin = String(activePin ?? '').trim();
     if (!/^\d{4}$/.test(pin) || !matchId) return;
     try {
-      await updateCloudMatchFromTablet(pin, matchType, matchId, {
-        tabletStatus: 'timeout_warning',
-      });
-    } catch {}
+      await updateCloudMatchFromTablet(
+        pin,
+        matchType,
+        matchId,
+        { tabletStatus: 'timeout_warning' },
+        { tabletPassword: loadStoredTabletPassword() }
+      );
+    } catch (err) {
+      console.warn('Tablet timeout warning sync', err);
+    }
   };
 
   const handleTabletStartGame = async (matchId, startingPlayerId) => {
@@ -3249,11 +3289,23 @@ function AppMain({ lang, setLang }) {
     const mid = am.matchId ?? am.id;
     if (/^\d{4}$/.test(pin)) {
       try {
-        await updateCloudMatchFromTablet(pin, am.matchType, mid, {
-          whoStarts: startingPlayerId,
-          tabletStatus: 'ready_to_play',
-        });
-      } catch {}
+        await updateCloudMatchFromTablet(
+          pin,
+          am.matchType,
+          mid,
+          {
+            whoStarts: startingPlayerId,
+            tabletStatus: 'ready_to_play',
+          },
+          { tabletPassword: loadStoredTabletPassword() }
+        );
+      } catch (err) {
+        console.warn('Tablet start sync', err);
+        showNotification(
+          String(err?.message || translations[lang]?.tournamentHub?.syncError || 'Chyba synchronizace s cloudem.'),
+          'error'
+        );
+      }
     }
 
     const td =
@@ -3867,15 +3919,33 @@ function AppMain({ lang, setLang }) {
                       tabletStatus: 'completed',
                     };
 
-                    if (/^\d{4}$/.test(pin)) {
-                      try {
-                        await updateCloudMatchFromTablet(
-                          pin,
-                          tmt === 'bracket' ? 'bracket' : 'group',
-                          mid,
-                          completedPatch
-                        );
-                      } catch {}
+                    if (!/^\d{4}$/.test(pin)) {
+                      showNotification(
+                        translations[lang]?.tournamentHub?.enterPin || 'Zadejte PIN turnaje',
+                        'error'
+                      );
+                      throw new Error('missing_pin');
+                    }
+
+                    try {
+                      await updateCloudMatchFromTablet(
+                        pin,
+                        tmt === 'bracket' ? 'bracket' : 'group',
+                        mid,
+                        completedPatch,
+                        { tabletPassword: loadStoredTabletPassword() }
+                      );
+                    } catch (err) {
+                      showNotification(
+                        String(
+                          err?.message ||
+                            translations[lang]?.tablet?.saveMatchError ||
+                            translations[lang]?.tournamentHub?.syncError ||
+                            'Uložení zápasu selhalo. Zkuste to znovu.'
+                        ),
+                        'error'
+                      );
+                      throw err;
                     }
 
                     if (tmt === 'bracket' && ctx.roundIndex != null && bm?.id != null) {

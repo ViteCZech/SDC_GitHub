@@ -8,10 +8,12 @@ import {
   addDoc,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app, db } from '../firebase';
 
 const COLLECTION = 'active_tournaments';
 const PAST_COLLECTION = 'past_tournaments';
+const FUNCTIONS_REGION = 'europe-west1';
 
 function isMatchTerminal(m) {
   const s = m?.status;
@@ -182,81 +184,50 @@ export async function archivePastTournamentAndDeleteActive(userId, pin, name, fu
 }
 
 /**
- * Tablet: načte dokument, najde zápas ve skupině nebo pavoukovi, sloučí matchUpdates do objektu zápasu a uloží celý dokument.
+ * Tablet: aktualizace zápasu přes Cloud Function (bez Google loginu).
+ * Ověření PIN + volitelné heslo terče probíhá na serveru.
  * @param {string} pin
  * @param {'group'|'bracket'} matchType
  * @param {string} matchId
  * @param {Record<string, unknown>} matchUpdates
+ * @param {{ tabletPassword?: string }} [opts]
  */
-export async function updateCloudMatchFromTablet(pin, matchType, matchId, matchUpdates) {
-  if (!db || !pin) return;
-  const id = String(pin).trim();
-  if (!/^\d{4}$/.test(id)) return;
+export async function updateCloudMatchFromTablet(pin, matchType, matchId, matchUpdates, opts = {}) {
+  if (!app) throw new Error('Firebase app není dostupná.');
+  const id = String(pin ?? '').trim();
+  if (!/^\d{4}$/.test(id)) throw new Error('Neplatný PIN turnaje.');
+  const mt = matchType === 'bracket' ? 'bracket' : matchType === 'group' ? 'group' : null;
+  if (!mt) throw new Error('Neplatný typ zápasu.');
+  const mid = String(matchId ?? '').trim();
+  if (!mid) throw new Error('Chybí ID zápasu.');
   const rawPatches = matchUpdates && typeof matchUpdates === 'object' ? matchUpdates : {};
   const patches = stripUndefinedDeep(rawPatches);
-  if (!patches || typeof patches !== 'object' || Object.keys(patches).length === 0) return;
-
-  const ref = doc(db, COLLECTION, id);
-  const docSnap = await getDoc(ref);
-  const exists = typeof docSnap.exists === 'function' ? docSnap.exists() : docSnap.exists;
-  if (!exists) {
-    console.warn('updateCloudMatchFromTablet: document missing', id);
-    return;
+  if (!patches || typeof patches !== 'object' || Object.keys(patches).length === 0) {
+    throw new Error('Chybí data zápasu.');
   }
 
-  const raw = docSnap.data();
-  const tournamentData = raw.tournamentData ?? null;
-  let groupMatches = Array.isArray(raw.groupMatches) ? cloneJsonSafe(raw.groupMatches, []) : [];
-  let tournamentBracket = Array.isArray(raw.tournamentBracket)
-    ? cloneJsonSafe(raw.tournamentBracket, [])
-    : [];
-
-  if (matchType === 'group') {
-    const idx = findGroupMatchIndex(groupMatches, matchId);
-    if (idx < 0) {
-      console.warn('updateCloudMatchFromTablet: group match not found', matchId);
-      return;
-    }
-    groupMatches = groupMatches.map((m, i) => (i === idx ? { ...m, ...patches } : m));
-  } else if (matchType === 'bracket') {
-    const loc = findBracketMatchLoc(tournamentBracket, matchId);
-    if (!loc) {
-      console.warn('updateCloudMatchFromTablet: bracket match not found', matchId);
-      return;
-    }
-    tournamentBracket = tournamentBracket.map((round, ri) => {
-      if (ri !== loc.roundIndex) return round;
-      const matches = (round.matches || []).map((m, mi) =>
-        mi === loc.matchIndex ? { ...m, ...patches } : m
-      );
-      return { ...round, matches };
+  const functions = getFunctions(app, FUNCTIONS_REGION);
+  const fn = httpsCallable(functions, 'submitTabletMatchUpdate');
+  try {
+    await fn({
+      pin: id,
+      matchType: mt,
+      matchId: mid,
+      matchUpdates: patches,
+      tabletPassword: String(opts.tabletPassword ?? '').trim().slice(0, 5) || undefined,
     });
-  } else {
-    console.warn('updateCloudMatchFromTablet: invalid matchType', matchType);
-    return;
+  } catch (err) {
+    const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
+    const message =
+      err && typeof err === 'object' && 'message' in err ? String(err.message) : '';
+    const clean = message
+      .replace(/^Firebase:\s*/i, '')
+      .replace(/^functions\/[a-z-]+:\s*/i, '')
+      .trim();
+    const error = new Error(clean || 'Uložení zápasu do cloudu selhalo.');
+    error.code = code.replace(/^functions\//, '') || 'tablet_match_update_failed';
+    throw error;
   }
-
-  const groups = Array.isArray(raw.groups) ? raw.groups : [];
-  const status = deriveTournamentStatus({
-    tournamentData,
-    groupMatches,
-    tournamentBracket,
-  });
-
-  const payload = cloneJsonSafe(
-    {
-      ...raw,
-      tournamentData,
-      groups,
-      groupMatches,
-      tournamentBracket,
-      status,
-      lastUpdated: new Date().toISOString(),
-    },
-    null
-  );
-  if (payload == null) return;
-  await setDoc(ref, payload);
 }
 
 function isCloudMatchTerminal(m) {
