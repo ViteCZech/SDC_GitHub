@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-08-11T04:03:00.000Z",
-    "effectiveDate": "2026-08-11",
-    "generatedAt": "2026-08-11 04:03",
-    "fetchedAt": "2026-08-11T05:57:51.849Z",
+    "updatedAt": "2026-08-12T04:03:00.000Z",
+    "effectiveDate": "2026-08-12",
+    "generatedAt": "2026-08-12 04:03",
+    "fetchedAt": "2026-08-12T06:20:25.484Z",
     "totalPlayers": 135
   },
   "players": [
@@ -132,13 +132,13 @@
     },
     {
       "rank": 27,
-      "name": "Monika Krotká",
-      "club": "Plaská Zvěř"
-    },
-    {
-      "rank": 28,
       "name": "Martina Vaňková",
       "club": "Kladno Steel"
+    },
+    {
+      "rank": 27,
+      "name": "Monika Krotká",
+      "club": "Plaská Zvěř"
     },
     {
       "rank": 29,
@@ -446,11 +446,11 @@
     },
     {
       "rank": 98,
-      "name": "Lenka Chudobová"
+      "name": "Dita Schmied"
     },
     {
-      "rank": 98,
-      "name": "Dita Schmied"
+      "rank": 99,
+      "name": "Lenka Chudobová"
     },
     {
       "rank": 100,
