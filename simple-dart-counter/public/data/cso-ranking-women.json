@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-08-12T04:03:00.000Z",
-    "effectiveDate": "2026-08-12",
-    "generatedAt": "2026-08-12 04:03",
-    "fetchedAt": "2026-08-12T06:20:25.484Z",
+    "updatedAt": "2026-08-13T04:03:00.000Z",
+    "effectiveDate": "2026-08-13",
+    "generatedAt": "2026-08-13 04:03",
+    "fetchedAt": "2026-08-13T06:21:45.108Z",
     "totalPlayers": 135
   },
   "players": [
@@ -128,17 +128,17 @@
     },
     {
       "rank": 26,
-      "name": "Žaneta Šmejcová"
-    },
-    {
-      "rank": 27,
       "name": "Martina Vaňková",
       "club": "Kladno Steel"
     },
     {
-      "rank": 27,
+      "rank": 26,
       "name": "Monika Krotká",
       "club": "Plaská Zvěř"
+    },
+    {
+      "rank": 28,
+      "name": "Žaneta Šmejcová"
     },
     {
       "rank": 29,
@@ -171,11 +171,11 @@
     },
     {
       "rank": 35,
-      "name": "Veronika Vašutová"
+      "name": "Irena Vybíralová"
     },
     {
       "rank": 36,
-      "name": "Irena Vybíralová"
+      "name": "Veronika Vašutová"
     },
     {
       "rank": 37,
@@ -236,13 +236,13 @@
       "club": "Mr. Boombastic"
     },
     {
-      "rank": 50,
-      "name": "Kateřina Amlerová",
-      "club": "D.C.O.B."
+      "rank": 49,
+      "name": "Nikola Fofová"
     },
     {
       "rank": 51,
-      "name": "Nikola Fofová"
+      "name": "Kateřina Amlerová",
+      "club": "D.C.O.B."
     },
     {
       "rank": 52,
@@ -289,24 +289,24 @@
     },
     {
       "rank": 61,
-      "name": "Monika Doležalová",
-      "club": "Pitbull Bažiny"
+      "name": "Lenka Domaniková"
     },
     {
-      "rank": 61,
+      "rank": 62,
       "name": "Hana Konvalinková"
     },
     {
       "rank": 63,
+      "name": "Monika Doležalová",
+      "club": "Pitbull Bažiny"
+    },
+    {
+      "rank": 64,
       "name": "Lucie Reinišová",
       "club": "OKO Plzeň"
     },
     {
-      "rank": 63,
-      "name": "Lenka Domaniková"
-    },
-    {
-      "rank": 63,
+      "rank": 64,
       "name": "Adriana Brhelová"
     },
     {
@@ -407,12 +407,12 @@
     },
     {
       "rank": 89,
-      "name": "Ivana Vodenková"
-    },
-    {
-      "rank": 89,
       "name": "Miroslava Komanová",
       "club": "DC Vikings Blatná"
+    },
+    {
+      "rank": 90,
+      "name": "Ivana Vodenková"
     },
     {
       "rank": 91,
