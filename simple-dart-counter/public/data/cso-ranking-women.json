@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-08-14T04:03:00.000Z",
-    "effectiveDate": "2026-08-14",
-    "generatedAt": "2026-08-14 04:03",
-    "fetchedAt": "2026-08-14T06:20:22.480Z",
+    "updatedAt": "2026-08-15T04:03:00.000Z",
+    "effectiveDate": "2026-08-15",
+    "generatedAt": "2026-08-15 04:03",
+    "fetchedAt": "2026-08-15T05:32:09.768Z",
     "totalPlayers": 135
   },
   "players": [
@@ -361,35 +361,35 @@
     },
     {
       "rank": 78,
-      "name": "Barbora Nováková"
-    },
-    {
-      "rank": 79,
       "name": "Pavlína  Pokorná"
     },
     {
-      "rank": 79,
+      "rank": 78,
       "name": "Eliška Jandová"
     },
     {
-      "rank": 79,
+      "rank": 78,
+      "name": "Barbora Nováková"
+    },
+    {
+      "rank": 78,
       "name": "Nikola Šestáková"
     },
     {
-      "rank": 79,
+      "rank": 78,
       "name": "Dorota Šestáková"
     },
     {
-      "rank": 79,
+      "rank": 78,
       "name": "Eva Špryslová"
     },
     {
-      "rank": 79,
+      "rank": 78,
       "name": "Irena Tomíšková",
       "club": "DC Sokolka Dobříš"
     },
     {
-      "rank": 79,
+      "rank": 78,
       "name": "Karolína Hochmanová"
     },
     {
