@@ -1,11 +1,11 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-08-15T04:03:00.000Z",
-    "effectiveDate": "2026-08-15",
-    "generatedAt": "2026-08-15 04:03",
-    "fetchedAt": "2026-08-15T05:32:09.768Z",
-    "totalPlayers": 135
+    "updatedAt": "2026-08-16T04:03:00.000Z",
+    "effectiveDate": "2026-08-16",
+    "generatedAt": "2026-08-16 04:03",
+    "fetchedAt": "2026-08-16T05:34:46.340Z",
+    "totalPlayers": 134
   },
   "players": [
     {
@@ -311,94 +311,94 @@
     },
     {
       "rank": 66,
-      "name": "Helena Židková"
-    },
-    {
-      "rank": 67,
       "name": "Anna Votavová",
       "club": "ŠK Pivnice Radegast"
     },
     {
-      "rank": 68,
-      "name": "Růžena Rýdelová"
-    },
-    {
-      "rank": 68,
+      "rank": 67,
       "name": "Lenka Křivková"
     },
     {
-      "rank": 70,
+      "rank": 68,
       "name": "Kateřina Kupsová"
     },
     {
-      "rank": 70,
+      "rank": 68,
       "name": "Adéla Hipíková"
     },
     {
-      "rank": 72,
+      "rank": 70,
       "name": "Michaela Dukátová"
     },
     {
-      "rank": 72,
+      "rank": 70,
       "name": "Jana Duroňová"
     },
     {
-      "rank": 74,
+      "rank": 72,
       "name": "Jitka Grebáčová"
     },
     {
-      "rank": 75,
+      "rank": 73,
+      "name": "Růžena Rýdelová"
+    },
+    {
+      "rank": 74,
       "name": "Viktorie Axmannová"
     },
     {
-      "rank": 76,
+      "rank": 75,
       "name": "Zdeňka Zonová"
     },
     {
-      "rank": 77,
+      "rank": 76,
       "name": "Lucie Ditrychová",
       "club": "Desítka"
     },
     {
-      "rank": 78,
+      "rank": 77,
       "name": "Pavlína  Pokorná"
     },
     {
-      "rank": 78,
+      "rank": 77,
       "name": "Eliška Jandová"
     },
     {
-      "rank": 78,
+      "rank": 77,
       "name": "Barbora Nováková"
     },
     {
-      "rank": 78,
+      "rank": 77,
       "name": "Nikola Šestáková"
     },
     {
-      "rank": 78,
+      "rank": 77,
       "name": "Dorota Šestáková"
     },
     {
-      "rank": 78,
+      "rank": 77,
       "name": "Eva Špryslová"
     },
     {
-      "rank": 78,
+      "rank": 77,
       "name": "Irena Tomíšková",
       "club": "DC Sokolka Dobříš"
     },
     {
-      "rank": 78,
+      "rank": 77,
       "name": "Karolína Hochmanová"
     },
     {
-      "rank": 86,
+      "rank": 85,
       "name": "Marie Kropíková",
       "club": "Schovi Darts"
     },
     {
-      "rank": 86,
+      "rank": 85,
+      "name": "Helena Židková"
+    },
+    {
+      "rank": 85,
       "name": "Veronika Kocařová"
     },
     {
@@ -465,148 +465,144 @@
       "name": "Nela Rychlíková"
     },
     {
-      "rank": 102,
-      "name": "Sabina Hubáčková"
-    },
-    {
-      "rank": 104,
+      "rank": 103,
       "name": "Renata Brandejsová",
       "club": "Tělocvičná jednota Sokol Lukavice"
     },
     {
-      "rank": 105,
+      "rank": 104,
       "name": "Jana Juráková"
     },
     {
-      "rank": 105,
+      "rank": 104,
       "name": "Petra Chytilová"
     },
     {
-      "rank": 105,
+      "rank": 104,
       "name": "Karla Wetterová"
     },
     {
-      "rank": 105,
+      "rank": 104,
       "name": "Klára Goldschmidtová"
     },
     {
-      "rank": 109,
+      "rank": 108,
       "name": "Andrea Homolová",
       "club": "Bumerang Team Plzeň"
     },
     {
-      "rank": 109,
+      "rank": 108,
       "name": "Iva Macháčková",
       "club": "Pojď mi hop"
     },
     {
-      "rank": 111,
+      "rank": 110,
       "name": "Jana Ullrichová",
       "club": "DARTS CLUB ORLOVÁ"
     },
     {
-      "rank": 111,
+      "rank": 110,
       "name": "Vlasta Nováková",
       "club": "Spolek neratovických šipkařů"
     },
     {
-      "rank": 113,
+      "rank": 112,
       "name": "Anna Krčmáriková"
     },
     {
-      "rank": 113,
+      "rank": 112,
       "name": "Renata Řeháková",
       "club": "Steel Darts Skalička"
     },
     {
-      "rank": 113,
+      "rank": 112,
       "name": "Pavla Petraniová",
       "club": "Plaská Zvěř"
     },
     {
-      "rank": 113,
+      "rank": 112,
       "name": "Michaela Zelenková",
       "club": "Steel Darts Club Petrovice"
     },
     {
-      "rank": 113,
+      "rank": 112,
       "name": "Pavla Jurigová",
       "club": "Guru-Caffé Nekonečný příběh ..."
     },
     {
-      "rank": 118,
+      "rank": 117,
       "name": "Silvie Hronová"
     },
     {
-      "rank": 118,
+      "rank": 117,
       "name": "Eliška Steinová"
     },
     {
-      "rank": 118,
+      "rank": 117,
       "name": "Michaela Zahradníková"
     },
     {
-      "rank": 118,
+      "rank": 117,
       "name": "Kateřina Čepelová"
     },
     {
-      "rank": 118,
+      "rank": 117,
       "name": "Renata Slípková"
     },
     {
-      "rank": 118,
+      "rank": 117,
       "name": "Renata Nejezchlebová st.",
       "club": "DC Steelový Šílenci Teplice"
     },
     {
-      "rank": 118,
+      "rank": 117,
       "name": "Petra Nykodemová"
     },
     {
-      "rank": 118,
+      "rank": 117,
       "name": "Helena Krausová",
       "club": "Mouchy v medu"
     },
     {
-      "rank": 118,
+      "rank": 117,
       "name": "Kateřina Šildbergerová",
       "club": "Pojď mi hop"
     },
     {
-      "rank": 118,
+      "rank": 117,
       "name": "Lucie Škardová"
     },
     {
-      "rank": 118,
+      "rank": 117,
       "name": "Gabriela Pacltová"
     },
     {
-      "rank": 129,
+      "rank": 128,
       "name": "Hana Hozová"
     },
     {
-      "rank": 129,
+      "rank": 128,
       "name": "Lucie  Kluková"
     },
     {
-      "rank": 129,
+      "rank": 128,
       "name": "Simona Horváthová st"
     },
     {
-      "rank": 129,
+      "rank": 128,
       "name": "Sára Blahutová"
     },
     {
-      "rank": 129,
+      "rank": 128,
       "name": "Petra Vosková"
     },
     {
-      "rank": 129,
+      "rank": 128,
       "name": "Martina Sládková",
       "club": "Brněnská šipková z.s."
     },
     {
-      "rank": 129,
+      "rank": 128,
       "name": "Gabriela Vítková",
       "club": "Ferrari Darts Kyjov"
     }
