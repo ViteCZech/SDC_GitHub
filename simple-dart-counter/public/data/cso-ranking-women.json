@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-08-16T04:03:00.000Z",
-    "effectiveDate": "2026-08-16",
-    "generatedAt": "2026-08-16 04:03",
-    "fetchedAt": "2026-08-16T05:34:46.340Z",
+    "updatedAt": "2026-08-17T04:03:00.000Z",
+    "effectiveDate": "2026-08-17",
+    "generatedAt": "2026-08-17 04:03",
+    "fetchedAt": "2026-08-17T05:41:01.714Z",
     "totalPlayers": 134
   },
   "players": [
@@ -147,35 +147,35 @@
     },
     {
       "rank": 30,
-      "name": "Pavla Pokorná"
+      "name": "Veronika Vašutová"
     },
     {
       "rank": 31,
+      "name": "Pavla Pokorná"
+    },
+    {
+      "rank": 32,
       "name": "Jitka Dorazilová",
       "club": "PV-Knihovna Olomouc"
     },
     {
-      "rank": 32,
+      "rank": 33,
       "name": "Markéta Fryštacká",
       "club": "Black Panthers"
     },
     {
-      "rank": 33,
+      "rank": 34,
       "name": "Romana Csemerová",
       "club": "Mouchy v medu"
     },
     {
-      "rank": 34,
+      "rank": 35,
       "name": "Anna Brandejsová",
       "club": "Tělocvičná jednota Sokol Lukavice"
     },
     {
-      "rank": 35,
-      "name": "Irena Vybíralová"
-    },
-    {
       "rank": 36,
-      "name": "Veronika Vašutová"
+      "name": "Irena Vybíralová"
     },
     {
       "rank": 37,
