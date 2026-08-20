@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-08-19T04:03:00.000Z",
-    "effectiveDate": "2026-08-19",
-    "generatedAt": "2026-08-19 04:03",
-    "fetchedAt": "2026-08-19T05:37:45.052Z",
+    "updatedAt": "2026-08-20T04:03:00.000Z",
+    "effectiveDate": "2026-08-20",
+    "generatedAt": "2026-08-20 04:03",
+    "fetchedAt": "2026-08-20T05:37:28.066Z",
     "totalPlayers": 134
   },
   "players": [
@@ -438,14 +438,14 @@
     },
     {
       "rank": 96,
-      "name": "Monika Žiačiková"
-    },
-    {
-      "rank": 97,
       "name": "Vendula Šimčíková"
     },
     {
-      "rank": 97,
+      "rank": 96,
+      "name": "Monika Žiačiková"
+    },
+    {
+      "rank": 96,
       "name": "Lucie Jirásková"
     },
     {
