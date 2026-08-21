@@ -2438,6 +2438,29 @@ export const updateBracketReferees = (
     !isBracketByeName(match.player1Name) &&
     !isBracketByeName(match.player2Name);
 
+  // Obsazené sloty: probíhající zápasy + pending s platným počtářem (dokončené slot neblokují).
+  newBracket.forEach((round) => {
+    (round?.matches || []).forEach((match) => {
+      if (!match || match.isBye) return;
+      if (match.status === 'playing') {
+        if (match.player1Id) currentlyPlayingIds.add(match.player1Id);
+        if (match.player2Id) currentlyPlayingIds.add(match.player2Id);
+        if (match.referee && !isBracketRefereePlaceholder(match.referee, match.refereeId)) {
+          usedReferees.add(match.referee.id || match.referee.name);
+        }
+        activeBoardsUsed += 1;
+        return;
+      }
+      if (
+        isPlayablePending(match) &&
+        match.referee &&
+        !isBracketRefereePlaceholder(match.referee, match.refereeId)
+      ) {
+        activeBoardsUsed += 1;
+      }
+    });
+  });
+
   const collectByeRoundCandidateIds = (roundIndex) => {
     const out = new Set();
     const roundMatches = newBracket?.[roundIndex]?.matches || [];
@@ -2612,20 +2635,6 @@ export const updateBracketReferees = (
     usedReferees.add(rid);
     if (chosenRef?.name != null && chosenRef.name !== rid) usedReferees.add(chosenRef.name);
   };
-
-  // 1. Zmapování zápasů, které UŽ SE HRAJÍ
-  newBracket.forEach((round) => {
-    (round?.matches || []).forEach((match) => {
-      if (match?.status === 'playing' && !match.isBye) {
-        if (match.player1Id) currentlyPlayingIds.add(match.player1Id);
-        if (match.player2Id) currentlyPlayingIds.add(match.player2Id);
-        if (match.referee && !isBracketRefereePlaceholder(match.referee, match.refereeId)) {
-          usedReferees.add(match.referee.id || match.referee.name);
-        }
-        activeBoardsUsed++;
-      }
-    });
-  });
 
   // 2. Hlavní přiřazování s dynamickým limitem terčů (min(availableBoards, …) přes activeBoardsUsed)
   newBracket.forEach((round, roundIndex) => {

@@ -398,10 +398,9 @@ export default function TournamentBracketView({
     for (const m of round.matches) {
       if (m.status !== 'pending' || !m.player1Id || !m.player2Id) continue;
       if (isByeMatch(m)) continue;
-      // Dev hack: jen zápasy „připravené na terči“ — mají terč i počtáře (vlny 1–2 na stejných deskách)
+      // Dev simulace: stačí terč (počtář není nutný — admin může doplnit ručně).
       const hasBoard = m.board != null && Number.isFinite(Number(m.board)) && Number(m.board) >= 1;
-      const hasRef = m.referee && (m.referee.id != null || m.referee.name);
-      if (!hasBoard || !hasRef) continue;
+      if (!hasBoard) continue;
       const wl = Math.max(1, Number(m.winLegs) || 3);
       const p1Wins = Math.random() > 0.5;
       const p1 = p1Wins ? wl : Math.floor(Math.random() * wl);

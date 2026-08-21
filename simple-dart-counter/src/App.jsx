@@ -1835,6 +1835,28 @@ function AppMain({ lang, setLang }) {
     [tournamentData?.promotersCount, tournamentData?.advancePerGroup, tournamentDraft.promotersCount]
   );
 
+  /** Po změně výsledků / terče: uvolnit frontu, doplnit terče pending zápasům a dopočítat počítáře. */
+  const applyBracketMaintenance = React.useCallback(
+    (bracket) => {
+      if (!Array.isArray(bracket) || bracket.length === 0 || !tournamentData) return bracket;
+      const availableBoards =
+        Number(tournamentData.boardsCount ?? tournamentData.totalBoards ?? tournamentData.numBoards) || 1;
+      const regForDirectKo =
+        isTournamentBracketOnlyFormat(tournamentData.tournamentFormat) && tournamentData.players?.length
+          ? tournamentData.players.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}` }))
+          : null;
+      return assignBracketJitBoardsAndReferees(bracket, {
+        availableBoards,
+        groups: tournamentGroups,
+        promotersCount: promotersForRefereeEngine,
+        groupMatches: tournamentMatches,
+        registeredPlayersForDirectKo: regForDirectKo,
+        prelimLegs: tournamentData?.prelimLegs ?? null,
+      }).bracket;
+    },
+    [tournamentData, tournamentGroups, tournamentMatches, promotersForRefereeEngine]
+  );
+
   const chalkerShortageNotifiedRef = useRef('');
 
   tournamentSyncPayloadRef.current = {
@@ -3776,7 +3798,7 @@ function AppMain({ lang, setLang }) {
     const n = Math.max(1, Math.floor(Number(newBoard)) || 1);
     setTournamentBracket((prev) => {
       if (!Array.isArray(prev) || !prev[roundIndex]?.matches) return prev;
-      return prev.map((round, ri) => {
+      const withBoard = prev.map((round, ri) => {
         if (ri !== roundIndex) return round;
         return {
           ...round,
@@ -3785,6 +3807,7 @@ function AppMain({ lang, setLang }) {
           ),
         };
       });
+      return applyBracketMaintenance(withBoard);
     });
   };
 
@@ -3880,7 +3903,8 @@ function AppMain({ lang, setLang }) {
   };
 
   const handleBracketDataCommit = (nextBracket) => {
-    setTournamentBracket(propagateBracketWinners(nextBracket));
+    const propagated = propagateBracketWinners(nextBracket);
+    setTournamentBracket(applyBracketMaintenance(propagated));
   };
 
   const handleBracketWalkover = (roundIndex, matchIndex, winnerId) => {
