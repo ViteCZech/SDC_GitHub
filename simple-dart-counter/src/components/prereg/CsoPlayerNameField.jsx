@@ -25,6 +25,8 @@ import CsoRankingUpdateButton from '../CsoRankingUpdateButton';
  *   inputClassName?: string,
  *   disabled?: boolean,
  *   showRankingField?: boolean,
+ *   showAdminControls?: boolean,
+ *   nullableRecreationalId?: boolean,
  *   user?: object|null,
  *   onGoogleLogin?: () => void,
  *   onNotify?: (message: string, type?: 'success'|'error') => void,
@@ -40,6 +42,8 @@ export default function CsoPlayerNameField({
   inputClassName = '',
   disabled = false,
   showRankingField = true,
+  showAdminControls = true,
+  nullableRecreationalId = false,
   user = null,
   onGoogleLogin,
   onNotify,
@@ -115,7 +119,11 @@ export default function CsoPlayerNameField({
   const handleNameChange = (v) => {
     onPlayerNameChange(v);
     setSelectedCsoRank(null);
-    onCsoPlayerIdChange?.(resolveCsoPlayerId({ name: v }));
+    if (nullableRecreationalId) {
+      onCsoPlayerIdChange?.(null);
+    } else {
+      onCsoPlayerIdChange?.(resolveCsoPlayerId({ name: v }));
+    }
     if (!useCsoRanking) {
       setShowSuggestions(false);
       setNameSuggestions([]);
@@ -222,6 +230,7 @@ export default function CsoPlayerNameField({
             {csoError && !csoLoading && (
               <span className="text-[10px] text-amber-400">{csoError}</span>
             )}
+            {showAdminControls && (
             <CsoRankingUpdateButton
               lang={lang}
               user={user}
@@ -241,6 +250,7 @@ export default function CsoPlayerNameField({
                 setCsoReloadKey((k) => k + 1);
               }}
             />
+            )}
           </div>
         )}
       </div>

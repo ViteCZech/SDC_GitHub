@@ -89,6 +89,17 @@ function fail(code: HttpsError['code'], message: string): TxFail {
   return { ok: false, code, message };
 }
 
+function resolveRegistrationCsoPlayerId(
+  playerName: string,
+  csoPlayerIdInput: string | null | undefined
+): string | null {
+  if (csoPlayerIdInput === null) return null;
+  return resolveCsoPlayerId({
+    name: playerName,
+    csoPlayerId: csoPlayerIdInput,
+  });
+}
+
 /**
  * Callable v2: onCall((request) => …) — data jsou v request.data
  * invoker: 'public' je nutné na Gen2/Cloud Run — jinak OPTIONS preflight bez CORS hlaviček
@@ -108,7 +119,7 @@ export const registerPlayer = onCall(
       const email = data.email;
       const phone = data.phone;
       const csoRank = data.csoRank;
-      const csoPlayerIdInput = data.csoPlayerId ?? null;
+      const csoPlayerIdInput = data.csoPlayerId;
       const paymentMethod = data.paymentMethod;
       const termsAccepted = !!data.termsAccepted;
 
@@ -126,10 +137,7 @@ export const registerPlayer = onCall(
 
       const normalizedEmail = normalizeEmail(email);
       const nameKey = normalizePlayerNameKey(playerName);
-      const csoPlayerId = resolveCsoPlayerId({
-        name: playerName,
-        csoPlayerId: csoPlayerIdInput,
-      });
+      const csoPlayerId = resolveRegistrationCsoPlayerId(playerName, csoPlayerIdInput);
 
       const outcome = await db.runTransaction(async (transaction): Promise<TxOutcome> => {
         const tournamentRef = db.collection('tournaments').doc(tournamentId);

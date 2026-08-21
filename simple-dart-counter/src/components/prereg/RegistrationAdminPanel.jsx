@@ -80,7 +80,7 @@ function ManualRegistrationModal({
     return { name, csoPlayerId: id };
   };
 
-  const persistRegistration = async () => {
+  const persistRegistration = async (opts = {}) => {
     const name = playerName.trim();
     const candidate = buildCandidate();
     await createManualRegistration(tournament.id, {
@@ -93,9 +93,29 @@ function ManualRegistrationModal({
       paymentMethod,
       isPaid,
       checkedIn,
+      duplicateOk: !!opts.force,
     });
     onSaved?.();
     onClose?.();
+  };
+
+  const mapSaveError = (err) => {
+    const code = String(err?.code ?? '');
+    const msg = String(err?.message ?? '');
+    const clean = msg
+      .replace(/^Firebase:\s*/i, '')
+      .replace(/^functions\/[a-z-]+:\s*/i, '')
+      .trim();
+    if (code === 'already-exists' && clean.includes('PLAYER_NAME_DUPLICATE:')) {
+      const dupName =
+        clean.split('PLAYER_NAME_DUPLICATE:')[1]?.trim() || playerName.trim();
+      return (t('preregErrDuplicatePlayer') || 'Hráč {name} již je v tomto turnaji zaregistrován.').replace(
+        '{name}',
+        dupName
+      );
+    }
+    if (code === 'resource-exhausted') return t('preregErrFull');
+    return clean || t('preregErrGeneric');
   };
 
   const handleSave = async (opts = {}) => {
@@ -115,9 +135,9 @@ function ManualRegistrationModal({
 
     setLoading(true);
     try {
-      await persistRegistration();
+      await persistRegistration(opts);
     } catch (err) {
-      setError(String(err?.message ?? t('preregErrGeneric')));
+      setError(mapSaveError(err));
     } finally {
       setLoading(false);
     }

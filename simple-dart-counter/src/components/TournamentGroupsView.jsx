@@ -8,7 +8,6 @@ import {
   isTournamentGroupsThenBracketFormat,
 } from '../utils/tournamentLogic';
 import { translations } from '../translations';
-import TabletBoardQrPanel from './TabletBoardQrPanel';
 
 /** Rozdělení zobrazeného jména (mezera nebo podtržítko) pro zalamování řádků */
 function splitStandingNameParts(name) {
@@ -423,9 +422,6 @@ export default function TournamentGroupsView({
   onGenerateBracket,
   onFinishGroups,
   onResumeBracket,
-  tabletQrPin = '',
-  onEnsureBoardAuthTokens,
-  onNotify,
 }) {
   const isAdmin = userRole === 'admin';
   const th = (k) => translations[lang]?.tournamentHub?.[k] ?? k;
@@ -706,17 +702,6 @@ export default function TournamentGroupsView({
         </div>
       )}
       <div className="w-full max-w-[98vw] mx-auto px-2 sm:px-4 pb-24">
-        {isAdmin && tournamentData?.cloudEnabled && /^\d{4}$/.test(String(tabletQrPin ?? '').trim()) ? (
-          <div className="pt-4">
-            <TabletBoardQrPanel
-              lang={lang}
-              pin={tabletQrPin}
-              tournamentData={tournamentData}
-              onNotify={onNotify}
-              onEnsureTokens={onEnsureBoardAuthTokens}
-            />
-          </div>
-        ) : null}
         {!isReviewMode && (
           <>
             {/* Status lišta – nad nadpisem; nadpis má odsazení mt-8 */}

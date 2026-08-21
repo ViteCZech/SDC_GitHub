@@ -504,72 +504,42 @@ function buildVariableSymbol(prefix, registrationId) {
 }
 
 /**
- * Ruční registrace hráče adminem (přímý zápis do Firestore).
+ * Ruční registrace hráče adminem (Cloud Function se serverovou kontrolou duplicit).
  * @param {string} tournamentId
  * @param {object} input
  */
 export async function createManualRegistration(tournamentId, input) {
-  await requireAdminAccess(tournamentId);
+  const id = String(tournamentId ?? '').trim();
+  if (!id) throw new Error(PREREG_NOT_FOUND);
 
-  return runTransaction(requireDb(), async (transaction) => {
-    const tourRef = doc(requireDb(), 'tournaments', tournamentId);
-    const tourSnap = await transaction.get(tourRef);
-    if (!tourSnap.exists()) throw new Error(PREREG_NOT_FOUND);
+  const functions = getFunctions(requireApp(), FUNCTIONS_REGION);
+  const fn = httpsCallable(functions, 'createManualRegistration');
 
-    const tData = tourSnap.data();
-    const currentConfirmed = tData.counters?.confirmed ?? 0;
-    const maxCapacity = tData.meta?.capacity ?? null;
-    const unlimited = maxCapacity == null || maxCapacity === 0;
-
-    let newStatus = 'CONFIRMED';
-    if (!unlimited && maxCapacity > 0 && currentConfirmed >= maxCapacity) {
-      if (!tData.meta?.waitlistEnabled) {
-        throw new Error('prereg_full');
-      }
-      newStatus = 'WAITLIST';
-    }
-
-    const regRef = doc(collection(requireDb(), 'tournaments', tournamentId, 'registrations'));
-    const variableSymbol = buildVariableSymbol(tData.finance?.vsPrefix, regRef.id);
-    const now = serverTimestamp();
-
-    const playerName = input.playerName.trim();
-    transaction.set(regRef, {
-      id: regRef.id,
-      player: {
-        name: playerName,
-        email: input.email?.trim()?.toLowerCase() || null,
-        phone: input.phone?.trim() || null,
-        csoRank: input.csoRank ?? null,
-        csoPlayerId: input.csoPlayerId ?? null,
-        nameKey: input.nameKey ?? null,
-      },
-      status: newStatus,
-      payment: {
-        method: input.paymentMethod ?? null,
-        variableSymbol,
-        amount: tData.finance?.entryFee ?? null,
-        isPaid: !!input.isPaid,
-        verifiedByAdmin: !!input.isPaid,
-        verifiedAt: input.isPaid ? now : null,
-      },
-      attendance: {
-        checkedIn: !!input.checkedIn,
-        checkedInAt: input.checkedIn ? now : null,
-      },
-      createdAt: now,
-      updatedAt: now,
-      source: 'ADMIN_MANUAL',
+  try {
+    const result = await fn({
+      tournamentId: id,
+      playerName: String(input?.playerName ?? '').trim(),
+      email: input?.email ?? null,
+      phone: input?.phone ?? null,
+      csoRank: input?.csoRank ?? null,
+      csoPlayerId: input?.csoPlayerId ?? null,
+      nameKey: input?.nameKey ?? null,
+      paymentMethod: input?.paymentMethod ?? null,
+      isPaid: !!input?.isPaid,
+      checkedIn: !!input?.checkedIn,
+      duplicateOk: !!input?.duplicateOk,
     });
-
-    if (newStatus === 'CONFIRMED') {
-      transaction.update(tourRef, { 'counters.confirmed': increment(1) });
-    } else {
-      transaction.update(tourRef, { 'counters.waitlist': increment(1) });
-    }
-
-    return { registrationId: regRef.id, status: newStatus, variableSymbol };
-  });
+    return /** @type {{ registrationId: string, status: string, variableSymbol: string }} */ (
+      result.data
+    );
+  } catch (err) {
+    const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
+    const message =
+      err && typeof err === 'object' && 'message' in err ? String(err.message) : '';
+    const error = new Error(message || PREREG_REGISTRATION_FAILED);
+    error.code = code.replace(/^functions\//, '') || PREREG_REGISTRATION_FAILED;
+    throw error;
+  }
 }
 
 export async function markRegistrationPaid(tournamentId, regId, method) {

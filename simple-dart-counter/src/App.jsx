@@ -2282,6 +2282,12 @@ function AppMain({ lang, setLang }) {
     pinBarTabletPw.length > 0 &&
     !!(tournamentData?.cloudEnabled || tournamentDraft?.cloudEnabled);
 
+  const showTabletQrNav =
+    userRole === 'admin' &&
+    !!tournamentData?.cloudEnabled &&
+    /^\d{4}$/.test(String(activePin ?? '').trim()) &&
+    ['tournament_groups', 'tournament_bracket', 'tournament_stats'].includes(appState);
+
   const showTournamentPinBar =
     !!pinBarDisplayCode &&
     ((userRole === 'admin' && appState === 'tournament_setup') ||
@@ -4932,6 +4938,16 @@ function AppMain({ lang, setLang }) {
         }
         right={
           <>
+            {showTabletQrNav ? (
+              <TabletBoardQrPanel
+                lang={lang}
+                pin={activePin}
+                tournamentData={tournamentData}
+                onNotify={showNotification}
+                onEnsureTokens={handleEnsureBoardAuthTokens}
+                compact
+              />
+            ) : null}
             <button
               onClick={toggleFullscreen}
               className="p-2 transition-colors rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700"
@@ -5522,27 +5538,11 @@ function AppMain({ lang, setLang }) {
           onStartMatch={handleStartTournamentMatch}
           onResetMatch={handleResetMatch}
           onWithdrawPlayer={handleWithdrawPlayer}
-          tabletQrPin={activePin}
-          onEnsureBoardAuthTokens={handleEnsureBoardAuthTokens}
-          onNotify={showNotification}
         />
       )}
 
       {appState === 'tournament_bracket' && tournamentData && (
         <main className="flex flex-col flex-1 w-full overflow-y-auto bg-slate-950 p-4 pb-24">
-          {userRole === 'admin' &&
-          tournamentData?.cloudEnabled &&
-          /^\d{4}$/.test(String(activePin ?? '').trim()) ? (
-            <div className="w-full max-w-[98vw] xl:max-w-7xl mx-auto mb-4">
-              <TabletBoardQrPanel
-                lang={lang}
-                pin={activePin}
-                tournamentData={tournamentData}
-                onNotify={showNotification}
-                onEnsureTokens={handleEnsureBoardAuthTokens}
-              />
-            </div>
-          ) : null}
           <TournamentBracketView
             bracketData={tournamentBracket}
             tournamentData={tournamentData}

@@ -61,10 +61,30 @@ export interface RegisterPlayerPayload {
   email?: string;
   phone?: string;
   csoRank?: number | null;
-  /** Stabilní ČŠO ID (`cso:…` / `name:…`), pokud je známé. */
+  /** Stabilní ČŠO ID (`cso:…`); null = rekreační hráč bez ČŠO ID. */
   csoPlayerId?: string | null;
   paymentMethod?: PaymentMethod | null;
   termsAccepted?: boolean;
+}
+
+export interface CreateManualRegistrationPayload {
+  tournamentId: string;
+  playerName: string;
+  email?: string | null;
+  phone?: string | null;
+  csoRank?: number | string | null;
+  csoPlayerId?: string | null;
+  nameKey?: string | null;
+  paymentMethod?: PaymentMethod | null;
+  isPaid?: boolean;
+  checkedIn?: boolean;
+  duplicateOk?: boolean;
+}
+
+export interface CreateManualRegistrationResult {
+  registrationId: string;
+  status: 'CONFIRMED' | 'WAITLIST';
+  variableSymbol: string;
 }
 
 export interface RegisterPlayerResult {

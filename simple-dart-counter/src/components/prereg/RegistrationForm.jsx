@@ -1,15 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import { Loader2, Send } from 'lucide-react';
 import { translations } from '../../translations';
-import {
-  registerPlayerApi,
-} from '../../services/tournamentPreRegService';
+import { registerPlayerApi } from '../../services/tournamentPreRegService';
+import CsoPlayerNameField from './CsoPlayerNameField';
 
 /**
  * @param {{
  *   lang: string,
  *   tournament: object,
  *   onSuccess: (result: object, formSnapshot: object) => void,
+ *   defaultEmail?: string,
  * }} props
  */
 export default function RegistrationForm({ lang, tournament, onSuccess, defaultEmail = '' }) {
@@ -28,6 +28,7 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
   const entryFee = tournament?.finance?.entryFee ?? null;
 
   const [playerName, setPlayerName] = useState('');
+  const [csoPlayerId, setCsoPlayerId] = useState(null);
   const [email, setEmail] = useState(() => String(defaultEmail ?? '').trim());
   const [phone, setPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState(paymentOptions[0] ?? null);
@@ -35,11 +36,13 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const inputCls =
+    'w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50';
+
   const mapErrorMessage = (err) => {
     const code = err?.code ?? '';
     const msg = String(err?.message ?? '');
 
-    // Firebase někdy prefixuje "Firebase: " / "functions/" — necháme čitelný text
     const clean = msg
       .replace(/^Firebase:\s*/i, '')
       .replace(/^functions\/[a-z-]+:\s*/i, '')
@@ -101,6 +104,7 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
         playerName: name,
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
+        csoPlayerId,
         paymentMethod: paymentMethod ?? null,
         termsAccepted: requiresTerms ? termsAccepted : false,
       });
@@ -111,6 +115,7 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
         phone: phone.trim() || null,
         paymentMethod: paymentMethod ?? null,
         amount: entryFee,
+        csoPlayerId,
       });
     } catch (err) {
       setError(mapErrorMessage(err));
@@ -121,20 +126,23 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
-          {t('preregPlayerName')} *
-        </label>
-        <input
-          type="text"
-          value={playerName}
-          onChange={(e) => setPlayerName(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-          placeholder={t('tournPlayerPlaceholder')}
-          autoComplete="name"
-          disabled={loading}
-        />
-      </div>
+      <CsoPlayerNameField
+        lang={lang}
+        playerName={playerName}
+        onPlayerNameChange={setPlayerName}
+        csoRank=""
+        onCsoRankChange={() => {}}
+        onCsoPlayerIdChange={setCsoPlayerId}
+        inputClassName={inputCls}
+        disabled={loading}
+        showRankingField={false}
+        showAdminControls={false}
+        nullableRecreationalId
+      />
+      <p className="text-xs text-slate-500 -mt-2">
+        {t('preregCsoRecreationalHint') ||
+          'Pokud nejste v žebříčku ČŠO, zadejte jméno ručně — registrace proběhne bez ČŠO ID.'}
+      </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
@@ -145,7 +153,7 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            className={inputCls}
             autoComplete="email"
             disabled={loading}
           />
@@ -158,7 +166,7 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            className={inputCls}
             autoComplete="tel"
             disabled={loading}
           />

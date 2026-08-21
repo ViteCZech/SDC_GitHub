@@ -17,7 +17,7 @@ function BoardQrModal({ lang, board, url, online, connected, onClose }) {
   const t = (k) => translations[lang]?.[k] ?? k;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-black/70">
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4 bg-black/70">
       <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -65,8 +65,54 @@ function BoardQrModal({ lang, board, url, online, connected, onClose }) {
   );
 }
 
+function BoardGrid({ lang, boards, boardStatuses, tokens, onOpenBoard }) {
+  const t = (k) => translations[lang]?.[k] ?? k;
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      {boards.map((board) => {
+        const online = isBoardOnline(boardStatuses, board);
+        const token = tokens[String(board)];
+        return (
+          <button
+            key={board}
+            type="button"
+            onClick={() => {
+              if (!token) return;
+              onOpenBoard(board);
+            }}
+            disabled={!token}
+            className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all active:scale-95 ${
+              online
+                ? 'border-emerald-500/60 bg-emerald-900/25'
+                : 'border-slate-700 bg-slate-800 hover:border-emerald-500/40'
+            }`}
+          >
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
+              {(t('tabletQrBoardLabel') || 'Terč {n}').replace('{n}', String(board))}
+            </span>
+            {online ? (
+              <span className="flex items-center gap-1 text-emerald-400 text-xs font-bold">
+                <Wifi className="w-4 h-4" />
+                {t('tabletQrStatusOnline') || 'Online'}
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-slate-500 text-xs font-bold">
+                <WifiOff className="w-4 h-4" />
+                {t('tabletQrStatusOffline') || 'Offline'}
+              </span>
+            )}
+            <QrCode className="w-5 h-5 text-emerald-400 mt-1" />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
- * Admin panel: QR kódy pro terče + real-time potvrzení připojení.
+ * Admin: QR kódy pro terče + real-time potvrzení připojení.
+ * @param {{ compact?: boolean }} props — compact = ikona v menu, panel v modalu
  */
 export default function TabletBoardQrPanel({
   lang = 'cs',
@@ -74,8 +120,10 @@ export default function TabletBoardQrPanel({
   tournamentData,
   onNotify,
   onEnsureTokens,
+  compact = false,
 }) {
   const t = (k) => translations[lang]?.[k] ?? k;
+  const [panelOpen, setPanelOpen] = useState(false);
   const [boardStatuses, setBoardStatuses] = useState({});
   const [openBoard, setOpenBoard] = useState(null);
   const [connectedBoard, setConnectedBoard] = useState(null);
@@ -150,6 +198,94 @@ export default function TabletBoardQrPanel({
   if (totalBoards <= 0) return null;
 
   const boards = Array.from({ length: totalBoards }, (_, i) => i + 1);
+  const onlineCount = boards.filter((b) => isBoardOnline(boardStatuses, b)).length;
+
+  const handleOpenBoard = (board) => {
+    setConnectedBoard(null);
+    setOpenBoard(board);
+  };
+
+  const boardQrModal =
+    openBoard != null && tokens[String(openBoard)] ? (
+      <BoardQrModal
+        lang={lang}
+        board={openBoard}
+        url={buildTabletBoardQrUrl({
+          pin: String(pin),
+          board: openBoard,
+          token: tokens[String(openBoard)],
+        })}
+        online={isBoardOnline(boardStatuses, openBoard)}
+        connected={connectedBoard === openBoard}
+        onClose={() => {
+          setOpenBoard(null);
+          setConnectedBoard(null);
+        }}
+      />
+    ) : null;
+
+  if (compact) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setPanelOpen(true)}
+          className="relative p-2 rounded-lg bg-slate-800 border border-slate-700 text-emerald-400 hover:text-emerald-300 hover:bg-slate-700 transition-colors"
+          title={t('tabletQrOpenMenu') || 'Terče / QR kódy pro tablety'}
+          aria-label={t('tabletQrOpenMenu') || 'Terče / QR kódy pro tablety'}
+        >
+          <QrCode className="w-4 h-4" />
+          {onlineCount > 0 ? (
+            <span className="absolute -top-1 -right-1 min-w-[1rem] h-4 px-1 rounded-full bg-emerald-500 text-[9px] font-black text-white flex items-center justify-center">
+              {onlineCount}
+            </span>
+          ) : null}
+        </button>
+
+        {panelOpen ? (
+          <div
+            className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-black/70"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setPanelOpen(false)}
+          >
+            <div
+              className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-widest text-emerald-400">
+                    {t('tabletQrSectionTitle') || 'Terče / Tablety'}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {t('tabletQrSectionHint') ||
+                      'Zobrazte QR kód pro daný terč. Po naskenování tabletu uvidíte okamžité potvrzení připojení.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPanelOpen(false)}
+                  className="p-2 text-slate-400 hover:text-white shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <BoardGrid
+                lang={lang}
+                boards={boards}
+                boardStatuses={boardStatuses}
+                tokens={tokens}
+                onOpenBoard={handleOpenBoard}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {boardQrModal}
+      </>
+    );
+  }
 
   return (
     <>
@@ -164,64 +300,15 @@ export default function TabletBoardQrPanel({
           {t('tabletQrSectionHint') ||
             'Zobrazte QR kód pro daný terč. Po naskenování tabletu uvidíte okamžité potvrzení připojení.'}
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-          {boards.map((board) => {
-            const online = isBoardOnline(boardStatuses, board);
-            const token = tokens[String(board)];
-            return (
-              <button
-                key={board}
-                type="button"
-                onClick={() => {
-                  if (!token) return;
-                  setConnectedBoard(null);
-                  setOpenBoard(board);
-                }}
-                disabled={!token}
-                className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all active:scale-95 ${
-                  online
-                    ? 'border-emerald-500/60 bg-emerald-900/25'
-                    : 'border-slate-700 bg-slate-800 hover:border-emerald-500/40'
-                }`}
-              >
-                <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                  {(t('tabletQrBoardLabel') || 'Terč {n}').replace('{n}', String(board))}
-                </span>
-                {online ? (
-                  <span className="flex items-center gap-1 text-emerald-400 text-xs font-bold">
-                    <Wifi className="w-4 h-4" />
-                    {t('tabletQrStatusOnline') || 'Online'}
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-slate-500 text-xs font-bold">
-                    <WifiOff className="w-4 h-4" />
-                    {t('tabletQrStatusOffline') || 'Offline'}
-                  </span>
-                )}
-                <QrCode className="w-5 h-5 text-emerald-400 mt-1" />
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {openBoard != null && tokens[String(openBoard)] ? (
-        <BoardQrModal
+        <BoardGrid
           lang={lang}
-          board={openBoard}
-          url={buildTabletBoardQrUrl({
-            pin: String(pin),
-            board: openBoard,
-            token: tokens[String(openBoard)],
-          })}
-          online={isBoardOnline(boardStatuses, openBoard)}
-          connected={connectedBoard === openBoard}
-          onClose={() => {
-            setOpenBoard(null);
-            setConnectedBoard(null);
-          }}
+          boards={boards}
+          boardStatuses={boardStatuses}
+          tokens={tokens}
+          onOpenBoard={handleOpenBoard}
         />
-      ) : null}
+      </section>
+      {boardQrModal}
     </>
   );
 }

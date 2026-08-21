@@ -226,6 +226,8 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
       'Máte zapnuté herní tablety — vyplňte heslo pro ně (1–5 znaků, nesmí být stejné jako PIN). Bez toho nelze pokračovat do dalšího kroku.',
     tournTabletPasswordInvalid: 'Heslo pro herní tablety musí mít 1–5 znaků a nesmí být stejné jako PIN.',
     tournTabletPasswordDistinct: 'Heslo nesmí být stejné jako PIN turnaje.',
+    preregCsoRecreationalHint:
+      'Pokud nejste v žebříčku ČŠO, zadejte jméno ručně — registrace proběhne bez ČŠO ID.',
     tabletQrSectionTitle: 'Terče / Tablety',
     tabletQrSectionHint:
       'Zobrazte QR kód pro daný terč. Po naskenování tabletu uvidíte okamžité potvrzení připojení.',
@@ -237,6 +239,7 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     tabletQrStatusOffline: 'Offline',
     tabletQrConnectedSuccess: 'Terč {n} úspěšně připojen!',
     tabletQrAlreadyOnline: 'Tablet je již online',
+    tabletQrOpenMenu: 'Terče / QR kódy pro tablety',
     tournPinTapShowPassword: 'Klepnutím zobrazíte heslo pro herní tablety',
     tournFormat: 'Formát turnaje', tournFormatGroupsKo: 'Skupiny + KO Pavouk', tournFormatKoOnly: 'Pouze KO Pavouk',
     formatGroupsBracket: 'Skupiny a Pavouk',
@@ -963,6 +966,8 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
       'Game tablets are enabled — set a password for them (1–5 characters, must differ from the PIN). You cannot continue without it.',
     tournTabletPasswordInvalid: 'Game-tablet password must be 1–5 characters and must not match the PIN.',
     tournTabletPasswordDistinct: 'Password must not be the same as the tournament PIN.',
+    preregCsoRecreationalHint:
+      'If you are not in the CSO ranking, enter your name manually — registration will proceed without a CSO ID.',
     tabletQrSectionTitle: 'Boards / Tablets',
     tabletQrSectionHint:
       'Show the QR code for a board. After the tablet scans it, you will get instant connection confirmation.',
@@ -973,6 +978,7 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     tabletQrStatusOffline: 'Offline',
     tabletQrConnectedSuccess: 'Board {n} connected successfully!',
     tabletQrAlreadyOnline: 'Tablet is already online',
+    tabletQrOpenMenu: 'Boards / QR codes for tablets',
     tournPinTapShowPassword: 'Tap to show the game-tablet password',
     tournFormat: 'Tournament format', tournFormatGroupsKo: 'Groups + KO Bracket', tournFormatKoOnly: 'KO Bracket only',
     formatGroupsBracket: 'Groups & Bracket',
