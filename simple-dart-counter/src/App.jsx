@@ -12,6 +12,7 @@ import {
   updateCloudMatchFromTablet,
   mergeAdminGroupMatchesFromTabletCloud,
   mergeAdminBracketFromTabletCloud,
+  registerTabletBoardOnline,
 } from './services/tournamentSync';
 import { cancelOnlineGame, getOnlineGameById, abandonOnlineGameSession } from './services/onlineGamesService';
 import {
@@ -44,6 +45,7 @@ import TournamentGroupsView from './components/TournamentGroupsView';
 import TournamentBracketView from './components/TournamentBracketView';
 import TournamentStatisticsView from './components/TournamentStatisticsView';
 import TabletWaitingRoom from './components/TabletWaitingRoom';
+import TabletBoardQrPanel from './components/TabletBoardQrPanel';
 import TournamentHistory from './components/TournamentHistory';
 import PublicTournamentPage from './components/prereg/PublicTournamentPage';
 import PublicTournamentDirectory from './components/prereg/PublicTournamentDirectory';
@@ -55,6 +57,7 @@ import PauseMenuOverlay from './components/PauseMenuOverlay';
 import ActiveSessionBanner from './components/ActiveSessionBanner';
 import { resolveAppNav, shouldParkTournamentSession } from './utils/appNavigation';
 import { parsePreregRouteFromUrl, isPublicTournamentCatalogPath } from './utils/preregAdmin';
+import { parseTabletRouteFromUrl, ensureBoardAuthTokens } from './utils/tabletBoardQr';
 import { loadAdminInviteSession, saveAdminInviteSession } from './utils/preregStorage';
 import {
   verifyAdminInviteToken,
@@ -138,8 +141,9 @@ const SESSION_ROLE_KEY = 'dartsSessionRole';
 const SESSION_PIN_KEY = 'dartsSessionPin';
 const SESSION_BOARD_KEY = 'dartsSessionBoard';
 const SESSION_TABLET_PW_KEY = 'dartsSessionTabletPw';
+const SESSION_BOARD_TOKEN_KEY = 'dartsSessionBoardToken';
 
-function persistSpectatorSession(role, pin, boardStr = '', tabletPassword = '') {
+function persistSpectatorSession(role, pin, boardStr = '', tabletPassword = '', boardToken = '') {
   if (role !== 'viewer' && role !== 'tablet') return;
   const p = String(pin ?? '').trim();
   if (!/^\d{4}$/.test(p)) return;
@@ -147,12 +151,20 @@ function persistSpectatorSession(role, pin, boardStr = '', tabletPassword = '') 
   safeStorage.setItem(SESSION_PIN_KEY, p);
   if (role === 'tablet') {
     safeStorage.setItem(SESSION_BOARD_KEY, String(boardStr ?? '').trim());
+    const bt = String(boardToken ?? '').trim();
     const tp = String(tabletPassword ?? '').trim().slice(0, 5);
-    if (tp) safeStorage.setItem(SESSION_TABLET_PW_KEY, tp);
-    else safeStorage.removeItem(SESSION_TABLET_PW_KEY);
+    if (bt) {
+      safeStorage.setItem(SESSION_BOARD_TOKEN_KEY, bt);
+      safeStorage.removeItem(SESSION_TABLET_PW_KEY);
+    } else {
+      safeStorage.removeItem(SESSION_BOARD_TOKEN_KEY);
+      if (tp) safeStorage.setItem(SESSION_TABLET_PW_KEY, tp);
+      else safeStorage.removeItem(SESSION_TABLET_PW_KEY);
+    }
   } else {
     safeStorage.removeItem(SESSION_BOARD_KEY);
     safeStorage.removeItem(SESSION_TABLET_PW_KEY);
+    safeStorage.removeItem(SESSION_BOARD_TOKEN_KEY);
   }
 }
 
@@ -161,6 +173,7 @@ function clearSpectatorSession() {
   safeStorage.removeItem(SESSION_PIN_KEY);
   safeStorage.removeItem(SESSION_BOARD_KEY);
   safeStorage.removeItem(SESSION_TABLET_PW_KEY);
+  safeStorage.removeItem(SESSION_BOARD_TOKEN_KEY);
 }
 
 function loadStoredTabletPassword() {
@@ -169,6 +182,33 @@ function loadStoredTabletPassword() {
   } catch {
     return '';
   }
+}
+
+function loadStoredBoardAuthToken() {
+  try {
+    return String(safeStorage.getItem(SESSION_BOARD_TOKEN_KEY) ?? '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function loadStoredTabletBoard() {
+  try {
+    return String(safeStorage.getItem(SESSION_BOARD_KEY) ?? '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function tabletCloudAuthOpts() {
+  const boardToken = loadStoredBoardAuthToken();
+  if (boardToken) {
+    return {
+      board: loadStoredTabletBoard(),
+      boardToken,
+    };
+  }
+  return { tabletPassword: loadStoredTabletPassword() };
 }
 
 function writeTournamentWip(pin) {
@@ -1516,11 +1556,67 @@ function AppMain({ lang, setLang }) {
   showNotificationRef.current = showNotification;
   const tRef = useRef(t);
   tRef.current = t;
+
+  /** Deep-link /tablet?t=PIN&board=N&token=… — automatické připojení herního tabletu. */
+  const tabletQrHandledRef = useRef(false);
+  useEffect(() => {
+    const tabletRoute = parseTabletRouteFromUrl();
+    if (!tabletRoute) return;
+    if (tabletQrHandledRef.current) return;
+    tabletQrHandledRef.current = true;
+
+    const run = async () => {
+      const { pin, board, token } = tabletRoute;
+      const access = await verifyTabletBoardAccess(pin, '', { board, boardToken: token });
+      if (!access.ok) {
+        showNotificationRef.current(
+          access.reason === 'bad_password'
+            ? tRef.current('tournamentHub.invalidTabletPassword')
+            : tRef.current('tournamentHub.invalidPin'),
+          'error'
+        );
+        window.history.replaceState(null, '', '/');
+        return;
+      }
+      try {
+        await registerTabletBoardOnline(pin, board, token);
+      } catch (err) {
+        console.warn('registerTabletBoardOnline:', err);
+        showNotificationRef.current(
+          String(err?.message || tRef.current('tournamentHub.syncError') || 'Chyba synchronizace s cloudem.'),
+          'error'
+        );
+      }
+      setTournamentData(null);
+      setTournamentMatches([]);
+      setTournamentBracket([]);
+      setTournamentMatchContext(null);
+      setActivePin(pin);
+      setUserRole('tablet');
+      setTournamentDraft((prev) => ({ ...prev, hubTabletBoard: board }));
+      persistSpectatorSession('tablet', pin, board, '', token);
+      setAppState('tournament_tablet');
+      window.history.replaceState(null, '', '/');
+    };
+    void run();
+  }, []);
   useEffect(() => {
     if (!startupStorageError) return;
     showNotification(startupStorageError, 'error');
     setStartupStorageError(null);
   }, [startupStorageError]);
+
+  const handleEnsureBoardAuthTokens = React.useCallback((nextTd) => {
+    if (!nextTd?.boardAuthTokens) return;
+    setTournamentData((prev) => {
+      if (!prev || prev.boardAuthTokens) return prev;
+      const merged = { ...prev, boardAuthTokens: nextTd.boardAuthTokens };
+      try {
+        safeStorage.setItem('dartsTournamentData', JSON.stringify(merged));
+      } catch {}
+      return merged;
+    });
+  }, []);
 
   // Globální confirm modal (nahrazuje window.confirm)
   const [confirmState, setConfirmState] = useState(null); // { message, onConfirm, confirmLabel?, cancelLabel?, title? }
@@ -3442,7 +3538,7 @@ function AppMain({ lang, setLang }) {
         am.matchType,
         am.matchId ?? am.id,
         { tabletStatus: 'checked_in' },
-        { tabletPassword: loadStoredTabletPassword() }
+        tabletCloudAuthOpts()
       );
     } catch (err) {
       console.warn('Tablet check-in cloud sync', err);
@@ -3480,7 +3576,7 @@ function AppMain({ lang, setLang }) {
           tabletTimeoutRoleWarningCounts: roleCounts,
           tabletCheckInResume: null,
         },
-        { tabletPassword: loadStoredTabletPassword() }
+        tabletCloudAuthOpts()
       );
     } catch (err) {
       console.warn('Tablet timeout warning sync', err);
@@ -3592,7 +3688,7 @@ function AppMain({ lang, setLang }) {
             whoStarts: startingPlayerId,
             tabletStatus: 'ready_to_play',
           },
-          { tabletPassword: loadStoredTabletPassword() }
+          tabletCloudAuthOpts()
         );
       } catch (err) {
         console.warn('Tablet start sync', err);
@@ -4228,7 +4324,7 @@ function AppMain({ lang, setLang }) {
                         tmt === 'bracket' ? 'bracket' : 'group',
                         mid,
                         completedPatch,
-                        { tabletPassword: loadStoredTabletPassword() }
+                        tabletCloudAuthOpts()
                       );
                     } catch (err) {
                       console.error('KRITICKÁ CHYBA PŘI ULOŽENÍ ZÁPASU:', err);
@@ -5281,7 +5377,7 @@ function AppMain({ lang, setLang }) {
                 [],
                 data.prelimLegs ?? null
               );
-              const withId = {
+              const withId = ensureBoardAuthTokens({
                 ...data,
                 players: playersWithIds,
                 pin: generatedPin,
@@ -5293,7 +5389,7 @@ function AppMain({ lang, setLang }) {
                 advancePerGroup: 'all',
                 promotersCount: 'all',
                 status: 'bracket',
-              };
+              });
               setActivePin(generatedPin);
               setTournamentData(withId);
               setTournamentMatches([]);
@@ -5309,12 +5405,12 @@ function AppMain({ lang, setLang }) {
               return;
             }
 
-            const withId = {
+            const withId = ensureBoardAuthTokens({
               ...data,
               players: playersWithIds,
               pin: generatedPin,
               tournamentId,
-            };
+            });
             setActivePin(generatedPin);
             setTournamentData(withId);
             try {
@@ -5373,13 +5469,14 @@ function AppMain({ lang, setLang }) {
           }}
           lang={lang}
           onComplete={(data) => {
-            setTournamentData(data);
+            const nextData = ensureBoardAuthTokens(data);
+            setTournamentData(nextData);
             const boardAssignments = {};
             for (const g of data?.groups ?? []) {
               boardAssignments[g.groupId] = Array.isArray(g.boards) && g.boards.length > 0 ? g.boards.join(', ') : '';
             }
             setTournamentDraft((prev) => ({ ...prev, boardAssignments }));
-            try { safeStorage.setItem('dartsTournamentData', JSON.stringify(data)); } catch {}
+            try { safeStorage.setItem('dartsTournamentData', JSON.stringify(nextData)); } catch {}
             setAppState('tournament_groups');
           }}
           onBack={() => setAppState('tournament_setup')}
@@ -5425,11 +5522,27 @@ function AppMain({ lang, setLang }) {
           onStartMatch={handleStartTournamentMatch}
           onResetMatch={handleResetMatch}
           onWithdrawPlayer={handleWithdrawPlayer}
+          tabletQrPin={activePin}
+          onEnsureBoardAuthTokens={handleEnsureBoardAuthTokens}
+          onNotify={showNotification}
         />
       )}
 
       {appState === 'tournament_bracket' && tournamentData && (
         <main className="flex flex-col flex-1 w-full overflow-y-auto bg-slate-950 p-4 pb-24">
+          {userRole === 'admin' &&
+          tournamentData?.cloudEnabled &&
+          /^\d{4}$/.test(String(activePin ?? '').trim()) ? (
+            <div className="w-full max-w-[98vw] xl:max-w-7xl mx-auto mb-4">
+              <TabletBoardQrPanel
+                lang={lang}
+                pin={activePin}
+                tournamentData={tournamentData}
+                onNotify={showNotification}
+                onEnsureTokens={handleEnsureBoardAuthTokens}
+              />
+            </div>
+          ) : null}
           <TournamentBracketView
             bracketData={tournamentBracket}
             tournamentData={tournamentData}

@@ -15,10 +15,33 @@ type MatchType = 'group' | 'bracket';
 type SubmitPayload = {
   pin?: string;
   tabletPassword?: string;
+  board?: string | number;
+  boardToken?: string;
   matchType?: MatchType;
   matchId?: string;
   matchUpdates?: Record<string, unknown>;
 };
+
+function validateTabletAuth(
+  td: { boardAuthTokens?: Record<string, string>; tabletPassword?: string } | null,
+  board: string,
+  boardToken: string,
+  tabletPassword: string
+): boolean {
+  const token = String(boardToken ?? '').trim();
+  if (board && token) {
+    const tokens = td?.boardAuthTokens;
+    if (tokens && typeof tokens === 'object' && tokens[board] != null) {
+      return String(tokens[board]).trim() === token;
+    }
+  }
+
+  const expected =
+    td && td.tabletPassword != null ? String(td.tabletPassword).trim().slice(0, 5) : '';
+  if (expected === '') return true;
+  const provided = String(tabletPassword ?? '').trim().slice(0, 5);
+  return provided !== '' && provided === expected;
+}
 
 function cloneJsonSafe<T>(value: T, fallback: T): T {
   try {
@@ -145,14 +168,15 @@ export const submitTabletMatchUpdate = onCall(
     }
 
     const raw = snap.data() ?? {};
-    const td = (raw.tournamentData ?? null) as { tabletPassword?: string } | null;
-    const expected =
-      td && td.tabletPassword != null ? String(td.tabletPassword).trim().slice(0, 5) : '';
-    if (expected !== '') {
-      const provided = String(data.tabletPassword ?? '').trim().slice(0, 5);
-      if (provided !== expected) {
-        throw new HttpsError('permission-denied', 'Neplatné heslo pro herní tablet.');
-      }
+    const td = (raw.tournamentData ?? null) as {
+      tabletPassword?: string;
+      boardAuthTokens?: Record<string, string>;
+    } | null;
+    const board = String(data.board ?? '').replace(/\D/g, '').slice(0, 2);
+    const boardToken = String(data.boardToken ?? '').trim();
+    const tabletPassword = String(data.tabletPassword ?? '').trim().slice(0, 5);
+    if (!validateTabletAuth(td, board, boardToken, tabletPassword)) {
+      throw new HttpsError('permission-denied', 'Neplatné heslo pro herní tablet.');
     }
 
     let groupMatches: unknown[] = Array.isArray(raw.groupMatches)

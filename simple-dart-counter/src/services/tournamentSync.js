@@ -240,6 +240,37 @@ export async function archivePastTournamentAndDeleteActive(userId, pin, name, fu
  * @param {Record<string, unknown>} matchUpdates
  * @param {{ tabletPassword?: string }} [opts]
  */
+/**
+ * Tablet: označí terč jako online po naskenování QR (Cloud Function, bez Google loginu).
+ * @param {string} pin
+ * @param {string|number} board
+ * @param {string} token
+ */
+export async function registerTabletBoardOnline(pin, board, token) {
+  if (!app) throw new Error('Firebase app není dostupná.');
+  const id = String(pin ?? '').trim();
+  if (!/^\d{4}$/.test(id)) throw new Error('Neplatný PIN turnaje.');
+  const boardStr = String(board ?? '').replace(/\D/g, '').slice(0, 2);
+  const boardNum = parseInt(boardStr, 10);
+  if (!Number.isFinite(boardNum) || boardNum < 1) throw new Error('Neplatné číslo terče.');
+  const authToken = String(token ?? '').trim();
+  if (!authToken) throw new Error('Chybí autorizační token.');
+
+  const functions = getFunctions(app, FUNCTIONS_REGION);
+  const fn = httpsCallable(functions, 'registerTabletBoardOnline');
+  try {
+    await fn({ pin: id, board: boardStr, token: authToken });
+  } catch (err) {
+    const message =
+      err && typeof err === 'object' && 'message' in err ? String(err.message) : '';
+    const clean = message
+      .replace(/^Firebase:\s*/i, '')
+      .replace(/^functions\/[a-z-]+:\s*/i, '')
+      .trim();
+    throw new Error(clean || 'Nepodařilo se potvrdit připojení tabletu.');
+  }
+}
+
 export async function updateCloudMatchFromTablet(pin, matchType, matchId, matchUpdates, opts = {}) {
   if (!app) throw new Error('Firebase app není dostupná.');
   const id = String(pin ?? '').trim();
@@ -263,6 +294,8 @@ export async function updateCloudMatchFromTablet(pin, matchType, matchId, matchU
       matchId: mid,
       matchUpdates: patches,
       tabletPassword: String(opts.tabletPassword ?? '').trim().slice(0, 5) || undefined,
+      board: opts.board != null ? String(opts.board).replace(/\D/g, '').slice(0, 2) : undefined,
+      boardToken: String(opts.boardToken ?? '').trim() || undefined,
     });
   } catch (err) {
     const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
@@ -557,7 +590,7 @@ export async function verifyTournamentPin(pin) {
  * @param {string} [tabletPassword]
  * @returns {Promise<{ ok: boolean, reason?: 'not_found'|'bad_password'|'error' }>}
  */
-export async function verifyTabletBoardAccess(pin, tabletPassword) {
+export async function verifyTabletBoardAccess(pin, tabletPassword, opts = {}) {
   if (!db || !pin) return { ok: false, reason: 'error' };
   const id = String(pin).trim();
   if (!/^\d{4}$/.test(id)) return { ok: false, reason: 'not_found' };
@@ -568,6 +601,15 @@ export async function verifyTabletBoardAccess(pin, tabletPassword) {
     if (!exists) return { ok: false, reason: 'not_found' };
     const raw = docSnap.data();
     const td = raw?.tournamentData;
+    const board = String(opts.board ?? '').replace(/\D/g, '').slice(0, 2);
+    const boardToken = String(opts.boardToken ?? '').trim();
+    if (board && boardToken) {
+      const tokens = td?.boardAuthTokens;
+      if (tokens && typeof tokens === 'object' && tokens[board] != null) {
+        if (String(tokens[board]).trim() === boardToken) return { ok: true };
+        return { ok: false, reason: 'bad_password' };
+      }
+    }
     const expected =
       td && td.tabletPassword != null ? String(td.tabletPassword).trim().slice(0, 5) : '';
     if (expected === '') return { ok: true };
