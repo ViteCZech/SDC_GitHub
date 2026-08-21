@@ -30,6 +30,36 @@ function distinctBoardNumbers(boardInputs, groups, totalBoardsCap) {
   return set;
 }
 
+/** Mapa terč → seznam groupId, které ho používají. */
+function boardToGroupsMap(boardInputs, groups, totalBoardsCap = 0) {
+  const map = new Map();
+  for (const g of groups) {
+    const raw = boardInputs[g.groupId] ?? boardInputs[String(g.groupId)] ?? '';
+    for (const b of parseBoardInput(raw)) {
+      if (totalBoardsCap > 0 && b > totalBoardsCap) continue;
+      if (!map.has(b)) map.set(b, []);
+      map.get(b).push(g.groupId);
+    }
+  }
+  return map;
+}
+
+function findSharedBoards(boardInputs, groups, totalBoardsCap = 0) {
+  const entries = [];
+  for (const [board, groupIds] of boardToGroupsMap(boardInputs, groups, totalBoardsCap)) {
+    if (groupIds.length > 1) entries.push({ board, groupIds: [...groupIds].sort() });
+  }
+  entries.sort((a, b) => a.board - b.board);
+  return entries;
+}
+
+function groupSharedBoards(boardInputs, groupId, groups, totalBoardsCap = 0) {
+  const mine = parseBoardInput(boardInputs[groupId] ?? '');
+  if (mine.length === 0) return [];
+  const map = boardToGroupsMap(boardInputs, groups, totalBoardsCap);
+  return mine.filter((b) => (map.get(b)?.length ?? 0) > 1);
+}
+
 function groupInputIsEmpty(boardInputs, groupId) {
   const raw = String(boardInputs[groupId] ?? '').trim();
   if (raw === '') return true;
@@ -69,6 +99,7 @@ export default function TournamentBoardAssignment({
   const [boardInputs, setBoardInputs] = useState({});
   const [validationError, setValidationError] = useState('');
   const [boardInputErrors, setBoardInputErrors] = useState({});
+  const [dupConfirmOpen, setDupConfirmOpen] = useState(false);
   const totalBoards = Number(tournamentData?.totalBoards ?? tournamentData?.numBoards ?? 0) || 0;
 
   const distinctUsed = useMemo(
@@ -76,6 +107,15 @@ export default function TournamentBoardAssignment({
     [boardInputs, groups, totalBoards]
   );
   const distinctCount = distinctUsed.size;
+
+  const sharedBoards = useMemo(
+    () => findSharedBoards(boardInputs, groups, totalBoards),
+    [boardInputs, groups, totalBoards]
+  );
+  const sharedBoardNumberSet = useMemo(
+    () => new Set(sharedBoards.map((s) => s.board)),
+    [sharedBoards]
+  );
 
   const capacityReached =
     totalBoards > 0 && distinctCount >= totalBoards && groups.some((g) => groupInputIsEmpty(boardInputs, g.groupId));
@@ -157,8 +197,9 @@ export default function TournamentBoardAssignment({
     handleBoardChange(groupId, next);
   };
 
-  const validateAndSubmit = () => {
+  const validateAndSubmit = (forceDupOk = false) => {
     setValidationError('');
+    setDupConfirmOpen(false);
     const hasInputErrors = Object.values(boardInputErrors).some(Boolean);
     if (hasInputErrors) {
       setValidationError(t('tournBoardErrFixRange') || 'Opravte neplatná čísla terčů před pokračováním.');
@@ -171,6 +212,10 @@ export default function TournamentBoardAssignment({
             'Současně je použito více než {n} různých terčů. Upravte přiřazení.'
         ).replace(/\{n\}/g, String(totalBoards))
       );
+      return;
+    }
+    if (!forceDupOk && sharedBoards.length > 0) {
+      setDupConfirmOpen(true);
       return;
     }
     const groupBoards = {};
@@ -250,10 +295,33 @@ export default function TournamentBoardAssignment({
                 ).replace(/\{n\}/g, String(totalBoards))}
               </div>
             ) : null}
+            {sharedBoards.length > 0 && (
+              <div
+                className="mt-2 p-3 rounded-lg bg-amber-950/50 border border-amber-500/40 text-amber-100 text-sm"
+                role="alert"
+              >
+                <p className="font-bold mb-1.5">
+                  {t('tournBoardDupBanner') || 'Upozornění — stejný terč u více skupin:'}
+                </p>
+                <ul className="space-y-1 text-xs font-mono">
+                  {sharedBoards.map(({ board, groupIds }) => (
+                    <li key={board}>
+                      {(t('tournBoardDupWarningLine') || 'Terč {board}: Skupiny {groups}')
+                        .replace(/\{board\}/g, String(board))
+                        .replace(/\{groups\}/g, groupIds.join(', '))}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-[11px] text-amber-200/80 mt-2 leading-snug">
+                  {t('tournBoardDupHint') ||
+                    'Sdílení terče je v pořádku při střídání (skupiny nehrají současně). Při spuštění turnaje budete vyzváni k potvrzení.'}
+                </p>
+              </div>
+            )}
           </div>
           <div className="hidden md:flex items-center gap-2 shrink-0">
             <button
-              onClick={validateAndSubmit}
+              onClick={() => validateAndSubmit()}
               className={`${btnBase} bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500`}
             >
               {t('tournStartTournament') || 'Spustit turnaj'}
@@ -270,6 +338,7 @@ export default function TournamentBoardAssignment({
               distinctCount >= totalBoards &&
               groupInputIsEmpty(boardInputs, gid);
             const displayValue = boardInputs[gid] ?? '';
+            const sharedHere = groupSharedBoards(boardInputs, gid, groups, totalBoards);
             return (
             <div
               key={gid}
@@ -326,17 +395,26 @@ export default function TournamentBoardAssignment({
                       {boardInputErrors[gid]}
                     </p>
                   )}
+                  {!boardInputErrors[gid] && sharedHere.length > 0 && (
+                    <p className="mt-1 text-xs text-amber-400 font-bold">
+                      {(t('tournBoardDupFieldHint') || 'Terč {boards} sdílíte s jinou skupinou — ověřte střídání.')
+                        .replace(/\{boards\}/g, sharedHere.join(', '))}
+                    </p>
+                  )}
                   {totalBoards > 0 && !fieldLocked && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {Array.from({ length: totalBoards }, (_, i) => i + 1).map((b) => {
                         const selected = parseBoardInput(displayValue).includes(b);
+                        const isShared = selected && sharedBoardNumberSet.has(b);
                         return (
                           <button
                             key={b}
                             type="button"
                             onClick={() => toggleBoardChip(gid, b, fieldLocked)}
                             className={`min-w-[40px] min-h-[36px] px-2 rounded-lg text-sm font-bold font-mono border transition-colors ${
-                              selected
+                              isShared
+                                ? 'bg-amber-600 border-amber-400 text-white'
+                                : selected
                                 ? 'bg-emerald-600 border-emerald-500 text-white'
                                 : 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white'
                             }`}
@@ -365,13 +443,55 @@ export default function TournamentBoardAssignment({
       <StickyActionBar>
         <button
           type="button"
-          onClick={validateAndSubmit}
+          onClick={() => validateAndSubmit()}
           className={`${btnBase} w-full bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500`}
         >
           {t('tournStartTournament') || 'Spustit turnaj'}
           <ArrowRight className="w-5 h-5" />
         </button>
       </StickyActionBar>
+
+      {dupConfirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="board-dup-confirm-title"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-amber-500/50 p-5 shadow-xl">
+            <h3 id="board-dup-confirm-title" className="text-lg font-black text-amber-300 mb-2">
+              {t('tournBoardDupConfirmTitle') || 'Sdílený terč mezi skupinami'}
+            </h3>
+            <p className="text-sm text-slate-300 mb-3">
+              {t('tournBoardDupConfirmMessage') ||
+                'Některé terče jsou přiřazeny více skupinám. Skupiny by se měly střídat, ne hrát souběžně na stejném terči.'}
+            </p>
+            <ul className="text-xs font-mono text-amber-200/90 mb-4 space-y-1">
+              {sharedBoards.map(({ board, groupIds }) => (
+                <li key={board}>
+                  T{board} → {t('tournGroup') || 'Skupina'} {groupIds.join(', ')}
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={() => setDupConfirmOpen(false)}
+                className={`${btnBase} flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200`}
+              >
+                {t('cancel') || 'Zrušit'}
+              </button>
+              <button
+                type="button"
+                onClick={() => validateAndSubmit(true)}
+                className={`${btnBase} flex-1 bg-amber-600 hover:bg-amber-500 text-white border-amber-500`}
+              >
+                {t('tournBoardDupConfirmProceed') || 'Spustit i přesto'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
