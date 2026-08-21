@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Settings, Play, ClipboardList, Lock, Unlock, X, Pencil, Flag, Bell } from 'lucide-react';
 import { translations } from '../translations';
-import { getBracketWinLegsForRound, getRoundBusyPlayerIds, isBracketRefereePlaceholder, suggestRefereeIdsForBracketMatch } from '../utils/tournamentLogic';
+import { getBracketWinLegsForRound, getRoundBusyPlayerIds, isBracketRefereePlaceholder, suggestRefereeIdsForBracketMatch, resolveBracketRefereePlaceholder, countBracketJitStats } from '../utils/tournamentLogic';
 import { AdminTapTextField } from './AdminTapField';
 
 const BYE_MARKER = 'Volný los';
@@ -181,6 +181,14 @@ export default function TournamentBracketView({
   const formatSummary = `${startScore} ${outLabel}, ${legsPhrase}`;
 
   const activeRoundTitle = getRoundName(activeRoundIndex, totalRounds, t, prelimLegs);
+
+  const bracketQueueStats = useMemo(() => {
+    const boards =
+      Number(
+        tournamentData?.boardsCount ?? tournamentData?.totalBoards ?? tournamentData?.numBoards
+      ) || 1;
+    return countBracketJitStats(bracketData, boards);
+  }, [bracketData, tournamentData?.boardsCount, tournamentData?.totalBoards, tournamentData?.numBoards]);
 
   useEffect(() => {
     setLegsModalOpen(false);
@@ -442,14 +450,17 @@ export default function TournamentBracketView({
 
   const BoardChip = ({ roundIndex, match, disabled, readOnly }) => {
     const n = match.board;
-    const label = n != null && Number.isFinite(Number(n)) ? `#T${n}` : '#T—';
+    const hasBoard = n != null && n !== '' && Number.isFinite(Number(n)) && Number(n) >= 1;
+    const label = hasBoard ? `#T${n}` : '#T—';
     const locked = !!match.boardLocked;
+    const queueTitle = !hasBoard ? t('tournBracketWaitingBoard') || 'Ve frontě — čeká na uvolnění terče' : undefined;
     if (readOnly) {
       return (
         <span
           className={`font-mono text-xl font-bold tabular-nums px-3 py-1 rounded bg-slate-800 ${
-            locked ? 'text-amber-200/80' : 'text-slate-500'
+            locked ? 'text-amber-200/80' : hasBoard ? 'text-slate-500' : 'text-amber-400/90'
           }`}
+          title={queueTitle}
         >
           {label}
         </span>
@@ -466,9 +477,11 @@ export default function TournamentBracketView({
               ? 'bg-slate-800 text-slate-600 cursor-default'
               : locked
               ? 'bg-slate-700 text-amber-200 hover:bg-slate-600'
-              : 'bg-slate-700 text-emerald-200 hover:bg-slate-600'
+              : hasBoard
+              ? 'bg-slate-700 text-emerald-200 hover:bg-slate-600'
+              : 'bg-slate-800 text-amber-400/90 hover:bg-slate-700'
           }`}
-          title={locked ? (t('tournBoardLocked') || 'Terč je ručně zamčený') : undefined}
+          title={queueTitle || (locked ? (t('tournBoardLocked') || 'Terč je ručně zamčený') : undefined)}
         >
           {label}
         </button>
@@ -513,6 +526,7 @@ export default function TournamentBracketView({
   const RefereeRow = ({ match, roundIndex, matchIndex }) => {
     if (isByeMatch(match)) return null;
     const placeholderRef = isBracketRefereePlaceholder(match?.referee, match?.refereeId);
+    const waitKind = resolveBracketRefereePlaceholder(match);
     const canPickRefereeManually =
       isAdmin &&
       match.status === 'pending' &&
@@ -520,9 +534,15 @@ export default function TournamentBracketView({
     const showRefereeAsButton = canPickRefereeManually;
     const refNameTrim =
       match.referee?.name != null ? String(match.referee.name).trim() : '';
-    const refereeLabel =
-      refNameTrim ||
-      (placeholderRef ? t('tournBracketScorerPlaceholder') || '⏳ Čeká na proherce...' : '');
+    const placeholderText =
+      waitKind === 'waiting_board'
+        ? t('tournBracketWaitingBoard') || '⏳ Čeká na uvolnění terče'
+        : waitKind === 'waiting_referee'
+        ? t('tournBracketScorerPlaceholder') || '⏳ Čeká na proherce...'
+        : placeholderRef
+        ? t('tournBracketScorerPlaceholder') || '⏳ Čeká na proherce...'
+        : '';
+    const refereeLabel = refNameTrim || placeholderText;
     return (
       <div className="text-sm text-slate-400 mt-2 flex items-center gap-2 border-t border-slate-700/50 pt-2">
         <span className="text-xs uppercase tracking-wider">
@@ -555,7 +575,7 @@ export default function TournamentBracketView({
           <span className="text-amber-500 font-semibold truncate">{match.referee.name}</span>
         ) : (
           <span className="italic text-slate-500">
-            {t('tournBracketScorerPlaceholder') || '⏳ Čeká na proherce...'}
+            {refereeLabel || t('tournBracketScorerPlaceholder') || '⏳ Čeká na proherce...'}
           </span>
         )}
       </div>
@@ -564,6 +584,16 @@ export default function TournamentBracketView({
 
   return (
     <div className="w-full max-w-[98vw] mx-auto px-2 sm:px-4 space-y-3 relative">
+      {isAdmin && bracketQueueStats.queued > 0 && (
+        <div className="rounded-xl border border-amber-500/35 bg-amber-950/35 px-4 py-3 text-sm text-amber-100/95 leading-snug">
+          {(t('tournBracketQueueBanner') ||
+            '{onBoards} zápasů na terčích, {queued} ve frontě ({boards} terčů celkem). Fronta se doplní po uvolnění terče.')
+            .replace(/\{onBoards\}/g, String(bracketQueueStats.onBoards))
+            .replace(/\{queued\}/g, String(bracketQueueStats.queued))
+            .replace(/\{boards\}/g, String(bracketQueueStats.availableBoards))
+            .replace(/\{total\}/g, String(bracketQueueStats.totalReady))}
+        </div>
+      )}
       {legsModalOpen && (
         <div
           className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm"

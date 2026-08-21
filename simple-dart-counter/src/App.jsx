@@ -70,6 +70,7 @@ import {
   getBracketWinLegsForRound,
   autoAssignSequentialBoardsToRound,
   updateBracketReferees,
+  assignBracketJitBoardsAndReferees,
   getBracketFirstRoundChalkerShortage,
   propagateBracketWinners,
   isRealPendingBracketMatch,
@@ -2101,77 +2102,14 @@ function AppMain({ lang, setLang }) {
         ? tournamentData.players.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}` }))
         : null;
 
-    const updatedBracket = JSON.parse(JSON.stringify(tournamentBracket));
-
-    const isReadyMatch = (m) => {
-      if (!m) return false;
-      if (m.isBye === true) return false;
-      const isPending = m.status === 'pending';
-      if (!isPending) return false;
-      if (m.board !== null && m.board !== undefined && m.board !== '') return false;
-      const p1 = m.player1Id ?? m.p1Id;
-      const p2 = m.player2Id ?? m.p2Id;
-      if (p1 === null || p1 === undefined || p1 === '') return false;
-      if (p2 === null || p2 === undefined || p2 === '') return false;
-      return isRealPendingBracketMatch({
-        status: 'pending',
-        player1Id: p1,
-        player2Id: p2,
-        player1Name: m.player1Name,
-        player2Name: m.player2Name,
-      });
-    };
-
-    // Terče 1..availableBoards, které jsou kdekoliv obsazené.
-    const occupied = new Set();
-    for (const round of updatedBracket) {
-      const matches = round?.matches || [];
-      for (const m of matches) {
-        if (!m || m.isBye) continue;
-        const b = Number(m.board);
-        if (!(Number.isFinite(b) && b >= 1 && b <= availableBoards)) continue;
-        const tabletBusy = m.tabletStatus === 'checked_in' || m.tabletStatus === 'ready_to_play';
-        const pendingHasBoard = m.status === 'pending' && m.board != null;
-        if (m.status === 'playing' || tabletBusy || pendingHasBoard) occupied.add(b);
-      }
-    }
-
-    const freeBoards = [];
-    for (let b = 1; b <= availableBoards; b++) {
-      if (!occupied.has(b)) freeBoards.push(b);
-    }
-    if (freeBoards.length === 0) return;
-
-    const allReadyMatches = [];
-    for (const round of updatedBracket) {
-      const matches = round?.matches || [];
-      for (const m of matches) {
-        if (!isReadyMatch(m)) continue; // nekompletní zápasy (čekající na feeder) se jen přeskočí
-        allReadyMatches.push(m);
-      }
-    }
-    if (allReadyMatches.length === 0) return;
-
-    // Pouze přiřazení terčů — bez updateBracketReferees uvnitř smyčky (jedna dávka na konci).
-    let assigned = 0;
-    for (let i = 0; i < allReadyMatches.length && freeBoards.length > 0; i++) {
-      const m = allReadyMatches[i];
-      if (!isReadyMatch(m)) continue;
-      m.board = freeBoards.shift();
-      assigned += 1;
-    }
-
-    if (assigned === 0) return;
-
-    const withRefs = updateBracketReferees(
-      updatedBracket,
-      tournamentGroups,
-      promotersForRefereeEngine,
+    const { bracket: withRefs } = assignBracketJitBoardsAndReferees(tournamentBracket, {
       availableBoards,
-      tournamentMatches,
-      regForDirectKo,
-      tournamentData?.prelimLegs ?? null
-    );
+      groups: tournamentGroups,
+      promotersCount: promotersForRefereeEngine,
+      groupMatches: tournamentMatches,
+      registeredPlayersForDirectKo: regForDirectKo,
+      prelimLegs: tournamentData?.prelimLegs ?? null,
+    });
 
     if (JSON.stringify(withRefs) !== JSON.stringify(tournamentBracket)) {
       setTournamentBracket(withRefs);
@@ -5393,6 +5331,15 @@ function AppMain({ lang, setLang }) {
                 [],
                 data.prelimLegs ?? null
               );
+              const availableBoards = Number(data.totalBoards ?? data.numBoards ?? 1) || 1;
+              const { bracket: preparedBracket } = assignBracketJitBoardsAndReferees(rawBracket, {
+                availableBoards,
+                groups: syntheticGroups,
+                promotersCount: 'all',
+                groupMatches: [],
+                registeredPlayersForDirectKo: playersWithIds,
+                prelimLegs: data.prelimLegs ?? null,
+              });
               const withId = ensureBoardAuthTokens({
                 ...data,
                 players: playersWithIds,
@@ -5409,11 +5356,11 @@ function AppMain({ lang, setLang }) {
               setActivePin(generatedPin);
               setTournamentData(withId);
               setTournamentMatches([]);
-              setTournamentBracket(rawBracket);
+              setTournamentBracket(preparedBracket);
               try {
                 safeStorage.setItem(
                   'dartsTournamentData',
-                  JSON.stringify({ ...withId, tournamentBracket: rawBracket })
+                  JSON.stringify({ ...withId, tournamentBracket: preparedBracket })
                 );
               } catch {}
               setTournamentDraft((prev) => ({ ...prev, boardAssignments: {} }));
@@ -5513,6 +5460,7 @@ function AppMain({ lang, setLang }) {
           onBack={() => setAppState('home')}
           onFinishGroups={() => setAppState('tournament_bracket')}
           onDevFillMatches={(nextMatches) => setTournamentMatches(nextMatches)}
+          onNotify={showNotification}
           onGenerateBracket={() => {
             const promotersCount =
               tournamentData?.promotersCount ??
@@ -5531,8 +5479,33 @@ function AppMain({ lang, setLang }) {
               tournamentMatches,
               tournamentData?.prelimLegs ?? null
             );
-            setTournamentBracket(rawBracket);
+            const availableBoards =
+              Number(
+                tournamentData?.boardsCount ?? tournamentData?.totalBoards ?? tournamentData?.numBoards
+              ) || 1;
+            const { bracket: prepared, stats } = assignBracketJitBoardsAndReferees(rawBracket, {
+              availableBoards,
+              groups: tournamentGroups,
+              promotersCount,
+              groupMatches: tournamentMatches,
+              prelimLegs: tournamentData?.prelimLegs ?? null,
+            });
+            setTournamentBracket(prepared);
             setAppState('tournament_bracket');
+            if (stats.totalReady > 0) {
+              const tmpl =
+                t('tournBracketGeneratedHint') ||
+                'Pavouk: {onBoards}/{total} zápasů na terčích ({boards} k dispozici), {queued} ve frontě.';
+              showNotification(
+                tmpl
+                  .replace(/\{onBoards\}/g, String(stats.onBoards))
+                  .replace(/\{total\}/g, String(stats.totalReady))
+                  .replace(/\{queued\}/g, String(stats.queued))
+                  .replace(/\{boards\}/g, String(stats.availableBoards))
+                  .replace(/\{refs\}/g, String(stats.withReferee)),
+                'success'
+              );
+            }
           }}
           onResumeBracket={() => setAppState('tournament_bracket')}
           onStartMatch={handleStartTournamentMatch}

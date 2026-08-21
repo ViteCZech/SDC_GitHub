@@ -614,6 +614,14 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     tournRoundLastN: 'Last{n}',
     tournBracketScorer: 'Počtář:',
     tournBracketScorerPlaceholder: 'Čeká na proherce...',
+    tournBracketWaitingBoard: '⏳ Čeká na uvolnění terče',
+    tournBracketGeneratedHint:
+      'Pavouk: {onBoards}/{total} zápasů na terčích ({boards} k dispozici), {queued} ve frontě.',
+    tournBracketQueueBanner:
+      '{onBoards} zápasů na terčích, {queued} ve frontě ({boards} terčů celkem). Fronta se doplní po uvolnění terče.',
+    tournGroupsSimulatedHint:
+      'Skupiny dohrány simulací (dlouhý stisk). Zkontrolujte tabulky a vygenerujte pavouka.',
+    tournSimHoldHint: 'Dlouhý stisk 1,5 s = simulace dohrání skupin (dev)',
     tournEditScorer: 'Upravit počtáře',
     tournRefereeDisplayName: 'Jméno u zápasu (úprava)',
     tournRefereeNamePlaceholder: 'Volitelně upravte zobrazené jméno',
@@ -1352,6 +1360,14 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     tournRoundLastN: 'Last{n}',
     tournBracketScorer: 'Scorer:',
     tournBracketScorerPlaceholder: 'Waiting for loser to chalk...',
+    tournBracketWaitingBoard: '⏳ Waiting for a free board',
+    tournBracketGeneratedHint:
+      'Bracket: {onBoards}/{total} matches on boards ({boards} available), {queued} queued.',
+    tournBracketQueueBanner:
+      '{onBoards} matches on boards, {queued} queued ({boards} boards total). Queue fills when a board frees up.',
+    tournGroupsSimulatedHint:
+      'Groups completed via simulation (long press). Review standings and generate the bracket.',
+    tournSimHoldHint: 'Long press 1.5 s = simulate finishing groups (dev)',
     tournEditScorer: 'Edit scorer',
     tournRefereeDisplayName: 'Name at match (edit)',
     tournRefereeNamePlaceholder: 'Optionally change displayed name',
@@ -2059,6 +2075,14 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
     tournRoundLastN: 'Last{n}',
     tournBracketScorer: 'Zapisujący:',
     tournBracketScorerPlaceholder: 'Oczekiwanie na przegranego...',
+    tournBracketWaitingBoard: '⏳ Oczekiwanie na wolne stanowisko',
+    tournBracketGeneratedHint:
+      'Drabinka: {onBoards}/{total} meczów na stanowiskach ({boards} dostępnych), {queued} w kolejce.',
+    tournBracketQueueBanner:
+      '{onBoards} meczów na stanowiskach, {queued} w kolejce ({boards} stanowisk łącznie). Kolejka uzupełni się po zwolnieniu stanowiska.',
+    tournGroupsSimulatedHint:
+      'Grupy ukończone symulacją (długie przytrzymanie). Sprawdź tabele i wygeneruj drabinkę.',
+    tournSimHoldHint: 'Długie przytrzymanie 1,5 s = symulacja ukończenia grup (dev)',
     tournEditScorer: 'Edytuj zapisującego',
     tournRefereeDisplayName: 'Nazwa przy meczu (edycja)',
     tournRefereeNamePlaceholder: 'Opcjonalnie zmień wyświetlaną nazwę',

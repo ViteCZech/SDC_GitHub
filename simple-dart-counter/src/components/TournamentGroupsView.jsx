@@ -419,6 +419,7 @@ export default function TournamentGroupsView({
   onResetMatch,
   onWithdrawPlayer,
   onDevFillMatches,
+  onNotify,
   onGenerateBracket,
   onFinishGroups,
   onResumeBracket,
@@ -452,6 +453,20 @@ export default function TournamentGroupsView({
       onConfirm: typeof onConfirm === 'function' ? onConfirm : () => {},
     });
   const pressTimer = useRef(null);
+  const simHoldIntervalRef = useRef(null);
+  const [simHoldProgress, setSimHoldProgress] = useState(0);
+
+  const clearSimHold = () => {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+    if (simHoldIntervalRef.current) {
+      clearInterval(simHoldIntervalRef.current);
+      simHoldIntervalRef.current = null;
+    }
+    setSimHoldProgress(0);
+  };
 
   useEffect(() => {
     if (hasBracket) setIsReviewMode(true);
@@ -543,8 +558,17 @@ export default function TournamentGroupsView({
   };
 
   const handlePressStart = () => {
-    if (pressTimer.current) clearTimeout(pressTimer.current);
+    clearSimHold();
+    const started = Date.now();
+    simHoldIntervalRef.current = setInterval(() => {
+      setSimHoldProgress(Math.min(100, ((Date.now() - started) / 1500) * 100));
+    }, 50);
     pressTimer.current = setTimeout(() => {
+      if (simHoldIntervalRef.current) {
+        clearInterval(simHoldIntervalRef.current);
+        simHoldIntervalRef.current = null;
+      }
+      setSimHoldProgress(100);
       const winLegs = tournamentData?.legsGroup || tournamentData?.groupsLegs || 2;
       const nextMatches = (tournamentMatches || []).map((m) => {
         if (m.status === 'completed') return m;
@@ -553,8 +577,9 @@ export default function TournamentGroupsView({
         const scoreP2 = p1Wins ? Math.floor(Math.random() * winLegs) : winLegs;
         const mockP1Avg = parseFloat((Math.random() * 20 + 50).toFixed(2));
         const mockP2Avg = parseFloat((Math.random() * 20 + 50).toFixed(2));
+        const { tabletStatus, tabletBoard, tabletCheckedInAt, ...rest } = m;
         return {
-          ...m,
+          ...rest,
           status: 'completed',
           winnerId: p1Wins ? m.player1Id : m.player2Id,
           p1Avg: mockP1Avg,
@@ -570,17 +595,25 @@ export default function TournamentGroupsView({
       });
       onDevFillMatches?.(nextMatches);
       setIsReviewMode(true);
+      onNotify?.(
+        t('tournGroupsSimulatedHint') ||
+          'Skupiny dohrány simulací (dlouhý stisk). Zkontrolujte tabulky a vygenerujte pavouka.',
+        'success'
+      );
+      try {
+        navigator.vibrate?.(100);
+      } catch {
+        /* ignore */
+      }
+      window.setTimeout(() => setSimHoldProgress(0), 400);
     }, 1500);
   };
 
   const handlePressEnd = () => {
-    if (pressTimer.current) {
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
+    clearSimHold();
   };
 
-  useEffect(() => () => handlePressEnd(), []);
+  useEffect(() => () => clearSimHold(), []);
 
   if (!tournamentData) {
     if (userRole === 'viewer' || userRole === 'tablet') {
@@ -812,9 +845,23 @@ export default function TournamentGroupsView({
               if (hasUnfinished) return;
               setIsReviewMode(true);
             }}
-            className="mt-8 flex items-center justify-center gap-3 w-full py-5 px-4 rounded-2xl font-black text-lg uppercase tracking-wide text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 border-2 border-amber-400/50 shadow-lg shadow-amber-900/30 active:scale-[0.98] transition-all"
+            className="relative overflow-hidden mt-8 flex flex-col items-center justify-center gap-1 w-full py-5 px-4 rounded-2xl font-black text-lg uppercase tracking-wide text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 border-2 border-amber-400/50 shadow-lg shadow-amber-900/30 active:scale-[0.98] transition-all"
           >
-            {t('tournFinishGroupsBtn') || 'Ukončit skupiny a nastavit Pavouka'}
+            {simHoldProgress > 0 && simHoldProgress < 100 && (
+              <span
+                className="absolute inset-y-0 left-0 bg-white/25 pointer-events-none transition-[width] duration-75"
+                style={{ width: `${simHoldProgress}%` }}
+                aria-hidden
+              />
+            )}
+            <span className="relative z-[1] flex items-center gap-3">
+              {t('tournFinishGroupsBtn') || 'Ukončit skupiny a nastavit Pavouka'}
+            </span>
+            {isAdmin && (
+              <span className="relative z-[1] text-[10px] font-semibold normal-case tracking-normal text-amber-100/80">
+                {t('tournSimHoldHint') || 'Dlouhý stisk 1,5 s = simulace dohrání skupin (dev)'}
+              </span>
+            )}
           </button>
         )}
 

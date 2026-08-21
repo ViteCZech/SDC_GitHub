@@ -2157,6 +2157,133 @@ function collectRefereeIdsFromCompletedMatches(bracketRounds) {
   return s;
 }
 
+function isBracketMatchReadyForJitBoard(m) {
+  if (!m || m.isBye === true) return false;
+  if (m.status !== 'pending') return false;
+  if (m.board !== null && m.board !== undefined && m.board !== '') return false;
+  const p1 = m.player1Id ?? m.p1Id;
+  const p2 = m.player2Id ?? m.p2Id;
+  if (p1 == null || p1 === '') return false;
+  if (p2 == null || p2 === '') return false;
+  return isRealPendingBracketMatch({
+    status: 'pending',
+    player1Id: p1,
+    player2Id: p2,
+    player1Name: m.player1Name,
+    player2Name: m.player2Name,
+  });
+}
+
+/**
+ * Statistiky přiřazení terčů / počítářů pro pending zápasy v pavouku.
+ * @returns {{ onBoards: number, queued: number, withReferee: number, totalReady: number, availableBoards: number }}
+ */
+export function countBracketJitStats(bracket, availableBoards) {
+  const nb = Math.max(1, Number(availableBoards) || 1);
+  let onBoards = 0;
+  let queued = 0;
+  let withReferee = 0;
+  let totalReady = 0;
+  for (const round of bracket || []) {
+    for (const m of round?.matches || []) {
+      if (!m || m.isBye) continue;
+      if (m.status !== 'pending') continue;
+      if (!isRealPendingBracketMatch(m)) continue;
+      totalReady += 1;
+      const b = Number(m.board);
+      const hasBoard = m.board != null && m.board !== '' && Number.isFinite(b) && b >= 1;
+      if (hasBoard) onBoards += 1;
+      else queued += 1;
+      if (
+        m.referee &&
+        !isBracketRefereePlaceholder(m.referee, m.refereeId) &&
+        String(m.referee.name ?? '').trim()
+      ) {
+        withReferee += 1;
+      }
+    }
+  }
+  return { onBoards, queued, withReferee, totalReady, availableBoards: nb };
+}
+
+/**
+ * JIT: přiřadí volné terče pending zápasům napříč pavoukem a dopočítá počítáře.
+ * @returns {{ bracket: array, stats: ReturnType<typeof countBracketJitStats> }}
+ */
+export function assignBracketJitBoardsAndReferees(
+  bracket,
+  {
+    availableBoards = 1,
+    groups = [],
+    promotersCount = 2,
+    groupMatches = [],
+    registeredPlayersForDirectKo = null,
+    prelimLegs = null,
+  } = {}
+) {
+  const nb = Math.max(1, Number(availableBoards) || 1);
+  const updatedBracket = JSON.parse(JSON.stringify(bracket || []));
+
+  const occupied = new Set();
+  for (const round of updatedBracket) {
+    for (const m of round?.matches || []) {
+      if (!m || m.isBye) continue;
+      const b = Number(m.board);
+      if (!(Number.isFinite(b) && b >= 1 && b <= nb)) continue;
+      const tabletBusy = m.tabletStatus === 'checked_in' || m.tabletStatus === 'ready_to_play';
+      const pendingHasBoard = m.status === 'pending' && m.board != null;
+      if (m.status === 'playing' || tabletBusy || pendingHasBoard) occupied.add(b);
+    }
+  }
+
+  const freeBoards = [];
+  for (let b = 1; b <= nb; b++) {
+    if (!occupied.has(b)) freeBoards.push(b);
+  }
+
+  const allReadyMatches = [];
+  for (const round of updatedBracket) {
+    for (const m of round?.matches || []) {
+      if (isBracketMatchReadyForJitBoard(m)) allReadyMatches.push(m);
+    }
+  }
+
+  for (let i = 0; i < allReadyMatches.length && freeBoards.length > 0; i++) {
+    const m = allReadyMatches[i];
+    if (!isBracketMatchReadyForJitBoard(m)) continue;
+    m.board = freeBoards.shift();
+  }
+
+  const withRefs = updateBracketReferees(
+    updatedBracket,
+    groups,
+    promotersCount,
+    nb,
+    groupMatches,
+    registeredPlayersForDirectKo,
+    prelimLegs
+  );
+
+  return { bracket: withRefs, stats: countBracketJitStats(withRefs, nb) };
+}
+
+/** @returns {'none'|'assigned'|'waiting_board'|'waiting_referee'} */
+export function resolveBracketRefereePlaceholder(match) {
+  if (!match || match.isBye) return 'none';
+  if (match.status !== 'pending') return 'none';
+  if (
+    match.referee &&
+    !isBracketRefereePlaceholder(match.referee, match.refereeId) &&
+    String(match.referee?.name ?? '').trim()
+  ) {
+    return 'assigned';
+  }
+  const b = Number(match.board);
+  const hasBoard = match.board != null && match.board !== '' && Number.isFinite(b) && b >= 1;
+  if (!hasBoard) return 'waiting_board';
+  return 'waiting_referee';
+}
+
 /**
  * Přiřadí počtáře k pending zápasům s terčem.
  * Turnaj se skupinami + předkolo: kolo 0 = předkolo — vlna 1 z poolu nepostupujících, vlna 2 z proherců téhož kola;
