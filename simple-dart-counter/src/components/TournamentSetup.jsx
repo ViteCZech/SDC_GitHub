@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle, Cloud, Edit2, ExternalLink, Target, Trash2, UserPlus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle, Cloud, Edit2, ExternalLink, Loader2, Target, Trash2, UserPlus } from 'lucide-react';
 import { translations } from '../translations';
 import {
   applyAdvancementPhrase,
@@ -14,6 +14,8 @@ import {
   listValidGroupCounts,
 } from '../utils/tournamentLogic';
 import { AdminTapTextField } from './AdminTapField';
+import NumericStepper from './NumericStepper';
+import StickyActionBar from './StickyActionBar';
 import { useAdminVirtualKeyboardOptional } from '../context/AdminVirtualKeyboardContext';
 import {
   buildDrawRankingSnapshot,
@@ -707,7 +709,7 @@ export default function TournamentSetup({
     'w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500';
 
   return (
-    <main className="flex flex-col flex-1 w-full overflow-y-auto bg-slate-950">
+    <main className="flex flex-col flex-1 w-full overflow-y-auto bg-slate-950 pb-24 sm:pb-4">
       {notification && (
         <div
           className={`fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 border ${
@@ -757,6 +759,9 @@ export default function TournamentSetup({
                     }`}
                   >
                     {t('formatGroupsBracket') || t('tournFormatGroupsKo')}
+                    <span className="block text-[10px] font-normal normal-case tracking-normal text-slate-400 mt-1">
+                      {t('tournFormatGroupsKoHint') || 'Skupiny → pavouk'}
+                    </span>
                   </button>
                   <button
                     type="button"
@@ -768,6 +773,9 @@ export default function TournamentSetup({
                     }`}
                   >
                     {t('formatBracketOnly') || t('tournFormatKoOnly')}
+                    <span className="block text-[10px] font-normal normal-case tracking-normal text-slate-400 mt-1">
+                      {t('tournFormatKoOnlyHint') || 'Přímý pavouk bez skupin'}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -1281,7 +1289,7 @@ export default function TournamentSetup({
                               <button
                                 type="button"
                                 onClick={() => handleEditPlayer(p._origIdx)}
-                                className="p-2 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-emerald-400 transition-colors"
+                                className="p-2.5 min-w-[44px] min-h-[44px] rounded-lg text-slate-400 hover:bg-slate-700 hover:text-emerald-400 transition-colors"
                                 title={t('editThrow') || 'Upravit'}
                               >
                                 <Edit2 className="w-4 h-4" />
@@ -1289,7 +1297,7 @@ export default function TournamentSetup({
                               <button
                                 type="button"
                                 onClick={() => handleDeletePlayer(p._origIdx)}
-                                className="p-2 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-red-400 transition-colors"
+                                className="p-2.5 min-w-[44px] min-h-[44px] rounded-lg text-slate-400 hover:bg-slate-700 hover:text-red-400 transition-colors"
                                 title="Smazat"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -1343,9 +1351,13 @@ export default function TournamentSetup({
                     }
                     className={`${btnBase} w-full bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
-                    <Target className="w-5 h-5" />
+                    {isGenerating ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Target className="w-5 h-5" />
+                    )}
                     {isGenerating
-                      ? t('tournCsoLoading') || 'Načítám…'
+                      ? t('tournGenerating') || 'Generuji turnaj…'
                       : t('tournGenerate') || 'Vygenerovat turnaj'}
                   </button>
                 </div>
@@ -1403,25 +1415,22 @@ export default function TournamentSetup({
                   <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
                     {t('tournNumBoards') || 'Celkový počet dostupných terčů v herně'}
                   </label>
-                  <AdminTapTextField
-                    value={
-                      rawNumBoards === '' || rawNumBoards == null
-                        ? ''
-                        : String(rawNumBoards)
-                    }
-                    onValueChange={(text) => {
-                      if (text === '') {
-                        setTournamentDraft((prev) => ({ ...prev, numBoards: '' }));
-                        return;
-                      }
-                      const v = parseInt(text, 10);
+                  <NumericStepper
+                    useAdminTap
+                    allowEmpty
+                    value={rawNumBoards === '' || rawNumBoards == null ? '' : numBoards}
+                    onChange={(v) =>
                       setTournamentDraft((prev) => ({
                         ...prev,
-                        numBoards: Number.isFinite(v) ? Math.max(1, Math.min(99, v)) : '',
-                      }));
-                    }}
-                    filterChar={(c) => /^\d$/.test(c)}
-                    className={`${inputBase} w-24 font-mono`}
+                        numBoards: v === '' ? '' : v,
+                      }))
+                    }
+                    min={1}
+                    max={99}
+                    quickValues={[2, 4, 6, 8, 10, 12]}
+                    decreaseLabel={t('numericDecrease') || 'Snížit'}
+                    increaseLabel={t('numericIncrease') || 'Zvýšit'}
+                    hint={t('tournNumBoardsHint') || 'Počet fyzických terčů v herně (1–99)'}
                   />
                 </div>
                 {grpFmtStep && (
@@ -1539,37 +1548,43 @@ export default function TournamentSetup({
                         <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
                           {t('tournCustomNumGroups') || 'Počet skupin'}
                         </label>
-                        <AdminTapTextField
-                          value={String(customNumGroups)}
-                          onValueChange={(text) => {
-                            const v = Math.max(1, Math.min(99, parseInt(String(text), 10) || 1));
+                        <NumericStepper
+                          useAdminTap
+                          value={customNumGroups}
+                          onChange={(v) => {
+                            const n = Math.max(1, Math.min(99, Number(v) || 1));
                             setTournamentDraft((prev) => ({
                               ...prev,
-                              customNumGroups: v,
-                              numGroups: v,
+                              customNumGroups: n,
+                              numGroups: n,
                             }));
                           }}
-                          filterChar={(c) => /^\d$/.test(c)}
-                          className={`${inputBase} font-mono`}
+                          min={1}
+                          max={99}
+                          decreaseLabel={t('numericDecrease') || 'Snížit'}
+                          increaseLabel={t('numericIncrease') || 'Zvýšit'}
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
                           {t('tournCustomAdvancePerGroup') || 'Počet postupujících z každé skupiny'}
                         </label>
-                        <AdminTapTextField
-                          value={String(customAdvancePerGroup)}
-                          onValueChange={(text) => {
-                            const v = Math.max(1, Math.min(99, parseInt(String(text), 10) || 1));
+                        <NumericStepper
+                          useAdminTap
+                          value={customAdvancePerGroup}
+                          onChange={(v) => {
+                            const n = Math.max(1, Math.min(99, Number(v) || 1));
                             setTournamentDraft((prev) => ({
                               ...prev,
-                              customAdvancePerGroup: v,
-                              advancePerGroup: v,
-                              promotersCount: v,
+                              customAdvancePerGroup: n,
+                              advancePerGroup: n,
+                              promotersCount: n,
                             }));
                           }}
-                          filterChar={(c) => /^\d$/.test(c)}
-                          className={`${inputBase} font-mono`}
+                          min={1}
+                          max={99}
+                          decreaseLabel={t('numericDecrease') || 'Snížit'}
+                          increaseLabel={t('numericIncrease') || 'Zvýšit'}
                         />
                       </div>
                       <p className="text-sm text-slate-300">
@@ -1691,6 +1706,58 @@ export default function TournamentSetup({
           </div>
         )}
       </div>
+
+      {step === 1 && (
+        <StickyActionBar>
+          <button
+            type="button"
+            onClick={handleStep1Continue}
+            className={`${btnBase} w-full bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500`}
+          >
+            {t('tournContinue') || 'Pokračovat'}
+            <ArrowRight className="w-5 h-5" />
+          </button>
+        </StickyActionBar>
+      )}
+
+      {step === 2 && (
+        <StickyActionBar>
+          <button
+            type="button"
+            onClick={() => setStep(3)}
+            disabled={players.length < minPlayersRequired || hasAnyDuplicates()}
+            className={`${btnBase} w-full bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 disabled:opacity-40`}
+          >
+            {t('tournContinue') || 'Pokračovat'}
+            <ArrowRight className="w-5 h-5" />
+          </button>
+        </StickyActionBar>
+      )}
+
+      {step === 3 && (
+        <StickyActionBar>
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={
+              players.length < minPlayersRequired ||
+              hasAnyDuplicates() ||
+              isCustomInvalid ||
+              isGenerating
+            }
+            className={`${btnBase} w-full bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 disabled:opacity-40`}
+          >
+            {isGenerating ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Target className="w-5 h-5" />
+            )}
+            {isGenerating
+              ? t('tournGenerating') || 'Generuji turnaj…'
+              : t('tournGenerate') || 'Vygenerovat turnaj'}
+          </button>
+        </StickyActionBar>
+      )}
 
       <PlayerDuplicateModal
         open={!!dupModal}

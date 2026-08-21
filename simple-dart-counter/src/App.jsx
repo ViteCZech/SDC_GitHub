@@ -24,7 +24,7 @@ import {
   AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, 
   DownloadCloud, FileText, History, Home, Info, Keyboard as KeyboardIcon, 
   Maximize, Minimize, Mic, MicOff, MousePointer2, Pause, Play, RefreshCw, RotateCcw, 
-  Target, Trash2, Trophy, Undo2, Unplug, User, Cloud, X, BarChart2, List, Swords, ClipboardList
+  Target, Trash2, Trophy, Undo2, Unplug, User, Cloud, X, BarChart2, List, Swords, ClipboardList, Lock
 } from 'lucide-react';
 
 import { translations } from './translations';
@@ -4922,7 +4922,7 @@ function AppMain({ lang, setLang }) {
         />
       )}
       {showTournamentStepper && (
-        <nav className="flex overflow-x-auto whitespace-nowrap bg-slate-900 p-3 text-sm font-semibold border-b border-slate-800 shrink-0">
+        <nav className="flex overflow-x-auto whitespace-nowrap bg-slate-900 p-2 sm:p-3 text-sm font-semibold border-b border-slate-800 shrink-0 gap-1">
           {(userRole === 'viewer'
             ? [
                 [5, t('stepperSkupiny') || '5. Skupiny'],
@@ -4944,13 +4944,13 @@ function AppMain({ lang, setLang }) {
             const isLocked = userRole === 'admin' && n <= 3 && isTournamentLive;
             const clickable = canNavigateToStep(n) && !isLocked;
             let stepClass =
-              'mx-1 first:ml-0 last:mr-0 px-2 py-1 rounded transition-colors shrink-0 ';
+              'mx-0.5 first:ml-0 last:mr-0 px-3 py-2 min-h-[44px] rounded-lg transition-colors shrink-0 inline-flex items-center gap-1.5 ';
             if (!clickable) {
-              stepClass += 'text-slate-500 cursor-not-allowed';
+              stepClass += 'text-slate-500 cursor-not-allowed opacity-60';
             } else if (isCurrent) {
-              stepClass += 'text-green-500 cursor-pointer';
+              stepClass += 'text-emerald-400 bg-emerald-950/50 ring-1 ring-emerald-500/40 cursor-pointer';
             } else {
-              stepClass += 'text-white cursor-pointer hover:text-white';
+              stepClass += 'text-slate-300 cursor-pointer hover:text-white hover:bg-slate-800';
             }
             return (
               <button
@@ -4958,8 +4958,11 @@ function AppMain({ lang, setLang }) {
                 type="button"
                 onClick={() => handleStepperClick(n)}
                 disabled={!clickable}
+                aria-current={isCurrent ? 'step' : undefined}
+                title={isLocked ? t('stepperLockedHint') || 'Turnaj už běží — krok je uzamčen' : undefined}
                 className={stepClass}
               >
+                {isLocked && <Lock className="w-3.5 h-3.5 shrink-0" aria-hidden />}
                 {label}
               </button>
             );
@@ -6124,12 +6127,17 @@ function AppMain({ lang, setLang }) {
       {/* --- GLOBAL TOAST --- */}
       {notification && notification.message && (
         <div
-          className={`fixed bottom-4 left-1/2 -translate-x-1/2 p-4 rounded-lg shadow-2xl z-50 flex items-center gap-3 animate-slide-in border text-white bg-slate-800 ${
-            notification.type === 'error' ? 'border-red-600' : 'border-green-600'
+          className={`fixed bottom-4 left-1/2 -translate-x-1/2 max-w-[min(92vw,28rem)] p-4 rounded-xl shadow-2xl z-[5200] flex items-start gap-3 animate-slide-in border text-white bg-slate-900/95 backdrop-blur-sm ${
+            notification.type === 'error' ? 'border-red-500/60' : 'border-emerald-500/60'
           }`}
+          role="status"
         >
-          <span>{notification.type === 'error' ? '❌' : '✅'}</span>
-          <p>{notification.message}</p>
+          {notification.type === 'error' ? (
+            <AlertTriangle className="w-5 h-5 shrink-0 text-red-400 mt-0.5" aria-hidden />
+          ) : (
+            <CheckCircle className="w-5 h-5 shrink-0 text-emerald-400 mt-0.5" aria-hidden />
+          )}
+          <p className="text-sm leading-snug">{notification.message}</p>
         </div>
       )}
 

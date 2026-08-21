@@ -4,6 +4,7 @@ import { distributePlayersToFixedGroups } from '../utils/tournamentGenerator';
 import { isTournamentBracketOnlyFormat } from '../utils/tournamentLogic';
 import { translations } from '../translations';
 import { AdminTapTextField } from './AdminTapField';
+import StickyActionBar from './StickyActionBar';
 import { useAdminVirtualKeyboardOptional } from '../context/AdminVirtualKeyboardContext';
 
 const EMPTY_BOARD_ASSIGNMENTS = {};
@@ -143,6 +144,17 @@ export default function TournamentBoardAssignment({
       const boards = value.trim() === '' ? [] : parseBoardInput(value);
       onUpdateGroupBoard(groupId, boards);
     }
+  };
+
+  const toggleBoardChip = (groupId, boardNum, fieldLocked) => {
+    if (fieldLocked) return;
+    const raw = String(boardInputs[groupId] ?? '').trim();
+    const current = raw === '' ? [] : parseBoardInput(raw);
+    const set = new Set(current);
+    if (set.has(boardNum)) set.delete(boardNum);
+    else set.add(boardNum);
+    const next = [...set].sort((a, b) => a - b).join(', ');
+    handleBoardChange(groupId, next);
   };
 
   const validateAndSubmit = () => {
@@ -314,6 +326,27 @@ export default function TournamentBoardAssignment({
                       {boardInputErrors[gid]}
                     </p>
                   )}
+                  {totalBoards > 0 && !fieldLocked && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {Array.from({ length: totalBoards }, (_, i) => i + 1).map((b) => {
+                        const selected = parseBoardInput(displayValue).includes(b);
+                        return (
+                          <button
+                            key={b}
+                            type="button"
+                            onClick={() => toggleBoardChip(gid, b, fieldLocked)}
+                            className={`min-w-[40px] min-h-[36px] px-2 rounded-lg text-sm font-bold font-mono border transition-colors ${
+                              selected
+                                ? 'bg-emerald-600 border-emerald-500 text-white'
+                                : 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white'
+                            }`}
+                          >
+                            T{b}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -327,16 +360,18 @@ export default function TournamentBoardAssignment({
           </div>
         )}
 
-        <div className="flex justify-end gap-2 mt-8 md:hidden">
-          <button
-            onClick={validateAndSubmit}
-            className={`${btnBase} bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500`}
-          >
-            {t('tournStartTournament') || 'Spustit turnaj'}
-            <ArrowRight className="w-5 h-5" />
-          </button>
-        </div>
       </div>
+
+      <StickyActionBar>
+        <button
+          type="button"
+          onClick={validateAndSubmit}
+          className={`${btnBase} w-full bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500`}
+        >
+          {t('tournStartTournament') || 'Spustit turnaj'}
+          <ArrowRight className="w-5 h-5" />
+        </button>
+      </StickyActionBar>
     </main>
   );
 }

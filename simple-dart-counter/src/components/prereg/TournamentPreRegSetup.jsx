@@ -10,6 +10,7 @@ import {
 } from '../../utils/preregAdmin';
 import PreRegPageShell from './PreRegPageShell';
 import DateTimeLocalFields from './DateTimeLocalFields';
+import NumericStepper from '../NumericStepper';
 
 /**
  * @param {{
@@ -294,14 +295,16 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
           </h2>
           <div>
             <label className={labelCls}>{t('preregAdminCapacity')}</label>
-            <input
-              type="number"
-              min="1"
-              value={capacity}
-              onChange={(e) => setCapacity(e.target.value)}
-              placeholder={t('preregAdminUnlimitedHint')}
-              className={inputCls}
+            <NumericStepper
+              allowEmpty
+              value={capacity === '' ? '' : Number(capacity) || ''}
+              onChange={(v) => setCapacity(v === '' ? '' : String(v))}
+              min={1}
+              max={9999}
+              hint={t('preregAdminUnlimitedHint')}
               disabled={loading}
+              decreaseLabel={t('numericDecrease') || 'Snížit'}
+              increaseLabel={t('numericIncrease') || 'Zvýšit'}
             />
           </div>
           <label className="flex items-center gap-2 text-sm text-slate-300">
@@ -337,37 +340,46 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>{t('preregAdminEntryFee')}</label>
-              <input
-                type="number"
-                min="0"
-                value={entryFee}
-                onChange={(e) => setEntryFee(e.target.value)}
-                className={inputCls}
+              <NumericStepper
+                allowEmpty
+                value={entryFee === '' ? '' : Number(entryFee) || ''}
+                onChange={(v) => setEntryFee(v === '' ? '' : String(v))}
+                min={0}
+                max={999999}
+                step={50}
+                quickValues={[0, 100, 200, 300, 500]}
                 disabled={loading}
+                decreaseLabel={t('numericDecrease') || 'Snížit'}
+                increaseLabel={t('numericIncrease') || 'Zvýšit'}
               />
             </div>
             <div>
               <label className={labelCls}>{t('preregAdminPayoutPercent')}</label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={payoutPercent}
-                onChange={(e) => setPayoutPercent(e.target.value)}
-                placeholder="100"
-                className={inputCls}
+              <NumericStepper
+                allowEmpty
+                value={payoutPercent === '' ? '' : Number(payoutPercent) || ''}
+                onChange={(v) => setPayoutPercent(v === '' ? '' : String(v))}
+                min={0}
+                max={100}
+                step={5}
+                quickValues={[50, 80, 100]}
                 disabled={loading}
+                decreaseLabel={t('numericDecrease') || 'Snížit'}
+                increaseLabel={t('numericIncrease') || 'Zvýšit'}
               />
             </div>
             <div className="sm:col-span-2">
               <label className={labelCls}>{t('preregAdminSponsor')}</label>
-              <input
-                type="number"
-                min="0"
-                value={sponsorMoney}
-                onChange={(e) => setSponsorMoney(e.target.value)}
-                className={inputCls}
+              <NumericStepper
+                allowEmpty
+                value={sponsorMoney === '' ? '' : Number(sponsorMoney) || ''}
+                onChange={(v) => setSponsorMoney(v === '' ? '' : String(v))}
+                min={0}
+                max={999999}
+                step={100}
                 disabled={loading}
+                decreaseLabel={t('numericDecrease') || 'Snížit'}
+                increaseLabel={t('numericIncrease') || 'Zvýšit'}
               />
             </div>
           </div>

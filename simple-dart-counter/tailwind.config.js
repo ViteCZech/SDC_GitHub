@@ -7,6 +7,10 @@ export default {
   theme: {
     extend: {
       keyframes: {
+        'slide-in': {
+          '0%': { opacity: '0', transform: 'translate(-50%, 12px)' },
+          '100%': { opacity: '1', transform: 'translate(-50%, 0)' },
+        },
         'high-score-pop': {
           '0%': { transform: 'scale(0)', opacity: '1' },
           '15%': { transform: 'scale(1.2)' },
@@ -18,6 +22,7 @@ export default {
         },
       },
       animation: {
+        'slide-in': 'slide-in 0.25s ease-out forwards',
         'high-score-pop': 'high-score-pop 1.5s ease-out forwards',
       },
     },

@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import VirtualKeyboard from '../components/VirtualKeyboard';
+import NumericKeyboard from '../components/NumericKeyboard';
 
 export const AdminVirtualKeyboardContext = createContext(null);
 
@@ -19,6 +20,7 @@ function computeInternalKeyboardEnabled() {
 export function AdminVirtualKeyboardProvider({ children, lang, onVisibilityChange }) {
   const bindingRef = useRef(null);
   const [open, setOpen] = useState(false);
+  const [keyboardMode, setKeyboardMode] = useState('default');
   const [internalKeyboardEnabled, setInternalKeyboardEnabled] = useState(computeInternalKeyboardEnabled);
 
   useEffect(() => {
@@ -48,6 +50,7 @@ export function AdminVirtualKeyboardProvider({ children, lang, onVisibilityChang
     (binding) => {
       if (!internalKeyboardEnabled) return;
       bindingRef.current = binding;
+      setKeyboardMode(binding?.keyboardMode === 'numeric' ? 'numeric' : 'default');
       setOpen(true);
       onVisibilityChange?.(true);
     },
@@ -80,7 +83,16 @@ export function AdminVirtualKeyboardProvider({ children, lang, onVisibilityChang
   return (
     <AdminVirtualKeyboardContext.Provider value={value}>
       {children}
-      {open && internalKeyboardEnabled && (
+      {open && internalKeyboardEnabled && keyboardMode === 'numeric' && (
+        <NumericKeyboard
+          onChar={onChar}
+          onDelete={onDelete}
+          onClose={closeKeyboard}
+          onEnter={handlePhysicalEnter}
+          lang={lang}
+        />
+      )}
+      {open && internalKeyboardEnabled && keyboardMode !== 'numeric' && (
         <VirtualKeyboard
           onChar={onChar}
           onDelete={onDelete}

@@ -171,18 +171,32 @@ function ManualRegistrationModal({
           onNotify={onNotify}
         />
 
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder={t('preregEmail')}
-          className={inputCls}
-        />
-        <input
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder={t('preregPhone')}
-          className={inputCls}
-        />
+        <div>
+          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+            {t('preregEmail')}
+          </label>
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder={t('preregEmail')}
+            className={inputCls}
+            type="email"
+            autoComplete="email"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+            {t('preregPhone')}
+          </label>
+          <input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder={t('preregPhone')}
+            className={inputCls}
+            type="tel"
+            autoComplete="tel"
+          />
+        </div>
 
         {methods.length > 0 && (
           <div className="flex flex-wrap gap-2">

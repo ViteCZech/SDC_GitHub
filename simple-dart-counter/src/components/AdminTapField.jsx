@@ -24,6 +24,8 @@ export function AdminTapTextField({
   onKeyDown: onKeyDownProp,
   /** Ref na nativní input nebo tlačítko (focus / programové otevření klávesnice). */
   fieldRef,
+  /** 'default' | 'numeric' — na tabletu otevře numerickou klávesnici místo QWERTY. */
+  keyboardMode = 'default',
 }) {
   const vk = useContext(AdminVirtualKeyboardContext);
   const useInternalVk = vk?.internalKeyboardEnabled !== false && typeof vk?.openKeyboard === 'function';
@@ -32,6 +34,7 @@ export function AdminTapTextField({
     if (disabled || readOnly || !useInternalVk) return;
     let buf = String(value ?? '');
     vk.openKeyboard({
+      keyboardMode,
       onAppend: (c) => {
         if (filterChar && !filterChar(c)) return;
         buf += c;

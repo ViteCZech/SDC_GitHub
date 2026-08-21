@@ -3,6 +3,7 @@ import { Settings, Play, ClipboardList, Lock, Unlock, X, Pencil, Flag, Bell } fr
 import { translations } from '../translations';
 import { getBracketWinLegsForRound, getRoundBusyPlayerIds, isBracketRefereePlaceholder, suggestRefereeIdsForBracketMatch, resolveBracketRefereePlaceholder, countBracketJitStats } from '../utils/tournamentLogic';
 import { AdminTapTextField } from './AdminTapField';
+import NumericStepper from './NumericStepper';
 
 const BYE_MARKER = 'Volný los';
 
@@ -624,12 +625,15 @@ export default function TournamentBracketView({
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
                   {t('tournBracketModalLegsTitle')}
                 </label>
-                <AdminTapTextField
-                  value={editLegsValue}
-                  onValueChange={setEditLegsValue}
-                  onEnterPress={saveRoundSettingsModal}
-                  filterChar={(c) => /^\d$/.test(c)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
+                <NumericStepper
+                  useAdminTap
+                  value={editLegsValue === '' ? 1 : Number(editLegsValue) || 1}
+                  onChange={(v) => setEditLegsValue(String(v))}
+                  min={1}
+                  max={15}
+                  quickValues={[1, 2, 3, 4, 5]}
+                  decreaseLabel={t('numericDecrease') || 'Snížit'}
+                  increaseLabel={t('numericIncrease') || 'Zvýšit'}
                 />
                 <p className="text-[10px] text-slate-500 mt-1">{t('tournBracketModalLegsHint')}</p>
               </div>
@@ -637,12 +641,14 @@ export default function TournamentBracketView({
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
                   {t('tournBracketModalRoundBoardsLabel')}
                 </label>
-                <AdminTapTextField
-                  value={editBoardsValue}
-                  onValueChange={setEditBoardsValue}
-                  onEnterPress={saveRoundSettingsModal}
-                  filterChar={(c) => /^\d$/.test(c)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500"
+                <NumericStepper
+                  useAdminTap
+                  value={editBoardsValue === '' ? 1 : Number(editBoardsValue) || 1}
+                  onChange={(v) => setEditBoardsValue(String(v))}
+                  min={1}
+                  max={99}
+                  decreaseLabel={t('numericDecrease') || 'Snížit'}
+                  increaseLabel={t('numericIncrease') || 'Zvýšit'}
                 />
                 <p className="text-[10px] text-slate-500 mt-1">{t('tournBracketModalRoundBoardsHint')}</p>
               </div>
