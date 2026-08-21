@@ -87,7 +87,7 @@ function ManualRegistrationModal({
       playerName: name,
       email: email.trim() || null,
       phone: phone.trim() || null,
-      csoRank: null,
+      csoRank: csoRank ? Number(csoRank) : null,
       csoPlayerId: candidate.csoPlayerId,
       nameKey: normalizePlayerNameKey(name) || null,
       paymentMethod,

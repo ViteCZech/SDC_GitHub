@@ -86,7 +86,10 @@ export const createManualRegistration = onCall(
 
     await assertTournamentAdmin(tournamentId, uid);
     const nameKey = normalizePlayerNameKey(playerName);
-    const csoPlayerId = resolveStoredCsoPlayerId(playerName, data.csoPlayerId ?? undefined);
+    const csoPlayerId = resolveStoredCsoPlayerId(
+      playerName,
+      Object.prototype.hasOwnProperty.call(data, 'csoPlayerId') ? data.csoPlayerId : undefined
+    );
 
     const tourRef = db.collection('tournaments').doc(tournamentId);
     const result = await db.runTransaction(async (transaction) => {

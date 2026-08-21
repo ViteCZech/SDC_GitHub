@@ -29,6 +29,7 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
 
   const [playerName, setPlayerName] = useState('');
   const [csoPlayerId, setCsoPlayerId] = useState(null);
+  const [csoRank, setCsoRank] = useState(null);
   const [email, setEmail] = useState(() => String(defaultEmail ?? '').trim());
   const [phone, setPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState(paymentOptions[0] ?? null);
@@ -105,6 +106,7 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
         csoPlayerId,
+        csoRank: csoRank ?? undefined,
         paymentMethod: paymentMethod ?? null,
         termsAccepted: requiresTerms ? termsAccepted : false,
       });
@@ -116,6 +118,7 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
         paymentMethod: paymentMethod ?? null,
         amount: entryFee,
         csoPlayerId,
+        csoRank,
       });
     } catch (err) {
       setError(mapErrorMessage(err));
@@ -130,8 +133,8 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
         lang={lang}
         playerName={playerName}
         onPlayerNameChange={setPlayerName}
-        csoRank=""
-        onCsoRankChange={() => {}}
+        csoRank={csoRank != null ? String(csoRank) : ''}
+        onCsoRankChange={(v) => setCsoRank(v ? Number(v) : null)}
         onCsoPlayerIdChange={setCsoPlayerId}
         inputClassName={inputCls}
         disabled={loading}

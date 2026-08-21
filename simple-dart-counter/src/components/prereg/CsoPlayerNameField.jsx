@@ -119,6 +119,7 @@ export default function CsoPlayerNameField({
   const handleNameChange = (v) => {
     onPlayerNameChange(v);
     setSelectedCsoRank(null);
+    onCsoRankChange('');
     if (nullableRecreationalId) {
       onCsoPlayerIdChange?.(null);
     } else {
