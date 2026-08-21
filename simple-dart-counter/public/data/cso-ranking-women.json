@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-08-20T04:03:00.000Z",
-    "effectiveDate": "2026-08-20",
-    "generatedAt": "2026-08-20 04:03",
-    "fetchedAt": "2026-08-20T05:37:28.066Z",
+    "updatedAt": "2026-08-21T04:03:00.000Z",
+    "effectiveDate": "2026-08-21",
+    "generatedAt": "2026-08-21 04:03",
+    "fetchedAt": "2026-08-21T05:39:04.742Z",
     "totalPlayers": 134
   },
   "players": [
@@ -487,93 +487,93 @@
     },
     {
       "rank": 105,
+      "name": "Kateřina Šildbergerová",
+      "club": "Pojď mi hop"
+    },
+    {
+      "rank": 105,
       "name": "Klára Goldschmidtová"
     },
     {
-      "rank": 109,
-      "name": "Andrea Homolová",
-      "club": "Bumerang Team Plzeň"
-    },
-    {
-      "rank": 109,
+      "rank": 105,
       "name": "Iva Macháčková",
       "club": "Pojď mi hop"
     },
     {
       "rank": 111,
+      "name": "Andrea Homolová",
+      "club": "Bumerang Team Plzeň"
+    },
+    {
+      "rank": 112,
       "name": "Jana Ullrichová",
       "club": "DARTS CLUB ORLOVÁ"
     },
     {
-      "rank": 111,
+      "rank": 112,
       "name": "Vlasta Nováková",
       "club": "Spolek neratovických šipkařů"
     },
     {
-      "rank": 113,
+      "rank": 114,
       "name": "Anna Krčmáriková"
     },
     {
-      "rank": 113,
+      "rank": 114,
       "name": "Renata Řeháková",
       "club": "Steel Darts Skalička"
     },
     {
-      "rank": 113,
+      "rank": 114,
       "name": "Pavla Petraniová",
       "club": "Plaská Zvěř"
     },
     {
-      "rank": 113,
+      "rank": 114,
       "name": "Michaela Zelenková",
       "club": "Steel Darts Club Petrovice"
     },
     {
-      "rank": 113,
+      "rank": 114,
       "name": "Pavla Jurigová",
       "club": "Guru-Caffé Nekonečný příběh ..."
     },
     {
-      "rank": 118,
+      "rank": 119,
       "name": "Silvie Hronová"
     },
     {
-      "rank": 118,
+      "rank": 119,
       "name": "Eliška Steinová"
     },
     {
-      "rank": 118,
+      "rank": 119,
       "name": "Michaela Zahradníková"
     },
     {
-      "rank": 118,
+      "rank": 119,
       "name": "Kateřina Čepelová"
     },
     {
-      "rank": 118,
+      "rank": 119,
       "name": "Renata Slípková"
     },
     {
-      "rank": 118,
+      "rank": 119,
       "name": "Renata Nejezchlebová st.",
       "club": "DC Steelový Šílenci Teplice"
     },
     {
-      "rank": 118,
+      "rank": 119,
       "name": "Petra Nykodemová"
     },
     {
-      "rank": 118,
+      "rank": 119,
       "name": "Helena Krausová",
       "club": "Mouchy v medu"
     },
     {
-      "rank": 118,
-      "name": "Kateřina Šildbergerová",
-      "club": "Pojď mi hop"
-    },
-    {
-      "rank": 118,
+      "rank": 119,
       "name": "Gabriela Pacltová"
     },
     {
