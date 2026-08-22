@@ -99,7 +99,7 @@ async function loadItemFromRegistration(
   if (!regSnap.exists) return null;
   const data = regSnap.data() ?? {};
   const status = String(data.status ?? '');
-  if (status === 'CANCELLED' || status === 'NO_SHOW') return null;
+  if (status === 'NO_SHOW') return null;
 
   const tourSnap = await db.collection('tournaments').doc(tournamentId).get();
   const tournament = sanitizeTournament(tournamentId, tourSnap.data());

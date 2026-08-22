@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Ban, CheckCircle, Delete, Mic, MicOff, Trophy, Undo2, X } from 'lucide-react';
+import { ArrowLeft, Ban, CheckCircle, Delete, Trophy, Undo2, X } from 'lucide-react';
 import { translations } from '../translations';
 import {
   cancelOnlineGame,
@@ -12,15 +12,6 @@ import {
 } from '../services/onlineGamesService';
 import OnlineVideoContainer from './online/OnlineVideoContainer';
 import PostMatchView from './online/PostMatchView';
-import {
-  SPEECH_LANG_MAP,
-  normalizeSpeechCommand,
-  parseNumberFromSpeech,
-  matchesAnyPhrase,
-  VOICE_PHRASES,
-  CHECKOUT_VOICE_PHRASES,
-  getBustPointsForActiveScore,
-} from '../voiceSpeech';
 
 const IMPOSSIBLE_SCORES = [163, 166, 169, 172, 173, 175, 176, 178, 179];
 
@@ -217,7 +208,6 @@ export default function GameX01({
   isPC,
   restoredGameState,
   onRestoredConsumed,
-  onRematchVoice,
   /** Volitelně: po kroku zpět z checkoutu, který ukončil leg (vrácení do probíhajícího zápasu). */
   onFinishedLegUndone,
   /** ID online zápasu ve Firestore – pro budoucí synchronizaci hodů. */
@@ -300,21 +290,14 @@ export default function GameX01({
   const longPressTimer = useRef(null);
   const historyRef = useRef(null);
 
-  const [isListening, setIsListening] = useState(false); 
-  const [isMicActive, setIsMicActive] = useState(false); 
-
-  const recognitionRef = useRef(null);
   const onlineGameIdRef = useRef(onlineGameId);
   const gameStateRef = useRef(gameState);
-  const isMicActiveRef = useRef(isMicActive);
   const currentInputRef = useRef(currentInput);
   const finishDataRef = useRef(finishData);
   const processTurnRef = useRef(null);
   const handleTurnCommitRef = useRef(null);
   const handleUndoClickRef = useRef(null);
   const handleNextLegRef = useRef(null);
-  const handleVoiceCommandRef = useRef(() => {});
-  const micTimeoutRef = useRef(null);
   const pushOnlineX01LiveRef = useRef(async () => {});
   const lastPushedWriteIdRef = useRef('');
   const didSeedOnlineRef = useRef(false);
@@ -342,7 +325,7 @@ export default function GameX01({
     );
 
     useEffect(() => {
-      gameStateRef.current = gameState; isMicActiveRef.current = isMicActive;
+      gameStateRef.current = gameState;
       currentInputRef.current = currentInput; finishDataRef.current = finishData;
       // Po novém kole posun historie na nejnovější řádek
       requestAnimationFrame(() => {
@@ -350,7 +333,7 @@ export default function GameX01({
           historyRef.current.scrollTop = historyRef.current.scrollHeight;
         }
       });
-  }, [gameState.history?.length, gameState, isMicActive, currentInput, finishData]);
+  }, [gameState.history?.length, gameState, currentInput, finishData]);
 
   useEffect(() => {
     onlineGameIdRef.current = onlineGameId;
@@ -658,7 +641,6 @@ export default function GameX01({
       return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [editingMove, finishData, isPC, gameState.matchWinner, onlineMatchTransition]);
 
-  const toggleMic = () => setIsMicActive(!isMicActive);
 
   // Bot logic
   const playBotTurn = () => {
@@ -776,12 +758,6 @@ export default function GameX01({
           botAvg: settings.botAvg,
         };
         setSetScores(nextSetScores);
-        if (isMicActiveRef.current) {
-          if (micTimeoutRef.current) clearTimeout(micTimeoutRef.current);
-          micTimeoutRef.current = setTimeout(() => {
-            setIsMicActive(false);
-          }, 10000);
-        }
         if (onlineGameId && settings.gameType === 'x01') {
           const loser = ns.winner === 'p1' ? 'p2' : 'p1';
           const matchT = {
@@ -1268,175 +1244,6 @@ export default function GameX01({
   handleUndoClickRef.current = handleUndoClick;
   handleNextLegRef.current = handleNextLeg;
 
-  const handleVoiceCommand = (rawTranscript) => {
-    const command = normalizeSpeechCommand(rawTranscript);
-    const gs = gameStateRef.current;
-    const voiceInputLocked = () =>
-      Boolean(
-        postMatchStatsActiveRef.current ||
-        (onlineGameId &&
-          settings.gameType === 'x01' &&
-          myOnlineRole &&
-          (onlineMatchTransitionRef.current ||
-            gs.matchWinner ||
-            (gs.currentPlayer !== myOnlineRole && !gs.winner && !gs.matchWinner)))
-      );
-    const tMap = translations[lang];
-    const legacyUndo = Array.isArray(tMap?.cmdUndo) ? tMap.cmdUndo : [];
-    const legacyNext = Array.isArray(tMap?.cmdNextLeg) ? tMap.cmdNextLeg : [];
-    const checkoutPhrases = [
-      ...(Array.isArray(tMap?.checkoutPhrases) ? tMap.checkoutPhrases : []),
-      ...CHECKOUT_VOICE_PHRASES,
-    ];
-
-    if (matchesAnyPhrase(command, [...VOICE_PHRASES.undo, ...legacyUndo])) {
-      if (finishDataRef.current) {
-        setFinishData(null);
-        return;
-      }
-      if (gs.history.length > 0) {
-        handleUndoClickRef.current();
-      }
-      return;
-    }
-
-    if (finishDataRef.current) {
-      if (voiceInputLocked()) return;
-      const num = parseNumberFromSpeech(rawTranscript);
-      if (num != null && num >= finishDataRef.current.minD && num <= 3) {
-        processTurnRef.current(finishDataRef.current.points, num);
-        setFinishData(null);
-      } else if (num != null) {
-        setErrorMsg(`Nemožné zavřít na ${num} šipek`);
-        setTimeout(() => setErrorMsg(''), 2000);
-      }
-      return;
-    }
-
-    if (gs.matchWinner && typeof onRematchVoice === 'function' && matchesAnyPhrase(command, VOICE_PHRASES.rematch)) {
-      onRematchVoice();
-      return;
-    }
-
-    if (matchesAnyPhrase(command, [...VOICE_PHRASES.nextLeg, ...legacyNext])) {
-      if (gs.winner && !gs.matchWinner) {
-        if (
-          onlineGameId &&
-          settings.gameType === 'x01' &&
-          onlineLegTransitionRef.current?.awaitingAckFrom === myOnlineRole
-        ) {
-          acknowledgeOnlineLegEndRef.current();
-        } else if (
-          onlineGameId &&
-          settings.gameType === 'x01' &&
-          onlineLegTransitionRef.current
-        ) {
-          /* vítěz legu čeká na OK soupeře */
-        } else {
-          handleNextLegRef.current();
-        }
-      }
-      return;
-    }
-
-    if (matchesAnyPhrase(command, VOICE_PHRASES.bust)) {
-      if (!gs.winner) {
-        if (voiceInputLocked()) return;
-        const cScore = gs.currentPlayer === 'p1' ? gs.p1Score : gs.p2Score;
-        const bustPts = getBustPointsForActiveScore(cScore);
-        handleTurnCommitRef.current(bustPts);
-      }
-      return;
-    }
-
-    const checkoutMatch = checkoutPhrases.some((p) => matchesAnyPhrase(command, [p]));
-    if (checkoutMatch) {
-      if (!gs.winner) {
-        if (voiceInputLocked()) return;
-        const cScore = gs.currentPlayer === 'p1' ? gs.p1Score : gs.p2Score;
-        const requestedDarts = parseNumberFromSpeech(rawTranscript);
-        if (requestedDarts != null && requestedDarts >= 1 && requestedDarts <= 3) {
-          const minD = getMinDartsToCheckout(cScore, settings.outMode);
-          if (minD === Infinity || requestedDarts < minD) {
-            setErrorMsg(`Nemožné zavřít na ${requestedDarts} šipky`);
-            setTimeout(() => setErrorMsg(''), 2000);
-          } else {
-            processTurnRef.current(cScore, requestedDarts);
-          }
-        } else {
-          handleTurnCommitRef.current(cScore);
-        }
-      }
-      return;
-    }
-
-    if (!gs.winner) {
-      if (voiceInputLocked()) return;
-      const num = parseNumberFromSpeech(rawTranscript);
-      if (num != null && num >= 0 && num <= 180) {
-        handleTurnCommitRef.current(num);
-      } else {
-        setErrorMsg(`? "${command}"`);
-        setTimeout(() => setErrorMsg(''), 1500);
-      }
-    }
-  };
-
-  handleVoiceCommandRef.current = handleVoiceCommand;
-
-  useEffect(() => {
-    let recognition = recognitionRef.current;
-    if (isMicActive) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        setIsMicActive(false);
-        setErrorMsg(String(translations[lang]?.micError || 'Chyba mikrofonu'));
-        setTimeout(() => setErrorMsg(''), 2000);
-        return;
-      }
-      recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = false;
-      recognition.lang = SPEECH_LANG_MAP[lang] || 'cs-CZ';
-      recognition.onstart = () => setIsListening(true);
-      recognition.onend = () => {
-        setIsListening(false);
-        if (isMicActiveRef.current) {
-          try {
-            recognition.start();
-          } catch {}
-        }
-      };
-      recognition.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript;
-        handleVoiceCommandRef.current(transcript);
-      };
-      recognition.onerror = (e) => {
-        if (e.error === 'not-allowed') {
-          setIsMicActive(false);
-          setErrorMsg('Přístup k mikrofonu odepřen.');
-          setTimeout(() => setErrorMsg(''), 2500);
-        }
-      };
-      try {
-        recognition.start();
-      } catch {}
-      recognitionRef.current = recognition;
-    } else {
-      if (recognition) {
-        recognition.onend = null;
-        recognition.stop();
-        setIsListening(false);
-      }
-    }
-    return () => {
-      if (recognition) {
-        recognition.onend = null;
-        recognition.stop();
-      }
-    };
-  }, [isMicActive, lang]);
-
   const handleBackFromLeg = () => {
     if (prevNextLegStateRef.current) {
       setGameState(prevNextLegStateRef.current);
@@ -1768,7 +1575,6 @@ export default function GameX01({
                           >
                             {t('onlineOpenKeypad')}
                           </button>
-                          <button onClick={toggleMic} className={`w-12 h-12 rounded flex items-center justify-center border transition-all shrink-0 ${isMicActive ? (isListening ? 'bg-red-600 border-red-500 animate-pulse text-white' : 'bg-red-900/50 border-red-500/50 text-red-200') : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'}`}>{isMicActive ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}</button>
                           <button onClick={handleUndoClick} className="flex items-center justify-center w-12 h-12 border rounded bg-slate-800 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700 shrink-0"><Undo2 className="w-6 h-6" /></button>
                         </div>
                         <p className="text-[10px] text-center text-slate-500 font-semibold">
@@ -1797,7 +1603,6 @@ export default function GameX01({
                     <div className="flex items-center justify-between h-12 px-2 py-1 border rounded-lg mobile-input-area bg-slate-900 sm:px-4 sm:py-2 border-slate-800 sm:h-20 shrink-0">
                         <div className="flex flex-col justify-center flex-1 min-w-0 mr-2"><span className="text-[9px] text-slate-500 uppercase font-bold shrink-0">{translations[lang]?.throw || 'Hod'}</span><div className={`font-bold flex-1 flex items-center ${errorMsg ? 'text-red-500 text-sm sm:text-xl leading-tight whitespace-normal' : 'text-white text-3xl sm:text-5xl font-mono truncate'}`}>{errorMsg || currentInput || <span className="text-slate-700">0</span>}</div></div>
                         <div className="flex gap-1.5 sm:gap-2 shrink-0">
-                            <button onClick={toggleMic} className={`w-10 h-10 sm:w-12 sm:h-12 rounded flex items-center justify-center border transition-all ${isMicActive ? (isListening ? 'bg-red-600 border-red-500 animate-pulse text-white' : 'bg-red-900/50 border-red-500/50 text-red-200') : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'}`}>{isMicActive ? <Mic className="w-5 h-5 sm:w-6 sm:h-6" /> : <MicOff className="w-5 h-5 sm:w-6 sm:h-6" />}</button>
                             <button onClick={handleUndoClick} className="flex items-center justify-center w-10 h-10 border rounded sm:w-12 sm:h-12 bg-slate-800 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700"><Undo2 className="w-5 h-5 sm:w-6 sm:h-6" /></button>
                         </div>
                     </div>

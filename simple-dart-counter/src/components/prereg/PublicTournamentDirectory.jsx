@@ -13,6 +13,7 @@ import {
   getPublicTournamentData,
   getPublicTournamentsList,
   listMyRegistrationsApi,
+  lookupStoredRegistrationApi,
 } from '../../services/tournamentPreRegService';
 import { normalizeForSearch } from '../../utils/csoRanking';
 import { calculatePrizePool } from '../../utils/prizePool';
@@ -26,7 +27,12 @@ import {
   listAllStoredRegistrations,
   loadPreferredCity,
   savePreferredCity,
+  saveStoredRegistration,
 } from '../../utils/preregStorage';
+import {
+  blocksNewPreregistration,
+  preferActivePreregistration,
+} from '../../utils/playerIdentity';
 import PreRegPageShell from './PreRegPageShell';
 
 const TABS = [
@@ -75,7 +81,7 @@ function formatStartsAt(startsAt, lang) {
   }
 }
 
-function TournamentCard({ lang, tournament, onRegister, t, isRegistered, myStatus }) {
+function TournamentCard({ lang, tournament, onRegister, t, myStatus }) {
   const badge = getTournamentCatalogBadge(tournament);
   const confirmed = tournament.counters?.confirmed ?? 0;
   const capacity = tournament.meta?.capacity;
@@ -87,7 +93,9 @@ function TournamentCard({ lang, tournament, onRegister, t, isRegistered, myStatu
     payoutPercent: tournament.finance?.payoutPercent ?? null,
     sponsorMoney: tournament.finance?.addedSponsorMoney ?? null,
   });
-  const registerEnabled = canRegisterFromCatalog(tournament) && !isRegistered;
+  const cancelled = myStatus === 'CANCELLED';
+  const blocking = blocksNewPreregistration(myStatus);
+  const registerEnabled = canRegisterFromCatalog(tournament) && !blocking;
 
   return (
     <article className="p-4 rounded-xl border border-slate-800 bg-slate-900/80 flex flex-col sm:flex-row sm:items-center gap-4">
@@ -101,10 +109,16 @@ function TournamentCard({ lang, tournament, onRegister, t, isRegistered, myStatu
           >
             {t(BADGE_KEYS[badge] ?? BADGE_KEYS.OTHER)}
           </span>
-          {isRegistered && (
-            <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border shrink-0 bg-sky-500/20 text-sky-300 border-sky-500/40">
-              {t('preregCatalogBadgeMine')}
-              {myStatus ? ` · ${myStatus}` : ''}
+          {myStatus && (
+            <span
+              className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border shrink-0 ${
+                cancelled
+                  ? 'bg-red-500/20 text-red-300 border-red-500/40'
+                  : 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+              }`}
+            >
+              {cancelled ? t('preregCatalogBadgeCancelled') : t('preregCatalogBadgeMine')}
+              {!cancelled && myStatus && myStatus !== 'CONFIRMED' ? ` · ${myStatus}` : ''}
             </span>
           )}
         </div>
@@ -145,7 +159,7 @@ function TournamentCard({ lang, tournament, onRegister, t, isRegistered, myStatu
             : 'bg-slate-700 hover:bg-slate-600 border border-slate-600'
         }`}
       >
-        {isRegistered
+        {blocking
           ? t('preregCatalogMyRegBtn')
           : registerEnabled
             ? t('preregCatalogRegisterBtn')
@@ -231,31 +245,55 @@ export default function PublicTournamentDirectory({
     const mergeLocal = async (baseMap) => {
       const map = new Map(baseMap);
       const local = listAllStoredRegistrations();
-      for (const row of local) {
-        if (map.has(row.tournamentId)) continue;
-        let tournament =
-          tournaments.find((x) => x.id === row.tournamentId) || null;
-        if (!tournament) {
+      await Promise.all(
+        local.map(async (row) => {
+          let status = row.status;
           try {
-            tournament = await getPublicTournamentData(row.tournamentId);
+            const fresh = await lookupStoredRegistrationApi(row.tournamentId, row.registrationId);
+            if (fresh?.status) {
+              status = fresh.status;
+              const { tournamentId: _tid, ...rest } = row;
+              saveStoredRegistration(row.tournamentId, {
+                ...rest,
+                status: fresh.status,
+                playerName: fresh.playerName ?? row.playerName,
+                variableSymbol: fresh.variableSymbol ?? row.variableSymbol ?? null,
+                paymentMethod: fresh.paymentMethod ?? row.paymentMethod ?? null,
+                amount: fresh.amount ?? row.amount ?? null,
+                savedAt: row.savedAt || new Date().toISOString(),
+              });
+            }
           } catch {
-            tournament = {
-              id: row.tournamentId,
-              meta: { name: row.playerName || row.tournamentId },
-              status: null,
-            };
+            /* keep local */
           }
-        }
-        if (cancelled) return map;
-        map.set(row.tournamentId, {
-          tournamentId: row.tournamentId,
-          registrationId: row.registrationId,
-          status: row.status,
-          playerName: row.playerName ?? null,
-          source: 'local',
-          tournament,
-        });
-      }
+          let tournament =
+            tournaments.find((x) => x.id === row.tournamentId) || null;
+          if (!tournament) {
+            try {
+              tournament = await getPublicTournamentData(row.tournamentId);
+            } catch {
+              tournament = {
+                id: row.tournamentId,
+                meta: { name: row.playerName || row.tournamentId },
+                status: null,
+              };
+            }
+          }
+          if (cancelled) return;
+          const incoming = {
+            tournamentId: row.tournamentId,
+            registrationId: row.registrationId,
+            status,
+            playerName: row.playerName ?? null,
+            source: 'local',
+            tournament,
+          };
+          map.set(
+            row.tournamentId,
+            preferActivePreregistration(map.get(row.tournamentId), incoming)
+          );
+        })
+      );
       return map;
     };
 
@@ -268,13 +306,17 @@ export default function PublicTournamentDirectory({
           try {
             const items = await listMyRegistrationsApi();
             for (const item of items) {
-              map.set(item.tournamentId, {
+              const incoming = {
                 ...item,
                 source: 'server',
                 tournament: item.tournament
                   ? { id: item.tournamentId, ...item.tournament }
                   : null,
-              });
+              };
+              map.set(
+                item.tournamentId,
+                preferActivePreregistration(map.get(item.tournamentId), incoming)
+              );
             }
           } catch (err) {
             if (!cancelled) {
@@ -345,7 +387,7 @@ export default function PublicTournamentDirectory({
     let list = tournaments.filter((item) => tab?.match(item.status));
 
     if (scope === 'AVAILABLE') {
-      list = list.filter((item) => !myByTournamentId.has(item.id));
+      list = list.filter((item) => !blocksNewPreregistration(myByTournamentId.get(item.id)?.status));
     }
 
     if (q) {
@@ -381,7 +423,7 @@ export default function PublicTournamentDirectory({
     const counts = { OPEN: 0, ACTIVE: 0, FINISHED: 0 };
     const source =
       scope === 'AVAILABLE'
-        ? tournaments.filter((item) => !myByTournamentId.has(item.id))
+        ? tournaments.filter((item) => !blocksNewPreregistration(myByTournamentId.get(item.id)?.status))
         : tournaments;
     for (const item of source) {
       if (item.status === 'REGISTRATION_OPEN') counts.OPEN += 1;
@@ -582,7 +624,6 @@ export default function PublicTournamentDirectory({
                     lang={lang}
                     tournament={item}
                     t={t}
-                    isRegistered={!!mine}
                     myStatus={mine?.status || null}
                     onRegister={onOpenTournament}
                   />

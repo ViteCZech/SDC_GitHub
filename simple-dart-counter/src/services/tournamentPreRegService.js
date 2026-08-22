@@ -8,6 +8,7 @@ import {
   hashAdminPin,
 } from '../utils/preregAdmin';
 import { buildCzechBankAccount } from '../utils/bankAccount';
+import { findDuplicateRegistration } from '../utils/playerIdentity';
 
 /** Region musí odpovídat nasazení Cloud Functions (`functions/src/registerPlayer.ts`). */
 const FUNCTIONS_REGION = 'europe-west1';
@@ -138,6 +139,21 @@ export async function listMyRegistrationsApi() {
     error.code = code.replace(/^functions\//, '') || 'list_my_registrations_failed';
     throw error;
   }
+}
+
+/**
+ * Stav přihlášky podle ID z localStorage (bez e-mailu / telefonu).
+ * @param {string} tournamentId
+ * @param {string} registrationId
+ */
+export async function lookupStoredRegistrationApi(tournamentId, registrationId) {
+  const functions = getFunctions(requireApp(), FUNCTIONS_REGION);
+  const fn = httpsCallable(functions, 'lookupStoredRegistration');
+  const result = await fn({
+    tournamentId: String(tournamentId ?? '').trim(),
+    registrationId: String(registrationId ?? '').trim(),
+  });
+  return /** @type {object} */ (result.data);
 }
 
 function requireAuthUid() {
@@ -475,7 +491,7 @@ export async function updateRegistration(tournamentId, regId, patch) {
 /**
  * @param {string} tournamentId
  * @param {string} regId
- * @param {'CONFIRMED'|'WAITLIST'} previousStatus
+ * @param {'CONFIRMED'|'WAITLIST'|'PENDING_PAYMENT'} previousStatus
  */
 export async function cancelRegistration(tournamentId, regId, previousStatus) {
   await requireAdminAccess(tournamentId);
@@ -490,7 +506,84 @@ export async function cancelRegistration(tournamentId, regId, previousStatus) {
       transaction.update(tourRef, { 'counters.confirmed': increment(-1) });
     } else if (previousStatus === 'WAITLIST') {
       transaction.update(tourRef, { 'counters.waitlist': increment(-1) });
+    } else if (previousStatus === 'PENDING_PAYMENT') {
+      transaction.update(tourRef, { 'counters.pendingPayment': increment(-1) });
     }
+  });
+}
+
+/**
+ * Obnoví stornovanou přihlášku na CONFIRMED, PENDING_PAYMENT nebo WAITLIST.
+ * Při plné kapacitě a volbě CONFIRMED přesune na WAITLIST (pokud je zapnutý).
+ * @param {string} tournamentId
+ * @param {string} regId
+ * @param {'CONFIRMED'|'PENDING_PAYMENT'} targetStatus
+ * @returns {Promise<{ status: string }>}
+ */
+export async function restoreCancelledRegistration(tournamentId, regId, targetStatus) {
+  await requireAdminAccess(tournamentId);
+  const wanted = targetStatus === 'PENDING_PAYMENT' ? 'PENDING_PAYMENT' : 'CONFIRMED';
+
+  const regsSnap = await getDocs(collection(requireDb(), 'tournaments', tournamentId, 'registrations'));
+  const regs = regsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const currentReg = regs.find((r) => r.id === regId);
+  if (!currentReg) throw new Error(PREREG_NOT_FOUND);
+  if (String(currentReg.status ?? '') !== 'CANCELLED') {
+    throw new Error('prereg_restore_not_cancelled');
+  }
+  const player = currentReg.player ?? {};
+  const dup = findDuplicateRegistration(
+    regs.filter((r) => r.id !== regId),
+    {
+      name: player.name,
+      csoPlayerId:
+        player.csoPlayerId ?? (player.nameKey ? `name:${player.nameKey}` : null),
+    }
+  );
+  if (dup) throw new Error('prereg_restore_duplicate_active');
+
+  return runTransaction(requireDb(), async (transaction) => {
+    const regRef = doc(requireDb(), 'tournaments', tournamentId, 'registrations', regId);
+    const tourRef = doc(requireDb(), 'tournaments', tournamentId);
+    const [regSnap, tourSnap] = await Promise.all([
+      transaction.get(regRef),
+      transaction.get(tourRef),
+    ]);
+    if (!regSnap.exists()) throw new Error(PREREG_NOT_FOUND);
+    if (!tourSnap.exists()) throw new Error(PREREG_NOT_FOUND);
+
+    const current = String(regSnap.data()?.status ?? '');
+    if (current !== 'CANCELLED') {
+      throw new Error('prereg_restore_not_cancelled');
+    }
+
+    const tour = tourSnap.data() ?? {};
+    const confirmed = Number(tour.counters?.confirmed ?? 0) || 0;
+    const rawCap = tour.meta?.capacity;
+    const cap = rawCap == null ? null : Number(rawCap);
+    const unlimited = cap == null || !Number.isFinite(cap) || cap <= 0;
+    const waitlistEnabled = !!tour.meta?.waitlistEnabled;
+
+    let next = wanted;
+    if (wanted === 'CONFIRMED' && !unlimited && confirmed >= cap) {
+      if (!waitlistEnabled) {
+        throw new Error('prereg_restore_capacity_full');
+      }
+      next = 'WAITLIST';
+    }
+
+    transaction.update(regRef, {
+      status: next,
+      updatedAt: serverTimestamp(),
+    });
+    if (next === 'CONFIRMED') {
+      transaction.update(tourRef, { 'counters.confirmed': increment(1), updatedAt: serverTimestamp() });
+    } else if (next === 'WAITLIST') {
+      transaction.update(tourRef, { 'counters.waitlist': increment(1), updatedAt: serverTimestamp() });
+    } else {
+      transaction.update(tourRef, { 'counters.pendingPayment': increment(1), updatedAt: serverTimestamp() });
+    }
+    return { status: next };
   });
 }
 

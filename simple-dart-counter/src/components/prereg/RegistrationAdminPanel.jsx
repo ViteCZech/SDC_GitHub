@@ -7,6 +7,7 @@ import {
   Loader2,
   Plus,
   QrCode,
+  RotateCcw,
   Trash2,
   UserCheck,
   UserX,
@@ -21,6 +22,7 @@ import {
   getOwnerTournamentData,
   listenToRegistrations,
   markRegistrationPaid,
+  restoreCancelledRegistration,
   toggleRegistrationCheckIn,
 } from '../../services/tournamentPreRegService';
 import { calculatePrizePool, distributePrizePool, getDistributionTemplate } from '../../utils/prizePool';
@@ -42,6 +44,12 @@ import {
 } from '../../utils/playerIdentity';
 
 const FILTERS = ['ALL', 'CONFIRMED', 'WAITLIST', 'CANCELLED'];
+
+function registrationStatusLabel(t, status) {
+  const key = `preregStatusLabel${status}`;
+  const label = t(key);
+  return label === key ? status : label;
+}
 
 function ManualRegistrationModal({
   lang,
@@ -304,6 +312,7 @@ export default function RegistrationAdminPanel({
   const [deleting, setDeleting] = useState(false);
   const [checkInConfirm, setCheckInConfirm] = useState(null);
   const [qrModalReg, setQrModalReg] = useState(null);
+  const [restoreReg, setRestoreReg] = useState(null);
   const isFetchingTournamentRef = useRef(false);
   const [csoMen, setCsoMen] = useState([]);
   const [csoWomen, setCsoWomen] = useState([]);
@@ -421,6 +430,37 @@ export default function RegistrationAdminPanel({
     runAction(registration.id, () =>
       toggleRegistrationCheckIn(tournamentId, registration.id, nextCheckedIn)
     );
+  };
+
+  const mapRestoreError = (err) => {
+    const msg = String(err?.message ?? '');
+    if (msg === 'prereg_restore_capacity_full') return t('preregRestoreCapacityFull');
+    if (msg === 'prereg_restore_not_cancelled') return t('preregRestoreErr');
+    if (msg === 'prereg_restore_duplicate_active') return t('preregRestoreDuplicate');
+    return msg || t('preregRestoreErr');
+  };
+
+  const handleRestoreCancelled = async (targetStatus) => {
+    if (!restoreReg) return;
+    const reg = restoreReg;
+    setRestoreReg(null);
+    await runAction(reg.id, async () => {
+      try {
+        const result = await restoreCancelledRegistration(tournamentId, reg.id, targetStatus);
+        if (result?.status === 'WAITLIST' && targetStatus === 'CONFIRMED') {
+          onNotify?.(t('preregRestoreWaitlistNote'), 'success');
+        }
+        if (result?.status && FILTERS.includes(result.status)) {
+          setFilter(result.status);
+        } else {
+          setFilter('ALL');
+        }
+        setHighlightRegId(reg.id);
+        window.setTimeout(() => setHighlightRegId(null), 4500);
+      } catch (err) {
+        throw new Error(mapRestoreError(err));
+      }
+    });
   };
 
   const handleCheckInPayCashAndConfirm = async () => {
@@ -671,7 +711,13 @@ export default function RegistrationAdminPanel({
                     )}
                   </td>
                   <td className="p-3">
-                    <span className="text-xs font-bold uppercase">{r.status}</span>
+                    <span
+                      className={`text-xs font-bold uppercase ${
+                        isCancelled ? 'text-red-300' : 'text-slate-200'
+                      }`}
+                    >
+                      {registrationStatusLabel(t, r.status)}
+                    </span>
                     {r.attendance?.checkedIn && (
                       <div className="text-emerald-400 text-xs flex items-center gap-1 mt-1">
                         <UserCheck className="w-3 h-3" /> {t('preregCheckedIn')}
@@ -679,7 +725,18 @@ export default function RegistrationAdminPanel({
                     )}
                   </td>
                   <td className="p-3">
-                    {!isCancelled && (
+                    {isCancelled ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setRestoreReg(r)}
+                        className="inline-flex items-center gap-1.5 px-2 py-2 rounded-lg bg-slate-800 text-emerald-400 hover:bg-slate-700 text-[10px] sm:text-xs font-bold"
+                        title={t('preregRestoreReg')}
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        {t('preregRestoreReg')}
+                      </button>
+                    ) : (
                       <div className="flex flex-wrap gap-1">
                         {!r.payment?.isPaid && r.payment?.method === 'QR' && (
                           <>
@@ -794,6 +851,39 @@ export default function RegistrationAdminPanel({
           registration={qrModalReg}
           onClose={() => setQrModalReg(null)}
         />
+      )}
+
+      {restoreReg && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4">
+            <h3 className="text-lg font-black text-white">{t('preregRestoreRegTitle')}</h3>
+            <p className="text-sm text-slate-400">{t('preregRestoreRegBody')}</p>
+            <p className="text-sm font-bold text-white">{restoreReg.player?.name}</p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => handleRestoreCancelled('CONFIRMED')}
+                className="w-full py-3 rounded-xl font-black text-white bg-emerald-600 hover:bg-emerald-500 text-sm"
+              >
+                {t('preregRestoreConfirmed')}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRestoreCancelled('PENDING_PAYMENT')}
+                className="w-full py-3 rounded-xl font-black text-amber-100 bg-amber-700 hover:bg-amber-600 text-sm"
+              >
+                {t('preregRestorePending')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRestoreReg(null)}
+                className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-300 border border-slate-600 hover:bg-slate-700"
+              >
+                {t('cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {checkInConfirm && (

@@ -96,6 +96,38 @@ export const ACTIVE_PREREG_STATUSES = new Set([
 ]);
 
 /**
+ * Stornované / neaktivní přihlášky nesmí blokovat novou registraci.
+ * @param {string|null|undefined} status
+ * @returns {boolean}
+ */
+export function blocksNewPreregistration(status) {
+  return ACTIVE_PREREG_STATUSES.has(String(status || ''));
+}
+
+/**
+ * @param {object|null|undefined} existing
+ * @param {object} incoming
+ * @returns {object}
+ */
+export function preferActivePreregistration(existing, incoming) {
+  if (!existing) return incoming;
+  const sameDoc =
+    existing.registrationId &&
+    incoming?.registrationId &&
+    String(existing.registrationId) === String(incoming.registrationId);
+  if (sameDoc) {
+    if (existing.source === 'server' && incoming.source === 'local') return existing;
+    if (incoming.source === 'server' && existing.source === 'local') return incoming;
+  }
+  const rank = (s) => {
+    if (ACTIVE_PREREG_STATUSES.has(String(s || ''))) return 0;
+    if (String(s || '') === 'CANCELLED') return 2;
+    return 1;
+  };
+  return rank(incoming?.status) <= rank(existing?.status) ? incoming : existing;
+}
+
+/**
  * @param {Array<object>} registrations
  * @param {{ name?: string, csoPlayerId?: string|null }} candidate
  * @returns {object|null} matching registration doc

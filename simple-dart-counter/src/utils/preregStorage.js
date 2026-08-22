@@ -3,7 +3,7 @@ const STORAGE_PREFIX = 'dartsPrereg_';
 /**
  * @typedef {Object} StoredRegistration
  * @property {string} registrationId
- * @property {'CONFIRMED'|'WAITLIST'} status
+ * @property {'CONFIRMED'|'WAITLIST'|'CANCELLED'|'PENDING_PAYMENT'} status
  * @property {string|null} variableSymbol
  * @property {'QR'|'CASH'|null} paymentMethod
  * @property {string} playerName

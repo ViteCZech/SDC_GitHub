@@ -20,7 +20,6 @@ SDC_GitHub/
     src/main.jsx                     ← React 19 + PWA service worker
     src/firebase.js                  ← Firebase Auth + Firestore DB `eur3`
     src/translations.js
-    src/voiceSpeech.js               ← hlasové zadávání (Web Speech API)
     src/components/                  ← obrazovky a UI
     src/components/online/           ← online lobby / video / post-match
     src/components/prereg/           ← předregistrace turnajů
@@ -126,7 +125,6 @@ Domů → Nová hra (`setup`) → `playing`.
 - Typ: **X01** (301/501, Single/Double Out) nebo **Cricket** (15–20 + bull)
 - Formát: First To / Best Of, vlastní sety (1–9) × legy (až 21)
 - Soupeř: člověk nebo **bot** (avg 45 / 65 / 100 / custom 40–120)
-- Hlasové zadávání (`voiceSpeech.js`) — cs/en/pl fráze, undo, bust, rematch
 - Virtuální klávesnice na tabletu (`VirtualKeyboard.jsx`, `NumericKeyboard.jsx`)
 - Undo, editace hodu, quick checkout, nemožná skóre (163, 166, …)
 - Historie v `localStorage`; po Google loginu nabídka zálohy do cloudu
@@ -264,7 +262,7 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 
 | Úkol | Soubory |
 |---|---|
-| Chování X01 (bust, checkout, undo, online ACK) | `GameX01.jsx`, `voiceSpeech.js` |
+| Chování X01 (bust, checkout, undo, online ACK) | `GameX01.jsx` |
 | Cricket značky / MPR | `GameCricket.jsx` |
 | Setup lokálního zápasu / bot | `App.jsx` (`setup`) |
 | Online lobby / join / abandon | `onlineGamesService.js`, `OnlineHub.jsx`, `online/*` |

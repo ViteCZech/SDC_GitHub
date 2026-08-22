@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Trophy, Undo2 } from 'lucide-react';
-import { matchesAnyPhrase, normalizeSpeechCommand, VOICE_PHRASES } from '../voiceSpeech';
+import { Trophy, Undo2 } from 'lucide-react';
 import { subscribeOnlineGame } from '../services/onlineGamesService';
 
 // --- MOCK PŘEKLADŮ (V reálném projektu smažte a použijte import) ---
@@ -65,16 +64,12 @@ export default function GameCricket({
   });
 
   const [highScoreAnimation, setHighScoreAnimation] = useState(null);
-  const [isMicActive, setIsMicActive] = useState(false); 
-  const [isListening, setIsListening] = useState(false);
   const [setScores, setSetScores] = useState([]);
 
   const t = (k) => translations[lang]?.[k] || k;
 
-  const recognitionRef = useRef(null);
   const peerAbandonCricketRef = useRef(false);
   const onlineGameIdRef = useRef(onlineGameId);
-  const isMicActiveRef = useRef(isMicActive);
   const gameStateRef = useRef(gameState);
 
   const getDisplayName = (name, isP1, isBot) => {
@@ -93,10 +88,6 @@ export default function GameCricket({
     
     return name;
   };
-
-  useEffect(() => {
-    isMicActiveRef.current = isMicActive;
-  }, [isMicActive]);
 
   useEffect(() => {
     gameStateRef.current = gameState;
@@ -304,228 +295,6 @@ export default function GameCricket({
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [isPC, gameState.winner, gameState.multiplier, gameState.currentPlayer, onlineGameId, myOnlineRole]);
 
-  // --- HLASOVÉ OVLÁDÁNÍ – CRICKET ---
-  const sanitizeSpeech = (text) => {
-    if (!text) return '';
-    let clean = text.toLowerCase().trim();
-    // sjednotíme oddělovače na mezery + odstraníme diakritiku pro stabilní slovníky
-    clean = clean.replace(/[;,]/g, ' ');
-    clean = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-    const wordMap = {
-      // Czech targets
-      'patnact': '15', 'patnactka': '15', 'patnactku': '15',
-      'sestnact': '16', 'sestnactka': '16', 'sestnactku': '16',
-      'sedmnact': '17', 'sedmnactka': '17', 'sedmnactku': '17',
-      'osmnact': '18', 'osmnactka': '18', 'osmnactku': '18',
-      'devatenact': '19', 'devatenactka': '19', 'devatenactku': '19',
-      'dvacet': '20', 'dvacitka': '20', 'dvacitku': '20',
-      'petadvacet': '25', 'cisty stred': '25',
-      // bull color hints (standalone or with "stred")
-      'zeleny': '25', 'zeleny stred': '25',
-      'cerveny': '50', 'cerveny stred': '50',
-      'padesat': '50', 'stred': '50',
-      // English targets
-      'fifteen': '15',
-      'sixteen': '16',
-      'seventeen': '17',
-      'eighteen': '18',
-      'nineteen': '19',
-      'twenty': '20',
-      'bull': '50', 'bullseye': '50', 'outer bull': '25', 'inner bull': '50',
-      // Polish targets
-      'pietnascie': '15',
-      'szesnascie': '16',
-      'siedemnascie': '17',
-      'osiemnascie': '18',
-      'dziewietnascie': '19',
-      'dwadziescia': '20',
-      // Miss / zero
-      'vedle': '0', 'mimo': '0', 'nula': '0', 'nic': '0', 'minul': '0',
-      'miss': '0', 'outside': '0', 'no score': '0',
-      'pudlo': '0', 'obok': '0'
-    };
-
-    // Kvantifikátory počtu šipek (x1/x2/x3)
-    const countMap = {
-      // Czech (explicit repeats phrasing)
-      'jedna sipka': 'x1', 'jednu sipku': 'x1',
-      'dve sipky': 'x2', 'dvema sipkama': 'x2',
-      'tri sipky': 'x3', 'trema sipkama': 'x3',
-      // English
-      'once': 'x1', 'one time': 'x1',
-      'twice': 'x2', 'two times': 'x2',
-      'three times': 'x3',
-      // Polish
-      'raz': 'x1', 'jeden raz': 'x1',
-      'dwa razy': 'x2', 'dwa raz': 'x2',
-      'trzy razy': 'x3'
-    };
-
-    const multiplierMap = {
-      // Czech / generic
-      'tripl': 'T', 'trojitá': 'T', 'trojitý': 'T',
-      'dabl': 'D', 'dvojitá': 'D', 'dvojitý': 'D',
-      // Czech spoken: "dvakrát 20" usually means double 20, "třikrát 20" triple 20
-      'dvakrat': 'D',
-      'trikrat': 'T',
-      // English
-      'triple': 'T', 'treble': 'T',
-      'double': 'D',
-      // Polish
-      'potrojny': 'T',
-      'podwojny': 'D'
-    };
-
-    Object.entries(wordMap).forEach(([word, val]) => {
-      clean = clean.replace(new RegExp(`\\b${word}\\b`, 'g'), val);
-    });
-    Object.entries(countMap).forEach(([word, val]) => {
-      clean = clean.replace(new RegExp(`\\b${word}\\b`, 'g'), val);
-    });
-    Object.entries(multiplierMap).forEach(([word, val]) => {
-      clean = clean.replace(new RegExp(`\\b${word}\\b`, 'g'), val);
-    });
-
-    // Záchyt tvarů "2x", "3x" jako počtu šipek
-    clean = clean.replace(/\b1x\b/g, 'x1').replace(/\b2x\b/g, 'x2').replace(/\b3x\b/g, 'x3');
-
-    return clean;
-  };
-
-  const parseCricketDarts = (cleanText, maxDarts = 3) => {
-    const darts = [];
-    if (!cleanText) return darts;
-
-    const tokens = cleanText.split(/\s+/).filter(Boolean);
-    let currentMultiplier = 1;
-    let currentRepeat = 1;
-
-    const validDirectTargets = [15, 16, 17, 18, 19, 20, 25, 50, 0];
-
-    const pushDart = (target, multiplier) => {
-      if (darts.length >= maxDarts) return;
-      if (target === 25 && multiplier === 3) multiplier = 2;
-      if (target === 50) { target = 25; multiplier = 2; }
-      if (target === 0) multiplier = 1;
-      darts.push({ target, multiplier });
-    };
-
-    for (let token of tokens) {
-      if (darts.length >= maxDarts) break;
-
-      if (token === 'x3') { currentRepeat = 3; continue; }
-      if (token === 'x2') { currentRepeat = 2; continue; }
-      if (token === 'x1') { currentRepeat = 1; continue; }
-
-      if (token === 'T') { currentMultiplier = 3; continue; }
-      if (token === 'D') { currentMultiplier = 2; continue; }
-
-      const num = parseInt(token, 10);
-      if (Number.isNaN(num)) continue;
-
-      let target = null;
-      let multFromNumber = 1;
-
-      if (validDirectTargets.includes(num)) {
-        target = num;
-      } else {
-        // rozklad čísel jako 45, 60, 40 -> base * mult
-        for (let base of [15, 16, 17, 18, 19, 20]) {
-          for (let m of [3, 2, 1]) {
-            if (base * m === num) {
-              target = base;
-              multFromNumber = m;
-              break;
-            }
-          }
-          if (target !== null) break;
-        }
-      }
-
-      if (target === null) continue;
-
-      let effectiveMult = currentMultiplier !== 1 ? currentMultiplier : multFromNumber;
-
-      // Speciál: "dvakrát mimo" / "třikrát miss" – v praxi jde o počet šipek mimo
-      if (target === 0 && currentMultiplier > 1 && currentRepeat === 1) {
-        currentRepeat = currentMultiplier;
-        effectiveMult = 1;
-      }
-
-      const repeats = Math.min(maxDarts - darts.length, currentRepeat);
-      for (let i = 0; i < repeats; i++) {
-        pushDart(target, effectiveMult);
-      }
-
-      currentMultiplier = 1;
-      currentRepeat = 1;
-    }
-
-    return darts;
-  };
-
-  const handleVoiceCommand = (rawTranscript) => {
-    const transcript = (rawTranscript || '').toLowerCase().trim();
-    const cleanText = sanitizeSpeech(transcript);
-
-    const cmd = normalizeSpeechCommand(rawTranscript || '');
-    if (matchesAnyPhrase(cmd, VOICE_PHRASES.undo)) {
-      handleUndoClick();
-      return;
-    }
-    if (matchesAnyPhrase(cmd, VOICE_PHRASES.nextLeg)) {
-      const gs = gameStateRef.current;
-      if (gs?.winner && !gs?.matchWinner) handleNextLeg();
-      return;
-    }
-
-    const remaining = Math.max(0, 3 - (gameStateRef.current?.dartsThrown ?? 0));
-    const darts = parseCricketDarts(cleanText, remaining || 3);
-    darts.forEach(d => handleThrow(d.target, d.multiplier));
-  };
-
-  useEffect(() => {
-    let recognition = recognitionRef.current;
-    if (isMicActive) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        setIsMicActive(false);
-        return;
-      }
-      recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = false;
-      recognition.lang = lang === 'en' ? 'en-US' : (lang === 'pl' ? 'pl-PL' : 'cs-CZ');
-      recognition.onstart = () => setIsListening(true);
-      recognition.onend = () => {
-        setIsListening(false);
-        if (isMicActiveRef.current) {
-          try { recognition.start(); } catch {}
-        }
-      };
-      recognition.onresult = (event) => {
-        const res = event.results[event.results.length - 1][0].transcript;
-        handleVoiceCommand(res);
-      };
-      recognition.onerror = () => {};
-      try { recognition.start(); } catch {}
-      recognitionRef.current = recognition;
-    } else {
-      if (recognition) {
-        recognition.onend = null;
-        recognition.stop();
-        setIsListening(false);
-      }
-    }
-    return () => {
-      if (recognition) {
-        recognition.onend = null;
-        recognition.stop();
-      }
-    };
-  }, [isMicActive, lang]);
-
   const playBotDart = () => {
     const lvl = settings?.botLevel || 'amateur';
     let target = 0; let mult = 1;
@@ -725,20 +494,8 @@ export default function GameCricket({
             </div>
             
             <div className="flex h-12 gap-2 sm:h-14 shrink-0">
-                <button
-                  onClick={() => setIsMicActive(!isMicActive)}
-                  className={`flex-1 rounded-xl flex items-center justify-center border transition-all ${
-                    isMicActive
-                      ? (isListening
-                          ? 'bg-red-600 border-red-500 text-white animate-pulse'
-                          : 'bg-red-900/60 border-red-500 text-red-100')
-                      : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'
-                  }`}
-                >
-                    {isMicActive ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-                </button>
                 <button onClick={handleUndoClick} disabled={gameState.history.length === 0}
-                    className={`flex-[2] rounded-xl font-bold flex flex-col items-center justify-center uppercase tracking-widest border transition-all ${gameState.history.length === 0 ? 'bg-slate-900 border-slate-800 text-slate-700 cursor-not-allowed' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-red-900/40 hover:text-red-400 hover:border-red-900 active:scale-95'}`}>
+                    className={`flex-1 rounded-xl font-bold flex flex-col items-center justify-center uppercase tracking-widest border transition-all ${gameState.history.length === 0 ? 'bg-slate-900 border-slate-800 text-slate-700 cursor-not-allowed' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-red-900/40 hover:text-red-400 hover:border-red-900 active:scale-95'}`}>
                     <Undo2 className="w-4 h-4 mb-0.5" />
                     <span className="text-[10px]">Undo</span>
                 </button>

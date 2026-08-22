@@ -23,12 +23,11 @@ import {
 import { 
   AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, 
   DownloadCloud, FileText, History, Home, Info, Keyboard as KeyboardIcon, 
-  Maximize, Minimize, Mic, MicOff, MousePointer2, Pause, Play, RefreshCw, RotateCcw, 
+  Maximize, Minimize, MousePointer2, Pause, Play, RefreshCw, RotateCcw, 
   Target, Trash2, Trophy, Undo2, Unplug, User, Cloud, X, BarChart2, List, Swords, ClipboardList, Lock
 } from 'lucide-react';
 
 import { translations } from './translations';
-import { matchesRematchPhrase, normalizeSpeechCommand, SPEECH_LANG_MAP } from './voiceSpeech';
 import {
   TABLET_CHECKIN_MAX_WARNINGS,
   bumpRoleWarningCounts,
@@ -634,49 +633,9 @@ const FlagIcon = ({ lang }) => {
 
 const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch, isTournamentMode, onTournamentMatchComplete, onUndoAndResume }) => {
     const t = (k) => translations[lang]?.[k] || k;
-    const [isMicRematch, setIsMicRematch] = useState(false);
     const [savingMatch, setSavingMatch] = useState(false);
     const [saveError, setSaveError] = useState(null); // string | null
     const [pendingSavePayload, setPendingSavePayload] = useState(null); // { matchId, resultData } | null
-    const isMicRematchRef = useRef(false);
-    const onStartMatchRef = useRef(onStartMatch);
-    useEffect(() => {
-        isMicRematchRef.current = isMicRematch;
-    }, [isMicRematch]);
-    useEffect(() => {
-        onStartMatchRef.current = onStartMatch;
-    }, [onStartMatch]);
-
-    useEffect(() => {
-        if (!isMicRematch) return undefined;
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) return undefined;
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = false;
-        recognition.lang = SPEECH_LANG_MAP[lang] || 'cs-CZ';
-        recognition.onend = () => {
-            if (isMicRematchRef.current) {
-                try {
-                    recognition.start();
-                } catch {}
-            }
-        };
-        recognition.onresult = (event) => {
-            const transcript = event.results[event.results.length - 1][0].transcript;
-            const cmd = normalizeSpeechCommand(transcript);
-            if (matchesRematchPhrase(cmd)) {
-                onStartMatchRef.current();
-            }
-        };
-        try {
-            recognition.start();
-        } catch {}
-        return () => {
-            recognition.onend = null;
-            recognition.stop();
-        };
-    }, [isMicRematch, lang]);
     const isP1 = data.matchWinner === 'p1';
     const displayP1Name = getTranslatedName(data.p1Name, true, lang);
     
@@ -917,15 +876,6 @@ const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch, isTo
                             </>
                         ) : (
                             <>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsMicRematch((v) => !v)}
-                                    className={`flex items-center justify-center gap-2 w-full py-2 text-sm font-bold uppercase tracking-widest rounded-xl border transition-all ${isMicRematch ? 'bg-emerald-900/40 border-emerald-500 text-emerald-300' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
-                                    title="Hlasová odveta (rematch)"
-                                >
-                                    {isMicRematch ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-                                    {isMicRematch ? (t('micOn') || 'Mikrofon zapnutý') : (t('micOff') || 'Hlasová odveta')}
-                                </button>
                                 <button onClick={onStartMatch} className="flex items-center justify-center w-full gap-3 py-4 text-lg font-black text-white transition-all shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-xl active:scale-95">
                                     <RotateCcw className="w-6 h-6" /> {t('rematch')}
                                 </button>

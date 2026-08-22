@@ -4,6 +4,7 @@ import VenueMapLink from '../VenueMapLink';
 import { translations } from '../../translations';
 import {
   getPublicTournamentData,
+  lookupStoredRegistrationApi,
   PREREG_NOT_FOUND,
 } from '../../services/tournamentPreRegService';
 import { loadStoredRegistration, saveStoredRegistration } from '../../utils/preregStorage';
@@ -49,6 +50,30 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
     loadTournament();
   }, [loadTournament]);
 
+  useEffect(() => {
+    const stored = loadStoredRegistration(tournamentId);
+    if (!stored?.registrationId) return undefined;
+    let cancelled = false;
+    lookupStoredRegistrationApi(tournamentId, stored.registrationId)
+      .then((fresh) => {
+        if (cancelled || !fresh?.status) return;
+        const next = {
+          ...stored,
+          status: fresh.status,
+          playerName: fresh.playerName ?? stored.playerName,
+          variableSymbol: fresh.variableSymbol ?? stored.variableSymbol,
+          paymentMethod: fresh.paymentMethod ?? stored.paymentMethod,
+          amount: fresh.amount ?? stored.amount,
+        };
+        saveStoredRegistration(tournamentId, next);
+        setRegistration(next);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [tournamentId]);
+
   const handleRegistrationSuccess = (result, formSnapshot) => {
     const stored = {
       registrationId: result.registrationId,
@@ -67,7 +92,7 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
 
   const confirmationRef = useRef(null);
   useEffect(() => {
-    if (registration && confirmationRef.current) {
+    if (registration && registration.status !== 'CANCELLED' && confirmationRef.current) {
       confirmationRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [registration]);
@@ -113,9 +138,12 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
   }
 
   const startsAtLabel = formatDate(tournament.meta?.startsAt);
-  const showForm = isRegistrationOpen && !registration;
-  const showConfirmation = !!registration;
+  const isCancelled = registration?.status === 'CANCELLED';
+  const hasActiveRegistration = !!registration && !isCancelled;
+  const showForm = isRegistrationOpen && !hasActiveRegistration;
+  const showConfirmation = hasActiveRegistration;
   const showClosedOnly = !isRegistrationOpen && !registration;
+  const showCancelledNotice = isCancelled;
 
   return (
     <PreRegPageShell wide={false}>
@@ -145,8 +173,20 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
         </div>
       )}
 
-      {!isRegistrationOpen && registration && (
+      {!isRegistrationOpen && hasActiveRegistration && (
         <p className="text-sm text-slate-500">{t('preregClosedButRegistered')}</p>
+      )}
+
+      {showCancelledNotice && (
+        <div className="p-5 rounded-xl border border-red-500/40 bg-red-950/30">
+          <p className="font-black uppercase tracking-wide text-red-300 text-sm">
+            {t('preregStatusCancelled')}
+          </p>
+          {registration?.playerName && (
+            <p className="text-slate-300 mt-1">{registration.playerName}</p>
+          )}
+          <p className="text-sm text-red-200/80 mt-2">{t('preregCancelledHint')}</p>
+        </div>
       )}
 
       {showConfirmation && (
