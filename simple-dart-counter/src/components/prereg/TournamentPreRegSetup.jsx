@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { CheckCircle, Copy, Eye, EyeOff, Loader2, Trophy } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { BookmarkPlus, CheckCircle, Copy, Eye, EyeOff, Loader2, Trash2, Trophy } from 'lucide-react';
 import { translations } from '../../translations';
 import { createPreRegTournament } from '../../services/tournamentPreRegService';
 import {
@@ -8,8 +8,20 @@ import {
   parseOptionalNumber,
   parseOptionalString,
 } from '../../utils/preregAdmin';
+import {
+  deletePreregSetupTemplate,
+  loadPreregSetupTemplates,
+  upsertPreregSetupTemplate,
+} from '../../utils/preregStorage';
+import {
+  KNOWN_CITIES,
+  REGION_SUGGESTIONS,
+  regionForCity,
+  uniquePlaces,
+} from '../../utils/preregPlaces';
 import PreRegPageShell from './PreRegPageShell';
 import DateTimeLocalFields from './DateTimeLocalFields';
+import PlaceSuggestField from './PlaceSuggestField';
 import NumericStepper from '../NumericStepper';
 
 /**
@@ -47,11 +59,138 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
   const [adminPin, setAdminPin] = useState('');
   const [showAdminPin, setShowAdminPin] = useState(true);
 
+  const [templates, setTemplates] = useState(() => loadPreregSetupTemplates());
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [templateTitle, setTemplateTitle] = useState('');
+  const [includeBank, setIncludeBank] = useState(false);
+  const [infoNotice, setInfoNotice] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [createdLinks, setCreatedLinks] = useState(null);
 
   const showBankFields = payQr;
+  const selectedTemplate = templates.find((row) => row.id === selectedTemplateId) || null;
+
+  const extraCities = useMemo(
+    () =>
+      templates.flatMap((row) => {
+        const city = String(row.fields?.locationCity ?? '').trim();
+        const region = String(row.fields?.locationRegion ?? '').trim();
+        return city ? [{ name: city, region, hint: region }] : [];
+      }),
+    [templates]
+  );
+  const extraRegions = useMemo(
+    () =>
+      templates
+        .map((row) => String(row.fields?.locationRegion ?? '').trim())
+        .filter(Boolean)
+        .map((regionName) => ({ name: regionName })),
+    [templates]
+  );
+  const cityItems = useMemo(
+    () =>
+      uniquePlaces([
+        ...KNOWN_CITIES.map((c) => ({ name: c.name, hint: c.region, region: c.region })),
+        ...extraCities,
+      ]),
+    [extraCities]
+  );
+  const regionItems = useMemo(
+    () => uniquePlaces([...REGION_SUGGESTIONS, ...extraRegions]),
+    [extraRegions]
+  );
+
+  const captureTemplateFields = (withBank) => ({
+    name: name.trim(),
+    locationCity,
+    locationVenueName,
+    locationRegion,
+    isPublic,
+    capacity,
+    waitlistEnabled,
+    entryFee,
+    payoutPercent,
+    sponsorMoney,
+    payQr,
+    payCash,
+    vsPrefix,
+    termsAndConditions,
+    ...(withBank
+      ? { accountPrefix, accountNumber, bankCode }
+      : {}),
+  });
+
+  const applyTemplate = (template) => {
+    if (!template?.fields) return;
+    const f = template.fields;
+    if (f.name != null) setName(String(f.name));
+    setLocationCity(String(f.locationCity ?? ''));
+    setLocationVenueName(String(f.locationVenueName ?? ''));
+    setLocationRegion(String(f.locationRegion ?? ''));
+    setIsPublic(f.isPublic !== false);
+    setCapacity(f.capacity != null && f.capacity !== '' ? String(f.capacity) : '');
+    setWaitlistEnabled(!!f.waitlistEnabled);
+    setEntryFee(f.entryFee != null && f.entryFee !== '' ? String(f.entryFee) : '');
+    setPayoutPercent(f.payoutPercent != null && f.payoutPercent !== '' ? String(f.payoutPercent) : '');
+    setSponsorMoney(f.sponsorMoney != null && f.sponsorMoney !== '' ? String(f.sponsorMoney) : '');
+    setPayQr(f.payQr !== false);
+    setPayCash(f.payCash !== false);
+    setVsPrefix(String(f.vsPrefix ?? ''));
+    setTermsAndConditions(String(f.termsAndConditions ?? ''));
+    if (template.includeBank) {
+      setAccountPrefix(String(f.accountPrefix ?? ''));
+      setAccountNumber(String(f.accountNumber ?? ''));
+      setBankCode(String(f.bankCode ?? ''));
+      setInfoNotice(t('preregTemplateBankCheck'));
+    } else {
+      setInfoNotice(t('preregTemplateApplied'));
+    }
+    setError('');
+  };
+
+  const handleSaveTemplate = () => {
+    const title = templateTitle.trim();
+    if (!title) {
+      setError(t('preregTemplateErrName'));
+      return;
+    }
+    const withBank = includeBank && payQr;
+    const id =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `tpl_${Date.now()}`;
+    const next = upsertPreregSetupTemplate({
+      id,
+      title,
+      savedAt: new Date().toISOString(),
+      includeBank: withBank,
+      fields: captureTemplateFields(withBank),
+    });
+    setTemplates(next);
+    const saved = next.find(
+      (row) => String(row.title || '').trim().toLowerCase() === title.toLowerCase()
+    );
+    setSelectedTemplateId(saved?.id ?? '');
+    setSaveModalOpen(false);
+    setInfoNotice(t('preregTemplateSaved'));
+    setError('');
+  };
+
+  const handleDeleteTemplate = () => {
+    if (!selectedTemplateId) return;
+    const next = deletePreregSetupTemplate(selectedTemplateId);
+    setTemplates(next);
+    setSelectedTemplateId('');
+  };
+
+  const handleCityChange = (v) => {
+    setLocationCity(v);
+    const mapped = regionForCity(v, extraCities);
+    if (mapped && !locationRegion.trim()) setLocationRegion(mapped);
+  };
 
   const handleStartsAtChange = (val) => {
     setStartsAt(val);
@@ -206,6 +345,63 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
         <h1 className="text-2xl font-black text-white">{t('preregAdminSetupHeading')}</h1>
       </header>
 
+      <section className="p-4 rounded-xl border border-slate-800 bg-slate-900/80 space-y-3">
+        <h2 className="text-sm font-black uppercase tracking-widest text-slate-400">
+          {t('preregTemplateTitle')}
+        </h2>
+        <p className="text-xs text-slate-500">{t('preregTemplateHint')}</p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <select
+            value={selectedTemplateId}
+            onChange={(e) => setSelectedTemplateId(e.target.value)}
+            className={`${inputCls} sm:flex-1`}
+            disabled={loading}
+          >
+            <option value="">{t('preregTemplateNone')}</option>
+            {templates.map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.title}
+                {row.includeBank ? ' · QR' : ''}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={loading || !selectedTemplate}
+            onClick={() => applyTemplate(selectedTemplate)}
+            className="px-4 py-3 rounded-xl font-bold bg-slate-800 border border-slate-700 text-emerald-400 hover:bg-slate-700 disabled:opacity-40"
+          >
+            {t('preregTemplateApply')}
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => {
+              setTemplateTitle(name.trim() || selectedTemplate?.title || '');
+              setIncludeBank(false);
+              setSaveModalOpen(true);
+              setError('');
+            }}
+            className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold bg-slate-800 border border-slate-700 text-sky-300 hover:bg-slate-700 disabled:opacity-40"
+          >
+            <BookmarkPlus className="w-4 h-4" />
+            {t('preregTemplateSave')}
+          </button>
+          <button
+            type="button"
+            disabled={loading || !selectedTemplateId}
+            onClick={handleDeleteTemplate}
+            className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold bg-slate-800 border border-slate-700 text-red-400 hover:bg-slate-700 disabled:opacity-40"
+            title={t('preregTemplateDelete')}
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+        {infoNotice && (
+          <p className="text-sm text-emerald-300/90">{infoNotice}</p>
+        )}
+      </section>
+
       {!isLoggedIn && (
         <div className="p-4 rounded-xl border border-amber-500/50 bg-amber-900/20 space-y-3">
           <p className="text-sm text-amber-200">{t('preregAdminLoginRequired')}</p>
@@ -242,25 +438,38 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
               />
             </div>
             <div>
-              <label className={labelCls}>{t('preregAdminLocationCity')}</label>
-              <input
+              <PlaceSuggestField
+                id="prereg-setup-city"
+                label={t('preregAdminLocationCity')}
                 value={locationCity}
-                onChange={(e) => setLocationCity(e.target.value)}
-                className={inputCls}
-                disabled={loading}
+                onChange={handleCityChange}
+                onPick={(item) => {
+                  const mapped = item.region || regionForCity(item.name, extraCities);
+                  if (mapped) setLocationRegion(mapped);
+                }}
+                items={cityItems}
                 placeholder={t('preregAdminLocationCityHint')}
+                disabled={loading}
+                inputClassName={inputCls}
               />
             </div>
             <div>
-              <label className={labelCls}>{t('preregAdminLocationRegion')}</label>
-              <input
+              <PlaceSuggestField
+                id="prereg-setup-region"
+                label={t('preregAdminLocationRegion')}
                 value={locationRegion}
-                onChange={(e) => setLocationRegion(e.target.value)}
-                className={inputCls}
-                disabled={loading}
+                onChange={setLocationRegion}
+                items={regionItems}
                 placeholder={t('preregAdminLocationRegionHint')}
+                disabled={loading}
+                inputClassName={inputCls}
+                emptyOpen
+                minChars={0}
               />
             </div>
+            <p className="text-[10px] text-slate-500 md:col-span-2 -mt-2">
+              {t('preregPlaceSuggestHint')}
+            </p>
             <div>
               <label className={labelCls}>{t('preregAdminStartsAt')}</label>
               <DateTimeLocalFields
@@ -505,6 +714,57 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
           )}
         </button>
       </form>
+
+      {saveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4">
+            <h3 className="text-lg font-black text-white">{t('preregTemplateSave')}</h3>
+            <p className="text-xs text-slate-500">{t('preregTemplateHint')}</p>
+            <div>
+              <label className={labelCls}>{t('preregTemplateName')}</label>
+              <input
+                value={templateTitle}
+                onChange={(e) => setTemplateTitle(e.target.value)}
+                className={inputCls}
+                autoFocus
+              />
+              {templates.some(
+                (row) =>
+                  String(row.title || '').trim().toLowerCase() === templateTitle.trim().toLowerCase()
+              ) && (
+                <p className="text-[10px] text-amber-400 mt-1">{t('preregTemplateOverwriteHint')}</p>
+              )}
+            </div>
+            {payQr && (
+              <label className="flex items-start gap-2 text-sm text-slate-300">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={includeBank}
+                  onChange={(e) => setIncludeBank(e.target.checked)}
+                />
+                <span>{t('preregTemplateIncludeBank')}</span>
+              </label>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSaveModalOpen(false)}
+                className="flex-1 py-3 rounded-xl font-bold bg-slate-800 text-slate-300 border border-slate-600 hover:bg-slate-700"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveTemplate}
+                className="flex-1 py-3 rounded-xl font-black text-white bg-emerald-600 hover:bg-emerald-500"
+              >
+                {t('save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </PreRegPageShell>
   );

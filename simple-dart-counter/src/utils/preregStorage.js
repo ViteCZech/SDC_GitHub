@@ -135,3 +135,64 @@ export function clearAdminInviteSession(tournamentId) {
     localStorage.removeItem(`${ADMIN_INVITE_PREFIX}${tournamentId}`);
   } catch {}
 }
+
+const SETUP_TEMPLATES_KEY = 'dartsPreregSetupTemplates_v1';
+const MAX_SETUP_TEMPLATES = 30;
+
+/**
+ * Vzor nastavení předregistrace (bez termínů, uzávěrky a PIN).
+ * @typedef {Object} PreregSetupTemplate
+ * @property {string} id
+ * @property {string} title
+ * @property {string} savedAt
+ * @property {boolean} includeBank
+ * @property {object} fields
+ */
+
+/** @returns {PreregSetupTemplate[]} */
+export function loadPreregSetupTemplates() {
+  try {
+    const raw = localStorage.getItem(SETUP_TEMPLATES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((row) => row && typeof row === 'object' && row.id && row.title);
+  } catch {
+    return [];
+  }
+}
+
+/** @param {PreregSetupTemplate[]} list */
+export function savePreregSetupTemplates(list) {
+  try {
+    const next = Array.isArray(list) ? list.slice(0, MAX_SETUP_TEMPLATES) : [];
+    localStorage.setItem(SETUP_TEMPLATES_KEY, JSON.stringify(next));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+/**
+ * @param {PreregSetupTemplate} template
+ * @returns {PreregSetupTemplate[]}
+ */
+export function upsertPreregSetupTemplate(template) {
+  const list = loadPreregSetupTemplates();
+  const idx = list.findIndex(
+    (row) =>
+      row.id === template.id ||
+      String(row.title || '').trim().toLowerCase() === String(template.title || '').trim().toLowerCase()
+  );
+  const next = [...list];
+  if (idx >= 0) next[idx] = { ...template, id: list[idx].id };
+  else next.unshift(template);
+  savePreregSetupTemplates(next);
+  return loadPreregSetupTemplates();
+}
+
+/** @param {string} templateId */
+export function deletePreregSetupTemplate(templateId) {
+  const next = loadPreregSetupTemplates().filter((row) => row.id !== templateId);
+  savePreregSetupTemplates(next);
+  return next;
+}
