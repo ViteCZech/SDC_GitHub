@@ -3,11 +3,11 @@ import {
   ArrowRight,
   Calendar,
   Loader2,
-  MapPin,
   Search,
   Trophy,
   Users,
 } from 'lucide-react';
+import VenueMapLink from '../VenueMapLink';
 import { translations } from '../../translations';
 import {
   getPublicTournamentData,
@@ -18,7 +18,6 @@ import { normalizeForSearch } from '../../utils/csoRanking';
 import { calculatePrizePool } from '../../utils/prizePool';
 import {
   canRegisterFromCatalog,
-  formatLocationLabel,
   getTournamentCatalogBadge,
   sortByNearestStart,
   sortByPreferredCityThenStart,
@@ -109,9 +108,8 @@ function TournamentCard({ lang, tournament, onRegister, t, isRegistered, myStatu
             </span>
           )}
         </div>
-        <p className="text-sm text-slate-400 flex items-start gap-1.5">
-          <MapPin className="w-4 h-4 shrink-0 mt-0.5 text-slate-500" />
-          {formatLocationLabel(tournament)}
+        <p className="min-w-0">
+          <VenueMapLink tournament={tournament} lang={lang} />
         </p>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
           <span className="flex items-center gap-1">

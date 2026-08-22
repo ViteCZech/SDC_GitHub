@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Calendar, Loader2, MapPin, Trophy } from 'lucide-react';
+import { Calendar, Loader2, Trophy } from 'lucide-react';
+import VenueMapLink from '../VenueMapLink';
 import { translations } from '../../translations';
 import {
   getPublicTournamentData,
@@ -133,11 +134,7 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
               <Calendar className="w-4 h-4" /> {startsAtLabel}
             </span>
           )}
-          {tournament.meta?.venue && (
-            <span className="inline-flex items-center gap-1.5">
-              <MapPin className="w-4 h-4" /> {tournament.meta.venue}
-            </span>
-          )}
+          <VenueMapLink tournament={tournament} lang={lang} />
         </div>
       </header>
 

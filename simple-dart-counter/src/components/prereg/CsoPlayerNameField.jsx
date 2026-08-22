@@ -9,6 +9,7 @@ import {
   searchCsoPlayers,
 } from '../../utils/csoRanking';
 import { resolveCsoPlayerId } from '../../utils/playerIdentity';
+import { handleExternalLinkClick } from '../../utils/openExternalUrl';
 import { useListboxKeyboard } from '../../hooks/useListboxKeyboard';
 import CsoRankingUpdateButton from '../CsoRankingUpdateButton';
 
@@ -216,6 +217,7 @@ export default function CsoPlayerNameField({
               href={getCsoRankingUrl(csoGender)}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={handleExternalLinkClick(getCsoRankingUrl(csoGender))}
               className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-[10px] text-slate-300 hover:text-white"
             >
               <ExternalLink className="w-3 h-3" />

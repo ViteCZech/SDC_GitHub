@@ -104,16 +104,58 @@ export function canRegisterFromCatalog(tournament) {
 }
 
 /**
+ * Sloučené místo (podnik / adresa) — nové turnaje ukládají stejný text do venue i location.venueName.
+ * @param {object} tournament
+ * @returns {string}
+ */
+export function getVenuePlaceName(tournament) {
+  const loc = tournament?.meta?.location;
+  const fromStructured = String(loc?.venueName || '').trim();
+  const fromLegacy = String(tournament?.meta?.venue || '').trim();
+  if (fromStructured && fromLegacy && fromStructured !== fromLegacy) {
+    return `${fromStructured}, ${fromLegacy}`;
+  }
+  return fromStructured || fromLegacy;
+}
+
+/**
+ * Text pro vyhledávání v mapách: podnik, město, kraj (bez duplicit).
+ * @param {object} tournament
+ * @returns {string}
+ */
+export function getMapsSearchQuery(tournament) {
+  const loc = tournament?.meta?.location;
+  const parts = [
+    getVenuePlaceName(tournament),
+    loc?.city,
+    loc?.region,
+  ]
+    .map((p) => String(p ?? '').trim())
+    .filter(Boolean);
+  return [...new Set(parts)].join(', ');
+}
+
+/**
+ * Google Maps search URL, nebo null když není co hledat.
+ * @param {object} tournament
+ * @returns {string|null}
+ */
+export function buildMapsSearchUrl(tournament) {
+  const q = getMapsSearchQuery(tournament);
+  if (!q) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+}
+
+/**
  * @param {object} tournament
  * @returns {string}
  */
 export function formatLocationLabel(tournament) {
   const loc = tournament?.meta?.location;
   const parts = [
-    loc?.venueName,
+    getVenuePlaceName(tournament),
     loc?.city,
     loc?.region,
-    tournament?.meta?.venue,
   ]
     .map((p) => String(p ?? '').trim())
     .filter(Boolean);

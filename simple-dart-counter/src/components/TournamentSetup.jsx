@@ -34,6 +34,7 @@ import {
   playersAreSame,
   resolveCsoPlayerId,
 } from '../utils/playerIdentity';
+import { handleExternalLinkClick } from '../utils/openExternalUrl';
 
 /** Ranking z inputu: prázdné nebo 0 → null */
 function parseRankingFromInput(val) {
@@ -1021,6 +1022,7 @@ export default function TournamentSetup({
                       href={getCsoRankingUrl(csoGender)}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={handleExternalLinkClick(getCsoRankingUrl(csoGender))}
                       className={`${btnBase} bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm`}
                     >
                       <ExternalLink className="w-4 h-4" />

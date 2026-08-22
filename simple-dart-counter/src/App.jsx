@@ -56,6 +56,7 @@ import AppNavBar from './components/AppNavBar';
 import PauseMenuOverlay from './components/PauseMenuOverlay';
 import ActiveSessionBanner from './components/ActiveSessionBanner';
 import { resolveAppNav, shouldParkTournamentSession } from './utils/appNavigation';
+import { loadUiResume, saveUiResume } from './utils/uiResumeStorage';
 import { parsePreregRouteFromUrl, isPublicTournamentCatalogPath } from './utils/preregAdmin';
 import { parseTabletRouteFromUrl, ensureBoardAuthTokens } from './utils/tabletBoardQr';
 import { loadAdminInviteSession, saveAdminInviteSession } from './utils/preregStorage';
@@ -218,6 +219,37 @@ function writeTournamentWip(pin) {
 
 function clearTournamentWip() {
   safeStorage.removeItem(TOURNAMENT_WIP_KEY);
+}
+
+function mergeDraftFromResume(saved) {
+  const base = createDefaultTournamentDraft();
+  if (!saved || typeof saved !== 'object') return base;
+  return {
+    ...base,
+    ...saved,
+    players: Array.isArray(saved.players) ? saved.players : [],
+  };
+}
+
+let bootUiResumeCache;
+function getBootUiResumeOnce() {
+  if (bootUiResumeCache !== undefined) return bootUiResumeCache;
+  try {
+    if (isPublicTournamentCatalogPath() || parsePreregRouteFromUrl() || parseTabletRouteFromUrl()) {
+      bootUiResumeCache = null;
+      return null;
+    }
+    const role = safeStorage.getItem(SESSION_ROLE_KEY);
+    if (role === 'viewer' || role === 'tablet') {
+      bootUiResumeCache = null;
+      return null;
+    }
+    bootUiResumeCache = loadUiResume();
+    return bootUiResumeCache;
+  } catch {
+    bootUiResumeCache = null;
+    return null;
+  }
 }
 
 /** Obecné načtení JSON z localStorage s bezpečným fallbackem. */
@@ -1149,17 +1181,33 @@ function AppMain({ lang, setLang }) {
     const route = parsePreregRouteFromUrl();
     if (route?.inviteToken) return 'prereg_admin';
     if (route?.tournamentId) return 'prereg_public';
+    const resume = getBootUiResumeOnce();
+    if (resume?.appState && resume.appState !== 'home') return resume.appState;
     return 'home';
   });
-  const [preregTournamentId, setPreregTournamentId] = useState(() =>
-    isPublicTournamentCatalogPath() ? null : parsePreregTournamentIdFromPath()
-  );
+  const [preregTournamentId, setPreregTournamentId] = useState(() => {
+    if (isPublicTournamentCatalogPath()) return null;
+    const fromPath = parsePreregTournamentIdFromPath();
+    if (fromPath) return fromPath;
+    const r = getBootUiResumeOnce();
+    if (r?.appState === 'prereg_public' || r?.appState === 'prereg_admin') {
+      return r.preregTournamentId ?? null;
+    }
+    return null;
+  });
   /** Po otevření turnaje z katalogu — zpět vede na /tournaments místo domů. */
-  const [preregReturnToCatalog, setPreregReturnToCatalog] = useState(false);
+  const [preregReturnToCatalog, setPreregReturnToCatalog] = useState(() => {
+    const r = getBootUiResumeOnce();
+    return r?.appState === 'prereg_public' ? !!r.preregReturnToCatalog : false;
+  });
   /** UUID turnaje v admin panelu předregistrace (vlastník přes Google). */
   const [activePreRegTournamentId, setActivePreRegTournamentId] = useState(() => {
     const route = parsePreregRouteFromUrl();
-    return route?.inviteToken ? route.tournamentId : null;
+    if (route?.inviteToken) return route.tournamentId;
+    if (route?.tournamentId) return null;
+    const r = getBootUiResumeOnce();
+    if (r?.appState === 'prereg_admin') return r.activePreRegTournamentId ?? null;
+    return null;
   });
   /** Invite token z URL / session pro spolupořaditele. */
   const [activePreRegInviteToken, setActivePreRegInviteToken] = useState(() => {
@@ -1481,18 +1529,59 @@ function AppMain({ lang, setLang }) {
     return loaded.hadError ? 'Předchozí turnaj byl poškozen nebo je ze staré verze. Začínáme čistý turnaj.' : null;
   });
   const [tournamentData, setTournamentData] = useState(() => getInitialTournamentBootstrapOnce().td ?? null);
-  const [tournamentDraft, setTournamentDraft] = useState(() => createDefaultTournamentDraft());
-  const [tournamentSetupStep, setTournamentSetupStep] = useState(1);
+  const [tournamentDraft, setTournamentDraft] = useState(() =>
+    mergeDraftFromResume(getBootUiResumeOnce()?.tournamentDraft)
+  );
+  const [tournamentSetupStep, setTournamentSetupStep] = useState(() => {
+    const s = Number(getBootUiResumeOnce()?.tournamentSetupStep);
+    return Number.isFinite(s) && s >= 1 && s <= 7 ? s : 1;
+  });
   const [tournamentBracket, setTournamentBracket] = useState(
     () => getInitialTournamentBootstrapOnce().bracket ?? []
   );
   const hasBracketGenerated = Array.isArray(tournamentBracket) && (tournamentBracket?.length ?? 0) > 0;
   /** Režim přístupu k turnaji (cloud rozcestník); null = zatím nevybráno v hubu */
-  const [userRole, setUserRole] = useState(null);
+  const [userRole, setUserRole] = useState(() => {
+    const r = getBootUiResumeOnce();
+    if (!r?.appState || r.appState === 'home') return null;
+    if (r.appState === 'tournament_setup' || r.appState === 'tournament_board_assignment') {
+      return r.userRole || 'admin';
+    }
+    return r.userRole ?? null;
+  });
   /** PIN zadaný při připojení tabletu / diváka (Firebase později) */
-  const [activePin, setActivePin] = useState('');
+  const [activePin, setActivePin] = useState(() => {
+    const r = getBootUiResumeOnce();
+    if (r?.appState && r.appState !== 'home') return String(r.activePin ?? '');
+    return '';
+  });
   const userRoleRef = useRef(userRole);
   userRoleRef.current = userRole;
+
+  /** Obnova obrazovky po zavření externího odkazu (ČŠO / mapy) v PWA/TWA. */
+  useEffect(() => {
+    saveUiResume({
+      appState,
+      tournamentSetupStep,
+      tournamentDraft,
+      userRole,
+      activePin,
+      activePreRegTournamentId,
+      preregTournamentId,
+      preregReturnToCatalog,
+      homeSubmenu,
+    });
+  }, [
+    appState,
+    tournamentSetupStep,
+    tournamentDraft,
+    userRole,
+    activePin,
+    activePreRegTournamentId,
+    preregTournamentId,
+    preregReturnToCatalog,
+    homeSubmenu,
+  ]);
 
   /** Po přijetí sloučených dat z tabletu přes onSnapshot: přeruší outbound sync, aby se neposlal starý stav zpět (echo loop). */
   const isIncomingCloudUpdate = useRef(false);

@@ -26,7 +26,6 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
   const isLoggedIn = user && !user.isAnonymous;
 
   const [name, setName] = useState('');
-  const [venue, setVenue] = useState('');
   const [locationCity, setLocationCity] = useState('');
   const [locationVenueName, setLocationVenueName] = useState('');
   const [locationRegion, setLocationRegion] = useState('');
@@ -113,7 +112,7 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
     try {
       const result = await createPreRegTournament({
         name: name.trim(),
-        venue: parseOptionalString(venue),
+        venue: parseOptionalString(locationVenueName),
         locationCity: parseOptionalString(locationCity),
         locationVenueName: parseOptionalString(locationVenueName),
         locationRegion: parseOptionalString(locationRegion),
@@ -234,7 +233,13 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
             </div>
             <div>
               <label className={labelCls}>{t('preregAdminVenue')}</label>
-              <input value={venue} onChange={(e) => setVenue(e.target.value)} className={inputCls} disabled={loading} />
+              <input
+                value={locationVenueName}
+                onChange={(e) => setLocationVenueName(e.target.value)}
+                className={inputCls}
+                disabled={loading}
+                placeholder={t('preregAdminLocationVenueHint')}
+              />
             </div>
             <div>
               <label className={labelCls}>{t('preregAdminLocationCity')}</label>
@@ -244,16 +249,6 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
                 className={inputCls}
                 disabled={loading}
                 placeholder={t('preregAdminLocationCityHint')}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>{t('preregAdminLocationVenue')}</label>
-              <input
-                value={locationVenueName}
-                onChange={(e) => setLocationVenueName(e.target.value)}
-                className={inputCls}
-                disabled={loading}
-                placeholder={t('preregAdminLocationVenueHint')}
               />
             </div>
             <div>
