@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  calculateFinalStandings,
   calculateGroupStandings,
   countPlayersAdvancingFromGroups,
+  estimateSingleEliminationWallMs,
   generateBracketStructure,
   generateRoundRobinSchedule,
   generateTournamentVariants,
@@ -255,5 +257,26 @@ describe('tournamentLogic – nasazení a konec turnaje', () => {
     ];
     expect(isEntireTournamentFinished(data, groupsDone, bracket)).toBe(true);
     expect(isEntireTournamentFinished(data, groupsDone, [])).toBe(false);
+  });
+
+  it('calculateFinalStandings: vítěz 1., finalista 2., semifinalisté sdílí 3.', () => {
+    const { placementById } = calculateFinalStandings([
+      {
+        matches: [
+          { status: 'completed', player1Id: 'a', player2Id: 'b', winnerId: 'a' },
+          { status: 'completed', player1Id: 'c', player2Id: 'd', winnerId: 'c' },
+        ],
+      },
+      {
+        matches: [{ status: 'completed', player1Id: 'a', player2Id: 'c', winnerId: 'a' }],
+      },
+    ]);
+    expect(placementById).toEqual({ a: 1, c: 2, b: 3, d: 3 });
+  });
+
+  it('estimateSingleEliminationWallMs: 8 hráčů, 1 terč = 7 zápasů, 4 terče = 3 kola paralelně', () => {
+    expect(estimateSingleEliminationWallMs(8, 10, 1)).toBe(70);
+    expect(estimateSingleEliminationWallMs(8, 10, 4)).toBe(30);
+    expect(estimateSingleEliminationWallMs(1, 10, 4)).toBe(0);
   });
 });

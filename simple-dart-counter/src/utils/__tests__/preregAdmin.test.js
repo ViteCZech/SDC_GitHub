@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { clampDateTimeLocal, isDeadlineAfterStart } from '../preregAdmin';
+import {
+  clampDateTimeLocal,
+  getPublicRegistrationUrl,
+  hashAdminPin,
+  isDeadlineAfterStart,
+  parseOptionalNumber,
+  parseOptionalString,
+} from '../preregAdmin';
 
 describe('preregAdmin datetime', () => {
   it('isDeadlineAfterStart: stejný okamžik není po startu', () => {
@@ -18,5 +25,26 @@ describe('preregAdmin datetime', () => {
     expect(clampDateTimeLocal('2026-08-29T09:00', { max: '2026-08-29T10:00' })).toBe(
       '2026-08-29T09:00'
     );
+  });
+});
+
+describe('preregAdmin helpers', () => {
+  it('parseOptionalNumber / String: prázdné je null', () => {
+    expect(parseOptionalNumber('')).toBeNull();
+    expect(parseOptionalNumber('12.5')).toBe(12.5);
+    expect(parseOptionalString('  ')).toBeNull();
+    expect(parseOptionalString(' Brno ')).toBe('Brno');
+  });
+
+  it('getPublicRegistrationUrl v node je relativní /t/id', () => {
+    expect(getPublicRegistrationUrl('abc 1')).toBe('/t/abc%201');
+  });
+
+  it('hashAdminPin je SHA-256 hex a prázdný PIN je prázdný řetězec', async () => {
+    expect(await hashAdminPin('')).toBe('');
+    const h = await hashAdminPin('1234');
+    expect(h).toMatch(/^[a-f0-9]{64}$/);
+    expect(h).toBe(await hashAdminPin('1234'));
+    expect(h).not.toBe(await hashAdminPin('1235'));
   });
 });

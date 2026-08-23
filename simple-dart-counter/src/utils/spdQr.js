@@ -4,8 +4,8 @@
  * @returns {string|null}
  */
 function czechAccountToIban(account) {
-  const normalized = account.replace(/\s+/g, '');
-  if (normalized.startsWith('CZ')) return normalized.toUpperCase();
+  const normalized = account.replace(/\s+/g, '').toUpperCase();
+  if (normalized.startsWith('CZ')) return normalized;
 
   const match = normalized.match(/^(?:(\d{1,6})-)?(\d{1,10})\/(\d{4})$/);
   if (!match) return null;
@@ -34,9 +34,9 @@ function czechAccountToIban(account) {
 export function generateSpdString({ accountNumber, amount, variableSymbol, message = '' }) {
   if (!accountNumber) return null;
 
-  const cleanAccount = accountNumber.replace(/\s+/g, '');
+  const cleanAccount = accountNumber.replace(/\s+/g, '').toUpperCase();
   const iban = cleanAccount.startsWith('CZ')
-    ? cleanAccount.toUpperCase()
+    ? cleanAccount
     : czechAccountToIban(cleanAccount);
 
   if (!iban) return null;

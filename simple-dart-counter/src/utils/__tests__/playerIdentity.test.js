@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   blocksNewPreregistration,
+  findDuplicatePlayer,
   findDuplicateRegistration,
   playersAreSame,
+  preferActivePreregistration,
+  resolveCsoPlayerId,
 } from '../playerIdentity';
 
 describe('playerIdentity', () => {
@@ -67,6 +70,30 @@ describe('playerIdentity', () => {
 
       expect(findDuplicateRegistration([cancelled], candidate)).toBeNull();
       expect(findDuplicateRegistration([cancelled, confirmed], candidate)).toBe(confirmed);
+    });
+  });
+
+  describe('ID a duplicity v soupisce', () => {
+    it('resolveCsoPlayerId prefixuje číslo, name: nechá, jinak jméno', () => {
+      expect(resolveCsoPlayerId({ regNumber: '42' })).toBe('cso:42');
+      expect(resolveCsoPlayerId({ csoPlayerId: 'name:jan novak' })).toBe('name:jan novak');
+      expect(resolveCsoPlayerId({ name: 'Jan Novák' })).toBe('name:jan novak');
+    });
+
+    it('findDuplicatePlayer přeskočí excludeIndex', () => {
+      const list = [
+        { name: 'Ada', csoPlayerId: 'cso:1' },
+        { name: 'Ada', csoPlayerId: 'cso:1' },
+      ];
+      expect(findDuplicatePlayer(list, list[1], { excludeIndex: 1 })?.index).toBe(0);
+      expect(findDuplicatePlayer(list, { name: 'Bo', csoPlayerId: 'cso:9' })).toBeNull();
+    });
+
+    it('preferActivePreregistration drží CONFIRMED před CANCELLED', () => {
+      const live = { status: 'CONFIRMED', registrationId: 'a' };
+      const dead = { status: 'CANCELLED', registrationId: 'b' };
+      expect(preferActivePreregistration(dead, live)).toBe(live);
+      expect(preferActivePreregistration(live, dead)).toBe(live);
     });
   });
 });
