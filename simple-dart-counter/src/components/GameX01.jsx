@@ -12,6 +12,15 @@ import {
 } from '../services/onlineGamesService';
 import OnlineVideoContainer from './online/OnlineVideoContainer';
 import PostMatchView from './online/PostMatchView';
+import DoublesThrowerPicker from './DoublesThrowerPicker';
+import {
+  attachDoublesRecordFields,
+  deriveThrowerFromHistory,
+  isDoublesMatch,
+  pendingThrowerSide,
+  memberName,
+  snapshotCompletedLeg,
+} from '../utils/doublesThrowOrder';
 
 const IMPOSSIBLE_SCORES = [163, 166, 169, 172, 173, 175, 176, 178, 179];
 
@@ -247,6 +256,7 @@ export default function GameX01({
     
     return name;
   };
+  const doublesOn = isDoublesMatch(settings);
   const defaultGameState = {
     p1Score: settings.startScore,
     p2Score: settings.startScore,
@@ -259,7 +269,10 @@ export default function GameX01({
     winner: null,
     matchWinner: null,
     history: [],
-    completedLegs: []
+    completedLegs: [],
+    ...(doublesOn
+      ? { throwerId: null, startingThrowers: { p1: null, p2: null } }
+      : {}),
   };
 
   const [gameState, setGameState] = useState(() => restoredGameState?.gameState || defaultGameState);
@@ -689,11 +702,36 @@ export default function GameX01({
       return { ...move, remaining: move.player === 'p1' ? p1 : p2, isBust, turn: i + 1 };
     });
     let nP = rec.length > 0 ? (rec[rec.length - 1].player === 'p1' ? 'p2' : 'p1') : bs.startingPlayer;
-    return { ...bs, p1Score: p1, p2Score: p2, history: rec.reverse(), winner, currentPlayer: winner ? winner : nP };
+    let throwerExtra = {};
+    if (isDoublesMatch(settings)) {
+      throwerExtra = deriveThrowerFromHistory(
+        settings,
+        [...rec].reverse(),
+        bs.startingPlayer,
+        bs.startingThrowers
+      );
+      if (!winner && throwerExtra.currentPlayer) nP = throwerExtra.currentPlayer;
+    }
+    return {
+      ...bs,
+      p1Score: p1,
+      p2Score: p2,
+      history: rec.reverse(),
+      winner,
+      currentPlayer: winner ? winner : nP,
+      ...(isDoublesMatch(settings)
+        ? {
+            throwerId: throwerExtra.throwerId ?? null,
+            lastThrowerBySide: throwerExtra.lastThrowerBySide,
+          }
+        : {}),
+    };
   };
 
   const processTurn = (points, dartsCount = 3) => {
     if (isOnlineInputLocked()) return;
+    if (isDoublesMatch(settings) && pendingThrowerSide(gameState, settings)) return;
+    if (isDoublesMatch(settings) && !gameState.throwerId) return;
     const pts = parseInt(points);
     if (isNaN(pts) || pts < 0 || pts > 180 || IMPOSSIBLE_SCORES.includes(pts)) { 
         setErrorMsg(String(translations[lang]?.impossible || 'Chyba')); setTimeout(() => setErrorMsg(''), 1500); setCurrentInput(''); return; 
@@ -704,6 +742,7 @@ export default function GameX01({
     const restorePayload = { gameState, setScores };
 
     const nm = { id: Date.now(), player: gameState.currentPlayer, score: pts, dartsUsed: dartsCount };
+    if (isDoublesMatch(settings) && gameState.throwerId) nm.throwerId = gameState.throwerId;
     const ns = recalculateGame([nm, ...gameState.history]);
     if (ns.history[0].isBust) { setErrorMsg(String(translations[lang]?.bust || 'Bust')); setTimeout(() => setErrorMsg(''), 1500); }
 
@@ -723,7 +762,7 @@ export default function GameX01({
       if (p2W >= legTarget) { p2S += 1; p1W = 0; p2W = 0; }
       const setTarget = settings.matchSets || 1;
       const isOver = p1S >= setTarget || p2S >= setTarget;
-      const uLegs = [...gameState.completedLegs, { history: ns.history, winner: ns.winner }];
+      const uLegs = [...gameState.completedLegs, snapshotCompletedLeg(ns, gameState)];
 
       if (isOver) {
         const finalResult = {
@@ -756,6 +795,7 @@ export default function GameX01({
           isBot: settings.isBot,
           botLevel: settings.botLevel,
           botAvg: settings.botAvg,
+          ...attachDoublesRecordFields(uLegs, settings),
         };
         setSetScores(nextSetScores);
         if (onlineGameId && settings.gameType === 'x01') {
@@ -827,6 +867,8 @@ export default function GameX01({
 
   const handleTurnCommit = (points, darts = 3, force = false) => {
     if (isOnlineInputLocked()) return;
+    if (isDoublesMatch(settings) && pendingThrowerSide(gameState, settings)) return;
+    if (isDoublesMatch(settings) && !gameState.throwerId) return;
     const cS = gameState.currentPlayer === 'p1' ? gameState.p1Score : gameState.p2Score;
     if ((cS - points) === 0 && !force) {
         const minD = getMinDartsToCheckout(cS, settings.outMode);
@@ -1025,7 +1067,7 @@ export default function GameX01({
     else if (!gameState.winner && ns.winner) {
         if (ns.winner === 'p1') nextP1Legs++;
         if (ns.winner === 'p2') nextP2Legs++;
-        nextCompletedLegs.push({ history: ns.history, winner: ns.winner });
+        nextCompletedLegs.push(snapshotCompletedLeg(ns, gameState));
 
         const tgt = settings.matchMode === 'first_to' ? settings.matchTarget : Math.ceil(settings.matchTarget / 2);
         const isOver = nextP1Legs >= tgt || nextP2Legs >= tgt;
@@ -1061,6 +1103,7 @@ export default function GameX01({
             isBot: settings.isBot,
             botLevel: settings.botLevel,
             botAvg: settings.botAvg,
+            ...attachDoublesRecordFields(nextCompletedLegs, settings),
           };
           setEditingMove(null);
           if (onlineGameId && settings.gameType === 'x01') {
@@ -1232,6 +1275,9 @@ export default function GameX01({
         history: [],
         currentPlayer: nS,
         startingPlayer: nS,
+        ...(isDoublesMatch(settings)
+          ? { startingThrowers: { p1: null, p2: null }, throwerId: null }
+          : {}),
       };
       setGameState(next);
       setCurrentInput('');
@@ -1243,6 +1289,24 @@ export default function GameX01({
 
   handleUndoClickRef.current = handleUndoClick;
   handleNextLegRef.current = handleNextLeg;
+
+  const confirmThrowers = (picks) => {
+    setGameState((prev) => {
+      const startingThrowers = {
+        p1: picks?.p1 || prev.startingThrowers?.p1 || null,
+        p2: picks?.p2 || prev.startingThrowers?.p2 || null,
+      };
+      const side = prev.currentPlayer === 'p2' ? 'p2' : 'p1';
+      return {
+        ...prev,
+        startingThrowers,
+        throwerId: startingThrowers[side] || prev.throwerId || null,
+      };
+    });
+  };
+
+  const throwerPendingSide = doublesOn ? pendingThrowerSide(gameState, settings) : null;
+  const throwerPickOpen = Boolean(throwerPendingSide);
 
   const handleBackFromLeg = () => {
     if (prevNextLegStateRef.current) {
@@ -1425,6 +1489,17 @@ export default function GameX01({
   return (
     <>
       <main className={mainLayoutClass}>
+        {throwerPickOpen && (
+          <DoublesThrowerPicker
+            lang={lang}
+            settings={settings}
+            startingPlayer={gameState.startingPlayer}
+            requiredSide={throwerPendingSide}
+            allowOptionalOther={(gameState.history || []).length === 0}
+            existing={gameState.startingThrowers}
+            onConfirm={confirmThrowers}
+          />
+        )}
         {onlineGameId && settings.gameType === 'x01' && myOnlineRole && (
           <div className={`shrink-0 ${!postMatchStatsActive && isLandscape ? 'col-span-3' : ''}`}>
             <OnlineVideoContainer
@@ -1504,6 +1579,10 @@ export default function GameX01({
                     const isP1 = pKey === 'p1';
                     const isBot = !isP1 && settings.isBot;
                     const displayName = getDisplayName(isP1 ? settings.p1Name : settings.p2Name, isP1, isBot);
+                    const throwerLabel =
+                      doublesOn && act && gameState.throwerId
+                        ? memberName(settings, gameState.throwerId)
+                        : '';
 
                     return (
                         <div
@@ -1535,6 +1614,11 @@ export default function GameX01({
                                         </span>
                                     )}
                                 </h2>
+                                {throwerLabel ? (
+                                  <p className={`text-[10px] sm:text-xs font-bold truncate ${isP1 ? 'text-emerald-400' : 'text-purple-400'}`}>
+                                    {throwerLabel}
+                                  </p>
+                                ) : null}
                             </div>
                             <div className="w-2 shrink-0" />
                         </div>

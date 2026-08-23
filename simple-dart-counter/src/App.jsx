@@ -87,6 +87,11 @@ import {
   withRankingsLocked,
 } from './utils/tournamentRanking';
 import { normalizePlayerNameKey, resolveCsoPlayerId } from './utils/playerIdentity';
+import { isTeamPlayer } from './utils/doublesSeeding';
+import {
+  buildDoublesSettingsFromSlots,
+  findTournamentSlot,
+} from './utils/doublesThrowOrder';
 import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
 
 const APP_VERSION = "v1.10.1";
@@ -365,10 +370,21 @@ function enrichTabletMatchPlayerNames(raw, tournamentData, tournamentGroups) {
     groupPlayers.find((p) => p.id === raw.player2Id)?.name ||
     resolveTournamentPlayerName(raw.player2Id, tournamentData) ||
     (raw.player2Id != null ? String(raw.player2Id) : '');
+  const p1Slot =
+    groupPlayers.find((p) => p.id === raw.player1Id) ||
+    findTournamentSlot(raw.player1Id, tournamentData, tournamentGroups);
+  const p2Slot =
+    groupPlayers.find((p) => p.id === raw.player2Id) ||
+    findTournamentSlot(raw.player2Id, tournamentData, tournamentGroups);
+  const p1Members = isTeamPlayer(p1Slot) ? p1Slot.members.slice(0, 2) : [];
+  const p2Members = isTeamPlayer(p2Slot) ? p2Slot.members.slice(0, 2) : [];
   return {
     ...raw,
     player1Name: p1Raw || '?',
     player2Name: p2Raw || '?',
+    p1Members,
+    p2Members,
+    doubles: p1Members.length >= 2 && p2Members.length >= 2,
   };
 }
 
@@ -623,6 +639,13 @@ const calculateStats = (legs, p1Name, p2Name) => {
     return { p1Avg: p1DartsTotal ? (p1ScoreTotal/p1DartsTotal)*3 : 0, p2Avg: p2DartsTotal ? (p2ScoreTotal/p2DartsTotal)*3 : 0, p1DartsTotal, p2DartsTotal, legDetails, p1High, p2High, p1HighCheckout: p1HighCheck, p2HighCheckout: p2HighCheck };
 };
 
+function doublesResultExtras(resultData) {
+  const extras = {};
+  if (resultData?.members) extras.members = resultData.members;
+  if (resultData?.legStarters) extras.legStarters = resultData.legStarters;
+  return extras;
+}
+
 // --- KOMPONENTY MENU / UI ---
 const FlagIcon = ({ lang }) => {
     if (lang === 'cs') return <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" className="w-5 h-3.5 rounded-sm object-cover"><rect width="900" height="600" fill="#D7141A"/><rect width="900" height="300" fill="#FFF"/><polygon points="0,0 0,600 450,300" fill="#11457E"/></svg>;
@@ -685,7 +708,7 @@ const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch, isTo
           : {};
       return {
         matchId: data?.tournamentMatchId ?? data?.id,
-        resultData: { p1Legs, p2Legs, ...statsPayload },
+        resultData: { p1Legs, p2Legs, ...statsPayload, ...doublesResultExtras(data) },
       };
     };
 
@@ -829,6 +852,23 @@ const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch, isTo
                                     <div className="flex justify-between font-mono text-lg font-bold landscape:text-base"><span className="text-emerald-400">{stats.p1HighCheckout}</span><span className="text-purple-400">{stats.p2HighCheckout}</span></div>
                                 </div>
                             </div>
+                            {data.members && typeof data.members === 'object' && (
+                              <div className="w-full overflow-hidden border rounded-lg bg-slate-900 border-slate-800">
+                                <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-800">
+                                  {t('doublesMembersAvg')}
+                                </div>
+                                <div className="divide-y divide-slate-800">
+                                  {Object.values(data.members).map((m) => (
+                                    <div key={m.id} className="flex items-center justify-between px-3 py-1.5 text-sm">
+                                      <span className={`font-bold truncate ${m.side === 'p1' ? 'text-emerald-400' : 'text-purple-400'}`}>
+                                        {m.name}
+                                      </span>
+                                      <span className="font-mono text-slate-200">{Number(m.avg || 0).toFixed(1)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                             <div className="w-full overflow-hidden border rounded-lg bg-slate-900 border-slate-800">
                                 <table className="w-full text-sm text-left">
                                     <thead className="text-[10px] uppercase bg-slate-800 text-slate-400"><tr><th className="px-2 py-1.5 landscape:px-2 landscape:py-1">#</th><th className="px-2 py-1.5 landscape:px-2 landscape:py-1">{t('detailWinner')}</th><th className="px-2 py-1.5 text-center landscape:px-2 landscape:py-1">{t('detailDarts')}</th><th className="px-2 py-1.5 text-right landscape:px-2 landscape:py-1">{t('detailCheckout')}</th><th className="px-2 py-1.5 text-right landscape:px-2 landscape:py-1">{t('detailAvg')}</th></tr></thead>
@@ -1241,6 +1281,8 @@ function AppMain({ lang, setLang }) {
       p2Name: String(gameData?.guestName || '').trim() || prev.p2Name,
       isBot: false,
       startPlayer: gameData?.startPlayer === 'p2' ? 'p2' : 'p1',
+      doubles: false,
+      teams: null,
     }));
     setOnlineGameId(String(gameId));
     setMyOnlineRole(r);
@@ -3514,6 +3556,8 @@ function AppMain({ lang, setLang }) {
       ...prev,
       p1Name: p1?.name ?? match.player1Id ?? 'P1',
       p2Name: p2?.name ?? match.player2Id ?? 'P2',
+      p1Id: p1?.id ?? match.player1Id ?? null,
+      p2Id: p2?.id ?? match.player2Id ?? null,
       matchMode: 'first_to',
       matchTarget: legsToWin,
       matchSets: 1,
@@ -3521,6 +3565,7 @@ function AppMain({ lang, setLang }) {
       gameType: 'x01',
       startScore: tournamentData?.startScore ?? 501,
       outMode: tournamentData?.outMode ?? 'double',
+      ...buildDoublesSettingsFromSlots(p1, p2),
     }));
     setAppState('playing');
   };
@@ -3548,10 +3593,14 @@ function AppMain({ lang, setLang }) {
       );
     }
     setTournamentMatchContext({ match, type: 'bracket', roundIndex, tournamentData });
+    const p1Slot = findTournamentSlot(match.player1Id, tournamentData, tournamentGroups);
+    const p2Slot = findTournamentSlot(match.player2Id, tournamentData, tournamentGroups);
     setSettings((prev) => ({
       ...prev,
-      p1Name: match.player1Name ?? match.player1Id ?? 'P1',
-      p2Name: match.player2Name ?? match.player2Id ?? 'P2',
+      p1Name: match.player1Name ?? p1Slot?.name ?? match.player1Id ?? 'P1',
+      p2Name: match.player2Name ?? p2Slot?.name ?? match.player2Id ?? 'P2',
+      p1Id: match.player1Id ?? p1Slot?.id ?? null,
+      p2Id: match.player2Id ?? p2Slot?.id ?? null,
       matchMode: 'first_to',
       matchTarget: legsToWin,
       matchSets: 1,
@@ -3559,6 +3608,7 @@ function AppMain({ lang, setLang }) {
       gameType: 'x01',
       startScore: tournamentData?.startScore ?? 501,
       outMode: tournamentData?.outMode ?? 'double',
+      ...buildDoublesSettingsFromSlots(p1Slot, p2Slot),
     }));
     setAppState('playing');
   };
@@ -3769,10 +3819,14 @@ function AppMain({ lang, setLang }) {
         tabletTitle: td.name ?? pinBarTitle,
         tabletPin: activePin,
       });
+      const p1Slot = findTournamentSlot(am.player1Id, td, tournamentGroups);
+      const p2Slot = findTournamentSlot(am.player2Id, td, tournamentGroups);
       setSettings((prev) => ({
         ...prev,
-        p1Name: am.player1Name ?? am.player1Id ?? 'P1',
-        p2Name: am.player2Name ?? am.player2Id ?? 'P2',
+        p1Name: am.player1Name ?? p1Slot?.name ?? am.player1Id ?? 'P1',
+        p2Name: am.player2Name ?? p2Slot?.name ?? am.player2Id ?? 'P2',
+        p1Id: am.player1Id ?? p1Slot?.id ?? null,
+        p2Id: am.player2Id ?? p2Slot?.id ?? null,
         matchMode: 'first_to',
         matchTarget: legsToWin,
         matchSets: 1,
@@ -3781,6 +3835,7 @@ function AppMain({ lang, setLang }) {
         startScore: td.startScore ?? 501,
         outMode: td.outMode ?? 'double',
         startPlayer: startingPlayerId === am.player2Id ? 'p2' : 'p1',
+        ...buildDoublesSettingsFromSlots(p1Slot, p2Slot),
       }));
     } else {
       const group =
@@ -3805,6 +3860,8 @@ function AppMain({ lang, setLang }) {
         ...prev,
         p1Name: p1?.name ?? am.player1Name ?? am.player1Id ?? 'P1',
         p2Name: p2?.name ?? am.player2Name ?? am.player2Id ?? 'P2',
+        p1Id: p1?.id ?? am.player1Id ?? null,
+        p2Id: p2?.id ?? am.player2Id ?? null,
         matchMode: 'first_to',
         matchTarget: legsToWin,
         matchSets: 1,
@@ -3813,6 +3870,7 @@ function AppMain({ lang, setLang }) {
         startScore: td.startScore ?? 501,
         outMode: td.outMode ?? 'double',
         startPlayer: startingPlayerId === am.player2Id ? 'p2' : 'p1',
+        ...buildDoublesSettingsFromSlots(p1, p2),
       }));
     }
     setAppState('playing');
@@ -4330,6 +4388,7 @@ function AppMain({ lang, setLang }) {
                       p1HighCheckout: resultData?.p1HighCheckout,
                       p2HighCheckout: resultData?.p2HighCheckout,
                       legDetails: resultData?.legDetails,
+                      ...doublesResultExtras(resultData),
                       result: {
                         p1Legs,
                         p2Legs,
@@ -4342,6 +4401,7 @@ function AppMain({ lang, setLang }) {
                         p1HighCheckout: resultData?.p1HighCheckout,
                         p2HighCheckout: resultData?.p2HighCheckout,
                         legDetails: resultData?.legDetails,
+                        ...doublesResultExtras(resultData),
                       },
                       completedAt: Date.now(),
                       tabletStatus: 'completed',
@@ -4468,6 +4528,7 @@ function AppMain({ lang, setLang }) {
                                 p1HighCheckout: resultData?.p1HighCheckout,
                                 p2HighCheckout: resultData?.p2HighCheckout,
                                 legDetails: resultData?.legDetails,
+                                ...doublesResultExtras(resultData),
                                 result: {
                                   p1Legs,
                                   p2Legs,
@@ -4480,6 +4541,7 @@ function AppMain({ lang, setLang }) {
                                   p1HighCheckout: resultData?.p1HighCheckout,
                                   p2HighCheckout: resultData?.p2HighCheckout,
                                   legDetails: resultData?.legDetails,
+                                  ...doublesResultExtras(resultData),
                                 },
                               }
                             : m
@@ -4533,6 +4595,7 @@ function AppMain({ lang, setLang }) {
                             p1HighCheckout: resultData?.p1HighCheckout,
                             p2HighCheckout: resultData?.p2HighCheckout,
                             legDetails: resultData?.legDetails,
+                            ...doublesResultExtras(resultData),
                             result: {
                               p1Legs,
                               p2Legs,
@@ -4545,6 +4608,7 @@ function AppMain({ lang, setLang }) {
                               p1HighCheckout: resultData?.p1HighCheckout,
                               p2HighCheckout: resultData?.p2HighCheckout,
                               legDetails: resultData?.legDetails,
+                              ...doublesResultExtras(resultData),
                             },
                             completedAt: Date.now(),
                           }
@@ -4745,7 +4809,7 @@ function AppMain({ lang, setLang }) {
                       </div>
                   </div>
               </header>
-              {settings.gameType === 'x01' ? (
+              {settings.gameType === 'x01' || settings.doubles ? (
                   <GameX01
                     settings={settings}
                     lang={lang}
@@ -5900,7 +5964,10 @@ function AppMain({ lang, setLang }) {
                     </button>
                 </div>
             </div>
-            <button onClick={() => setAppState('playing')} className="flex items-center justify-center w-full gap-2 py-4 landscape:py-3 mt-2 landscape:mt-0 text-xl font-black transition-all shadow-lg bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-xl shadow-emerald-900/20 active:scale-95 landscape:col-span-2"><Play className="w-6 h-6 fill-current" /> {t('startMatch')}</button>
+            <button onClick={() => {
+              setSettings((s) => ({ ...s, doubles: false, teams: null }));
+              setAppState('playing');
+            }} className="flex items-center justify-center w-full gap-2 py-4 landscape:py-3 mt-2 landscape:mt-0 text-xl font-black transition-all shadow-lg bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-xl shadow-emerald-900/20 active:scale-95 landscape:col-span-2"><Play className="w-6 h-6 fill-current" /> {t('startMatch')}</button>
             </div>
           </div>
         </main>

@@ -211,6 +211,7 @@ Typy: `src/types/tournamentPreReg.d.ts` a `functions/src/types.ts` — držet v 
 - **Dvojice / mix / losované dvojice:** `doubles` = Stedar ČP nasazovací (rankingId=6). Nikdy ne id=5.
 - Nasazení páru: součet obou doubles ranků → lepší individuální rank → `seedTieBreak`
 - Import předregistrace u dvojic skládá `players[]` jako týmy (`kind: 'team'`, `members`)
+- **X01 dvojice:** `settings.doubles` + `settings.teams.{p1,p2}.members`. Zápas zůstává 2 sloty (`player1Id`/`player2Id` = tým). Každý leg: začínající dvojice musí vybrat házejícího; druhá může hned, nebo až po prvním hodu. Pak střídání uvnitř páru. Historie hodu má `throwerId`. Výsledek: `result.p1Avg/p2Avg` = pár, `result.members` = 4 hráči, `result.legStarters`. Tablet check-in = 4 hráči + počtář. Cricket a online 1v1 dvojice nemají.
 - Scheduled CF denně 7:00 Europe/Prague + ruční tlačítko `CsoRankingUpdateButton`
 - Identita hráče: `playerIdentity.js` / `functions/src/playerIdentity.ts` (nameKey + `csoPlayerId`)
 

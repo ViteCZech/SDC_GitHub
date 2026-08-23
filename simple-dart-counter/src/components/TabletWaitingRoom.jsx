@@ -42,13 +42,25 @@ export default function TabletWaitingRoom({
   const [idleTab, setIdleTab] = useState('standings');
   const [presentP1, setPresentP1] = useState(false);
   const [presentP2, setPresentP2] = useState(false);
+  const [presentP1a, setPresentP1a] = useState(false);
+  const [presentP1b, setPresentP1b] = useState(false);
+  const [presentP2a, setPresentP2a] = useState(false);
+  const [presentP2b, setPresentP2b] = useState(false);
   const [presentRef, setPresentRef] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(CHECKIN_SECONDS);
   const [timerExpired, setTimerExpired] = useState(false);
   const timeoutSentRef = useRef(false);
   const lastResumeTokenRef = useRef(null);
 
-  const allPresent = presentP1 && presentP2 && presentRef;
+  const doublesCheckIn =
+    match?.doubles === true &&
+    Array.isArray(match?.p1Members) &&
+    match.p1Members.length >= 2 &&
+    Array.isArray(match?.p2Members) &&
+    match.p2Members.length >= 2;
+  const allPresent = doublesCheckIn
+    ? presentP1a && presentP1b && presentP2a && presentP2b && presentRef
+    : presentP1 && presentP2 && presentRef;
   const matchKey = match ? String(match.matchId ?? match.id ?? '') : '';
 
   const matchP1 = !match
@@ -74,6 +86,10 @@ export default function TabletWaitingRoom({
   const resetCheckIn = useCallback(() => {
     setPresentP1(false);
     setPresentP2(false);
+    setPresentP1a(false);
+    setPresentP1b(false);
+    setPresentP2a(false);
+    setPresentP2b(false);
     setPresentRef(false);
   }, []);
 
@@ -127,16 +143,16 @@ export default function TabletWaitingRoom({
   useEffect(() => {
     if (phase !== 2 || !match) return undefined;
     const id = setInterval(() => {
-      if (presentP1 && presentP2 && presentRef) return;
+      if (allPresent) return;
       setSecondsLeft((s) => (s <= 0 ? 0 : s - 1));
     }, 1000);
     return () => clearInterval(id);
-  }, [phase, match, presentP1, presentP2, presentRef]);
+  }, [phase, match, allPresent]);
 
   useEffect(() => {
     if (phase !== 2 || !match) return;
     if (secondsLeft > 0) return;
-    if (presentP1 && presentP2 && presentRef) return;
+    if (allPresent) return;
     if (timeoutSentRef.current) return;
     timeoutSentRef.current = true;
     setTimerExpired(true);
@@ -144,8 +160,8 @@ export default function TabletWaitingRoom({
     const mt = match.matchType === 'bracket' ? 'bracket' : 'group';
     if (typeof onTabletTimeoutWarning === 'function' && mid) {
       onTabletTimeoutWarning(mt, mid, {
-        presentP1: !!presentP1,
-        presentP2: !!presentP2,
+        presentP1: doublesCheckIn ? presentP1a && presentP1b : !!presentP1,
+        presentP2: doublesCheckIn ? presentP2a && presentP2b : !!presentP2,
         presentRef: !!presentRef,
       });
     }
@@ -153,8 +169,14 @@ export default function TabletWaitingRoom({
     secondsLeft,
     phase,
     match,
+    allPresent,
+    doublesCheckIn,
     presentP1,
     presentP2,
+    presentP1a,
+    presentP1b,
+    presentP2a,
+    presentP2b,
     presentRef,
     onTabletTimeoutWarning,
   ]);
@@ -371,9 +393,35 @@ export default function TabletWaitingRoom({
           </div>
 
           <div className="flex-1 min-h-0 flex flex-col md:flex-row md:gap-2 gap-1.5 py-1 md:py-2">
-            {checkInSlotBtn(presentP1, () => setPresentP1(true), tt('player1'), matchP1)}
-            {checkInSlotBtn(presentP2, () => setPresentP2(true), tt('player2'), matchP2)}
-            {checkInSlotBtn(presentRef, () => setPresentRef(true), tt('referee'), match.refereeName)}
+            {doublesCheckIn ? (
+              <>
+                <div className="flex-1 min-h-0 flex flex-col gap-1.5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500/80 text-center truncate">
+                    {matchP1}
+                  </p>
+                  <div className="flex-1 min-h-0 flex flex-col sm:flex-row gap-1.5">
+                    {checkInSlotBtn(presentP1a, () => setPresentP1a(true), tt('player1'), match.p1Members[0]?.name)}
+                    {checkInSlotBtn(presentP1b, () => setPresentP1b(true), tt('player2'), match.p1Members[1]?.name)}
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 flex flex-col gap-1.5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-purple-400/80 text-center truncate">
+                    {matchP2}
+                  </p>
+                  <div className="flex-1 min-h-0 flex flex-col sm:flex-row gap-1.5">
+                    {checkInSlotBtn(presentP2a, () => setPresentP2a(true), tt('player1'), match.p2Members[0]?.name)}
+                    {checkInSlotBtn(presentP2b, () => setPresentP2b(true), tt('player2'), match.p2Members[1]?.name)}
+                  </div>
+                </div>
+                {checkInSlotBtn(presentRef, () => setPresentRef(true), tt('referee'), match.refereeName)}
+              </>
+            ) : (
+              <>
+                {checkInSlotBtn(presentP1, () => setPresentP1(true), tt('player1'), matchP1)}
+                {checkInSlotBtn(presentP2, () => setPresentP2(true), tt('player2'), matchP2)}
+                {checkInSlotBtn(presentRef, () => setPresentRef(true), tt('referee'), match.refereeName)}
+              </>
+            )}
           </div>
 
           <div className="shrink-0 flex flex-col gap-1.5 pt-1 border-t border-slate-800/80 bg-slate-950">
