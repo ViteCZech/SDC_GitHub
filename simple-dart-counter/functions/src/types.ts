@@ -93,3 +93,17 @@ export interface RegisterPlayerResult {
   status: 'CONFIRMED' | 'WAITLIST';
   variableSymbol: string | null;
 }
+
+export type CancelledBy = 'PLAYER' | 'ADMIN';
+
+export interface UnregisterPlayerPayload {
+  tournamentId: string;
+  registrationId: string;
+}
+
+export interface UnregisterPlayerResult {
+  success: true;
+  status: 'CANCELLED';
+  refundDue: boolean;
+  waitlistPromoted: boolean;
+}

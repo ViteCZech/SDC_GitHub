@@ -10,6 +10,8 @@ const STORAGE_PREFIX = 'dartsPrereg_';
  * @property {string|null} [email]
  * @property {string|null} [phone]
  * @property {number|null} [amount]
+ * @property {boolean} [isPaid]
+ * @property {boolean} [refundDue]
  * @property {string} savedAt
  */
 

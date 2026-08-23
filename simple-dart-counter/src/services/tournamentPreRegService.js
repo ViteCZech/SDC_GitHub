@@ -142,6 +142,33 @@ export async function listMyRegistrationsApi() {
 }
 
 /**
+ * Hráč stornuje vlastní přihlášku (Cloud Function).
+ * @param {string} tournamentId
+ * @param {string} registrationId
+ * @returns {Promise<{ success: true, status: 'CANCELLED', refundDue: boolean, waitlistPromoted: boolean }>}
+ */
+export async function unregisterPlayerApi(tournamentId, registrationId) {
+  const functions = getFunctions(requireApp(), FUNCTIONS_REGION);
+  const fn = httpsCallable(functions, 'unregisterPlayer');
+  try {
+    const result = await fn({
+      tournamentId: String(tournamentId ?? '').trim(),
+      registrationId: String(registrationId ?? '').trim(),
+    });
+    return /** @type {{ success: true, status: 'CANCELLED', refundDue: boolean, waitlistPromoted: boolean }} */ (
+      result.data
+    );
+  } catch (err) {
+    const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
+    const message =
+      err && typeof err === 'object' && 'message' in err ? String(err.message) : '';
+    const error = new Error(message || 'unregister_failed');
+    error.code = code.replace(/^functions\//, '') || 'unregister_failed';
+    throw error;
+  }
+}
+
+/**
  * Stav přihlášky podle ID z localStorage (bez e-mailu / telefonu).
  * @param {string} tournamentId
  * @param {string} registrationId
@@ -488,27 +515,86 @@ export async function updateRegistration(tournamentId, regId, patch) {
   });
 }
 
+function createdAtMs(data) {
+  const raw = data?.createdAt;
+  if (raw && typeof raw.toMillis === 'function') return raw.toMillis();
+  if (raw && typeof raw.seconds === 'number') return raw.seconds * 1000;
+  return 0;
+}
+
 /**
  * @param {string} tournamentId
  * @param {string} regId
- * @param {'CONFIRMED'|'WAITLIST'|'PENDING_PAYMENT'} previousStatus
+ * @param {'CONFIRMED'|'WAITLIST'|'PENDING_PAYMENT'} [_previousStatus]
  */
-export async function cancelRegistration(tournamentId, regId, previousStatus) {
+export async function cancelRegistration(tournamentId, regId, _previousStatus) {
   await requireAdminAccess(tournamentId);
-  await runTransaction(requireDb(), async (transaction) => {
-    const regRef = doc(requireDb(), 'tournaments', tournamentId, 'registrations', regId);
-    const tourRef = doc(requireDb(), 'tournaments', tournamentId);
-    transaction.update(regRef, {
-      status: 'CANCELLED',
-      updatedAt: serverTimestamp(),
-    });
-    if (previousStatus === 'CONFIRMED') {
-      transaction.update(tourRef, { 'counters.confirmed': increment(-1) });
-    } else if (previousStatus === 'WAITLIST') {
-      transaction.update(tourRef, { 'counters.waitlist': increment(-1) });
-    } else if (previousStatus === 'PENDING_PAYMENT') {
-      transaction.update(tourRef, { 'counters.pendingPayment': increment(-1) });
+  const dbInst = requireDb();
+  const regsSnap = await getDocs(collection(dbInst, 'tournaments', tournamentId, 'registrations'));
+  const waitlistIds = regsSnap.docs
+    .filter((d) => d.id !== regId && String(d.data()?.status ?? '') === 'WAITLIST')
+    .sort((a, b) => createdAtMs(a.data()) - createdAtMs(b.data()))
+    .map((d) => d.id);
+
+  await runTransaction(dbInst, async (transaction) => {
+    const regRef = doc(dbInst, 'tournaments', tournamentId, 'registrations', regId);
+    const tourRef = doc(dbInst, 'tournaments', tournamentId);
+    const [regSnap, tourSnap] = await Promise.all([
+      transaction.get(regRef),
+      transaction.get(tourRef),
+    ]);
+    if (!regSnap.exists() || !tourSnap.exists()) throw new Error(PREREG_NOT_FOUND);
+
+    const current = String(regSnap.data()?.status ?? '');
+    if (current === 'CANCELLED') return;
+
+    const paid = !!regSnap.data()?.payment?.isPaid;
+    const partnerId = String(regSnap.data()?.pair?.partnerRegistrationId ?? '').trim();
+    const partnerRef = partnerId
+      ? doc(dbInst, 'tournaments', tournamentId, 'registrations', partnerId)
+      : null;
+    const partnerSnap = partnerRef ? await transaction.get(partnerRef) : null;
+
+    let promoteRef = null;
+    const waitlistEnabled = !!tourSnap.data()?.meta?.waitlistEnabled;
+    if (current === 'CONFIRMED' && waitlistEnabled && waitlistIds[0]) {
+      const wRef = doc(dbInst, 'tournaments', tournamentId, 'registrations', waitlistIds[0]);
+      const wSnap = await transaction.get(wRef);
+      if (wSnap.exists() && String(wSnap.data()?.status ?? '') === 'WAITLIST') {
+        promoteRef = wRef;
+      }
     }
+
+    const patch = {
+      status: 'CANCELLED',
+      cancelledBy: 'ADMIN',
+      cancelledAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    if (paid) patch['payment.refundDue'] = true;
+    transaction.update(regRef, patch);
+
+    if (partnerSnap?.exists()) {
+      transaction.update(partnerSnap.ref, {
+        'pair.status': 'BROKEN',
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    const counters = { updatedAt: serverTimestamp() };
+    if (current === 'CONFIRMED') {
+      if (promoteRef) {
+        transaction.update(promoteRef, { status: 'CONFIRMED', updatedAt: serverTimestamp() });
+        counters['counters.waitlist'] = increment(-1);
+      } else {
+        counters['counters.confirmed'] = increment(-1);
+      }
+    } else if (current === 'WAITLIST') {
+      counters['counters.waitlist'] = increment(-1);
+    } else if (current === 'PENDING_PAYMENT') {
+      counters['counters.pendingPayment'] = increment(-1);
+    }
+    transaction.update(tourRef, counters);
   });
 }
 
@@ -574,6 +660,10 @@ export async function restoreCancelledRegistration(tournamentId, regId, targetSt
 
     transaction.update(regRef, {
       status: next,
+      cancelledBy: null,
+      cancelledAt: null,
+      'payment.refundDue': false,
+      'payment.refundedAt': null,
       updatedAt: serverTimestamp(),
     });
     if (next === 'CONFIRMED') {
@@ -641,6 +731,15 @@ export async function markRegistrationPaid(tournamentId, regId, method) {
     'payment.verifiedByAdmin': true,
     'payment.verifiedAt': serverTimestamp(),
     'payment.method': method,
+    'payment.refundDue': false,
+  });
+}
+
+export async function markRegistrationRefunded(tournamentId, regId) {
+  await updateRegistration(tournamentId, regId, {
+    'payment.refundDue': false,
+    'payment.refundedAt': serverTimestamp(),
+    'payment.refundedByAdminUid': requireAuthUid(),
   });
 }
 

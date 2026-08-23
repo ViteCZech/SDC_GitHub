@@ -1,0 +1,616 @@
+import {
+  Callout,
+  Card,
+  CardBody,
+  CardHeader,
+  Code,
+  Divider,
+  Grid,
+  H1,
+  H2,
+  H3,
+  Pill,
+  Row,
+  Stack,
+  Stat,
+  Table,
+  Text,
+  TodoList,
+  useCanvasState,
+} from "cursor/canvas";
+
+type TabId = "verdict" | "isolation" | "schema" | "impact" | "roadmap" | "open";
+
+export default function DoublesArchitectureCanvas() {
+  const [tab, setTab] = useCanvasState<TabId>("tab", "verdict");
+
+  return (
+    <Stack gap={20}>
+      <Stack gap={6}>
+        <H1>Turnaje dvojic — architektura</H1>
+        <Text tone="secondary">
+          Simple Dart Counter · posouzení specifikace proti stávajícímu modelu
+          (players vs teams, předregistrace, tablet, ČŠO).
+        </Text>
+      </Stack>
+
+      <Grid columns={4} gap={12}>
+        <Stat value="Proveditelné" label="Celkový verdikt" tone="success" />
+        <Stat value="Střední" label="Datový model" tone="info" />
+        <Stat value="Vysoký" label="Herní tablet" tone="warning" />
+        <Stat value="6 fází" label="Doporučený rozklad" />
+      </Grid>
+
+      <Callout tone="success" title="Hlavní rozhodnutí: players neměnit, přidat roster">
+        Pole `players` nechat jako soutěžní jednotky (jednotlivec nebo tým).
+        Lidé žijí v novém `roster`. Skupiny, pavouk, JIT terče a počtářský
+        engine zůstanou téměř beze změny.
+      </Callout>
+
+      <Row gap={8} wrap>
+        <Pill active={tab === "verdict"} onClick={() => setTab("verdict")}>
+          Verdikt
+        </Pill>
+        <Pill active={tab === "isolation"} onClick={() => setTab("isolation")}>
+          Izolace PIN
+        </Pill>
+        <Pill active={tab === "schema"} onClick={() => setTab("schema")}>
+          Schema
+        </Pill>
+        <Pill active={tab === "impact"} onClick={() => setTab("impact")}>
+          Dopad
+        </Pill>
+        <Pill active={tab === "roadmap"} onClick={() => setTab("roadmap")}>
+          Roadmap
+        </Pill>
+        <Pill active={tab === "open"} onClick={() => setTab("open")}>
+          Otázky
+        </Pill>
+      </Row>
+
+      {tab === "verdict" && <VerdictSection />}
+      {tab === "isolation" && <IsolationSection />}
+      {tab === "schema" && <SchemaSection />}
+      {tab === "impact" && <ImpactSection />}
+      {tab === "roadmap" && <RoadmapSection />}
+      {tab === "open" && <OpenQuestionsSection />}
+    </Stack>
+  );
+}
+
+function VerdictSection() {
+  return (
+    <Stack gap={16}>
+      <H2>Proveditelnost po bodech specifikace</H2>
+      <Table
+        headers={["Bod", "Stav dnes", "Náročnost", "Poznámka"]}
+        columnAlign={["left", "left", "left", "left"]}
+        rowTone={["success", "info", "warning", "warning", "danger", "warning"]}
+        rows={[
+          [
+            "1. Více turnajů naráz",
+            "Hotovo",
+            "Nízká",
+            "Izolace přes active_tournaments/{pin}. PIN kolize je jediná mezera.",
+          ],
+          [
+            "2. Self-unregister",
+            "Jen admin",
+            "Nízká",
+            "Stav CANCELLED už existuje. Chybí CF a UI pro hráče.",
+          ],
+          [
+            "3. Párování / mixy / los",
+            "Jen jednotlivec",
+            "Střední",
+            "Nový competitionType + pair confirmation + los na místě.",
+          ],
+          [
+            "4. Ranking dvojic",
+            "Jen muži/ženy",
+            "Nízká",
+            "rankingId=6 jen pro doubles/mixed/random_doubles. Jednotlivci dál men/women.",
+          ],
+          [
+            "5. Tablet + statistiky",
+            "p1 vs p2",
+            "Vysoká",
+            "GameX01 umí jen dvě strany. Výběr házejícího před každým legem je nová obrazovka.",
+          ],
+          [
+            "6. Počtář z poražené dvojice",
+            "Celý poražený",
+            "Střední",
+            "Referee zůstane osoba. Engine musí oddělit teamId od playerId.",
+          ],
+        ]}
+        striped
+      />
+
+      <H3>Proč nahradit players za teams nedává smysl</H3>
+      <Text>
+        `tournamentLogic.js`, `tournamentGenerator.js`, skupiny, pavouk, JIT
+        desky i referee engine všude berou `player1Id` / `player2Id` jako
+        soutěžní slot. Kdyby se `players` přepsaly na lidi a zápasy na týmy,
+        musela by se přepsat většina turnajové vrstvy.
+      </Text>
+      <Text>
+        Správný rozřez: <Text weight="semibold">soutěžní jednotka</Text> (dnes
+        `players`) vs <Text weight="semibold">osoba</Text> (nový `roster`).
+        U jednotlivců je players[i].id rovno roster[i].id a memberIds obsahuje
+        jedno player id.
+        U dvojic je `players[i]` tým se `memberIds: [pA, pB]` a
+        `name: "Novák / Svoboda"`.
+      </Text>
+    </Stack>
+  );
+}
+
+function IsolationSection() {
+  return (
+    <Stack gap={16}>
+      <H2>Správa více turnajů současně</H2>
+      <Callout tone="success" title="Datový model izoluje běh">
+        Jednotlivci a dvojice mohou běžet ve stejný čas pod různými PINy. Není
+        žádný globální „aktuální turnaj“.
+      </Callout>
+
+      <Table
+        headers={["Vrstva", "Klíč", "Izolace", "Riziko"]}
+        rowTone={["success", "success", "warning", "success", "info"]}
+        rows={[
+          [
+            "Živý cloud turnaj",
+            "active_tournaments/{pin}",
+            "Celý stav v jednom dokumentu",
+            "Žádné sdílené pole mezi PINy",
+          ],
+          [
+            "Předregistrace",
+            "tournaments/{id}",
+            "Vlastní ID, nezávislé na PIN",
+            "Import jen kopíruje soupisku",
+          ],
+          [
+            "PIN prostor",
+            "4 číslice (1000–9999)",
+            "Dokument = jeden turnaj",
+            "generatePin() nekontroluje kolizi. tournament_pins je v rules, ale klient ho nepoužívá.",
+          ],
+          [
+            "ČŠO žebříčky",
+            "cso_rankings/{men|women}",
+            "Globální read-only cache",
+            "Záměrně sdílené, v pořádku",
+          ],
+          [
+            "Tablet / viewer relace",
+            "localStorage jeden PIN",
+            "Zařízení = jeden turnaj",
+            "Není to konflikt v DB, jen UX kiosku",
+          ],
+        ]}
+        striped
+      />
+
+      <Text tone="secondary">
+        Doplněk, ne blocker: při startu cloud turnaje rezervovat PIN atomicky
+        (`tournament_pins` + transakce), ať dva admini nedostanou stejný PIN.
+      </Text>
+    </Stack>
+  );
+}
+
+function SchemaSection() {
+  return (
+    <Stack gap={16}>
+      <H2>Navrhované Firestore schema</H2>
+
+      <H3>Předregistrace — tournaments / tournamentId</H3>
+      <Table
+        headers={["Pole", "Typ", "Význam"]}
+        rows={[
+          ["meta.competitionType", "singles | doubles | mixed | random_doubles", "Disciplína. Default singles."],
+          ["meta.capacity", "number | null", "Strop soupisky. Jednotlivci a losované = lidé. Pevné dvojice/mixy = potvrzené páry."],
+          ["meta.capacityUnit", "players | teams", "Label v setupu: Kapacita hráčů vs Kapacita dvojic."],
+          ["meta.requiresPairConfirm", "boolean", "true u doubles/mixed, false u random_doubles."],
+          ["finance.feeMode", "pair | split", "pair = jedna platba za dvojici. split = každý hráč za sebe."],
+          ["counters.confirmedTeams", "number", "Počet potvrzených párů (pair.CONFIRMED)."],
+        ]}
+        striped
+      />
+
+      <H3>Přihláška — registrations / registrationId</H3>
+      <Table
+        headers={["Pole", "Typ", "Význam"]}
+        rows={[
+          ["player", "object", "Stávající identita + gender + doublesRank."],
+          ["player.gender", "M | F | null", "Povinné u mixů. Inferovat z ČŠO men/women."],
+          ["player.doublesRank", "number | null", "Pozice v ČP dvojice (nasazovací)."],
+          ["partner", "object | null", "Cíl: jméno / csoPlayerId, i když B ještě nemá přihlášku."],
+          ["pair.status", "enum", "NONE | WAITING_PARTNER | PENDING_INVITE | CONFIRMED | DECLINED | BROKEN"],
+          ["pair.partnerRegistrationId", "string | null", "Propojení, až mají oba přihlášku."],
+          ["pair.inviteToken", "string | null", "Potvrzení bez Google účtu."],
+          ["pair.declinedAt", "timestamp | null", "A vidí jasné odmítnutí od B."],
+          ["payment.amount", "number", "pair: celé startovné na A. split: startovné na každého, vlastní VS."],
+          ["payment.refundDue", "boolean", "true když CANCELLED a isPaid — admin musí vidět vrácení."],
+          ["payment.refundedAt", "timestamp | null", "Admin označí startovné jako vrácené."],
+          ["status", "enum", "Beze změny: PENDING_PAYMENT | CONFIRMED | WAITLIST | CANCELLED | NO_SHOW"],
+        ]}
+        striped
+      />
+
+      <Callout tone="info" title="Stornovat, nemazat">
+        Self-unregister nastaví `CANCELLED` + `cancelledBy: PLAYER|ADMIN` +
+        `cancelledAt`. Platba, VS a audit zůstanou. Uvolní se kapacita a
+        `pair.status` druhé strany přejde na `BROKEN`.
+      </Callout>
+
+      <H3>Živý turnaj — active_tournaments / pin</H3>
+      <Table
+        headers={["Pole", "Role"]}
+        rows={[
+          [
+            "tournamentData.competitionType",
+            "Stejný enum jako v předregistraci.",
+          ],
+          [
+            "tournamentData.roster[]",
+            "Lidé: id, name, gender, ranking, doublesRanking, csoPlayerId, teamId.",
+          ],
+          [
+            "tournamentData.players[]",
+            "Soutěžní sloty. kind: player|team, memberIds[], ranking = seed (součet).",
+          ],
+          [
+            "match.player1Id / player2Id",
+            "Zůstávají ID slotu (tým). Zpětná kompatibilita.",
+          ],
+          [
+            "match.result.p1Avg / p2Avg",
+            "Průměr páru. Tie-break skupiny + horní blok po zápase.",
+          ],
+          [
+            "match.result.members[playerId]",
+            "Statistiky každého ze 4 hráčů. Povinné na obrazovce po zápase.",
+          ],
+          [
+            "match.legStarters[]",
+            "Kdo z týmu začal který leg.",
+          ],
+        ]}
+        striped
+      />
+
+      <H3>ČŠO žebříčky — tři oddělené zdroje</H3>
+      <Callout tone="warning" title="rankingId=6 nenahrazuje seeding jednotlivců">
+        ČP – dvojice (nasazovací) se smí použít jen když
+        `competitionType` je doubles, mixed nebo random_doubles. Turnaj
+        jednotlivců, online 1v1, lokální zápas i stávající našeptávač
+        zůstanou na rankingId=1 (muži) a rankingId=2 (ženy).
+      </Callout>
+      <Table
+        headers={["Disciplína", "Žebříček", "Dokument", "Jak se čte"]}
+        rowTone={["success", "info", "info", "info"]}
+        rows={[
+          [
+            "Jednotlivci (a všechno dnešní)",
+            "ČP muži / ženy nasazovací",
+            "cso_rankings/men | women",
+            "Přepínač Muži/Ženy, jeden rank na hráče",
+          ],
+          [
+            "Dvojice pevné",
+            "ČP dvojice nasazovací (id=6)",
+            "cso_rankings/doubles",
+            "Jeden seznam M+Ž, seed = součet dvou pozic",
+          ],
+          [
+            "Mixy",
+            "ČP dvojice nasazovací (id=6)",
+            "cso_rankings/doubles",
+            "Stejný seed. Pohlaví jen z men/women, ne z id=6",
+          ],
+          [
+            "Losované dvojice",
+            "ČP dvojice nasazovací (id=6)",
+            "cso_rankings/doubles",
+            "Seed až po losu párů, součet z id=6",
+          ],
+        ]}
+        striped
+      />
+      <Text>
+        Nový dokument `cso_rankings/doubles` se přidá vedle stávajících.
+        `parseRankingTable` stačí beze změny. Scraper stáhne třetí URL,
+        ale `loadCsoRanking('men'|'women')` a default v `TournamentSetup`
+        se nesmí přepnout na doubles.
+      </Text>
+      <Text>
+        Seed dvojice, v tomto pořadí: 1) nižší součet `doublesRank(A) +
+        doublesRank(B)` 2) při stejném součtu výš pár, kde je hráč s
+        nejlepším (nejnižším) individuálním rankem 3) stále shoda = los
+        (uložený `seedTieBreak`, ať se po refresh nemění). Bez rankingu
+        v id=6 = nenasazení, až za sečtenými. Sezónní rankingId=5 se
+        nestahuje.
+      </Text>
+    </Stack>
+  );
+}
+
+function ImpactSection() {
+  return (
+    <Stack gap={16}>
+      <H2>Dopad na kód</H2>
+      <Text tone="secondary">
+        Největší zásah je herní smyčka, ne skupiny/pavouk. Referee engine
+        potřebuje nový rozřez team vs osoba.
+      </Text>
+
+      <Card>
+        <CardHeader trailing={<Text size="small">téměř beze změny</Text>}>
+          tournamentLogic + generator
+        </CardHeader>
+        <CardBody>
+          <Text>
+            Los skupin, snake seeding, pavouk, BYE i JIT desky pracují se
+            sloty. Stačí do `players[].ranking` uložit součet a do `name`
+            „A / B“.
+          </Text>
+        </CardBody>
+      </Card>
+
+      <Table
+        headers={["Soubor", "Změna", "Proč"]}
+        rowTone={["danger", "danger", "warning", "warning", "warning", "info", "info", "success"]}
+        rows={[
+          [
+            "GameX01.jsx",
+            "4 házející + per-leg picker",
+            "Dnes jen currentPlayer p1|p2. Hod musí jít na konkrétního člena týmu.",
+          ],
+          [
+            "App.jsx calculateStats + MatchStatsView",
+            "Pár i 4 hráči",
+            "Po zápase dvě vrstvy: průměr/180/checkout páru a stejné metriky po hráčích.",
+          ],
+          [
+            "TabletWaitingRoom.jsx",
+            "Nová fáze před každým legem",
+            "whoStarts dnes vybírá stranu jednou na zápas, ne hráče v týmu.",
+          ],
+          [
+            "tournamentLogic.js referee",
+            "Horší člen poraženého týmu",
+            "Dnes referee = celý loserId. Nově výběr z roster podle avg.",
+          ],
+          [
+            "functions/registerPlayer.ts",
+            "Partner + gender + mix",
+            "Kapacita podle týmů, duplicita obou jmen, invite token.",
+          ],
+          [
+            "csoRankingScraper.ts",
+            "Třetí dokument doubles",
+            "Stejný scraper, nový rankingId.",
+          ],
+          [
+            "ImportToTournamentButton.jsx",
+            "Import týmů",
+            "Jen CONFIRMED + pair.CONFIRMED (nebo jednotlivci u losovaných).",
+          ],
+          [
+            "firestore.rules",
+            "Bez zápisu z klienta",
+            "Self-unregister i pair confirm jen přes Cloud Functions.",
+          ],
+        ]}
+        striped
+      />
+    </Stack>
+  );
+}
+
+function RoadmapSection() {
+  return (
+    <Stack gap={16}>
+      <H2>Krok za krokem — komponenty a Cloud Functions</H2>
+      <TodoList
+        todos={[
+          {
+            id: "p0",
+            status: "completed",
+            content: "Fáze 0 — ověřit izolaci PIN (hotovo: dokumentový model stačí)",
+          },
+          {
+            id: "p1",
+            status: "pending",
+            content: "Fáze 1 — self-unregister (CF + UI, CANCELLED, waitlist)",
+          },
+          {
+            id: "p2",
+            status: "pending",
+            content: "Fáze 2 — předregistrace doubles/mixed + potvrzení páru",
+          },
+          {
+            id: "p3",
+            status: "pending",
+            content: "Fáze 3 — ČŠO doubles ranking + seed součtem + import týmů",
+          },
+          {
+            id: "p4",
+            status: "pending",
+            content: "Fáze 4 — GameX01 + tablet: výběr házejícího před každým legem",
+          },
+          {
+            id: "p5",
+            status: "pending",
+            content: "Fáze 5 — týmový průměr ve skupině + horší počtář z páru",
+          },
+          {
+            id: "p6",
+            status: "pending",
+            content: "Fáze 6 — losované dvojice na místě (admin draw)",
+          },
+        ]}
+      />
+
+      <H3>Fáze 1 — Odhlášení z předregistrace</H3>
+      <Text>
+        Nová CF `unregisterPlayer`. Identita: `authUid` na přihlášce, nebo
+        `registrationId` z localStorage (`preregStorage`) + volitelně e-mail.
+        Povolit jen při `REGISTRATION_OPEN` a před importem do živého turnaje.
+      </Text>
+      <Text>
+        Upravit: `functions/src/unregisterPlayer.ts` (nová),
+        `listMyRegistrations.ts`, `tournamentPreRegService.js`,
+        `PublicTournamentPage.jsx`, `MyPreRegTournamentsList.jsx`,
+        `preregStorage.js`, `translations.js`. Admin `cancelRegistration`
+        nechat, přidat `cancelledBy` a filtr „K vrácení“ (`refundDue`).
+        Nová sdílená komponenta `ShareLinkMenu.jsx` (e-mail / Messenger /
+        WhatsApp / kopírovat) nahradí holé Copy u veřejného i invite linku.
+      </Text>
+      <Text tone="secondary">
+        Mezera už dnes: storno neposouvá waitlist. V téže transakci povýšit
+        nejstarší WAITLIST → CONFIRMED.
+      </Text>
+
+      <Divider />
+
+      <H3>Fáze 2 — Registrace a párování</H3>
+      <Text>
+        Kapacita = počet potvrzených párů. 1 místo = 2 potvrzená jména
+        (`pair.CONFIRMED`). Solo A čekající na B místo nebere.
+      </Text>
+      <Text>
+        Výběr spoluhráče ve `RegistrationForm`: 1) seznam volných už
+        přihlášených (CF `listAvailablePartners` — jen jména, bez e-mailu)
+        2) nebo napsat jméno, které v turnaji ještě není.
+      </Text>
+      <Text>
+        A vybere už přihlášeného B → B dostane výzvu, B potvrzuje. A napíše
+        nepřihlášeného B → A je `WAITING_PARTNER`. Až se B přihlásí a ze
+        seznamu vybere A, A v přehledu své registrace uvidí žádost a A
+        potvrzuje. Pravidlo: potvrzuje ten, kdo už v turnaji byl a byl
+        vybrán z listu.
+      </Text>
+      <Text>
+        Nové CF: `listAvailablePartners`, `confirmPairInvite`,
+        `declinePairInvite`, `requestPairWithRegistered`. Mix: 1× M + 1× Ž.
+        `random_doubles` bez partnera, páry až ve Fázi 6.
+      </Text>
+
+      <Divider />
+
+      <H3>Fáze 3 — Ranking a nasazení</H3>
+      <Text>
+        `csoRankingScraper.ts` + `updateCsoRankings.ts`: třetí dokument.
+        `csoRanking.js`: našeptávač umí doubles rank. `tournamentGenerator.js`
+        `sortPlayers` už řadí podle `ranking` vzestupně — stačí sem uložit
+        součet. `ImportToTournamentButton.jsx` staví týmové sloty, ne plochý
+        seznam jmen.
+      </Text>
+
+      <Divider />
+
+      <H3>Fáze 4 — Herní tablet</H3>
+      <Text>
+        Nový util `doublesThrowOrder.js`: pořadí hodů v legu (A1, B1, A2, B2
+        nebo A1, B1, A1, B1 podle zvoleného startéra). `GameX01.jsx` dostane
+        `settings.doubles` s rosterem obou stran. Před každým legem overlay
+        (ne jen phase 3 v čekárně): který člen začínajícího týmu hází první.
+      </Text>
+      <Text>
+        `handleTabletStartGame` v `App.jsx` musí po konci legu vrátit tabletu
+        picker, ne rovnou další leg. `submitTabletMatchUpdate.ts` musí umět
+        patch `legStarters` a průběžné member stats.
+      </Text>
+
+      <Divider />
+
+      <H3>Fáze 5 — Skupiny a počtář</H3>
+      <Text>
+        `calculateGroupStandings`: `average` = týmový průměr z `result.p1Avg`.
+        Tie-break (body → rozdíl legů → vyhrané legy → H2H → průměr) zůstává.
+        `calculateTournamentStats` agreguje i `result.members` — žebříček osob
+        i týmů.
+      </Text>
+      <Text>
+        Nový `pickWorsePlayerFromTeam(teamId, match, roster)`: horší avg v
+        daném zápase, fallback turnajový avg, pak nižší doublesRank. Výsledek
+        jde do match.referee (id + name) — stávající JIT to umí.
+      </Text>
+      <Text>
+        Check-in na tabletu: 4 hráči + 1 počtář, ne 2+1.
+      </Text>
+
+      <Divider />
+
+      <H3>Fáze 6 — Losované dvojice</H3>
+      <Text>
+        Nový krok v `TournamentSetup.jsx` (nebo mezi soupiskou a losem skupin):
+        admin spustí `drawRandomPairs(roster)`. Lichý počet = rezervní / bye
+        podle pravidla klubu. Po losu vzniknou `players[]` týmy a teprve pak
+        se generují skupiny.
+      </Text>
+    </Stack>
+  );
+}
+
+function OpenQuestionsSection() {
+  return (
+    <Stack gap={16}>
+      <H2>Uzavřená rozhodnutí</H2>
+      <Table
+        headers={["Otázka", "Rozhodnutí"]}
+        rowTone={["info", "success", "success", "success", "success", "info", "warning", "success", "warning"]}
+        rows={[
+          [
+            "Kapacita — co je to číslo?",
+            "Strop soupisky. Dvojice/mixy = potvrzené páry (16 = 16 párů). Losované = lidé do losu (32 = 32 hráčů → 16 párů). Jednotlivci beze změny = hráči.",
+          ],
+          [
+            "Startovné",
+            "Oba režimy: pair (1 platba, 1 VS, B jen potvrdí) a split (A zaplatí za sebe, B při potvrzení zaplatí nebo zvolí hotově). Nastavení turnaje.",
+          ],
+          [
+            "Partner odmítne / A se odhlásí",
+            "Pár BROKEN/DECLINED. A vidí odmítnutí, může vybrat jiného B, nebo stornovat. Zaplacené + zrušené = refundDue pro admina.",
+          ],
+          [
+            "Sdílení odkazů",
+            "Ikona Sdílet: e-mail, Messenger, WhatsApp, kopírovat. Platí i pro jednotlivce (veřejný link, invite, pair token).",
+          ],
+          [
+            "Žebříček id=6",
+            "Jen doubles/mixed/random_doubles. Shoda součtu: výš pár s nejlepším (nejnižším) individuálním rankem. Další shoda = los.",
+          ],
+          [
+            "Pohlaví pro mix",
+            "Lookup v men/women jednotlivcích podle jména / Reg. #, jinak ručně. Ne z id=6.",
+          ],
+          [
+            "Před každým legem vybírají oba týmy?",
+            "Ještě otevřené UX.",
+          ],
+          [
+            "Počtář",
+            "Nejdřív avg v daném zápase, při shodě turnajový avg.",
+          ],
+          [
+            "Lichý počet u losovaných?",
+            "Ještě otevřené: čeká / bye / ruční doplnění.",
+          ],
+        ]}
+        striped
+      />
+
+      <Callout tone="warning" title="Cricket bez dvojic — tvrdé omezení">
+        Logika párů (házející, statistiky 4 hráčů, per-leg picker) se
+        nepřidává do GameCricket ani do online Cricket. Dvojice, mixy i
+        losované dvojice jsou jen X01. Lokální Cricket a online 1v1 zůstanou
+        jak jsou.
+      </Callout>
+    </Stack>
+  );
+}

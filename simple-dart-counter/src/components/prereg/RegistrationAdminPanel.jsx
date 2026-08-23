@@ -11,6 +11,7 @@ import {
   Trash2,
   UserCheck,
   UserX,
+  Wallet,
   X,
 } from 'lucide-react';
 import { translations } from '../../translations';
@@ -22,6 +23,7 @@ import {
   getOwnerTournamentData,
   listenToRegistrations,
   markRegistrationPaid,
+  markRegistrationRefunded,
   restoreCancelledRegistration,
   toggleRegistrationCheckIn,
 } from '../../services/tournamentPreRegService';
@@ -43,7 +45,16 @@ import {
   resolveCsoPlayerId,
 } from '../../utils/playerIdentity';
 
-const FILTERS = ['ALL', 'CONFIRMED', 'WAITLIST', 'CANCELLED'];
+const FILTERS = ['ALL', 'CONFIRMED', 'WAITLIST', 'CANCELLED', 'REFUND_DUE'];
+
+function isRefundDue(r) {
+  return (
+    r?.status === 'CANCELLED' &&
+    !!r.payment?.isPaid &&
+    !!r.payment?.refundDue &&
+    !r.payment?.refundedAt
+  );
+}
 
 function registrationStatusLabel(t, status) {
   const key = `preregStatusLabel${status}`;
@@ -386,6 +397,7 @@ export default function RegistrationAdminPanel({
 
   const filtered = useMemo(() => {
     if (filter === 'ALL') return registrations;
+    if (filter === 'REFUND_DUE') return registrations.filter(isRefundDue);
     return registrations.filter((r) => r.status === filter);
   }, [registrations, filter]);
 
@@ -723,19 +735,44 @@ export default function RegistrationAdminPanel({
                         <UserCheck className="w-3 h-3" /> {t('preregCheckedIn')}
                       </div>
                     )}
+                    {isCancelled && r.cancelledBy === 'PLAYER' && (
+                      <div className="text-xs text-slate-500 mt-1">{t('preregCancelledByPlayer')}</div>
+                    )}
+                    {isRefundDue(r) && (
+                      <div className="text-xs font-bold text-amber-400 mt-1">{t('preregRefundDue')}</div>
+                    )}
+                    {isCancelled && r.payment?.refundedAt && (
+                      <div className="text-xs text-emerald-500 mt-1">{t('preregRefunded')}</div>
+                    )}
                   </td>
                   <td className="p-3">
                     {isCancelled ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => setRestoreReg(r)}
-                        className="inline-flex items-center gap-1.5 px-2 py-2 rounded-lg bg-slate-800 text-emerald-400 hover:bg-slate-700 text-[10px] sm:text-xs font-bold"
-                        title={t('preregRestoreReg')}
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                        {t('preregRestoreReg')}
-                      </button>
+                      <div className="flex flex-wrap gap-1">
+                        {isRefundDue(r) && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              runAction(r.id, () => markRegistrationRefunded(tournamentId, r.id))
+                            }
+                            className="inline-flex items-center gap-1.5 px-2 py-2 rounded-lg bg-slate-800 text-amber-400 hover:bg-slate-700 text-[10px] sm:text-xs font-bold"
+                            title={t('preregMarkRefunded')}
+                          >
+                            <Wallet className="w-4 h-4" />
+                            {t('preregMarkRefunded')}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setRestoreReg(r)}
+                          className="inline-flex items-center gap-1.5 px-2 py-2 rounded-lg bg-slate-800 text-emerald-400 hover:bg-slate-700 text-[10px] sm:text-xs font-bold"
+                          title={t('preregRestoreReg')}
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          {t('preregRestoreReg')}
+                        </button>
+                      </div>
                     ) : (
                       <div className="flex flex-wrap gap-1">
                         {!r.payment?.isPaid && r.payment?.method === 'QR' && (

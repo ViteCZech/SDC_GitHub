@@ -42,6 +42,9 @@ export const lookupStoredRegistration = onCall(
       variableSymbol?: string | null;
       method?: string | null;
       amount?: number | null;
+      isPaid?: boolean;
+      refundDue?: boolean;
+      refundedAt?: unknown;
     };
 
     return {
@@ -51,6 +54,8 @@ export const lookupStoredRegistration = onCall(
       variableSymbol: payment.variableSymbol ?? null,
       paymentMethod: payment.method ?? null,
       amount: payment.amount ?? null,
+      isPaid: !!payment.isPaid,
+      refundDue: !!payment.isPaid && !!payment.refundDue && payment.refundedAt == null,
     };
   }
 );

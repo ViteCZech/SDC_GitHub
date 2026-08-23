@@ -186,6 +186,7 @@ Samostatný modul od živého turnaje. Kolekce `tournaments/{id}` + `registratio
 Stavy turnaje: `DRAFT` → `REGISTRATION_OPEN` → `REGISTRATION_CLOSED` → `IN_PROGRESS` → `FINISHED`.
 
 Stavy přihlášky: `PENDING_PAYMENT` | `CONFIRMED` | `WAITLIST` | `CANCELLED` | `NO_SHOW`.
+Hráč se může sám odhlásit (`unregisterPlayer`) jen při `REGISTRATION_OPEN`. Storno uvolní místo a případně posune waitlist; zaplacené startovné označí `payment.refundDue`.
 
 Funkce:
 - Založení (název, místo, kapacita, waitlist, deadline, startovné, QR/hotovost, bankovní účet, VS, podmínky)
@@ -216,6 +217,7 @@ Region **europe-west1**, DB **eur3**. Export v `index.ts`:
 |---|---|
 | `registerPlayer` | Veřejná přihláška na předregistraci |
 | `createManualRegistration` | Admin ruční přihláška |
+| `unregisterPlayer` | Hráč stornuje přihlášku (jen REGISTRATION_OPEN) |
 | `listMyRegistrations` | Přihlášky přihlášeného hráče |
 | `submitTabletMatchUpdate` | Tablet zapíše výsledek zápasu do `active_tournaments` |
 | `registerTabletBoardOnline` | Tablet se ohlásí jako online na desce |

@@ -5,6 +5,7 @@ import { translations } from '../../translations';
 import {
   getPublicTournamentData,
   lookupStoredRegistrationApi,
+  unregisterPlayerApi,
   PREREG_NOT_FOUND,
 } from '../../services/tournamentPreRegService';
 import { loadStoredRegistration, saveStoredRegistration } from '../../utils/preregStorage';
@@ -27,6 +28,9 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
   const [error, setError] = useState('');
   const [tournament, setTournament] = useState(null);
   const [registration, setRegistration] = useState(() => loadStoredRegistration(tournamentId));
+  const [unregisterOpen, setUnregisterOpen] = useState(false);
+  const [unregisterBusy, setUnregisterBusy] = useState(false);
+  const [unregisterError, setUnregisterError] = useState('');
 
   const isRegistrationOpen = tournament?.status === 'REGISTRATION_OPEN';
 
@@ -64,6 +68,8 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
           variableSymbol: fresh.variableSymbol ?? stored.variableSymbol,
           paymentMethod: fresh.paymentMethod ?? stored.paymentMethod,
           amount: fresh.amount ?? stored.amount,
+          isPaid: fresh.isPaid ?? stored.isPaid,
+          refundDue: fresh.refundDue ?? stored.refundDue,
         };
         saveStoredRegistration(tournamentId, next);
         setRegistration(next);
@@ -88,6 +94,33 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
     };
     saveStoredRegistration(tournamentId, stored);
     setRegistration(stored);
+  };
+
+  const handleUnregister = async () => {
+    if (!registration?.registrationId) return;
+    setUnregisterBusy(true);
+    setUnregisterError('');
+    try {
+      const result = await unregisterPlayerApi(tournamentId, registration.registrationId);
+      const next = {
+        ...registration,
+        status: 'CANCELLED',
+        refundDue: !!result.refundDue,
+        savedAt: new Date().toISOString(),
+      };
+      saveStoredRegistration(tournamentId, next);
+      setRegistration(next);
+      setUnregisterOpen(false);
+    } catch (err) {
+      const msg = String(err?.message ?? '');
+      setUnregisterError(
+        msg.includes('otevřen') || msg.includes('open')
+          ? t('preregUnregisterErrClosed')
+          : t('preregUnregisterErr')
+      );
+    } finally {
+      setUnregisterBusy(false);
+    }
   };
 
   const confirmationRef = useRef(null);
@@ -186,6 +219,9 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
             <p className="text-slate-300 mt-1">{registration.playerName}</p>
           )}
           <p className="text-sm text-red-200/80 mt-2">{t('preregCancelledHint')}</p>
+          {registration?.refundDue && (
+            <p className="text-sm text-amber-200 mt-2">{t('preregRefundDueHint')}</p>
+          )}
         </div>
       )}
 
@@ -198,6 +234,50 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
             {t('preregLobbyTitle')}
           </h2>
           <SpdQrCard lang={lang} tournament={tournament} registration={registration} />
+          {isRegistrationOpen && (
+            <div className="mt-4 pt-4 border-t border-slate-800 space-y-3">
+              {!unregisterOpen ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUnregisterError('');
+                    setUnregisterOpen(true);
+                  }}
+                  className="w-full py-3 rounded-xl font-bold text-sm text-red-300 bg-red-950/40 border border-red-500/40 hover:bg-red-950/70"
+                >
+                  {t('preregUnregisterBtn')}
+                </button>
+              ) : (
+                <div className="p-4 rounded-xl border border-red-500/40 bg-red-950/30 space-y-3">
+                  <p className="text-sm font-black uppercase tracking-wide text-red-200">
+                    {t('preregUnregisterConfirmTitle')}
+                  </p>
+                  <p className="text-sm text-slate-300">{t('preregUnregisterConfirmBody')}</p>
+                  {unregisterError && (
+                    <p className="text-sm text-amber-300">{unregisterError}</p>
+                  )}
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      type="button"
+                      disabled={unregisterBusy}
+                      onClick={handleUnregister}
+                      className="flex-1 py-3 rounded-xl font-black uppercase tracking-wide text-sm text-white bg-red-600 hover:bg-red-500 disabled:opacity-50"
+                    >
+                      {unregisterBusy ? t('preregUnregisterWorking') : t('preregUnregisterConfirmBtn')}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={unregisterBusy}
+                      onClick={() => setUnregisterOpen(false)}
+                      className="flex-1 py-3 rounded-xl font-bold text-sm text-slate-300 bg-slate-800 border border-slate-600 hover:bg-slate-700"
+                    >
+                      {t('cancel')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </section>
       )}
 

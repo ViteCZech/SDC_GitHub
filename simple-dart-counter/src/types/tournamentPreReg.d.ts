@@ -58,10 +58,12 @@
  * @property {string} id
  * @property {{ name: string, email: string|null, phone: string|null, csoRank: number|null, csoPlayerId?: string|null, nameKey?: string|null }} player
  * @property {RegistrationStatus} status
- * @property {{ method: PaymentMethod|null, variableSymbol: string|null, amount: number|null, isPaid: boolean, verifiedByAdmin: boolean }} payment
+ * @property {{ method: PaymentMethod|null, variableSymbol: string|null, amount: number|null, isPaid: boolean, verifiedByAdmin: boolean, refundDue?: boolean, refundedAt?: import('firebase/firestore').Timestamp|null }} payment
  * @property {{ checkedIn: boolean }} attendance
  * @property {import('firebase/firestore').Timestamp} [termsAcceptedAt]
  * @property {'PUBLIC'|'ADMIN_MANUAL'} source
+ * @property {'PLAYER'|'ADMIN'|null} [cancelledBy]
+ * @property {import('firebase/firestore').Timestamp} [cancelledAt]
  */
 
 export {};
