@@ -84,8 +84,9 @@ export async function getPublicTournamentData(tournamentId) {
  * @typedef {Object} RegisterPlayerResult
  * @property {true} success
  * @property {string} registrationId
- * @property {'CONFIRMED'|'WAITLIST'} status
+ * @property {'CONFIRMED'|'WAITLIST'|'PENDING_PAYMENT'} status
  * @property {string|null} variableSymbol
+ * @property {boolean} [alreadyRegistered]
  */
 
 /**

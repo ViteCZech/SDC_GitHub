@@ -37,7 +37,6 @@ import GameX01 from './components/GameX01';
 import GameCricket from './components/GameCricket';
 import GameStats from './Stats';
 import TournamentSetup from './components/TournamentSetup';
-import CsoRankingUpdateButton from './components/CsoRankingUpdateButton';
 import TournamentHub from './components/TournamentHub';
 import TournamentBoardAssignment from './components/TournamentBoardAssignment';
 import TournamentGroupsView from './components/TournamentGroupsView';
@@ -247,6 +246,8 @@ function mergeDraftFromResume(saved) {
 }
 
 let bootUiResumeCache;
+/** Tvrdý reset: po vymazání localStorage už znovu neukládat resume (About / turnaj). */
+let skipUiResumePersist = false;
 function getBootUiResumeOnce() {
   if (bootUiResumeCache !== undefined) return bootUiResumeCache;
   try {
@@ -1586,6 +1587,7 @@ function AppMain({ lang, setLang }) {
 
   /** Obnova obrazovky po zavření externího odkazu (ČŠO / mapy) v PWA/TWA. */
   useEffect(() => {
+    if (skipUiResumePersist) return;
     saveUiResume({
       appState,
       tournamentSetupStep,
@@ -1789,8 +1791,11 @@ function AppMain({ lang, setLang }) {
     requestConfirm(
       t('headerHardResetTitle') || 'Resetovat aplikaci? Smažou se všechna lokální data a stránka se znovu načte.',
       () => {
+        skipUiResumePersist = true;
         safeStorage.clear();
-        window.location.reload();
+        const url = new URL(window.location.href);
+        url.hash = '';
+        window.location.replace(`${url.pathname || '/'}${url.search}`);
       },
       { confirmLabel: t('resetApp') || 'Resetovat', cancelLabel: t('cancel') || 'Zrušit' }
     );
@@ -6228,21 +6233,6 @@ function AppMain({ lang, setLang }) {
                 </div>
                 <div className="pt-6 md:pt-0 text-center md:text-left">
                     <p className="text-sm text-slate-400">{t('aboutText')}</p>
-                    {user && !user.isAnonymous && (
-                      <div className="mt-6 p-4 rounded-xl border border-slate-800 bg-slate-950/80 text-left space-y-2">
-                        <p className="text-xs font-black uppercase tracking-widest text-slate-400">
-                          {t('csoUpdateSectionTitle')}
-                        </p>
-                        <p className="text-[11px] text-slate-500">{t('csoUpdateSectionHint')}</p>
-                        <CsoRankingUpdateButton
-                          lang={lang}
-                          user={user}
-                          onLogin={handleLogin}
-                          onNotify={showNotification}
-                          onUpdated={() => {}}
-                        />
-                      </div>
-                    )}
                     <button onClick={() => window.location.href = `/privacy.html#${lang}`} className="flex items-center justify-center md:justify-start w-full gap-2 mt-8 text-sm font-bold tracking-widest underline uppercase text-emerald-500 hover:text-emerald-400">
                         {typeof t === 'function' ? t('privacyPolicy') : 'Zásady ochrany soukromí'}
                     </button>

@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase-admin/app';
 import { getFirestore, type DocumentData, type DocumentSnapshot, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { PLAYER_REG_LINKS_COLLECTION } from './playerRegLinks';
+import { normalizePlayerNameKey } from './playerIdentity';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 
@@ -207,6 +208,19 @@ export const listMyRegistrations = onCall(
         if (item) found.set(key, item);
       }
 
+      const extraNameKeys = new Set<string>();
+      for (const link of linkSnaps) {
+        const L = link.data() ?? {};
+        const fromLink = String(L.nameKey ?? '').trim();
+        if (fromLink) extraNameKeys.add(fromLink);
+        const fromName = normalizePlayerNameKey(L.playerName);
+        if (fromName) extraNameKeys.add(fromName);
+      }
+      for (const item of found.values()) {
+        const fromName = normalizePlayerNameKey(item.playerName);
+        if (fromName) extraNameKeys.add(fromName);
+      }
+
       // 2) Fallback pro starší registrace bez linku — jen veřejný katalog
       const tours = await db
         .collection('tournaments')
@@ -232,6 +246,9 @@ export const listMyRegistrations = onCall(
         await addFromQuery('player.authUid', uid);
         if (tokenEmail) {
           await addFromQuery('player.email', tokenEmail);
+        }
+        for (const nameKey of extraNameKeys) {
+          await addFromQuery('player.nameKey', nameKey);
         }
       }
 

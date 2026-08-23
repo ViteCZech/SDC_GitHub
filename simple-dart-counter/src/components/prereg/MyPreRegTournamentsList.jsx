@@ -16,6 +16,7 @@ import { translations } from '../../translations';
 import { listOwnerTournaments } from '../../services/tournamentPreRegService';
 import { normalizeForSearch } from '../../utils/csoRanking';
 import PreRegPageShell from './PreRegPageShell';
+import CompetitionTypeBadge from './CompetitionTypeBadge';
 
 const STATUS_KEYS = {
   REGISTRATION_OPEN: 'preregListStatusOpen',
@@ -374,6 +375,7 @@ export default function MyPreRegTournamentsList({
                 <div className="min-w-0 flex-1 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="font-black text-white truncate">{item.meta?.name || t('preregUntitled')}</h2>
+                    <CompetitionTypeBadge type={item.meta?.competitionType} t={t} />
                     <span
                       className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${statusBadgeClass(item.status)}`}
                     >

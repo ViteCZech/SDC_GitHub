@@ -8,6 +8,7 @@ import {
   playersAreSame,
   resolveCsoPlayerId,
 } from './playerIdentity';
+import { upsertPlayerRegistrationLink } from './playerRegLinks';
 import { normalizeCompetitionType, usesTeamCapacity } from './pairing';
 import type {
   CreateManualRegistrationPayload,
@@ -201,6 +202,25 @@ export const createManualRegistration = onCall(
       status: result.status,
       duplicateOk,
     });
+
+    try {
+      const email = data.email?.trim()?.toLowerCase() || null;
+      await upsertPlayerRegistrationLink(db, {
+        tournamentId,
+        registrationId: result.registrationId,
+        authUid: null,
+        email,
+        status: result.status,
+        playerName,
+        nameKey: nameKey || null,
+      });
+    } catch (linkErr) {
+      logger.warn('player_registration_links write failed', {
+        tournamentId,
+        registrationId: result.registrationId,
+        error: linkErr instanceof Error ? linkErr.message : String(linkErr),
+      });
+    }
 
     return result;
   }

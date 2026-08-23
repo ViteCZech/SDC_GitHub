@@ -127,8 +127,10 @@ export interface CreateManualRegistrationResult {
 export interface RegisterPlayerResult {
   success: true;
   registrationId: string;
-  status: 'CONFIRMED' | 'WAITLIST';
+  status: 'CONFIRMED' | 'WAITLIST' | 'PENDING_PAYMENT';
   variableSymbol: string | null;
+  /** True = existující přihláška (admin / dřívější) přiřazená k Google účtu. */
+  alreadyRegistered?: boolean;
 }
 
 export type CancelledBy = 'PLAYER' | 'ADMIN';

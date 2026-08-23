@@ -34,6 +34,7 @@ import {
   preferActivePreregistration,
 } from '../../utils/playerIdentity';
 import PreRegPageShell from './PreRegPageShell';
+import CompetitionTypeBadge from './CompetitionTypeBadge';
 
 const TABS = [
   { id: 'OPEN', match: (s) => s === 'REGISTRATION_OPEN' },
@@ -110,6 +111,7 @@ function TournamentCard({ lang, tournament, onRegister, t, myStatus }) {
           <h2 className="font-black text-white text-lg leading-tight">
             {tournament.meta?.name || t('preregUntitled')}
           </h2>
+          <CompetitionTypeBadge type={type} t={t} />
           <span
             className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border shrink-0 ${BADGE_CLASS[badge] ?? BADGE_CLASS.OTHER}`}
           >

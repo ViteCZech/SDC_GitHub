@@ -8,7 +8,7 @@ import {
   playersAreSame,
   resolveCsoPlayerId,
 } from './playerIdentity';
-import { PLAYER_REG_LINKS_COLLECTION } from './playerRegLinks';
+import { upsertPlayerRegistrationLink } from './playerRegLinks';
 import { randomBytes } from 'crypto';
 import {
   allowsPairing,
@@ -38,7 +38,7 @@ const db = getFirestore(getApp(), 'eur3');
 
 const ACTIVE_REGISTRATION_STATUSES = ACTIVE_PREREG_STATUSES;
 
-function normalizeEmail(email?: string): string | null {
+function normalizeEmail(email?: string | null): string | null {
   const trimmed = email?.trim().toLowerCase();
   return trimmed || null;
 }
@@ -101,6 +101,66 @@ function fail(code: HttpsError['code'], message: string): TxFail {
   return { ok: false, code, message };
 }
 
+type PlayerFields = {
+  name?: string;
+  email?: string | null;
+  phone?: string | null;
+  csoPlayerId?: string | null;
+  nameKey?: string | null;
+  authUid?: string | null;
+};
+
+function playerEmailOf(reg: Record<string, unknown>): string | null {
+  return normalizeEmail((reg.player as PlayerFields | undefined)?.email);
+}
+
+function playerAuthUidOf(reg: Record<string, unknown>): string | null {
+  const uid = (reg.player as PlayerFields | undefined)?.authUid;
+  return uid ? String(uid) : null;
+}
+
+function playerPhoneOf(reg: Record<string, unknown>): string | null {
+  const phone = (reg.player as PlayerFields | undefined)?.phone;
+  const trimmed = typeof phone === 'string' ? phone.trim() : '';
+  return trimmed || null;
+}
+
+/** Google uživatel si může „přivlastnit“ přihlášku bez authUid (typicky admin ruční zápis). */
+function canAttachGoogleUserToRegistration(
+  reg: Record<string, unknown>,
+  authUid: string | null,
+  myEmail: string | null
+): boolean {
+  if (!authUid) return false;
+  const existingUid = playerAuthUidOf(reg);
+  if (existingUid && existingUid !== authUid) return false;
+  const existingEmail = playerEmailOf(reg);
+  if (existingEmail && myEmail && existingEmail !== myEmail) return false;
+  if (existingEmail && !myEmail) return false;
+  return true;
+}
+
+function claimedResult(
+  snap: FirebaseFirestore.QueryDocumentSnapshot,
+  alreadyRegistered: boolean
+): TxOk {
+  const data = snap.data() ?? {};
+  const payment = (data.payment ?? {}) as { variableSymbol?: string | null };
+  const rawStatus = String(data.status ?? 'CONFIRMED');
+  const status: RegisterPlayerResult['status'] =
+    rawStatus === 'WAITLIST' || rawStatus === 'PENDING_PAYMENT' ? rawStatus : 'CONFIRMED';
+  return {
+    ok: true,
+    result: {
+      success: true,
+      registrationId: snap.id,
+      status,
+      variableSymbol: payment.variableSymbol ?? null,
+      alreadyRegistered,
+    },
+  };
+}
+
 function resolveRegistrationCsoPlayerId(
   playerName: string,
   csoPlayerIdInput: string | null | undefined
@@ -151,6 +211,14 @@ export const registerPlayer = onCall(
       }
 
       const normalizedEmail = normalizeEmail(email);
+      const tokenEmail = normalizeEmail(
+        (request.auth?.token?.email as string | undefined) ?? null
+      );
+      const authUid =
+        request.auth && request.auth.token?.firebase?.sign_in_provider !== 'anonymous'
+          ? request.auth.uid
+          : null;
+      const myEmail = normalizedEmail || tokenEmail;
       const nameKey = normalizePlayerNameKey(playerName);
       const csoPlayerId = resolveRegistrationCsoPlayerId(playerName, csoPlayerIdInput);
 
@@ -189,41 +257,60 @@ export const registerPlayer = onCall(
           return fail('failed-precondition', 'Vypršel časový limit pro přihlášení.');
         }
 
-        // Jednoduchý query (jen email) — bez composite indexu `email+status` uvnitř transakce
-        if (normalizedEmail) {
-          const duplicateQuery = tournamentRef
-            .collection('registrations')
-            .where('player.email', '==', normalizedEmail)
-            .limit(20);
-          const duplicateSnap = await transaction.get(duplicateQuery);
-          const hasActive = duplicateSnap.docs.some((docSnap) =>
-            ACTIVE_REGISTRATION_STATUSES.has(String(docSnap.data()?.status ?? ''))
-          );
-          if (hasActive) {
-            return fail('already-exists', 'Na tento e-mail je již registrace podána.');
-          }
-        }
-
-        // Duplicita jména / ČŠO ID (ranking se neporovnává)
+        // Duplicita e-mailu / jména / ČŠO — Google uživatel si může přivlastnit admin zápis.
         const regsSnap = await transaction.get(
           tournamentRef.collection('registrations').limit(500)
         );
+        const emailsToMatch = new Set(
+          [normalizedEmail, tokenEmail].filter((v): v is string => !!v)
+        );
         const candidate = { name: playerName, csoPlayerId };
+        let emailDup: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+        let nameDup: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+
         for (const docSnap of regsSnap.docs) {
           const reg = docSnap.data() ?? {};
           if (!ACTIVE_REGISTRATION_STATUSES.has(String(reg.status ?? ''))) continue;
-          const p = (reg.player ?? {}) as {
-            name?: string;
-            csoPlayerId?: string | null;
-            nameKey?: string | null;
-          };
+          const p = (reg.player ?? {}) as PlayerFields;
+          const existingEmail = playerEmailOf(reg);
+          if (existingEmail && emailsToMatch.has(existingEmail)) {
+            emailDup = docSnap;
+            break;
+          }
           const existing = {
             name: p.name,
             csoPlayerId: p.csoPlayerId ?? (p.nameKey ? `name:${p.nameKey}` : null),
           };
-          if (playersAreSame(existing, candidate)) {
-            return fail('already-exists', `PLAYER_NAME_DUPLICATE:${playerName}`);
+          if (!nameDup && playersAreSame(existing, candidate)) {
+            nameDup = docSnap;
           }
+        }
+
+        const attachExisting = (
+          dupSnap: FirebaseFirestore.QueryDocumentSnapshot,
+          conflictMessage: string
+        ): TxOutcome => {
+          const reg = dupSnap.data() ?? {};
+          if (!canAttachGoogleUserToRegistration(reg, authUid, myEmail)) {
+            return fail('already-exists', conflictMessage);
+          }
+          const nowTs = FieldValue.serverTimestamp();
+          const patch: Record<string, unknown> = {
+            updatedAt: nowTs,
+            'player.authUid': authUid,
+          };
+          if (myEmail && !playerEmailOf(reg)) patch['player.email'] = myEmail;
+          const submittedPhone = phone?.trim() || null;
+          if (submittedPhone && !playerPhoneOf(reg)) patch['player.phone'] = submittedPhone;
+          transaction.update(dupSnap.ref, patch);
+          return claimedResult(dupSnap, true);
+        };
+
+        if (emailDup) {
+          return attachExisting(emailDup, 'Na tento e-mail je již registrace podána.');
+        }
+        if (nameDup) {
+          return attachExisting(nameDup, `PLAYER_NAME_DUPLICATE:${playerName}`);
         }
 
         const competitionType = normalizeCompetitionType(
@@ -286,11 +373,6 @@ export const registerPlayer = onCall(
         const regRef = tournamentRef.collection('registrations').doc();
         const variableSymbol = buildVariableSymbol(finance.vsPrefix, regRef.id);
         const now = FieldValue.serverTimestamp();
-
-        const authUid =
-          request.auth && request.auth.token?.firebase?.sign_in_provider !== 'anonymous'
-            ? request.auth.uid
-            : null;
 
         const newRegistration: Record<string, unknown> = {
           id: regRef.id,
@@ -394,24 +476,15 @@ export const registerPlayer = onCall(
 
       // Index pro hráčský přehled (bez collectionGroup — Enterprise Edition)
       try {
-        const authUid =
-          request.auth && request.auth.token?.firebase?.sign_in_provider !== 'anonymous'
-            ? request.auth.uid
-            : null;
-        const linkId = `${tournamentId}_${outcome.result.registrationId}`;
-        await db.collection(PLAYER_REG_LINKS_COLLECTION).doc(linkId).set(
-          {
-            tournamentId,
-            registrationId: outcome.result.registrationId,
-            authUid: authUid ?? null,
-            email: normalizedEmail,
-            status: outcome.result.status,
-            playerName,
-            updatedAt: FieldValue.serverTimestamp(),
-            createdAt: FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
+        await upsertPlayerRegistrationLink(db, {
+          tournamentId,
+          registrationId: outcome.result.registrationId,
+          authUid: authUid ?? null,
+          email: myEmail,
+          status: outcome.result.status,
+          playerName,
+          nameKey: nameKey || null,
+        });
       } catch (linkErr) {
         logger.warn('player_registration_links write failed', {
           tournamentId,
@@ -424,6 +497,7 @@ export const registerPlayer = onCall(
         tournamentId,
         registrationId: outcome.result.registrationId,
         status: outcome.result.status,
+        alreadyRegistered: !!outcome.result.alreadyRegistered,
       });
 
       return outcome.result;

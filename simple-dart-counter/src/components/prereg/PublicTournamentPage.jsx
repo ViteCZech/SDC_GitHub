@@ -4,15 +4,18 @@ import VenueMapLink from '../VenueMapLink';
 import { translations } from '../../translations';
 import {
   getPublicTournamentData,
+  listMyRegistrationsApi,
   lookupStoredRegistrationApi,
   unregisterPlayerApi,
   PREREG_NOT_FOUND,
 } from '../../services/tournamentPreRegService';
 import { loadStoredRegistration, saveStoredRegistration } from '../../utils/preregStorage';
+import { preferActivePreregistration } from '../../utils/playerIdentity';
 import RegistrationForm from './RegistrationForm';
 import PairStatusPanel from './PairStatusPanel';
 import SpdQrCard from './SpdQrCard';
 import PreRegPageShell from './PreRegPageShell';
+import CompetitionTypeBadge from './CompetitionTypeBadge';
 import { allowsPairing, normalizeCompetitionType } from '../../utils/preregCompetition';
 
 /**
@@ -84,6 +87,63 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
       cancelled = true;
     };
   }, [tournamentId]);
+
+  useEffect(() => {
+    if (!user || user.isAnonymous) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const items = await listMyRegistrationsApi();
+        if (cancelled) return;
+        const mine = (items || []).find((i) => String(i.tournamentId) === String(tournamentId));
+        if (!mine?.registrationId) return;
+        const stored = loadStoredRegistration(tournamentId);
+        let next = {
+          registrationId: mine.registrationId,
+          status: mine.status,
+          variableSymbol: mine.variableSymbol ?? stored?.variableSymbol ?? null,
+          paymentMethod: stored?.paymentMethod ?? null,
+          playerName: mine.playerName ?? stored?.playerName ?? '',
+          email: mine.email ?? stored?.email ?? null,
+          isPaid: mine.isPaid ?? stored?.isPaid,
+          savedAt: stored?.savedAt || new Date().toISOString(),
+        };
+        try {
+          const fresh = await lookupStoredRegistrationApi(tournamentId, mine.registrationId);
+          if (fresh?.status) {
+            next = {
+              ...next,
+              status: fresh.status,
+              playerName: fresh.playerName ?? next.playerName,
+              variableSymbol: fresh.variableSymbol ?? next.variableSymbol,
+              paymentMethod: fresh.paymentMethod ?? next.paymentMethod,
+              amount: fresh.amount ?? stored?.amount ?? null,
+              isPaid: fresh.isPaid ?? next.isPaid,
+              refundDue: fresh.refundDue,
+              gender: fresh.gender ?? stored?.gender ?? null,
+              pair: fresh.pair,
+            };
+          }
+        } catch {
+          /* keep list payload */
+        }
+        if (cancelled) return;
+        const preferred = preferActivePreregistration(
+          stored ? { ...stored, source: 'local' } : null,
+          { ...next, source: 'server' }
+        );
+        const toSave = { ...preferred };
+        delete toSave.source;
+        saveStoredRegistration(tournamentId, toSave);
+        setRegistration(toSave);
+      } catch {
+        /* katalog i tak načte listMyRegistrations zvlášť */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tournamentId, user?.uid, user?.isAnonymous]);
 
   const handleRegistrationSuccess = (result, formSnapshot) => {
     const stored = {
@@ -208,12 +268,12 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
           <Trophy className="w-6 h-6" />
           <span className="text-xs font-black uppercase tracking-widest">{t('preregTitle')}</span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight">
-          {tournament.meta?.name || t('preregUntitled')}
-        </h1>
-        <p className="text-xs font-bold uppercase tracking-widest text-cyan-400">
-          {t(`preregCompType_${competitionType}`)}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight">
+            {tournament.meta?.name || t('preregUntitled')}
+          </h1>
+          <CompetitionTypeBadge type={competitionType} t={t} />
+        </div>
         <div className="flex flex-wrap gap-3 text-sm text-slate-400">
           {startsAtLabel && (
             <span className="inline-flex items-center gap-1.5">

@@ -63,7 +63,7 @@
 /**
  * @typedef {Object} RegistrationDocument
  * @property {string} id
- * @property {{ name: string, email: string|null, phone: string|null, csoRank: number|null, csoPlayerId?: string|null, nameKey?: string|null, gender?: PlayerGender|null }} player
+ * @property {{ name: string, email: string|null, phone: string|null, csoRank: number|null, csoPlayerId?: string|null, nameKey?: string|null, gender?: PlayerGender|null, authUid?: string|null }} player
  * @property {RegistrationStatus} status
  * @property {{ status?: PairStatus, partnerRegistrationId?: string|null, partnerName?: string|null, pendingName?: string|null, initiatedBy?: string|null }} [pair]
  * @property {{ method: PaymentMethod|null, variableSymbol: string|null, amount: number|null, isPaid: boolean, verifiedByAdmin: boolean, refundDue?: boolean, refundedAt?: import('firebase/firestore').Timestamp|null }} payment

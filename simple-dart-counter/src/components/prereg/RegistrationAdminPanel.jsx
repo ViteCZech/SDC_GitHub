@@ -46,6 +46,7 @@ import {
 import ImportToTournamentButton from './ImportToTournamentButton';
 import PaymentQrModal from './PaymentQrModal';
 import PreRegPageShell from './PreRegPageShell';
+import CompetitionTypeBadge from './CompetitionTypeBadge';
 import CsoPlayerNameField from './CsoPlayerNameField';
 import PlayerDuplicateModal from '../PlayerDuplicateModal';
 import {
@@ -770,7 +771,10 @@ export default function RegistrationAdminPanel({
       <div className="space-y-6">
       <header className="space-y-3">
         <div className="space-y-1">
-          <h1 className="text-2xl font-black text-white">{tournament.meta?.name || t('preregUntitled')}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-black text-white">{tournament.meta?.name || t('preregUntitled')}</h1>
+            <CompetitionTypeBadge type={competitionType} t={t} />
+          </div>
           <p className="text-xs font-mono text-slate-500 break-all">{getPublicRegistrationUrl(tournamentId)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
