@@ -27,6 +27,12 @@ jobs:
           npm run build
         working-directory: simple-dart-counter
 
+      - name: Playwright smoke
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+        working-directory: simple-dart-counter
+
       - name: Install and Build Functions
         run: |
           npm ci

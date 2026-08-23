@@ -33,6 +33,12 @@ jobs:
           npm test
         working-directory: simple-dart-counter/functions
 
+      - name: Playwright smoke
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+        working-directory: simple-dart-counter
+
       - name: Nahrání náhledu na Firebase
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
