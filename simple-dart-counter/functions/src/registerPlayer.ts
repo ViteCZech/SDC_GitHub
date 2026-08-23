@@ -9,6 +9,11 @@ import {
   resolveCsoPlayerId,
 } from './playerIdentity';
 import { upsertPlayerRegistrationLink } from './playerRegLinks';
+import {
+  canAttachGoogleUserToRegistration,
+  normalizeEmail,
+  playerEmailOf,
+} from './claimRegistration';
 import { randomBytes } from 'crypto';
 import {
   allowsPairing,
@@ -37,11 +42,6 @@ if (getApps().length === 0) {
 const db = getFirestore(getApp(), 'eur3');
 
 const ACTIVE_REGISTRATION_STATUSES = ACTIVE_PREREG_STATUSES;
-
-function normalizeEmail(email?: string | null): string | null {
-  const trimmed = email?.trim().toLowerCase();
-  return trimmed || null;
-}
 
 function buildVariableSymbol(prefix: string | undefined, registrationId: string): string {
   const digitsFromId = String(registrationId ?? '').replace(/\D/g, '');
@@ -110,56 +110,10 @@ type PlayerFields = {
   authUid?: string | null;
 };
 
-function playerEmailOf(reg: Record<string, unknown>): string | null {
-  return normalizeEmail((reg.player as PlayerFields | undefined)?.email);
-}
-
-function playerAuthUidOf(reg: Record<string, unknown>): string | null {
-  const uid = (reg.player as PlayerFields | undefined)?.authUid;
-  return uid ? String(uid) : null;
-}
-
 function playerPhoneOf(reg: Record<string, unknown>): string | null {
   const phone = (reg.player as PlayerFields | undefined)?.phone;
   const trimmed = typeof phone === 'string' ? phone.trim() : '';
   return trimmed || null;
-}
-
-function officialCsoId(raw: string | null | undefined): string | null {
-  const s = String(raw ?? '').trim();
-  return s.startsWith('cso:') ? s : null;
-}
-
-/**
- * Přiřazení existující přihlášky k Google účtu — jen když je identita jednoznačná.
- * - stejný účet už ji vlastní
- * - shoda e-mailu
- * - shoda oficiálního ČŠO ID (`cso:…`), ne pouhé jméno
- */
-function canAttachGoogleUserToRegistration(
-  reg: Record<string, unknown>,
-  authUid: string | null,
-  myEmail: string | null,
-  reason: 'email' | 'identity',
-  candidateCsoId: string | null
-): boolean {
-  if (!authUid) return false;
-  const existingUid = playerAuthUidOf(reg);
-  if (existingUid && existingUid !== authUid) return false;
-  if (existingUid === authUid) return true;
-
-  const existingEmail = playerEmailOf(reg);
-  if (reason === 'email') {
-    return !!existingEmail && !!myEmail && existingEmail === myEmail;
-  }
-
-  if (existingEmail) {
-    return !!myEmail && existingEmail === myEmail;
-  }
-
-  const existingCso = officialCsoId((reg.player as PlayerFields | undefined)?.csoPlayerId);
-  const mineCso = officialCsoId(candidateCsoId);
-  return !!existingCso && !!mineCso && existingCso === mineCso;
 }
 
 function claimedResult(

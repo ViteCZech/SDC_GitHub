@@ -16,13 +16,22 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: simple-dart-counter/package-lock.json
+          cache-dependency-path: |
+            simple-dart-counter/package-lock.json
+            simple-dart-counter/functions/package-lock.json
 
       - name: Instalace a sestavení
         run: |
           npm ci
+          npm test
           npm run build
         working-directory: simple-dart-counter
+
+      - name: Test Cloud Functions
+        run: |
+          npm ci
+          npm test
+        working-directory: simple-dart-counter/functions
 
       - name: Nahrání náhledu na Firebase
         uses: FirebaseExtended/action-hosting-deploy@v0

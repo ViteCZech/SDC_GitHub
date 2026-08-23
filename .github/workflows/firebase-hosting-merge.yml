@@ -23,12 +23,14 @@ jobs:
         run: |
           rm -rf node_modules dist dev-dist
           npm ci
+          npm test
           npm run build
         working-directory: simple-dart-counter
 
       - name: Install and Build Functions
         run: |
           npm ci
+          npm test
           npm run build
         working-directory: simple-dart-counter/functions
 

@@ -19,8 +19,8 @@ export function buildCzechBankAccount({ accountPrefix, accountNumber, bankCode }
  */
 export function resolveBankAccountString(bankInfo) {
   if (!bankInfo) return null;
-  const iban = String(bankInfo.iban ?? '').replace(/\s+/g, '');
-  if (iban.startsWith('CZ')) return iban.toUpperCase();
+  const iban = String(bankInfo.iban ?? '').replace(/\s+/g, '').toUpperCase();
+  if (iban.startsWith('CZ')) return iban;
 
   const built = buildCzechBankAccount(bankInfo);
   if (built) return built;
