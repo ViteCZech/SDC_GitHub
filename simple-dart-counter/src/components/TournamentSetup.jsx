@@ -43,6 +43,7 @@ import {
   isRandomDoublesDraft,
 } from '../utils/drawRandomPairs';
 import RandomPairDrawPanel from './RandomPairDrawPanel';
+import VenueTvLinkCard from './VenueTvLinkCard';
 
 /** Ranking z inputu: prázdné nebo 0 → null */
 function parseRankingFromInput(val) {
@@ -1064,7 +1065,7 @@ export default function TournamentSetup({
                   <div className="rounded-lg border border-amber-500/40 bg-amber-950/25 px-3 py-3 space-y-3">
                     <p className="text-sm font-medium text-amber-100/95 leading-snug">
                       {t('tournamentHub.loginRequiredForCloud') ||
-                        'Pro aktivaci cloudu a připojení tabletů se musíte přihlásit přes Google.'}
+                        'Pro tablety, cloudové diváky a TV obrazovku haly se musíte přihlásit přes Google.'}
                     </p>
                     {typeof onGoogleLogin === 'function' && (
                       <button
@@ -1078,6 +1079,12 @@ export default function TournamentSetup({
                     )}
                   </div>
                 )}
+                <VenueTvLinkCard
+                  lang={lang}
+                  pin={setupPinDisplay}
+                  isLoggedIn={!!isLoggedIn}
+                  cloudEnabled={!!tournamentDraft.cloudEnabled}
+                />
                 {tournamentDraft.cloudEnabled && isLoggedIn && (
                   <div className="rounded-lg border border-slate-600/80 bg-slate-900/80 px-3 py-3 space-y-2">
                     <label

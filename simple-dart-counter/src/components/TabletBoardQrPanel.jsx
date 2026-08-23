@@ -10,6 +10,7 @@ import {
   isBoardOnline,
   resolveTotalBoards,
 } from '../utils/tabletBoardQr';
+import VenueTvLinkCard from './VenueTvLinkCard';
 
 const ACTIVE_TOURNAMENTS_COLL = 'active_tournaments';
 
@@ -271,6 +272,7 @@ export default function TabletBoardQrPanel({
                   <X className="w-5 h-5" />
                 </button>
               </div>
+              <VenueTvLinkCard lang={lang} pin={pin} isLoggedIn cloudEnabled compact />
               <BoardGrid
                 lang={lang}
                 boards={boards}
@@ -300,6 +302,9 @@ export default function TabletBoardQrPanel({
           {t('tabletQrSectionHint') ||
             'Zobrazte QR kód pro daný terč. Po naskenování tabletu uvidíte okamžité potvrzení připojení.'}
         </p>
+        <div className="mb-4">
+          <VenueTvLinkCard lang={lang} pin={pin} isLoggedIn cloudEnabled compact />
+        </div>
         <BoardGrid
           lang={lang}
           boards={boards}

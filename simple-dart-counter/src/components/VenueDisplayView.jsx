@@ -5,6 +5,7 @@ import { listenToCloudTournament } from '../services/tournamentSync';
 import {
   VENUE_CALL_MS,
   VENUE_CAROUSEL_MS,
+  VENUE_LISTEN_TIMEOUT_MS,
   boardsOccupancySignature,
   buildVenueDisplayModel,
   detectVenueMatchCalls,
@@ -197,9 +198,16 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
       return undefined;
     }
     setDoc(undefined);
-    return listenToCloudTournament(pin, (data) => {
+    const unsub = listenToCloudTournament(pin, (data) => {
       setDoc(data ?? null);
     });
+    const timeoutId = window.setTimeout(() => {
+      setDoc((prev) => (prev === undefined ? null : prev));
+    }, VENUE_LISTEN_TIMEOUT_MS);
+    return () => {
+      window.clearTimeout(timeoutId);
+      unsub?.();
+    };
   }, [pin, invalidPin]);
 
   useEffect(() => {
@@ -304,9 +312,13 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
 
   const showEmpty = invalidPin || doc === null;
   const showLoading = !invalidPin && doc === undefined;
+  const viewState = showEmpty ? 'empty' : showLoading ? 'loading' : 'ready';
 
   return (
-    <div className="flex flex-col w-full h-[100dvh] bg-black text-white overflow-hidden select-none">
+    <div
+      data-testid="venue-display"
+      className="flex flex-col w-full h-[100dvh] bg-black text-white overflow-hidden select-none"
+    >
       <header className="shrink-0 flex items-center justify-between gap-4 px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 border-b border-slate-900">
         <div className="min-w-0">
           <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">{tv(lang, 'title')}</p>
@@ -317,7 +329,11 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
         ) : null}
       </header>
 
-      <main className="flex-1 min-h-0 p-4 xl:p-6 flex flex-col">
+      <main
+        className="flex-1 min-h-0 p-4 xl:p-6 flex flex-col"
+        data-testid="venue-display-status"
+        data-state={viewState}
+      >
         {showLoading ? (
           <p className="m-auto text-4xl font-black text-slate-600 uppercase tracking-widest">{tv(lang, 'loading')}</p>
         ) : null}

@@ -629,11 +629,20 @@ export async function verifyTabletBoardAccess(pin, tabletPassword, opts = {}) {
  * @returns {() => void} unsubscribe
  */
 export function listenToCloudTournament(pin, callback) {
+  const notifyMissing = () => {
+    try {
+      callback(null);
+    } catch {
+      /* ignore */
+    }
+  };
   if (!db || !pin) {
+    queueMicrotask(notifyMissing);
     return () => {};
   }
   const id = String(pin).trim();
   if (!/^\d{4}$/.test(id)) {
+    queueMicrotask(notifyMissing);
     return () => {};
   }
   const ref = doc(db, COLLECTION, id);
@@ -649,6 +658,7 @@ export function listenToCloudTournament(pin, callback) {
     },
     (err) => {
       console.warn('listenToCloudTournament snapshot error:', err);
+      notifyMissing();
     }
   );
 }

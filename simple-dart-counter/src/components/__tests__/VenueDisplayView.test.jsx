@@ -66,6 +66,8 @@ describe('VenueDisplayView', () => {
 
   it('neplatný PIN nic neposlouchá a ukáže chybu', () => {
     render(<VenueDisplayView pin={null} invalidPin lang="cs" />);
+    expect(screen.getByTestId('venue-display')).toBeTruthy();
+    expect(screen.getByTestId('venue-display-status').getAttribute('data-state')).toBe('empty');
     expect(screen.getAllByText('Neplatný PIN').length).toBeGreaterThan(0);
     expect(listenMock).not.toHaveBeenCalled();
   });

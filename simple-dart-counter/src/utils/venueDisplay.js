@@ -11,6 +11,8 @@ import { calculateGroupStandings, calculateTournamentStats } from './tournamentL
 
 export const VENUE_CAROUSEL_MS = 15_000;
 export const VENUE_CALL_MS = 8_000;
+/** Když Firestore v CI / offline neodpoví, nenechat TV viset na načítání. */
+export const VENUE_LISTEN_TIMEOUT_MS = 8_000;
 
 /**
  * @param {Pick<Location, 'pathname'>|null|undefined} loc
@@ -18,7 +20,10 @@ export const VENUE_CALL_MS = 8_000;
  */
 export function parseVenueDisplayRouteFromUrl(loc = typeof window !== 'undefined' ? window.location : null) {
   if (!loc) return null;
-  const match = String(loc.pathname || '').match(/^\/tv\/([^/]+)\/?$/i);
+  const path = String(loc.pathname || '');
+  const hash = String(loc.hash || '').replace(/^#/, '');
+  const match =
+    path.match(/^\/tv\/([^/]+)\/?$/i) || hash.match(/^\/?tv\/([^/]+)\/?$/i);
   if (!match) return null;
   const raw = decodeURIComponent(match[1] || '').trim();
   if (!/^\d{4}$/.test(raw)) return { pin: null, invalid: true };

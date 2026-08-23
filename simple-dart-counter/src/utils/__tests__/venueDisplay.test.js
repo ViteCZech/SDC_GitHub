@@ -77,6 +77,10 @@ describe('venueDisplay routing', () => {
       pin: '1234',
       invalid: false,
     });
+    expect(parseVenueDisplayRouteFromUrl({ pathname: '/', hash: '#/tv/5678' })).toEqual({
+      pin: '5678',
+      invalid: false,
+    });
     expect(parseVenueDisplayRouteFromUrl({ pathname: '/tv/1234/' })).toEqual({
       pin: '1234',
       invalid: false,
@@ -86,6 +90,10 @@ describe('venueDisplay routing', () => {
       invalid: true,
     });
     expect(parseVenueDisplayRouteFromUrl({ pathname: '/tablet' })).toBeNull();
+    expect(parseVenueDisplayRouteFromUrl({ pathname: '/', hash: '#/tv/0000' })).toEqual({
+      pin: '0000',
+      invalid: false,
+    });
   });
 
   it('buildVenueDisplayUrl složí veřejnou cestu', () => {
