@@ -38,6 +38,8 @@ const TournamentStatisticsView = ({
   const topCheckouts = stats?.topCheckouts ?? [];
   const bestLegs = stats?.bestLegs ?? [];
   const playerStats = stats?.playerStats ?? [];
+  const memberStats = stats?.memberStats ?? [];
+  const hasTeams = memberStats.length > 0;
 
   const isEmpty = !top180s.length && !topCheckouts.length && !bestLegs.length && !playerStats.length;
 
@@ -137,10 +139,44 @@ const TournamentStatisticsView = ({
           </div>
         </section>
 
+        {hasTeams && (
+          <section className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <div className="text-[10px] uppercase font-bold tracking-widest text-slate-500 mb-3">
+              {t('stats.players') || t('playerStats') || 'Hráči'}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-separate" style={{ borderSpacing: 0 }}>
+                <thead>
+                  <tr className="text-left text-xs text-slate-500">
+                    <th className="px-2 py-2 font-bold">{t('stats.rank') || '#'}</th>
+                    <th className="px-2 py-2 font-bold">{t('stats.player') || 'Hráč'}</th>
+                    <th className="px-2 py-2 font-bold text-right">{t('stats.avg') || 'Ø'}</th>
+                    <th className="px-2 py-2 font-bold text-right">{t('stats.highCheck') || 'High Check'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {memberStats.map((p, idx) => (
+                    <tr key={p.id || p.name} className="border-t border-slate-800">
+                      <td className="px-2 py-2 font-mono text-slate-400">{p.placement ?? idx + 1}</td>
+                      <td className="px-2 py-2 text-slate-200 truncate max-w-[220px]">{p.name}</td>
+                      <td className="px-2 py-2 font-mono text-right text-amber-400 font-bold">
+                        {Number(p.average ?? 0).toFixed(2)}
+                      </td>
+                      <td className="px-2 py-2 font-mono text-right text-emerald-400 font-bold">
+                        {p.bestCheckout ?? 0}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
         <section className="p-4 rounded-xl bg-slate-900 border border-slate-800">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div className="text-[10px] uppercase font-bold tracking-widest text-slate-500">
-              {t('playerStats') || 'Hráči'}
+              {hasTeams ? (t('stats.teams') || t('doublesTeam') || 'Dvojice') : (t('playerStats') || 'Hráči')}
             </div>
             <div className="text-xs text-slate-500">
               {isEmpty ? '' : t('sortedByPlacement') || 'Seřazeno dle umístění'}

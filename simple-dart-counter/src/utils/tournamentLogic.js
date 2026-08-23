@@ -5,6 +5,7 @@
 
 import { distributePlayersToFixedGroups } from './tournamentGenerator';
 import { compareTeamSeeds, isTeamPlayer } from './doublesSeeding';
+import { expandBusyIdsWithTeamMembers, resolveRefereePerson } from './doublesReferee';
 
 const BRACKET_BYE_LABEL = 'Volný los';
 
@@ -102,10 +103,14 @@ function generateRoundRobinFallback(players, groupId) {
       const available = chalkerPool.filter((id) => id !== m.player1Id && id !== m.player2Id);
       const chalkerId = available.length > 0 ? available[0] : null;
       if (chalkerId && byePlayerId) chalkerPool = chalkerPool.filter((id) => id !== chalkerId);
+      const chalkerSlot = chalkerId ? normalized.find((p) => p.id === chalkerId) : null;
+      const person = chalkerSlot ? resolveRefereePerson(chalkerSlot, {}) : null;
       matches.push({
         player1Id: m.player1Id,
         player2Id: m.player2Id,
         chalkerId,
+        refereeId: person?.id ?? chalkerId,
+        referee: person,
         groupId,
         round: r + 1,
         status: 'pending',
@@ -136,11 +141,15 @@ export function generateRoundRobinSchedule(players, groupId) {
       const player1Id = normalized[p1 - 1].id;
       const player2Id = normalized[p2 - 1].id;
       const round = Math.floor(i / matchesPerRound) + 1;
+      const chalkerSlot = normalized[chalker - 1];
+      const person = chalkerSlot ? resolveRefereePerson(chalkerSlot, {}) : null;
       return {
         id: `${groupId}-r${round}-${player1Id}-${player2Id}`,
         player1Id,
         player2Id,
-        chalkerId: normalized[chalker - 1]?.id ?? null,
+        chalkerId: chalkerSlot?.id ?? null,
+        refereeId: person?.id ?? chalkerSlot?.id ?? null,
+        referee: person,
         groupId,
         round,
         status: 'pending',
@@ -412,6 +421,40 @@ export function calculateTournamentTimePrediction(groups, matches, settings = {}
  * @param {Array<{status: string, player1Id: string, player2Id: string, result?: {p1Legs: number, p2Legs: number}, legsP1?: number, legsP2?: number, score1?: number, score2?: number}>} groupMatches - pole zápasů této skupiny
  * @returns {Array<{...player, played: number, wins: number, losses: number, legsWon: number, legsLost: number, legDifference: number, points: number, average: number}>} seřazené pole hráčů se statistikami
  */
+function addStandingAvg(statsRow, match, side) {
+  if (!statsRow) return;
+  const avg = Number(match?.result?.[`${side}Avg`] ?? match?.[`${side}Avg`] ?? match?.[`avg${side === 'p1' ? 'P1' : 'P2'}`]);
+  const darts = Number(match?.result?.[`${side}DartsTotal`] ?? match?.[`${side}DartsTotal`]);
+  if (Number.isFinite(avg) && Number.isFinite(darts) && darts > 0) {
+    statsRow._dartsSum += darts;
+    statsRow._scoreSum += (avg / 3) * darts;
+    return;
+  }
+  if (Number.isFinite(avg)) {
+    statsRow._avgSum += avg;
+    statsRow._avgCount += 1;
+    return;
+  }
+  const members = match?.result?.members ?? match?.members;
+  if (!members || !isTeamPlayer(statsRow)) return;
+  let d = 0;
+  let s = 0;
+  for (const mem of statsRow.members || []) {
+    const row = members[mem.id];
+    if (!row) continue;
+    const md = Number(row.darts) || 0;
+    const ms = Number(row.score);
+    if (md > 0 && Number.isFinite(ms)) {
+      d += md;
+      s += ms;
+    }
+  }
+  if (d > 0) {
+    statsRow._dartsSum += d;
+    statsRow._scoreSum += s;
+  }
+}
+
 export function calculateGroupStandings(groupPlayers, groupMatches) {
   const stats = (groupPlayers || []).map((p, i) => ({
     ...p,
@@ -424,6 +467,8 @@ export function calculateGroupStandings(groupPlayers, groupMatches) {
     legDifference: 0,
     _avgSum: 0,
     _avgCount: 0,
+    _dartsSum: 0,
+    _scoreSum: 0,
     _seedOrder: i,
   }));
 
@@ -463,16 +508,8 @@ export function calculateGroupStandings(groupPlayers, groupMatches) {
       p1Stats.matchesLost += 1;
     }
 
-    const p1Avg = Number(m.result?.p1Avg ?? m.avgP1 ?? m.player1Avg);
-    const p2Avg = Number(m.result?.p2Avg ?? m.avgP2 ?? m.player2Avg);
-    if (Number.isFinite(p1Avg)) {
-      p1Stats._avgSum += p1Avg;
-      p1Stats._avgCount += 1;
-    }
-    if (Number.isFinite(p2Avg)) {
-      p2Stats._avgSum += p2Avg;
-      p2Stats._avgCount += 1;
-    }
+    addStandingAvg(p1Stats, m, 'p1');
+    addStandingAvg(p2Stats, m, 'p2');
   }
 
   // Odvozené metriky pro tabulku
@@ -483,11 +520,15 @@ export function calculateGroupStandings(groupPlayers, groupMatches) {
     // Klasický formát: 1 výhra = 1 bod
     s.points = s.matchesWon;
     s.legDifference = s.legsWon - s.legsLost;
-    // Průměr = průměr z uložených p1Avg/p2Avg v dohraných zápasech; bez dat 0,00
-    const rawAvg = s._avgCount > 0 ? s._avgSum / s._avgCount : 0;
+    // Týmový / hráčský průměr: vážený šipkami, jinak průměr zápasových avg.
+    let rawAvg = 0;
+    if (s._dartsSum > 0) rawAvg = (s._scoreSum / s._dartsSum) * 3;
+    else if (s._avgCount > 0) rawAvg = s._avgSum / s._avgCount;
     s.average = Number(Number(rawAvg).toFixed(2));
     delete s._avgSum;
     delete s._avgCount;
+    delete s._dartsSum;
+    delete s._scoreSum;
   }
 
   const findHeadToHeadWinner = (aId, bId) => {
@@ -750,10 +791,46 @@ export function calculateTournamentStats(groups = [], bracketRounds = [], groupM
     }
   };
 
+  const memberAgg = {};
+  const ensureMember = (id, name) => {
+    if (id == null || id === '') return null;
+    if (memberAgg[id]) return memberAgg[id];
+    memberAgg[id] = {
+      id,
+      name: name ?? String(id),
+      totalDartsThrown: 0,
+      totalScore: 0,
+      total180s: 0,
+      total100plus: 0,
+      total140plus: 0,
+      totalCheckouts: 0,
+      bestCheckout: 0,
+      teamId: null,
+    };
+    return memberAgg[id];
+  };
+
   for (const m of allMatches) {
     processPlayerFromMatch(m, 'p1');
     processPlayerFromMatch(m, 'p2');
     processLegDetails(m);
+    const mems = m?.result?.members ?? m?.members;
+    if (!mems || typeof mems !== 'object') continue;
+    for (const row of Object.values(mems)) {
+      const mid = row?.id;
+      const pl = ensureMember(mid, row?.name);
+      if (!pl) continue;
+      const darts = Number(row.darts) || 0;
+      const score = Number(row.score);
+      if (darts > 0 && Number.isFinite(score)) {
+        pl.totalDartsThrown += darts;
+        pl.totalScore += score;
+      }
+      const hc = Number(row.highCheckout) || 0;
+      if (hc > pl.bestCheckout) pl.bestCheckout = hc;
+      if (row.side === 'p1') pl.teamId = m.player1Id ?? pl.teamId;
+      if (row.side === 'p2') pl.teamId = m.player2Id ?? pl.teamId;
+    }
   }
 
   const playerStatsArr = Object.values(playerAgg)
@@ -800,6 +877,25 @@ export function calculateTournamentStats(groups = [], bracketRounds = [], groupM
 
   const globalAverage = totalDartsThrown > 0 ? (totalScore / totalDartsThrown) * 3 : 0;
 
+  const memberStats = Object.values(memberAgg)
+    .map((p) => {
+      const avg = p.totalDartsThrown > 0 ? (p.totalScore / p.totalDartsThrown) * 3 : 0;
+      return {
+        ...p,
+        average: Number(avg.toFixed(2)),
+        placement: placementById?.[String(p.teamId)] ?? undefined,
+      };
+    })
+    .sort((a, b) => {
+      const pa = Number.isFinite(Number(a.placement)) ? Number(a.placement) : null;
+      const pb = Number.isFinite(Number(b.placement)) ? Number(b.placement) : null;
+      if (pa != null && pb != null && pa !== pb) return pa - pb;
+      const av = Number(a.average ?? 0) || 0;
+      const bv = Number(b.average ?? 0) || 0;
+      if (bv !== av) return bv - av;
+      return String(a.name ?? '').localeCompare(String(b.name ?? ''), 'cs');
+    });
+
   return {
     globalAverage: Number(globalAverage.toFixed(2)),
     totalDartsThrown,
@@ -808,6 +904,7 @@ export function calculateTournamentStats(groups = [], bracketRounds = [], groupM
     bestLegs: bestLegsPlayers.sort((a, b) => a.name.localeCompare(b.name, 'cs')),
     topDoublePercent,
     playerStats: playerStatsArr,
+    memberStats,
   };
 }
 
@@ -2643,7 +2740,11 @@ export const updateBracketReferees = (
   // 2. Hlavní přiřazování s dynamickým limitem terčů (min(availableBoards, …) přes activeBoardsUsed)
   newBracket.forEach((round, roundIndex) => {
     const roundMatches = round?.matches || [];
-    const roundBusyIds = getGlobalBusyPlayerIdsForRefereeEngine(newBracket);
+    const roundBusyIds = expandBusyIdsWithTeamMembers(
+      getGlobalBusyPlayerIdsForRefereeEngine(newBracket),
+      groups,
+      registeredPlayersForDirectKo
+    );
     const isPrelimRound = hasPrelimBracketRound && roundIndex === 0;
     const isFirstMainRound = roundIndex === firstMainRoundIndex;
     const isLaterKoRound = roundIndex > firstMainRoundIndex;
@@ -2892,11 +2993,22 @@ export const updateBracketReferees = (
       }
 
       if (chosenRef) {
-        match.referee = chosenRef;
+        const person =
+          resolveRefereePerson(chosenRef.id, {
+            groups,
+            players: registeredPlayersForDirectKo,
+            matches: [
+              ...(groupMatchesAll || []),
+              ...newBracket.flatMap((r) => r?.matches || []),
+            ],
+            usedIds: usedReferees,
+          }) || chosenRef;
+        match.referee = person;
         if (pickTier > 0) match.refereePickTier = pickTier;
         else delete match.refereePickTier;
         assignedRefsInThisRun.add(chosenRef.id);
-        registerPickedReferee(chosenRef);
+        if (person.id != null) assignedRefsInThisRun.add(person.id);
+        registerPickedReferee(person);
         currentlyPlayingIds.add(match.player1Id);
         currentlyPlayingIds.add(match.player2Id);
         activeBoardsUsed++;

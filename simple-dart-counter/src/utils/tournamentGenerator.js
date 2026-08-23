@@ -1,4 +1,5 @@
 import { compareTeamSeeds, isTeamPlayer } from './doublesSeeding';
+import { pickWorsePlayerFromTeam } from './doublesReferee';
 
 /**
  * Čisté pomocné funkce pro generování turnajových skupin a rozpisu zápasů.
@@ -255,14 +256,17 @@ export function generateGroupMatches(groupPlayers, groupId) {
     if (!p1 || !p2 || !refP) {
       return null;
     }
-    const name =
-      refP.name != null && String(refP.name).trim() !== '' ? String(refP.name) : String(refP.id);
+    const person = pickWorsePlayerFromTeam(refP, {}) || {
+      id: refP.id,
+      name:
+        refP.name != null && String(refP.name).trim() !== '' ? String(refP.name) : String(refP.id),
+    };
     return {
       player1Id: p1.id,
       player2Id: p2.id,
       chalkerId: refP.id,
-      refereeId: refP.id,
-      referee: { id: refP.id, name },
+      refereeId: person.id,
+      referee: person,
       groupId,
       id: `${groupId}-r${idx + 1}-${p1.id}-${p2.id}`,
       round: idx + 1,

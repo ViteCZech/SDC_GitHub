@@ -92,6 +92,7 @@ import {
   buildDoublesSettingsFromSlots,
   findTournamentSlot,
 } from './utils/doublesThrowOrder';
+import { resolveRefereePerson } from './utils/doublesReferee';
 import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
 
 const APP_VERSION = "v1.10.1";
@@ -644,6 +645,17 @@ function doublesResultExtras(resultData) {
   if (resultData?.members) extras.members = resultData.members;
   if (resultData?.legStarters) extras.legStarters = resultData.legStarters;
   return extras;
+}
+
+function loserRefereePerson(loserId, loserName, matchLike, tournamentData, extraGroups) {
+  if (loserId == null) return null;
+  return (
+    resolveRefereePerson(loserId, {
+      groups: extraGroups,
+      players: tournamentData?.players,
+      match: matchLike,
+    }) || { id: loserId, name: String(loserName ?? loserId) }
+  );
 }
 
 // --- KOMPONENTY MENU / UI ---
@@ -2369,15 +2381,17 @@ function AppMain({ lang, setLang }) {
     });
     if (!raw) return null;
     let refereeName = raw.referee?.name;
-    if (raw.matchType === 'group' && !refereeName) {
-      const gid = raw.groupId;
-      const grp =
-        tournamentGroups.find((g) => g.groupId === gid) ||
-        tournamentData?.groups?.find((g) => g.groupId === gid);
-      const chalkerId = raw.chalkerId;
-      if (grp?.players && chalkerId) {
-        refereeName = grp.players.find((p) => p.id === chalkerId)?.name ?? refereeName;
-      }
+    const gid = raw.groupId;
+    const grp =
+      tournamentGroups.find((g) => g.groupId === gid) ||
+      tournamentData?.groups?.find((g) => g.groupId === gid);
+    const chalkerId = raw.chalkerId ?? raw.referee?.id;
+    const chalkerSlot = grp?.players?.find((p) => p.id === chalkerId);
+    if (isTeamPlayer(chalkerSlot)) {
+      const person = resolveRefereePerson(chalkerSlot, { matches: tournamentMatches });
+      if (person?.name) refereeName = person.name;
+    } else if (!refereeName && chalkerSlot?.name) {
+      refereeName = chalkerSlot.name;
     }
     if (!refereeName) refereeName = '—';
     return enrichTabletMatchPlayerNames({ ...raw, refereeName }, tournamentData, tournamentGroups);
@@ -4440,8 +4454,13 @@ function AppMain({ lang, setLang }) {
                           : loserId === bm?.player2Id
                             ? (bm?.player2Name ?? loserId)
                             : loserId;
-                      const loserRef =
-                        loserId != null ? { id: loserId, name: String(loserName ?? loserId) } : null;
+                      const loserRef = loserRefereePerson(
+                        loserId,
+                        loserName,
+                        { ...bm, result: { ...(bm?.result || {}), members: resultData?.members } },
+                        tournamentData,
+                        tournamentGroups
+                      );
                       setTournamentBracket((prev) => {
                         const updated = prev.map((round, rIdx) => ({
                           ...round,
@@ -4507,8 +4526,13 @@ function AppMain({ lang, setLang }) {
                         : loserId === bm?.player2Id
                           ? (bm?.player2Name ?? loserId)
                           : loserId;
-                    const loserRef =
-                      loserId != null ? { id: loserId, name: String(loserName ?? loserId) } : null;
+                    const loserRef = loserRefereePerson(
+                      loserId,
+                      loserName,
+                      { ...bm, result: { ...(bm?.result || {}), members: resultData?.members } },
+                      tournamentData,
+                      tournamentGroups
+                    );
                     setTournamentBracket((prev) => {
                       const updated = prev.map((round, rIdx) => ({
                         ...round,

@@ -889,6 +889,8 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
       highCheck: 'Nej. zavření',
       bestLeg: 'Nej. leg',
       title: 'Statistiky turnaje',
+      teams: 'Dvojice',
+      players: 'Hráči',
     },
   },
   en: { 
@@ -1766,6 +1768,8 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
       highCheck: 'High Check',
       bestLeg: 'Best Leg',
       title: 'Tournament Statistics',
+      teams: 'Pairs',
+      players: 'Players',
     },
   },
   pl: {
@@ -2613,6 +2617,8 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
       highCheck: 'Max. Zamek',
       bestLeg: 'Naj. Leg',
       title: 'Statystyki turnieju',
+      teams: 'Pary',
+      players: 'Gracze',
     },
   }
 };
