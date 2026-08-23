@@ -75,6 +75,9 @@ export async function getPublicTournamentData(tournamentId) {
  * @property {string|null} [csoPlayerId]
  * @property {'QR'|'CASH'|null} [paymentMethod]
  * @property {boolean} [termsAccepted]
+ * @property {'M'|'F'|null} [gender]
+ * @property {string} [partnerRegistrationId]
+ * @property {string} [partnerName]
  */
 
 /**
@@ -141,12 +144,85 @@ export async function listMyRegistrationsApi() {
   }
 }
 
+function callPreRegFunction(name, payload) {
+  const functions = getFunctions(requireApp(), FUNCTIONS_REGION);
+  return httpsCallable(functions, name)(payload);
+}
+
 /**
- * Hráč stornuje vlastní přihlášku (Cloud Function).
+ * Nespárovaní hráči (jen jména) pro výběr partnera.
+ * @param {string} tournamentId
+ * @param {{ excludeRegistrationId?: string, gender?: 'M'|'F'|null }} [opts]
+ */
+export async function listAvailablePartnersApi(tournamentId, opts = {}) {
+  try {
+    const result = await callPreRegFunction('listAvailablePartners', {
+      tournamentId: String(tournamentId ?? '').trim(),
+      excludeRegistrationId: opts.excludeRegistrationId || undefined,
+      gender: opts.gender || undefined,
+    });
+    const partners = /** @type {{ partners?: Array<{ registrationId: string, name: string }> }} */ (
+      result.data
+    )?.partners;
+    return Array.isArray(partners) ? partners : [];
+  } catch (err) {
+    const error = new Error(err?.message || 'list_partners_failed');
+    error.code = String(err?.code ?? '').replace(/^functions\//, '') || 'list_partners_failed';
+    throw error;
+  }
+}
+
+/**
  * @param {string} tournamentId
  * @param {string} registrationId
- * @returns {Promise<{ success: true, status: 'CANCELLED', refundDue: boolean, waitlistPromoted: boolean }>}
+ * @param {string} partnerRegistrationId
  */
+export async function requestPairApi(tournamentId, registrationId, partnerRegistrationId) {
+  try {
+    const result = await callPreRegFunction('requestPair', {
+      tournamentId: String(tournamentId ?? '').trim(),
+      registrationId: String(registrationId ?? '').trim(),
+      partnerRegistrationId: String(partnerRegistrationId ?? '').trim(),
+    });
+    return result.data;
+  } catch (err) {
+    const error = new Error(err?.message || 'request_pair_failed');
+    error.code = String(err?.code ?? '').replace(/^functions\//, '') || 'request_pair_failed';
+    throw error;
+  }
+}
+
+/** @param {string} tournamentId @param {string} registrationId */
+export async function confirmPairApi(tournamentId, registrationId) {
+  try {
+    const result = await callPreRegFunction('confirmPair', {
+      tournamentId: String(tournamentId ?? '').trim(),
+      registrationId: String(registrationId ?? '').trim(),
+    });
+    return result.data;
+  } catch (err) {
+    const error = new Error(err?.message || 'confirm_pair_failed');
+    error.code = String(err?.code ?? '').replace(/^functions\//, '') || 'confirm_pair_failed';
+    throw error;
+  }
+}
+
+/** @param {string} tournamentId @param {string} registrationId */
+export async function declinePairApi(tournamentId, registrationId) {
+  try {
+    const result = await callPreRegFunction('declinePair', {
+      tournamentId: String(tournamentId ?? '').trim(),
+      registrationId: String(registrationId ?? '').trim(),
+    });
+    return result.data;
+  } catch (err) {
+    const error = new Error(err?.message || 'decline_pair_failed');
+    error.code = String(err?.code ?? '').replace(/^functions\//, '') || 'decline_pair_failed';
+    throw error;
+  }
+}
+
+/** Hráč stornuje vlastní přihlášku (Cloud Function). */
 export async function unregisterPlayerApi(tournamentId, registrationId) {
   const functions = getFunctions(requireApp(), FUNCTIONS_REGION);
   const fn = httpsCallable(functions, 'unregisterPlayer');
@@ -433,6 +509,8 @@ export async function createPreRegTournament(input) {
       startsAt: input.startsAt ? Timestamp.fromDate(input.startsAt) : null,
       capacity: input.capacity ?? null,
       waitlistEnabled: !!input.waitlistEnabled,
+      competitionType: input.competitionType || 'singles',
+      capacityUnit: input.capacityUnit || 'players',
       registrationDeadline: input.registrationDeadline
         ? Timestamp.fromDate(input.registrationDeadline)
         : null,
@@ -447,6 +525,7 @@ export async function createPreRegTournament(input) {
       payoutPercent: input.payoutPercent ?? null,
       addedSponsorMoney: input.addedSponsorMoney ?? null,
       vsPrefix: input.vsPrefix ?? null,
+      feeMode: input.feeMode === 'pair' ? 'pair' : 'split',
       bankInfo: {
         accountPrefix: bankParts.accountPrefix,
         accountNumber: bankParts.accountNumber,
@@ -469,6 +548,7 @@ export async function createPreRegTournament(input) {
       confirmed: 0,
       waitlist: 0,
       pendingPayment: 0,
+      confirmedTeams: 0,
     },
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -515,6 +595,72 @@ export async function updateRegistration(tournamentId, regId, patch) {
   });
 }
 
+/**
+ * Admin potvrdí dvojici okamžitě (obejde pozvánku).
+ * @param {string} tournamentId
+ * @param {string} regId
+ * @param {string} partnerRegId
+ */
+export async function adminConfirmPair(tournamentId, regId, partnerRegId) {
+  await requireAdminAccess(tournamentId);
+  if (!regId || !partnerRegId || regId === partnerRegId) {
+    throw new Error('prereg_pair_invalid');
+  }
+  const dbInst = requireDb();
+  await runTransaction(dbInst, async (transaction) => {
+    const aRef = doc(dbInst, 'tournaments', tournamentId, 'registrations', regId);
+    const bRef = doc(dbInst, 'tournaments', tournamentId, 'registrations', partnerRegId);
+    const tourRef = doc(dbInst, 'tournaments', tournamentId);
+    const [aSnap, bSnap, tourSnap] = await Promise.all([
+      transaction.get(aRef),
+      transaction.get(bRef),
+      transaction.get(tourRef),
+    ]);
+    if (!aSnap.exists() || !bSnap.exists() || !tourSnap.exists()) {
+      throw new Error(PREREG_NOT_FOUND);
+    }
+    const a = aSnap.data() ?? {};
+    const b = bSnap.data() ?? {};
+    const tour = tourSnap.data() ?? {};
+    const aPair = String(a.pair?.status ?? 'NONE');
+    const bPair = String(b.pair?.status ?? 'NONE');
+    if (aPair === 'CONFIRMED' || bPair === 'CONFIRMED') {
+      throw new Error('prereg_pair_taken');
+    }
+    const type = tour.meta?.competitionType;
+    const teamCapacity = type === 'doubles' || type === 'mixed';
+    const occupied = Number(tour.counters?.confirmedTeams ?? 0) || 0;
+    const cap = tour.meta?.capacity == null ? null : Number(tour.meta.capacity);
+    const unlimited = cap == null || !Number.isFinite(cap) || cap <= 0;
+    if (teamCapacity && !unlimited && occupied >= cap) {
+      throw new Error('prereg_restore_capacity_full');
+    }
+    const now = serverTimestamp();
+    const aName = String(a.player?.name ?? '').trim();
+    const bName = String(b.player?.name ?? '').trim();
+    const pairBase = {
+      status: 'CONFIRMED',
+      pendingName: null,
+      initiatedBy: regId,
+      inviteToken: null,
+    };
+    transaction.update(aRef, {
+      pair: { ...pairBase, partnerRegistrationId: partnerRegId, partnerName: bName || null },
+      updatedAt: now,
+    });
+    transaction.update(bRef, {
+      pair: { ...pairBase, partnerRegistrationId: regId, partnerName: aName || null },
+      updatedAt: now,
+    });
+    if (teamCapacity) {
+      transaction.update(tourRef, {
+        'counters.confirmedTeams': increment(1),
+        updatedAt: now,
+      });
+    }
+  });
+}
+
 function createdAtMs(data) {
   const raw = data?.createdAt;
   if (raw && typeof raw.toMillis === 'function') return raw.toMillis();
@@ -549,6 +695,12 @@ export async function cancelRegistration(tournamentId, regId, _previousStatus) {
     if (current === 'CANCELLED') return;
 
     const paid = !!regSnap.data()?.payment?.isPaid;
+    const pairStatus = String(regSnap.data()?.pair?.status ?? '');
+    const freedTeamSlot =
+      current === 'CONFIRMED' &&
+      pairStatus === 'CONFIRMED' &&
+      (tourSnap.data()?.meta?.competitionType === 'doubles' ||
+        tourSnap.data()?.meta?.competitionType === 'mixed');
     const partnerId = String(regSnap.data()?.pair?.partnerRegistrationId ?? '').trim();
     const partnerRef = partnerId
       ? doc(dbInst, 'tournaments', tournamentId, 'registrations', partnerId)
@@ -588,6 +740,7 @@ export async function cancelRegistration(tournamentId, regId, _previousStatus) {
         counters['counters.waitlist'] = increment(-1);
       } else {
         counters['counters.confirmed'] = increment(-1);
+        if (freedTeamSlot) counters['counters.confirmedTeams'] = increment(-1);
       }
     } else if (current === 'WAITLIST') {
       counters['counters.waitlist'] = increment(-1);
@@ -644,14 +797,18 @@ export async function restoreCancelledRegistration(tournamentId, regId, targetSt
     }
 
     const tour = tourSnap.data() ?? {};
-    const confirmed = Number(tour.counters?.confirmed ?? 0) || 0;
+    const teamCapacity =
+      tour.meta?.competitionType === 'doubles' || tour.meta?.competitionType === 'mixed';
+    const occupied = teamCapacity
+      ? Number(tour.counters?.confirmedTeams ?? 0) || 0
+      : Number(tour.counters?.confirmed ?? 0) || 0;
     const rawCap = tour.meta?.capacity;
     const cap = rawCap == null ? null : Number(rawCap);
     const unlimited = cap == null || !Number.isFinite(cap) || cap <= 0;
     const waitlistEnabled = !!tour.meta?.waitlistEnabled;
 
     let next = wanted;
-    if (wanted === 'CONFIRMED' && !unlimited && confirmed >= cap) {
+    if (wanted === 'CONFIRMED' && !teamCapacity && !unlimited && occupied >= cap) {
       if (!waitlistEnabled) {
         throw new Error('prereg_restore_capacity_full');
       }

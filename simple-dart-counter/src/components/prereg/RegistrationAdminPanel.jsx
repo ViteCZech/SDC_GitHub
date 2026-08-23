@@ -26,7 +26,14 @@ import {
   markRegistrationRefunded,
   restoreCancelledRegistration,
   toggleRegistrationCheckIn,
+  adminConfirmPair,
 } from '../../services/tournamentPreRegService';
+import {
+  allowsPairing,
+  countConfirmedTeams,
+  normalizeCompetitionType,
+  usesTeamCapacity,
+} from '../../utils/preregCompetition';
 import { calculatePrizePool, distributePrizePool, getDistributionTemplate } from '../../utils/prizePool';
 import { getPublicRegistrationUrl } from '../../utils/preregAdmin';
 import { clearAdminInviteSession } from '../../utils/preregStorage';
@@ -324,6 +331,7 @@ export default function RegistrationAdminPanel({
   const [checkInConfirm, setCheckInConfirm] = useState(null);
   const [qrModalReg, setQrModalReg] = useState(null);
   const [restoreReg, setRestoreReg] = useState(null);
+  const [pairPick, setPairPick] = useState({});
   const isFetchingTournamentRef = useRef(false);
   const [csoMen, setCsoMen] = useState([]);
   const [csoWomen, setCsoWomen] = useState([]);
@@ -405,8 +413,17 @@ export default function RegistrationAdminPanel({
   const paidCount = registrations.filter(
     (r) => r.status === 'CONFIRMED' && r.payment?.isPaid
   ).length;
+  const competitionType = normalizeCompetitionType(tournament?.meta?.competitionType);
+  const pairingOn = allowsPairing(competitionType);
+  const teamSlots = usesTeamCapacity(competitionType);
+  const confirmedTeams = countConfirmedTeams(registrations);
   const capacity = tournament?.meta?.capacity ?? null;
   const unlimited = capacity == null || capacity === 0;
+  const unpaired = registrations.filter((r) => {
+    if (r.status === 'CANCELLED' || r.status === 'NO_SHOW') return false;
+    const st = String(r.pair?.status ?? 'NONE');
+    return st !== 'CONFIRMED' && st !== 'PENDING_INVITE';
+  });
 
   const prizePool = useMemo(() => {
     return calculatePrizePool({
@@ -582,14 +599,22 @@ export default function RegistrationAdminPanel({
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/80">
-          <p className="text-xs uppercase tracking-widest text-slate-500">{t('preregAdminSummaryPlayers')}</p>
+          <p className="text-xs uppercase tracking-widest text-slate-500">
+            {teamSlots ? t('preregAdminSummaryTeams') : t('preregAdminSummaryPlayers')}
+          </p>
           <p className="text-2xl font-black text-white mt-1">
-            {confirmedCount}
+            {teamSlots ? confirmedTeams : confirmedCount}
             {!unlimited && ` / ${capacity}`}
           </p>
           <p className="text-xs text-slate-500 mt-1">
             {t('preregAdminPaidCount')}: {paidCount}
+            {teamSlots ? ` · ${confirmedCount} ${t('preregCatalogPlayers')}` : ''}
           </p>
+          {pairingOn && (
+            <p className="text-[10px] text-cyan-400 mt-1 font-bold uppercase tracking-wide">
+              {t(`preregCompType_${competitionType}`)}
+            </p>
+          )}
         </div>
         <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/80">
           <p className="text-xs uppercase tracking-widest text-slate-500">{t('preregAdminPrizePool')}</p>
@@ -697,6 +722,50 @@ export default function RegistrationAdminPanel({
                 >
                   <td className="p-3">
                     <div className="font-bold text-white">{r.player?.name}</div>
+                    {pairingOn && r.pair?.status && r.pair.status !== 'NONE' && (
+                      <div className="text-[10px] text-cyan-400 mt-1 font-bold uppercase tracking-wide">
+                        {t(`preregPairStatus_${r.pair.status}`)}
+                        {r.pair.partnerName || r.pair.pendingName
+                          ? ` · ${r.pair.partnerName || r.pair.pendingName}`
+                          : ''}
+                      </div>
+                    )}
+                    {pairingOn &&
+                      r.status !== 'CANCELLED' &&
+                      String(r.pair?.status ?? 'NONE') !== 'CONFIRMED' &&
+                      String(r.pair?.status ?? '') !== 'PENDING_INVITE' && (
+                        <div className="mt-2 flex flex-col gap-1">
+                          <select
+                            value={pairPick[r.id] ?? ''}
+                            onChange={(e) =>
+                              setPairPick((prev) => ({ ...prev, [r.id]: e.target.value }))
+                            }
+                            className="w-full max-w-[180px] px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-[10px] text-white"
+                          >
+                            <option value="">{t('preregAdminPairPick')}</option>
+                            {unpaired
+                              .filter((p) => p.id !== r.id)
+                              .map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.player?.name}
+                                </option>
+                              ))}
+                          </select>
+                          <button
+                            type="button"
+                            disabled={busy || !pairPick[r.id]}
+                            onClick={() =>
+                              runAction(r.id, async () => {
+                                await adminConfirmPair(tournamentId, r.id, pairPick[r.id]);
+                                setPairPick((prev) => ({ ...prev, [r.id]: '' }));
+                              })
+                            }
+                            className="px-2 py-1 rounded-lg bg-cyan-900/50 border border-cyan-600/50 text-[10px] font-bold text-cyan-300 disabled:opacity-40"
+                          >
+                            {t('preregAdminPairConfirm')}
+                          </button>
+                        </div>
+                      )}
                     {(() => {
                       const live = liveRankFor(r.player?.name);
                       if (live == null) return null;

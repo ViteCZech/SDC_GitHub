@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Send } from 'lucide-react';
 import { translations } from '../../translations';
-import { registerPlayerApi } from '../../services/tournamentPreRegService';
+import { listAvailablePartnersApi, registerPlayerApi } from '../../services/tournamentPreRegService';
+import { allowsPairing, normalizeCompetitionType, normalizeFeeMode } from '../../utils/preregCompetition';
 import CsoPlayerNameField from './CsoPlayerNameField';
 
 /**
@@ -14,6 +15,10 @@ import CsoPlayerNameField from './CsoPlayerNameField';
  */
 export default function RegistrationForm({ lang, tournament, onSuccess, defaultEmail = '' }) {
   const t = (k) => translations[lang]?.[k] || k;
+  const competitionType = normalizeCompetitionType(tournament?.meta?.competitionType);
+  const pairingOn = allowsPairing(competitionType);
+  const isMixed = competitionType === 'mixed';
+  const feeMode = normalizeFeeMode(tournament);
 
   const paymentOptions = useMemo(() => {
     const configured = tournament?.finance?.paymentMethods;
@@ -30,15 +35,43 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
   const [playerName, setPlayerName] = useState('');
   const [csoPlayerId, setCsoPlayerId] = useState(null);
   const [csoRank, setCsoRank] = useState(null);
+  const [gender, setGender] = useState(/** @type {'M'|'F'|null} */ (null));
+  const [recreationalGender, setRecreationalGender] = useState(/** @type {'M'|'F'|null} */ (null));
+  const [useCsoGender, setUseCsoGender] = useState(true);
   const [email, setEmail] = useState(() => String(defaultEmail ?? '').trim());
   const [phone, setPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState(paymentOptions[0] ?? null);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [partnerRegistrationId, setPartnerRegistrationId] = useState('');
+  const [partnerName, setPartnerName] = useState('');
+  const [partners, setPartners] = useState([]);
+  const [partnersLoading, setPartnersLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const resolvedGender = useCsoGender ? gender : recreationalGender;
+
   const inputCls =
     'w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50';
+
+  useEffect(() => {
+    if (!pairingOn || !tournament?.id) return undefined;
+    let cancelled = false;
+    setPartnersLoading(true);
+    listAvailablePartnersApi(tournament.id, { gender: isMixed ? resolvedGender : null })
+      .then((list) => {
+        if (!cancelled) setPartners(list);
+      })
+      .catch(() => {
+        if (!cancelled) setPartners([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPartnersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pairingOn, tournament?.id, isMixed, resolvedGender]);
 
   const mapErrorMessage = (err) => {
     const code = err?.code ?? '';
@@ -49,6 +82,9 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
       .replace(/^functions\/[a-z-]+:\s*/i, '')
       .trim();
 
+    if (clean.includes('GENDER_REQUIRED')) return t('preregErrGender');
+    if (clean.includes('PAIR_GENDER')) return t('preregErrPairGender');
+    if (clean.includes('PAIR_NOT_AVAILABLE')) return t('preregErrPairTaken');
     if (code === 'failed-precondition') {
       if (clean.includes('podmínk')) return t('preregErrTerms');
       if (clean.includes('limit') || clean.includes('Vypršel')) return t('preregErrDeadline');
@@ -83,6 +119,10 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
       setError(t('preregErrNameRequired'));
       return;
     }
+    if (isMixed && !resolvedGender) {
+      setError(t('preregErrGender'));
+      return;
+    }
     if (requiresTerms && !termsAccepted) {
       setError(t('preregErrTerms'));
       return;
@@ -109,6 +149,9 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
         csoRank: csoRank ?? undefined,
         paymentMethod: paymentMethod ?? null,
         termsAccepted: requiresTerms ? termsAccepted : false,
+        gender: pairingOn || isMixed ? resolvedGender : undefined,
+        partnerRegistrationId: pairingOn && partnerRegistrationId ? partnerRegistrationId : undefined,
+        partnerName: pairingOn && !partnerRegistrationId && partnerName.trim() ? partnerName.trim() : undefined,
       });
 
       onSuccess(result, {
@@ -116,9 +159,10 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
         email: email.trim() || null,
         phone: phone.trim() || null,
         paymentMethod: paymentMethod ?? null,
-        amount: entryFee,
+        amount: result.amount ?? (partnerRegistrationId && feeMode === 'pair' ? 0 : entryFee),
         csoPlayerId,
         csoRank,
+        gender: resolvedGender,
       });
     } catch (err) {
       setError(mapErrorMessage(err));
@@ -136,6 +180,10 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
         csoRank={csoRank != null ? String(csoRank) : ''}
         onCsoRankChange={(v) => setCsoRank(v ? Number(v) : null)}
         onCsoPlayerIdChange={setCsoPlayerId}
+        onGenderChange={(g) => {
+          setUseCsoGender(g != null);
+          if (g) setGender(g);
+        }}
         inputClassName={inputCls}
         disabled={loading}
         showRankingField={false}
@@ -146,6 +194,82 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
         {t('preregCsoRecreationalHint') ||
           'Pokud nejste v žebříčku ČŠO, zadejte jméno ručně — registrace proběhne bez ČŠO ID.'}
       </p>
+
+      {isMixed && !useCsoGender && (
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+            {t('preregGender')}
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {[
+              ['M', t('preregGenderM')],
+              ['F', t('preregGenderF')],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                disabled={loading}
+                onClick={() => setRecreationalGender(value)}
+                className={`px-4 py-2 rounded-xl font-bold border-2 ${
+                  recreationalGender === value
+                    ? 'bg-emerald-600 border-emerald-500 text-white'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {pairingOn && (
+        <div className="p-4 rounded-xl border border-slate-700 bg-slate-950/50 space-y-3">
+          <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+            {t('preregPartnerTitle')}
+          </p>
+          <p className="text-xs text-slate-500">{t('preregPartnerHint')}</p>
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
+              {t('preregPartnerRegistered')}
+            </label>
+            <select
+              value={partnerRegistrationId}
+              onChange={(e) => {
+                setPartnerRegistrationId(e.target.value);
+                if (e.target.value) setPartnerName('');
+              }}
+              disabled={loading || partnersLoading}
+              className={inputCls}
+            >
+              <option value="">{t('preregPartnerNone')}</option>
+              {partners.map((p) => (
+                <option key={p.registrationId} value={p.registrationId}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            {partnersLoading && (
+              <p className="text-[10px] text-slate-500 mt-1">{t('preregPartnerLoading')}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
+              {t('preregPartnerPending')}
+            </label>
+            <input
+              value={partnerName}
+              onChange={(e) => {
+                setPartnerName(e.target.value);
+                if (e.target.value.trim()) setPartnerRegistrationId('');
+              }}
+              disabled={loading || !!partnerRegistrationId}
+              className={inputCls}
+              placeholder={t('preregPartnerPendingPlaceholder')}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
@@ -207,6 +331,11 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
           <span className="text-white font-bold">
             {Number(entryFee).toLocaleString('cs-CZ')} Kč
           </span>
+          {pairingOn && (
+            <span className="block text-xs text-slate-500 mt-1">
+              {feeMode === 'pair' ? t('preregFeeHintPair') : t('preregFeeHintSplit')}
+            </span>
+          )}
         </p>
       )}
 

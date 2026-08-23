@@ -26,7 +26,8 @@ export default function SpdQrCard({ lang, tournament, registration }) {
   const variableSymbol = registration?.variableSymbol ?? null;
   const paymentMethod = registration?.paymentMethod ?? null;
   const isWaitlist = registration?.status === 'WAITLIST';
-  const showQr = paymentMethod === 'QR' && !isWaitlist;
+  const partnerPays = amount != null && Number(amount) <= 0;
+  const showQr = paymentMethod === 'QR' && !isWaitlist && !partnerPays;
 
   const spdString = useMemo(() => {
     if (!showQr) return null;
@@ -67,7 +68,13 @@ export default function SpdQrCard({ lang, tournament, registration }) {
         </div>
       </div>
 
-      {!isWaitlist && paymentMethod === 'CASH' && (
+      {!isWaitlist && partnerPays && (
+        <div className="p-4 rounded-xl border border-slate-700 bg-slate-900/80">
+          <p className="text-sm text-slate-300">{t('preregPartnerPaysHint')}</p>
+        </div>
+      )}
+
+      {!isWaitlist && paymentMethod === 'CASH' && !partnerPays && (
         <div className="p-4 rounded-xl border border-slate-700 bg-slate-900/80">
           <div className="flex items-center gap-2 text-slate-300 mb-2">
             <Banknote className="w-5 h-5 text-emerald-400" />

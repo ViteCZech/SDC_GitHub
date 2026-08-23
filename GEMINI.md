@@ -188,6 +188,9 @@ Stavy turnaje: `DRAFT` → `REGISTRATION_OPEN` → `REGISTRATION_CLOSED` → `IN
 Stavy přihlášky: `PENDING_PAYMENT` | `CONFIRMED` | `WAITLIST` | `CANCELLED` | `NO_SHOW`.
 Hráč se může sám odhlásit (`unregisterPlayer`) jen při `REGISTRATION_OPEN`. Storno uvolní místo a případně posune waitlist; zaplacené startovné označí `payment.refundDue`.
 
+Formát: `meta.competitionType` = `singles` | `doubles` | `mixed` | `random_doubles`.
+Dvojice / mix: kapacita je v **párech** (`counters.confirmedTeams`). Sólo nebo `WAITING_PARTNER` místo nebere. Párování jen přes CF (`listAvailablePartners`, `requestPair`, `confirmPair`, `declinePair`). Potvrzuje hráč vybraný ze seznamu. Mix = 1 M + 1 F. `finance.feeMode` = `pair` (jedno startovné) | `split`. `random_doubles` se hlásí jako jednotlivci (los na místě — pozdější fáze). Cricket a online 1v1 dvojice nemají.
+
 Funkce:
 - Založení (název, místo, kapacita, waitlist, deadline, startovné, QR/hotovost, bankovní účet, VS, podmínky)
 - Veřejný katalog + stránka turnaje
@@ -218,6 +221,9 @@ Region **europe-west1**, DB **eur3**. Export v `index.ts`:
 | `registerPlayer` | Veřejná přihláška na předregistraci |
 | `createManualRegistration` | Admin ruční přihláška |
 | `unregisterPlayer` | Hráč stornuje přihlášku (jen REGISTRATION_OPEN) |
+| `listAvailablePartners` | Nespárovaní hráči (jen jména) pro výběr partnera |
+| `requestPair` | Žádost o pár — vybraný hráč potvrzuje |
+| `confirmPair` / `declinePair` | Potvrzení / odmítnutí žádosti o pár |
 | `listMyRegistrations` | Přihlášky přihlášeného hráče |
 | `submitTabletMatchUpdate` | Tablet zapíše výsledek zápasu do `active_tournaments` |
 | `registerTabletBoardOnline` | Tablet se ohlásí jako online na desce |

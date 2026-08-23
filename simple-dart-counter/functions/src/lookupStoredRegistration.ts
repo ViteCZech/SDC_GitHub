@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { publicPairView } from './pairing';
 
 if (getApps().length === 0) {
   initializeApp();
@@ -37,7 +38,7 @@ export const lookupStoredRegistration = onCall(
     }
 
     const data = snap.data() ?? {};
-    const player = (data.player ?? {}) as { name?: string };
+    const player = (data.player ?? {}) as { name?: string; gender?: string | null };
     const payment = (data.payment ?? {}) as {
       variableSymbol?: string | null;
       method?: string | null;
@@ -56,6 +57,8 @@ export const lookupStoredRegistration = onCall(
       amount: payment.amount ?? null,
       isPaid: !!payment.isPaid,
       refundDue: !!payment.isPaid && !!payment.refundDue && payment.refundedAt == null,
+      gender: player.gender ?? null,
+      pair: publicPairView(snap.id, data),
     };
   }
 );

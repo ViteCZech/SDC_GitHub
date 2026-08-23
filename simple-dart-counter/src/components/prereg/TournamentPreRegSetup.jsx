@@ -23,6 +23,7 @@ import PreRegPageShell from './PreRegPageShell';
 import DateTimeLocalFields from './DateTimeLocalFields';
 import PlaceSuggestField from './PlaceSuggestField';
 import NumericStepper from '../NumericStepper';
+import { allowsPairing, usesTeamCapacity } from '../../utils/preregCompetition';
 
 /**
  * @param {{
@@ -44,6 +45,8 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
   const [isPublic, setIsPublic] = useState(true);
   const [startsAt, setStartsAt] = useState('');
   const [capacity, setCapacity] = useState('');
+  const [competitionType, setCompetitionType] = useState('singles');
+  const [feeMode, setFeeMode] = useState('pair');
   const [waitlistEnabled, setWaitlistEnabled] = useState(false);
   const [registrationDeadline, setRegistrationDeadline] = useState('');
   const [entryFee, setEntryFee] = useState('');
@@ -110,6 +113,8 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
     locationRegion,
     isPublic,
     capacity,
+    competitionType,
+    feeMode,
     waitlistEnabled,
     entryFee,
     payoutPercent,
@@ -132,6 +137,12 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
     setLocationRegion(String(f.locationRegion ?? ''));
     setIsPublic(f.isPublic !== false);
     setCapacity(f.capacity != null && f.capacity !== '' ? String(f.capacity) : '');
+    setCompetitionType(
+      f.competitionType === 'doubles' || f.competitionType === 'mixed' || f.competitionType === 'random_doubles'
+        ? f.competitionType
+        : 'singles'
+    );
+    setFeeMode(f.feeMode === 'split' ? 'split' : 'pair');
     setWaitlistEnabled(!!f.waitlistEnabled);
     setEntryFee(f.entryFee != null && f.entryFee !== '' ? String(f.entryFee) : '');
     setPayoutPercent(f.payoutPercent != null && f.payoutPercent !== '' ? String(f.payoutPercent) : '');
@@ -258,6 +269,9 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
         isPublic,
         startsAt: parseOptionalDateTimeLocal(startsAt),
         capacity: parseOptionalNumber(capacity),
+        competitionType,
+        capacityUnit: usesTeamCapacity(competitionType) ? 'teams' : 'players',
+        feeMode: allowsPairing(competitionType) ? feeMode : 'split',
         waitlistEnabled,
         registrationDeadline: parseOptionalDateTimeLocal(registrationDeadline),
         entryFee: parseOptionalNumber(entryFee),
@@ -495,10 +509,59 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
 
         <section className="p-4 rounded-xl border border-slate-800 bg-slate-900/80 space-y-4">
           <h2 className="text-sm font-black uppercase tracking-widest text-slate-400">
+            {t('preregAdminSectionFormat')}
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {['singles', 'doubles', 'mixed', 'random_doubles'].map((type) => (
+              <button
+                key={type}
+                type="button"
+                disabled={loading}
+                onClick={() => setCompetitionType(type)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wide border-2 transition-colors ${
+                  competitionType === type
+                    ? 'bg-emerald-600 border-emerald-500 text-white'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                }`}
+              >
+                {t(`preregCompType_${type}`)}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-500">{t(`preregCompTypeHint_${competitionType}`)}</p>
+          {allowsPairing(competitionType) && (
+            <div>
+              <span className={labelCls}>{t('preregAdminFeeMode')}</span>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {['pair', 'split'].map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => setFeeMode(mode)}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wide border-2 ${
+                      feeMode === mode
+                        ? 'bg-cyan-700 border-cyan-500 text-white'
+                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {t(`preregFeeMode_${mode}`)}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">{t(`preregFeeModeHint_${feeMode}`)}</p>
+            </div>
+          )}
+        </section>
+
+        <section className="p-4 rounded-xl border border-slate-800 bg-slate-900/80 space-y-4">
+          <h2 className="text-sm font-black uppercase tracking-widest text-slate-400">
             {t('preregAdminSectionCapacity')}
           </h2>
           <div>
-            <label className={labelCls}>{t('preregAdminCapacity')}</label>
+            <label className={labelCls}>
+              {usesTeamCapacity(competitionType) ? t('preregAdminCapacityTeams') : t('preregAdminCapacity')}
+            </label>
             <NumericStepper
               allowEmpty
               value={capacity === '' ? '' : Number(capacity) || ''}

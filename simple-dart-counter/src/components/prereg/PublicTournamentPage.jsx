@@ -10,8 +10,10 @@ import {
 } from '../../services/tournamentPreRegService';
 import { loadStoredRegistration, saveStoredRegistration } from '../../utils/preregStorage';
 import RegistrationForm from './RegistrationForm';
+import PairStatusPanel from './PairStatusPanel';
 import SpdQrCard from './SpdQrCard';
 import PreRegPageShell from './PreRegPageShell';
+import { allowsPairing, normalizeCompetitionType } from '../../utils/preregCompetition';
 
 /**
  * @param {{
@@ -70,6 +72,9 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
           amount: fresh.amount ?? stored.amount,
           isPaid: fresh.isPaid ?? stored.isPaid,
           refundDue: fresh.refundDue ?? stored.refundDue,
+          amount: fresh.amount ?? stored.amount,
+          gender: fresh.gender ?? stored.gender,
+          pair: fresh.pair ?? stored.pair,
         };
         saveStoredRegistration(tournamentId, next);
         setRegistration(next);
@@ -90,10 +95,25 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
       email: formSnapshot.email,
       phone: formSnapshot.phone,
       amount: formSnapshot.amount,
+      gender: formSnapshot.gender ?? null,
       savedAt: new Date().toISOString(),
     };
     saveStoredRegistration(tournamentId, stored);
     setRegistration(stored);
+    lookupStoredRegistrationApi(tournamentId, result.registrationId)
+      .then((fresh) => {
+        if (!fresh?.status) return;
+        const next = {
+          ...stored,
+          status: fresh.status,
+          pair: fresh.pair,
+          gender: fresh.gender ?? stored.gender,
+          amount: fresh.amount ?? stored.amount,
+        };
+        saveStoredRegistration(tournamentId, next);
+        setRegistration(next);
+      })
+      .catch(() => {});
   };
 
   const handleUnregister = async () => {
@@ -170,6 +190,8 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
     );
   }
 
+  const competitionType = normalizeCompetitionType(tournament.meta?.competitionType);
+  const pairingOn = allowsPairing(competitionType);
   const startsAtLabel = formatDate(tournament.meta?.startsAt);
   const isCancelled = registration?.status === 'CANCELLED';
   const hasActiveRegistration = !!registration && !isCancelled;
@@ -189,6 +211,9 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
         <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight">
           {tournament.meta?.name || t('preregUntitled')}
         </h1>
+        <p className="text-xs font-bold uppercase tracking-widest text-cyan-400">
+          {t(`preregCompType_${competitionType}`)}
+        </p>
         <div className="flex flex-wrap gap-3 text-sm text-slate-400">
           {startsAtLabel && (
             <span className="inline-flex items-center gap-1.5">
@@ -234,6 +259,21 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
             {t('preregLobbyTitle')}
           </h2>
           <SpdQrCard lang={lang} tournament={tournament} registration={registration} />
+          {pairingOn && registration?.registrationId && (
+            <PairStatusPanel
+              lang={lang}
+              tournamentId={tournamentId}
+              registrationId={registration.registrationId}
+              pair={registration.pair}
+              gender={registration.gender}
+              registrationOpen={isRegistrationOpen}
+              onPairChange={(nextPair) => {
+                const next = { ...registration, pair: nextPair };
+                saveStoredRegistration(tournamentId, next);
+                setRegistration(next);
+              }}
+            />
+          )}
           {isRegistrationOpen && (
             <div className="mt-4 pt-4 border-t border-slate-800 space-y-3">
               {!unregisterOpen ? (

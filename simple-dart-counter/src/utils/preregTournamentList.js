@@ -80,7 +80,11 @@ export function sortByPreferredCityThenStart(preferredCity) {
  */
 export function getTournamentCatalogBadge(tournament) {
   const status = tournament?.status;
-  const confirmed = tournament?.counters?.confirmed ?? 0;
+  const type = tournament?.meta?.competitionType;
+  const teamSlots = type === 'doubles' || type === 'mixed';
+  const confirmed = teamSlots
+    ? Number(tournament?.counters?.confirmedTeams ?? 0) || 0
+    : tournament?.counters?.confirmed ?? 0;
   const capacity = tournament?.meta?.capacity;
   const unlimited = capacity == null || capacity === 0;
   const waitlist = !!tournament?.meta?.waitlistEnabled;

@@ -9,6 +9,18 @@ import {
   resolveCsoPlayerId,
 } from './playerIdentity';
 import { PLAYER_REG_LINKS_COLLECTION } from './playerRegLinks';
+import { randomBytes } from 'crypto';
+import {
+  allowsPairing,
+  canAppearInPartnerList,
+  emptyPair,
+  gendersCompatible,
+  normalizeCompetitionType,
+  normalizeFeeMode,
+  normalizeGender,
+  playerGenderOf,
+  usesTeamCapacity,
+} from './pairing';
 import type {
   PaymentMethod,
   RegisterPlayerPayload,
@@ -122,6 +134,9 @@ export const registerPlayer = onCall(
       const csoPlayerIdInput = data.csoPlayerId;
       const paymentMethod = data.paymentMethod;
       const termsAccepted = !!data.termsAccepted;
+      const gender = normalizeGender(data.gender);
+      const partnerRegistrationId = String(data.partnerRegistrationId ?? '').trim();
+      const partnerName = String(data.partnerName ?? '').trim();
 
       logger.info('registerPlayer request', {
         tournamentId: tournamentId || '(empty)',
@@ -211,6 +226,31 @@ export const registerPlayer = onCall(
           }
         }
 
+        const competitionType = normalizeCompetitionType(
+          (meta as { competitionType?: unknown }).competitionType
+        );
+        const pairingOn = allowsPairing(competitionType);
+        const teamCapacity = usesTeamCapacity(competitionType);
+
+        if (competitionType === 'mixed' && !gender) {
+          return fail('invalid-argument', 'GENDER_REQUIRED');
+        }
+
+        let partnerSnap: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+        if (pairingOn && partnerRegistrationId) {
+          partnerSnap = regsSnap.docs.find((d) => d.id === partnerRegistrationId) ?? null;
+          if (!partnerSnap) {
+            return fail('not-found', 'Vybraný partner nebyl nalezen.');
+          }
+          const partnerData = partnerSnap.data() ?? {};
+          if (!canAppearInPartnerList(partnerData)) {
+            return fail('failed-precondition', 'PAIR_NOT_AVAILABLE');
+          }
+          if (!gendersCompatible(competitionType, gender, playerGenderOf(partnerData))) {
+            return fail('failed-precondition', 'PAIR_GENDER');
+          }
+        }
+
         const currentConfirmed = Number(counters.confirmed ?? 0) || 0;
         const rawCapacity = meta.capacity;
         const parsedCapacity = rawCapacity == null ? null : Number(rawCapacity);
@@ -221,7 +261,8 @@ export const registerPlayer = onCall(
 
         let newStatus: 'CONFIRMED' | 'WAITLIST' = 'CONFIRMED';
 
-        if (capacityNum != null && currentConfirmed >= capacityNum) {
+        // Dvojice / mix: sólo místo nebere. Kapacitu kontroluje až potvrzení páru.
+        if (!teamCapacity && capacityNum != null && currentConfirmed >= capacityNum) {
           if (!meta.waitlistEnabled) {
             return fail('resource-exhausted', 'Kapacita turnaje je naplněna.');
           }
@@ -239,6 +280,9 @@ export const registerPlayer = onCall(
         }
 
         const entryFee = finance.entryFee ?? null;
+        const feeMode = normalizeFeeMode((finance as { feeMode?: unknown }).feeMode);
+        const amount =
+          pairingOn && feeMode === 'pair' && partnerSnap ? 0 : entryFee;
         const regRef = tournamentRef.collection('registrations').doc();
         const variableSymbol = buildVariableSymbol(finance.vsPrefix, regRef.id);
         const now = FieldValue.serverTimestamp();
@@ -257,19 +301,32 @@ export const registerPlayer = onCall(
             csoRank: csoRank ?? null,
             csoPlayerId: csoPlayerId ?? null,
             nameKey: nameKey || null,
+            gender: gender,
             ...(authUid ? { authUid } : {}),
           },
           status: newStatus,
           payment: {
             method: resolvedPaymentMethod,
             variableSymbol,
-            amount: entryFee,
+            amount,
             isPaid: false,
             verifiedByAdmin: false,
           },
           attendance: {
             checkedIn: false,
           },
+          pair: pairingOn
+            ? partnerName && !partnerSnap
+              ? {
+                  status: 'WAITING_PARTNER',
+                  partnerRegistrationId: null,
+                  partnerName: null,
+                  pendingName: partnerName,
+                  initiatedBy: regRef.id,
+                  inviteToken: null,
+                }
+              : emptyPair()
+            : emptyPair(),
           createdAt: now,
           updatedAt: now,
           source: 'PUBLIC',
@@ -279,7 +336,34 @@ export const registerPlayer = onCall(
           newRegistration.termsAcceptedAt = now;
         }
 
-        transaction.set(regRef, newRegistration);
+        if (pairingOn && partnerSnap) {
+          const inviteToken = randomBytes(16).toString('hex');
+          const targetName = String(
+            ((partnerSnap.data()?.player ?? {}) as { name?: string }).name ?? ''
+          ).trim();
+          newRegistration.pair = {
+            status: 'PENDING_INVITE',
+            partnerRegistrationId: partnerSnap.id,
+            partnerName: targetName || null,
+            pendingName: null,
+            initiatedBy: regRef.id,
+            inviteToken,
+          };
+          transaction.set(regRef, newRegistration);
+          transaction.update(partnerSnap.ref, {
+            pair: {
+              status: 'PENDING_INVITE',
+              partnerRegistrationId: regRef.id,
+              partnerName: playerName,
+              pendingName: null,
+              initiatedBy: regRef.id,
+              inviteToken,
+            },
+            updatedAt: now,
+          });
+        } else {
+          transaction.set(regRef, newRegistration);
+        }
 
         if (newStatus === 'CONFIRMED') {
           transaction.update(tournamentRef, {

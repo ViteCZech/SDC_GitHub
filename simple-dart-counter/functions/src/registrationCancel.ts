@@ -1,5 +1,11 @@
 import { FieldValue, type DocumentReference, type Transaction } from 'firebase-admin/firestore';
 import { ACTIVE_PREREG_STATUSES } from './playerIdentity';
+import {
+  findOldestWaitlistPair,
+  normalizeCompetitionType,
+  pairStatusOf,
+  usesTeamCapacity,
+} from './pairing';
 
 export type CancelledBy = 'PLAYER' | 'ADMIN';
 
@@ -39,10 +45,28 @@ export function applyRegistrationCancel(args: {
   const refundDue = paid;
 
   const waitlistEnabled = !!(tourData.meta as { waitlistEnabled?: boolean } | undefined)?.waitlistEnabled;
+  const competitionType = normalizeCompetitionType(
+    (tourData.meta as { competitionType?: unknown } | undefined)?.competitionType
+  );
+  const teamSlots = usesTeamCapacity(competitionType);
+  const freedTeamSlot =
+    teamSlots && previousStatus === 'CONFIRMED' && pairStatusOf(regData) === 'CONFIRMED';
+
   let promoteSnap: FirebaseFirestore.QueryDocumentSnapshot | null = null;
-  if (previousStatus === 'CONFIRMED' && waitlistEnabled) {
-    const sorted = [...waitlistDocs].sort((a, b) => createdAtMs(a.data()) - createdAtMs(b.data()));
-    promoteSnap = sorted.find((d) => String(d.data()?.status ?? '') === 'WAITLIST') ?? null;
+  let promotePartnerSnap: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+  if (waitlistEnabled && previousStatus === 'CONFIRMED') {
+    if (teamSlots) {
+      if (freedTeamSlot) {
+        const pair = findOldestWaitlistPair(waitlistDocs);
+        if (pair) {
+          promoteSnap = pair.a;
+          promotePartnerSnap = pair.b;
+        }
+      }
+    } else {
+      const sorted = [...waitlistDocs].sort((a, b) => createdAtMs(a.data()) - createdAtMs(b.data()));
+      promoteSnap = sorted.find((d) => String(d.data()?.status ?? '') === 'WAITLIST') ?? null;
+    }
   }
 
   const now = FieldValue.serverTimestamp();
@@ -66,7 +90,12 @@ export function applyRegistrationCancel(args: {
 
   const counterUpdate: Record<string, unknown> = { updatedAt: now };
   if (previousStatus === 'CONFIRMED') {
-    if (promoteSnap) {
+    if (promoteSnap && promotePartnerSnap) {
+      transaction.update(promoteSnap.ref, { status: 'CONFIRMED', updatedAt: now });
+      transaction.update(promotePartnerSnap.ref, { status: 'CONFIRMED', updatedAt: now });
+      counterUpdate['counters.waitlist'] = FieldValue.increment(-2);
+      counterUpdate['counters.confirmed'] = FieldValue.increment(1);
+    } else if (promoteSnap) {
       transaction.update(promoteSnap.ref, {
         status: 'CONFIRMED',
         updatedAt: now,
@@ -74,6 +103,9 @@ export function applyRegistrationCancel(args: {
       counterUpdate['counters.waitlist'] = FieldValue.increment(-1);
     } else {
       counterUpdate['counters.confirmed'] = FieldValue.increment(-1);
+      if (freedTeamSlot) {
+        counterUpdate['counters.confirmedTeams'] = FieldValue.increment(-1);
+      }
     }
   } else if (previousStatus === 'WAITLIST') {
     counterUpdate['counters.waitlist'] = FieldValue.increment(-1);

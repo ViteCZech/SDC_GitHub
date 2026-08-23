@@ -83,9 +83,15 @@ function formatStartsAt(startsAt, lang) {
 
 function TournamentCard({ lang, tournament, onRegister, t, myStatus }) {
   const badge = getTournamentCatalogBadge(tournament);
-  const confirmed = tournament.counters?.confirmed ?? 0;
+  const type = tournament.meta?.competitionType;
+  const teamSlots = type === 'doubles' || type === 'mixed';
+  const confirmed = teamSlots
+    ? Number(tournament.counters?.confirmedTeams ?? 0) || 0
+    : tournament.counters?.confirmed ?? 0;
+  const people = tournament.counters?.confirmed ?? 0;
   const capacity = tournament.meta?.capacity;
   const unlimited = capacity == null || capacity === 0;
+  const unitLabel = teamSlots ? t('preregCatalogTeams') : t('preregCatalogPlayers');
   const entryFee = tournament.finance?.entryFee;
   const prizePool = calculatePrizePool({
     entryFee,
@@ -133,8 +139,9 @@ function TournamentCard({ lang, tournament, onRegister, t, myStatus }) {
           <span className="flex items-center gap-1">
             <Users className="w-3.5 h-3.5" />
             {unlimited
-              ? `${confirmed} ${t('preregCatalogPlayers')}`
-              : `${confirmed} / ${capacity} ${t('preregCatalogPlayers')}`}
+              ? `${confirmed} ${unitLabel}`
+              : `${confirmed} / ${capacity} ${unitLabel}`}
+            {teamSlots && people > 0 ? ` · ${people} ${t('preregCatalogPlayers')}` : ''}
           </span>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">

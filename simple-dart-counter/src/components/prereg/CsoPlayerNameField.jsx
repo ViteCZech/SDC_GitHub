@@ -23,6 +23,7 @@ import CsoRankingUpdateButton from '../CsoRankingUpdateButton';
  *   csoRank: string,
  *   onCsoRankChange: (rank: string) => void,
  *   onCsoPlayerIdChange?: (id: string|null) => void,
+ *   onGenderChange?: (gender: 'M'|'F'|null) => void,
  *   inputClassName?: string,
  *   disabled?: boolean,
  *   showRankingField?: boolean,
@@ -40,6 +41,7 @@ export default function CsoPlayerNameField({
   csoRank,
   onCsoRankChange,
   onCsoPlayerIdChange,
+  onGenderChange,
   inputClassName = '',
   disabled = false,
   showRankingField = true,
@@ -116,6 +118,11 @@ export default function CsoPlayerNameField({
       cancelled = true;
     };
   }, [useCsoRanking, csoGender, lang, csoReloadKey]);
+
+  useEffect(() => {
+    if (!onGenderChange) return;
+    onGenderChange(useCsoRanking ? (csoGender === 'women' ? 'F' : 'M') : null);
+  }, [useCsoRanking, csoGender, onGenderChange]);
 
   const handleNameChange = (v) => {
     onPlayerNameChange(v);

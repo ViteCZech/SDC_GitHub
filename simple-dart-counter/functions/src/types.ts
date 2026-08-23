@@ -16,6 +16,17 @@ export type RegistrationStatus =
 
 export type PaymentMethod = 'QR' | 'CASH';
 
+export type CompetitionType = 'singles' | 'doubles' | 'mixed' | 'random_doubles';
+export type FeeMode = 'pair' | 'split';
+export type PairStatus =
+  | 'NONE'
+  | 'WAITING_PARTNER'
+  | 'PENDING_INVITE'
+  | 'CONFIRMED'
+  | 'DECLINED'
+  | 'BROKEN';
+export type PlayerGender = 'M' | 'F';
+
 export interface TournamentMeta {
   name?: string;
   venue?: string;
@@ -25,6 +36,9 @@ export interface TournamentMeta {
   waitlistEnabled?: boolean;
   maxWaitlist?: number | null;
   registrationDeadline?: Timestamp | null;
+  competitionType?: CompetitionType;
+  /** players = singles / random_doubles; teams = doubles / mixed */
+  capacityUnit?: 'players' | 'teams';
 }
 
 export interface TournamentFinance {
@@ -34,6 +48,8 @@ export interface TournamentFinance {
   payoutPercent?: number | null;
   addedSponsorMoney?: number | null;
   vsPrefix?: string;
+  /** pair = jedno startovné / jeden VS; split = každý platí svůj podíl */
+  feeMode?: FeeMode;
   bankInfo?: {
     accountNumber?: string;
     bic?: string;
@@ -52,6 +68,7 @@ export interface TournamentDocument {
     confirmed?: number;
     waitlist?: number;
     pendingPayment?: number;
+    confirmedTeams?: number;
   };
 }
 
@@ -65,6 +82,26 @@ export interface RegisterPlayerPayload {
   csoPlayerId?: string | null;
   paymentMethod?: PaymentMethod | null;
   termsAccepted?: boolean;
+  gender?: PlayerGender | null;
+  partnerRegistrationId?: string;
+  partnerName?: string;
+}
+
+export interface PairActionPayload {
+  tournamentId: string;
+  registrationId: string;
+  partnerRegistrationId?: string;
+}
+
+export interface PairPublicView {
+  status: PairStatus;
+  partnerRegistrationId: string | null;
+  partnerName: string | null;
+  pendingName: string | null;
+  initiatedBy: string | null;
+  canConfirm: boolean;
+  canDecline: boolean;
+  canRequestPartner: boolean;
 }
 
 export interface CreateManualRegistrationPayload {

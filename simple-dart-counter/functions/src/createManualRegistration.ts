@@ -8,6 +8,7 @@ import {
   playersAreSame,
   resolveCsoPlayerId,
 } from './playerIdentity';
+import { normalizeCompetitionType, usesTeamCapacity } from './pairing';
 import type {
   CreateManualRegistrationPayload,
   CreateManualRegistrationResult,
@@ -102,9 +103,17 @@ export const createManualRegistration = onCall(
       const currentConfirmed = Number(fresh.counters?.confirmed ?? 0) || 0;
       const maxCapacity = fresh.meta?.capacity ?? null;
       const unlimited = maxCapacity == null || maxCapacity === 0;
+      const teamCapacity = usesTeamCapacity(
+        normalizeCompetitionType((fresh.meta as { competitionType?: unknown } | undefined)?.competitionType)
+      );
 
       let newStatus: 'CONFIRMED' | 'WAITLIST' = 'CONFIRMED';
-      if (!unlimited && Number(maxCapacity) > 0 && currentConfirmed >= Number(maxCapacity)) {
+      if (
+        !teamCapacity &&
+        !unlimited &&
+        Number(maxCapacity) > 0 &&
+        currentConfirmed >= Number(maxCapacity)
+      ) {
         if (!fresh.meta?.waitlistEnabled) {
           throw new HttpsError('resource-exhausted', 'Kapacita turnaje je naplněna.');
         }
