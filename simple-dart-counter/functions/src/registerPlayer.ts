@@ -125,19 +125,41 @@ function playerPhoneOf(reg: Record<string, unknown>): string | null {
   return trimmed || null;
 }
 
-/** Google uživatel si může „přivlastnit“ přihlášku bez authUid (typicky admin ruční zápis). */
+function officialCsoId(raw: string | null | undefined): string | null {
+  const s = String(raw ?? '').trim();
+  return s.startsWith('cso:') ? s : null;
+}
+
+/**
+ * Přiřazení existující přihlášky k Google účtu — jen když je identita jednoznačná.
+ * - stejný účet už ji vlastní
+ * - shoda e-mailu
+ * - shoda oficiálního ČŠO ID (`cso:…`), ne pouhé jméno
+ */
 function canAttachGoogleUserToRegistration(
   reg: Record<string, unknown>,
   authUid: string | null,
-  myEmail: string | null
+  myEmail: string | null,
+  reason: 'email' | 'identity',
+  candidateCsoId: string | null
 ): boolean {
   if (!authUid) return false;
   const existingUid = playerAuthUidOf(reg);
   if (existingUid && existingUid !== authUid) return false;
+  if (existingUid === authUid) return true;
+
   const existingEmail = playerEmailOf(reg);
-  if (existingEmail && myEmail && existingEmail !== myEmail) return false;
-  if (existingEmail && !myEmail) return false;
-  return true;
+  if (reason === 'email') {
+    return !!existingEmail && !!myEmail && existingEmail === myEmail;
+  }
+
+  if (existingEmail) {
+    return !!myEmail && existingEmail === myEmail;
+  }
+
+  const existingCso = officialCsoId((reg.player as PlayerFields | undefined)?.csoPlayerId);
+  const mineCso = officialCsoId(candidateCsoId);
+  return !!existingCso && !!mineCso && existingCso === mineCso;
 }
 
 function claimedResult(
@@ -288,10 +310,11 @@ export const registerPlayer = onCall(
 
         const attachExisting = (
           dupSnap: FirebaseFirestore.QueryDocumentSnapshot,
-          conflictMessage: string
+          conflictMessage: string,
+          reason: 'email' | 'identity'
         ): TxOutcome => {
           const reg = dupSnap.data() ?? {};
-          if (!canAttachGoogleUserToRegistration(reg, authUid, myEmail)) {
+          if (!canAttachGoogleUserToRegistration(reg, authUid, myEmail, reason, csoPlayerId)) {
             return fail('already-exists', conflictMessage);
           }
           const nowTs = FieldValue.serverTimestamp();
@@ -307,10 +330,10 @@ export const registerPlayer = onCall(
         };
 
         if (emailDup) {
-          return attachExisting(emailDup, 'Na tento e-mail je již registrace podána.');
+          return attachExisting(emailDup, 'Na tento e-mail je již registrace podána.', 'email');
         }
         if (nameDup) {
-          return attachExisting(nameDup, `PLAYER_NAME_DUPLICATE:${playerName}`);
+          return attachExisting(nameDup, `PLAYER_NAME_DUPLICATE:${playerName}`, 'identity');
         }
 
         const competitionType = normalizeCompetitionType(

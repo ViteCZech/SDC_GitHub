@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
@@ -18,5 +18,9 @@ export default defineConfig({
     })
   ],
   // Zajišťuje, že statické soubory včetně .well-known budou v buildu
-  publicDir: 'public'
+  publicDir: 'public',
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.js'],
+  },
 })
