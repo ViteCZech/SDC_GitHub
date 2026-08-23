@@ -20,7 +20,32 @@ export default defineConfig({
   // Zajišťuje, že statické soubory včetně .well-known budou v buildu
   publicDir: 'public',
   test: {
-    environment: 'node',
-    include: ['src/**/*.test.js'],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          environment: 'node',
+          include: ['src/**/*.test.js'],
+          exclude: [
+            'src/utils/__tests__/preregStorage.test.js',
+            'src/utils/__tests__/uiResumeStorage.test.js',
+          ],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'dom',
+          environment: 'jsdom',
+          include: [
+            'src/**/*.test.jsx',
+            'src/utils/__tests__/preregStorage.test.js',
+            'src/utils/__tests__/uiResumeStorage.test.js',
+          ],
+          setupFiles: ['./src/test/setup.js'],
+        },
+      },
+    ],
   },
 })
