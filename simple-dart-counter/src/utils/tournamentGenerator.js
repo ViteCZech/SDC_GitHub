@@ -1,5 +1,5 @@
 import { compareTeamSeeds, isTeamPlayer } from './doublesSeeding';
-import { pickWorsePlayerFromTeam } from './doublesReferee';
+import { pickRotatingRefereeFromTeam, pickWorsePlayerFromTeam } from './doublesReferee';
 
 /**
  * Čisté pomocné funkce pro generování turnajových skupin a rozpisu zápasů.
@@ -158,6 +158,7 @@ function generateGroupMatchesFallback(groupPlayers, groupId) {
   }
 
   const n = players.length;
+  const usedByTeam = new Map();
   const usedPairIdx = new Set();
   const orderedPairs = [];
   for (let i = 0; i < n; i++) {
@@ -192,22 +193,27 @@ function generateGroupMatchesFallback(groupPlayers, groupId) {
     });
     const chosen = eligible[0];
     refereeCounts[chosen.id] += 1;
-    const name =
-      chosen.name != null && String(chosen.name).trim() !== '' ? String(chosen.name) : String(chosen.id);
+    const person = pickRotatingRefereeFromTeam(chosen, usedByTeam) || pickWorsePlayerFromTeam(chosen, {}) || {
+      id: chosen.id,
+      name:
+        chosen.name != null && String(chosen.name).trim() !== '' ? String(chosen.name) : String(chosen.id),
+    };
     return {
       player1Id: p1Id,
       player2Id: p2Id,
       chalkerId: chosen.id,
-      refereeId: chosen.id,
-      referee: { id: chosen.id, name },
+      refereeId: person.id,
+      referee: person,
+      referees: [person],
       groupId,
     };
   });
 
+  const matchesPerRound = Math.max(1, Math.floor(players.length / 2));
   return matches.map((m, idx) => ({
     ...m,
-    id: `${groupId}-r${idx + 1}-${m.player1Id}-${m.player2Id}`,
-    round: idx + 1,
+    id: `${groupId}-r${Math.floor(idx / matchesPerRound) + 1}-m${idx}-${m.player1Id}-${m.player2Id}`,
+    round: Math.floor(idx / matchesPerRound) + 1,
     status: 'pending',
   }));
 }
@@ -249,6 +255,7 @@ export function generateGroupMatches(groupPlayers, groupId) {
     return generateGroupMatchesFallback(groupPlayers, groupId);
   }
 
+  const usedByTeam = new Map();
   const matches = schedule.map((row, idx) => {
     const p1 = players[row.i1];
     const p2 = players[row.i2];
@@ -256,20 +263,23 @@ export function generateGroupMatches(groupPlayers, groupId) {
     if (!p1 || !p2 || !refP) {
       return null;
     }
-    const person = pickWorsePlayerFromTeam(refP, {}) || {
+    const person = pickRotatingRefereeFromTeam(refP, usedByTeam) || pickWorsePlayerFromTeam(refP, {}) || {
       id: refP.id,
       name:
         refP.name != null && String(refP.name).trim() !== '' ? String(refP.name) : String(refP.id),
     };
+    const matchesPerRound = Math.max(1, Math.floor(n / 2));
+    const round = Math.floor(idx / matchesPerRound) + 1;
     return {
       player1Id: p1.id,
       player2Id: p2.id,
       chalkerId: refP.id,
       refereeId: person.id,
       referee: person,
+      referees: [person],
       groupId,
-      id: `${groupId}-r${idx + 1}-${p1.id}-${p2.id}`,
-      round: idx + 1,
+      id: `${groupId}-r${round}-m${idx}-${p1.id}-${p2.id}`,
+      round,
       status: 'pending',
     };
   });

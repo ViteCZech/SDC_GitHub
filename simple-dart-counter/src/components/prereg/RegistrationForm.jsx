@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Send } from 'lucide-react';
 import { translations } from '../../translations';
 import { listAvailablePartnersApi, registerPlayerApi } from '../../services/tournamentPreRegService';
-import { allowsPairing, normalizeCompetitionType, normalizeFeeMode } from '../../utils/preregCompetition';
+import { allowsPairing, normalizeCompetitionType, normalizeFeeMode, usesDoublesRanking } from '../../utils/preregCompetition';
 import CsoPlayerNameField from './CsoPlayerNameField';
 
 /**
@@ -189,6 +189,7 @@ export default function RegistrationForm({ lang, tournament, onSuccess, defaultE
         showRankingField={false}
         showAdminControls={false}
         nullableRecreationalId
+        rankingKind={usesDoublesRanking(competitionType) ? 'doubles' : 'singles'}
       />
       <p className="text-xs text-slate-500 -mt-2">
         {t('preregCsoRecreationalHint') ||

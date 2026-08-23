@@ -1750,15 +1750,31 @@ export default function TournamentSetup({
               </div>
             </div>
 
-            {/* Pravý blok – přehled hráčů, vlastní formát a návrhy (jako krok 1: širší panel s mřížkou) */}
+            {/* Pravý blok – přehled hráčů a sbalené vzory formátu */}
             <div className={`lg:col-span-7 min-w-0 ${fmtBracketOnly ? 'hidden' : ''}`}>
-              <div className="grid grid-cols-1 md:grid-cols-2 md:gap-6 gap-6">
-                <div className="flex flex-col gap-4 min-w-0">
+              <div className="flex flex-col gap-4 min-w-0">
                 <div className="p-4 border rounded-xl bg-slate-900 border-slate-800 space-y-4">
                   <p className="text-base font-black text-emerald-400">
                     {t('tournPlayersTotal') || 'Celkem přihlášeno'}: {players.length} {t('tournPlayersMany') || 'hráčů'}
                   </p>
                 </div>
+                <details className="rounded-xl border border-slate-700 bg-slate-900/80 group">
+                  <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3">
+                    <span>
+                      <span className="block text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        {t('tournVariantChoose') || 'Vyberte formát turnaje'}
+                      </span>
+                      <span className="block text-sm font-black text-emerald-400 mt-0.5">
+                        {isCustomFormat
+                          ? t('tournVariantCustom')
+                          : t(selectedVariant?.labelKey) || t('tournVariantStandard')}
+                      </span>
+                    </span>
+                    <span className="text-slate-500 text-xs font-bold uppercase tracking-wide group-open:rotate-180 transition-transform">
+                      ▾
+                    </span>
+                  </summary>
+                  <div className="px-3 pb-3 space-y-3 border-t border-slate-800 pt-3">
                 <div>
                   <button
                     type="button"
@@ -1874,9 +1890,8 @@ export default function TournamentSetup({
                     </div>
                   )}
                 </div>
-                </div>
 
-                <div className="flex flex-col gap-4 min-w-0">
+                <div className="flex flex-col gap-3 min-w-0">
                 <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
                   {t('tournVariantChoose') || 'Vyberte formát turnaje'}
                 </span>
@@ -1934,6 +1949,8 @@ export default function TournamentSetup({
                   );
                 })}
                 </div>
+                  </div>
+                </details>
               </div>
             </div>
 

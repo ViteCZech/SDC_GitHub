@@ -137,8 +137,63 @@ export function findSlotById(playerId, groups = [], extraPlayers = []) {
 }
 
 /**
- * Počtář jako osoba: u týmu horší člen, jinak původní slot.
+ * Členové páru v pořadí „kdo má počítat dřív“ (horší první).
+ * Jeden zápas počítá vždy jen jeden; střídají se napříč zápasy.
+ * @param {object} team
+ * @param {{ match?: object, matches?: object[], usedIds?: Set<string>|string[] }} [opts]
+ * @returns {Array<{ id: string, name: string }>}
  */
+export function pickRefereePeopleFromTeam(team, opts = {}) {
+  if (!team) return [];
+  if (!isTeamPlayer(team)) {
+    const one = pickWorsePlayerFromTeam(team, opts);
+    return one ? [one] : [];
+  }
+  const worse = pickWorsePlayerFromTeam(team, opts);
+  const rest = (team.members || [])
+    .slice(0, 2)
+    .filter((m) => worse == null || String(m.id ?? m.name) !== String(worse.id))
+    .map((m, i) => ({
+      id: m.id ?? `${team.id}-m${i}`,
+      name: String(m.name ?? m.id ?? ''),
+    }))
+    .filter((p) => p.id != null && p.id !== '');
+  const out = [];
+  if (worse) out.push(worse);
+  for (const p of rest) {
+    if (!out.some((x) => String(x.id) === String(p.id))) out.push(p);
+  }
+  return out;
+}
+
+/**
+ * Další počtář z páru — střídání: první zápas člen 1, další zápas člen 2.
+ * @param {object} team
+ * @param {Map<string, Set<string>>} usedByTeam
+ * @returns {{ id: string, name: string }|null}
+ */
+export function pickRotatingRefereeFromTeam(team, usedByTeam) {
+  if (!team) return null;
+  const key = String(team.id ?? team.name ?? '');
+  const used = usedByTeam.get(key) ?? new Set();
+  const person = pickWorsePlayerFromTeam(team, { usedIds: used });
+  if (person?.id != null) {
+    used.add(String(person.id));
+    usedByTeam.set(key, used);
+  }
+  return person;
+}
+
+/** @param {object} match */
+export function formatRefereeNames(match) {
+  const single = String(match?.referee?.name ?? '').trim();
+  if (single) return single;
+  if (Array.isArray(match?.referees) && match.referees.length > 0) {
+    return String(match.referees[0]?.name ?? '').trim();
+  }
+  return String(match?.refereeName ?? '').trim();
+}
+
 export function resolveRefereePerson(slotOrId, opts = {}) {
   const slot =
     slotOrId && typeof slotOrId === 'object' && (slotOrId.members || slotOrId.id)

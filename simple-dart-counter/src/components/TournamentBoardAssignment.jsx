@@ -284,6 +284,9 @@ export default function TournamentBoardAssignment({
             <p className="text-slate-400 text-sm mt-1">
               {t('tournBoardAssignmentDescExtended') || 'Přiřaďte každé skupině čísla terčů (např. 1 nebo 1, 2). Prázdné = skupina čeká ve frontě. Jedné skupině můžete přiřadit i více terčů najednou (např. "1, 2"). Zápasy se mezi ně rozdělí.'}
             </p>
+            <p className="text-emerald-300/90 text-sm mt-2">
+              {t('tournBoardDoublesHint')}
+            </p>
             {capacityReached ? (
               <div
                 className="mt-2 p-3 rounded-lg bg-amber-900/35 border border-amber-500/50 text-amber-200 text-sm font-bold"

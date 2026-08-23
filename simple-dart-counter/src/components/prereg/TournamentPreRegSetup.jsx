@@ -359,10 +359,23 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
         <h1 className="text-2xl font-black text-white">{t('preregAdminSetupHeading')}</h1>
       </header>
 
-      <section className="p-4 rounded-xl border border-slate-800 bg-slate-900/80 space-y-3">
-        <h2 className="text-sm font-black uppercase tracking-widest text-slate-400">
-          {t('preregTemplateTitle')}
-        </h2>
+      <details className="rounded-xl border border-slate-800 bg-slate-900/80 group">
+        <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3">
+          <span>
+            <span className="block text-sm font-black uppercase tracking-widest text-slate-400">
+              {t('preregTemplateTitle')}
+            </span>
+            <span className="block text-[11px] text-slate-500 mt-0.5">
+              {selectedTemplate
+                ? selectedTemplate.title
+                : t('preregTemplateCollapsedHint')}
+            </span>
+          </span>
+          <span className="text-slate-500 text-xs font-bold uppercase tracking-wide group-open:rotate-180 transition-transform">
+            ▾
+          </span>
+        </summary>
+        <div className="px-4 pb-4 space-y-3 border-t border-slate-800 pt-3">
         <p className="text-xs text-slate-500">{t('preregTemplateHint')}</p>
         <div className="flex flex-col sm:flex-row gap-2">
           <select
@@ -414,7 +427,8 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
         {infoNotice && (
           <p className="text-sm text-emerald-300/90">{infoNotice}</p>
         )}
-      </section>
+        </div>
+      </details>
 
       {!isLoggedIn && (
         <div className="p-4 rounded-xl border border-amber-500/50 bg-amber-900/20 space-y-3">

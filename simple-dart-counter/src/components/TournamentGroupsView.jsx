@@ -8,6 +8,8 @@ import {
   isTournamentGroupsThenBracketFormat,
 } from '../utils/tournamentLogic';
 import { translations } from '../translations';
+import { formatRefereeNames } from '../utils/doublesReferee';
+import { pickParallelGroupMatches } from '../utils/groupParallelPlay';
 
 /** Rozdělení zobrazeného jména (mezera nebo podtržítko) pro zalamování řádků */
 function splitStandingNameParts(name) {
@@ -159,7 +161,7 @@ function GroupStandingsTable({ standings, advanceCount, t }) {
 function ScrollableMatchList({
   groupMatches,
   group,
-  firstPlayableIdx,
+  playableKeys,
   getPlayerName,
   onStartMatch,
   onResetMatch,
@@ -177,10 +179,10 @@ function ScrollableMatchList({
           const isCompleted = m.status === 'completed';
           const isPlaying = m.status === 'playing';
           const isTabletTimeout = m.tabletStatus === 'timeout_warning';
-          const isLocked = idx > firstPlayableIdx;
+          const isLocked = !playableKeys?.has(String(m.matchId ?? m.id ?? ''));
           const name1 = getPlayerName(m.player1Id);
           const name2 = getPlayerName(m.player2Id);
-          const chalkerName = m.chalkerId ? getPlayerName(m.chalkerId) : null;
+          const chalkerName = formatRefereeNames(m) || (m.chalkerId ? getPlayerName(m.chalkerId) : null);
           const canClick = allowAdminMatchActions && (!isLocked || isPlaying || isCompleted);
           const statusClasses =
             isCompleted
@@ -266,7 +268,7 @@ function GroupCard({
   groupMatches,
   standings,
   advanceCount,
-  firstPlayableIdx,
+  playableKeys,
   isReviewMode,
   onStartMatch,
   onResetMatch,
@@ -296,7 +298,7 @@ function GroupCard({
           </h3>
           {!isReviewMode && hasBoard && !groupFullyDone ? (
             <span className="bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-bold shrink-0 whitespace-nowrap">
-              🎯 {t('tournBoard') || 'Terč'} {group.boards[0]}
+              🎯 {t('tournBoard') || 'Terč'} {group.boards.join(', ')}
             </span>
           ) : !isReviewMode && groupFullyDone ? (
             <span className="bg-slate-700/80 text-slate-300 px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-bold shrink-0 whitespace-nowrap">
@@ -392,7 +394,7 @@ function GroupCard({
         <ScrollableMatchList
           groupMatches={groupMatches}
           group={group}
-          firstPlayableIdx={firstPlayableIdx}
+          playableKeys={playableKeys}
           getPlayerName={getPlayerName}
           onStartMatch={onStartMatch}
           onResetMatch={onResetMatch}
@@ -548,13 +550,12 @@ export default function TournamentGroupsView({
     );
   };
 
-  const getFirstPlayableIndex = (groupMatches) => {
-    for (let i = 0; i < groupMatches.length; i++) {
-      if (groupMatches[i].status === 'pending' || groupMatches[i].status === 'playing') {
-        return i;
-      }
+  const getPlayableMatchKeys = (groupMatches, boardCount) => {
+    const keys = new Set();
+    for (const m of pickParallelGroupMatches(groupMatches, boardCount)) {
+      keys.add(String(m.matchId ?? m.id ?? ''));
     }
-    return groupMatches.length;
+    return keys;
   };
 
   const handlePressStart = () => {
@@ -803,7 +804,7 @@ export default function TournamentGroupsView({
             const advanceCount = rawAdvancePerGroup === 'all'
               ? (group.players?.length ?? 0)
               : Math.max(0, Math.min(group.players?.length ?? 0, Number(rawAdvancePerGroup) || 0));
-            const firstPlayableIdx = getFirstPlayableIndex(groupMatches);
+            const playableKeys = getPlayableMatchKeys(groupMatches, group.boards?.length ?? 1);
 
             return (
               <GroupCard
@@ -812,7 +813,7 @@ export default function TournamentGroupsView({
                 groupMatches={groupMatches}
                 standings={standings}
                 advanceCount={advanceCount}
-                firstPlayableIdx={firstPlayableIdx}
+                playableKeys={playableKeys}
                 isReviewMode={isReviewMode}
                 onStartMatch={handleStartMatch}
                 onResetMatch={onResetMatch}

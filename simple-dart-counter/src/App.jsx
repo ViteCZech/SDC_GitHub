@@ -88,11 +88,17 @@ import {
 } from './utils/tournamentRanking';
 import { normalizePlayerNameKey, resolveCsoPlayerId } from './utils/playerIdentity';
 import { isTeamPlayer } from './utils/doublesSeeding';
+import { formatRefereeNames, resolveRefereePerson } from './utils/doublesReferee';
+import {
+  adaptGroupParallelPlay,
+  matchPhaseSignature,
+  parallelAssignSignature,
+  pickParallelGroupMatches,
+} from './utils/groupParallelPlay';
 import {
   buildDoublesSettingsFromSlots,
   findTournamentSlot,
 } from './utils/doublesThrowOrder';
-import { resolveRefereePerson } from './utils/doublesReferee';
 import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
 
 const APP_VERSION = "v1.10.1";
@@ -383,12 +389,20 @@ function enrichTabletMatchPlayerNames(raw, tournamentData, tournamentGroups) {
     findTournamentSlot(raw.player2Id, tournamentData, tournamentGroups);
   const p1Members = isTeamPlayer(p1Slot) ? p1Slot.members.slice(0, 2) : [];
   const p2Members = isTeamPlayer(p2Slot) ? p2Slot.members.slice(0, 2) : [];
+  const referees =
+    Array.isArray(raw.referees) && raw.referees.length > 0
+      ? raw.referees
+      : raw.referee?.name
+        ? [raw.referee]
+        : [];
   return {
     ...raw,
     player1Name: p1Raw || '?',
     player2Name: p2Raw || '?',
     p1Members,
     p2Members,
+    referees,
+    refereeName: formatRefereeNames({ ...raw, referees }) || raw.refereeName || '—',
     doubles: p1Members.length >= 2 && p2Members.length >= 2,
   };
 }
@@ -469,20 +483,19 @@ function pickTabletMatchForBoard({
     .filter((m) => (m.groupId ?? m.group) === group.groupId)
     .slice()
     .sort((a, c) => (a.round ?? 0) - (c.round ?? 0));
-
-  for (let i = 0; i < gms.length; i++) {
-    const m = gms[i];
-    if (isTabletPickupCandidate(m)) {
-      return {
-        ...m,
-        matchType: 'group',
-        matchId: m.matchId ?? m.id,
-        groupId: m.groupId ?? group.groupId,
-      };
-    }
-  }
-
-  return null;
+  const groupBoards = (group.boards || []).map((x) => String(x).trim()).filter(Boolean);
+  const selected = pickParallelGroupMatches(gms, groupBoards.length || 1);
+  const boardIdx = groupBoards.indexOf(b);
+  const byBoard = selected.find((m) => String(m.board ?? '').trim() === b);
+  const byIndex = boardIdx >= 0 ? selected[boardIdx] : selected[0];
+  const m = byBoard || byIndex;
+  if (!m || !isTabletPickupCandidate(m)) return null;
+  return {
+    ...m,
+    matchType: 'group',
+    matchId: m.matchId ?? m.id,
+    groupId: m.groupId ?? group.groupId,
+  };
 }
 
 /** Rozpis zápasů na terči pro tablet (skupina nebo pavouk). */
@@ -540,7 +553,8 @@ function buildTabletBoardSchedule({
 
   const refereeForBracket = (m) => m.referee?.name ?? '—';
   const refereeForGroup = (m, players) => {
-    if (m.referee?.name) return m.referee.name;
+    const both = formatRefereeNames(m);
+    if (both) return both;
     if (m.chalkerId) return players.find((p) => p.id === m.chalkerId)?.name ?? '—';
     return '—';
   };
@@ -578,8 +592,12 @@ function buildTabletBoardSchedule({
     .slice()
     .sort((a, c) => (a.round ?? 0) - (c.round ?? 0));
 
+  const groupBoards = (groupOnBoard.boards || []).map((x) => String(x).trim()).filter(Boolean);
+  const multiBoard = groupBoards.length > 1;
   for (let i = 0; i < gms.length; i++) {
     const m = gms[i];
+    const assigned = m.board != null && m.board !== '' ? String(m.board).trim() : '';
+    if (multiBoard && assigned !== b) continue;
     rows.push({
       key: `g-${m.matchId ?? m.id ?? i}`,
       matchType: 'group',
@@ -2391,7 +2409,9 @@ function AppMain({ lang, setLang }) {
       tournamentData?.groups?.find((g) => g.groupId === gid);
     const chalkerId = raw.chalkerId ?? raw.referee?.id;
     const chalkerSlot = grp?.players?.find((p) => p.id === chalkerId);
-    if (isTeamPlayer(chalkerSlot)) {
+    if (formatRefereeNames(raw)) {
+      refereeName = formatRefereeNames(raw);
+    } else if (isTeamPlayer(chalkerSlot)) {
       const person = resolveRefereePerson(chalkerSlot, { matches: tournamentMatches });
       if (person?.name) refereeName = person.name;
     } else if (!refereeName && chalkerSlot?.name) {
@@ -3311,12 +3331,28 @@ function AppMain({ lang, setLang }) {
             completedAt: existing?.completedAt,
             startedAt: existing?.startedAt,
             chalkerId: existing?.chalkerId ?? m.chalkerId,
+            referees: existing?.referees ?? m.referees,
+            referee: existing?.referee ?? m.referee,
+            board: existing?.board ?? m.board,
           });
         }
       }
-      return allMatches;
+      return adaptGroupParallelPlay(allMatches, tournamentGroups);
     });
   }, [tournamentGroups]);
+
+  const groupMatchPhaseKey = React.useMemo(
+    () => matchPhaseSignature(tournamentMatches),
+    [tournamentMatches]
+  );
+
+  useEffect(() => {
+    if (!tournamentGroups?.length || !tournamentMatches?.length) return;
+    setTournamentMatches((prev) => {
+      const next = adaptGroupParallelPlay(prev, tournamentGroups);
+      return parallelAssignSignature(prev) === parallelAssignSignature(next) ? prev : next;
+    });
+  }, [tournamentGroups, groupMatchPhaseKey]);
 
   // Chytrá fronta terčů: při dokončení skupiny automaticky přiřaď terč první čekající
   useEffect(() => {

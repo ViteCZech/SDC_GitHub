@@ -32,6 +32,7 @@ import {
   allowsPairing,
   countConfirmedTeams,
   normalizeCompetitionType,
+  usesDoublesRanking,
   usesTeamCapacity,
 } from '../../utils/preregCompetition';
 import { calculatePrizePool, distributePrizePool, getDistributionTemplate } from '../../utils/prizePool';
@@ -195,6 +196,9 @@ function ManualRegistrationModal({
           user={user}
           onGoogleLogin={onGoogleLogin}
           onNotify={onNotify}
+          rankingKind={
+            usesDoublesRanking(tournament?.meta?.competitionType) ? 'doubles' : 'singles'
+          }
         />
 
         <div>
@@ -333,8 +337,7 @@ export default function RegistrationAdminPanel({
   const [restoreReg, setRestoreReg] = useState(null);
   const [pairPick, setPairPick] = useState({});
   const isFetchingTournamentRef = useRef(false);
-  const [csoMen, setCsoMen] = useState([]);
-  const [csoWomen, setCsoWomen] = useState([]);
+  const [csoLiveLists, setCsoLiveLists] = useState([]);
 
   const isOwner =
     !!user?.uid &&
@@ -343,27 +346,23 @@ export default function RegistrationAdminPanel({
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      loadCsoRanking('men', { bypassCache: true }),
-      loadCsoRanking('women', { bypassCache: true }),
-    ])
-      .then(([men, women]) => {
+    const keys = usesDoublesRanking(tournament?.meta?.competitionType)
+      ? ['doubles']
+      : ['men', 'women'];
+    Promise.all(keys.map((key) => loadCsoRanking(key, { bypassCache: true })))
+      .then((rows) => {
         if (cancelled) return;
-        setCsoMen(men?.players ?? []);
-        setCsoWomen(women?.players ?? []);
+        setCsoLiveLists(rows.map((row) => row?.players ?? []));
       })
       .catch(() => {
-        if (!cancelled) {
-          setCsoMen([]);
-          setCsoWomen([]);
-        }
+        if (!cancelled) setCsoLiveLists([]);
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tournament?.meta?.competitionType]);
 
-  const liveRankFor = (name) => resolvePlayerLiveRankFromLists(name, csoMen, csoWomen);
+  const liveRankFor = (name) => resolvePlayerLiveRankFromLists(name, ...csoLiveLists);
 
   useEffect(() => {
     if (!tournamentId) return;

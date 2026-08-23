@@ -31,9 +31,10 @@ import CsoRankingUpdateButton from '../CsoRankingUpdateButton';
  *   nullableRecreationalId?: boolean,
  *   user?: object|null,
  *   onGoogleLogin?: () => void,
- *   onNotify?: (message: string, type?: 'success'|'error') => void,
- * }} props
- */
+   *   onNotify?: (message: string, type?: 'success'|'error') => void,
+   *   rankingKind?: 'singles'|'doubles',
+   * }} props
+   */
 export default function CsoPlayerNameField({
   lang,
   playerName,
@@ -50,11 +51,14 @@ export default function CsoPlayerNameField({
   user = null,
   onGoogleLogin,
   onNotify,
+  rankingKind = 'singles',
 }) {
   const t = (k) => translations[lang]?.[k] || k;
 
   const [useCsoRanking, setUseCsoRanking] = useState(true);
   const [csoGender, setCsoGender] = useState('men');
+  const usesDoublesList = rankingKind === 'doubles';
+  const csoListKey = usesDoublesList ? 'doubles' : csoGender;
   const [csoList, setCsoList] = useState([]);
   const [csoMeta, setCsoMeta] = useState(null);
   const [csoLoading, setCsoLoading] = useState(false);
@@ -84,7 +88,7 @@ export default function CsoPlayerNameField({
     }
 
     // Plovoucí ranking: vždy ze serveru Firestore, ať badge není ze staré memory/IndexedDB cache.
-    loadCsoRanking(csoGender, { bypassCache: true })
+    loadCsoRanking(csoListKey, { bypassCache: true })
       .then((data) => {
         if (!cancelled) {
           setCsoList(data.players ?? []);
@@ -117,12 +121,16 @@ export default function CsoPlayerNameField({
     return () => {
       cancelled = true;
     };
-  }, [useCsoRanking, csoGender, lang, csoReloadKey]);
+  }, [useCsoRanking, csoListKey, lang, csoReloadKey]);
 
   useEffect(() => {
     if (!onGenderChange) return;
+    if (usesDoublesList) {
+      onGenderChange(null);
+      return;
+    }
     onGenderChange(useCsoRanking ? (csoGender === 'women' ? 'F' : 'M') : null);
-  }, [useCsoRanking, csoGender, onGenderChange]);
+  }, [useCsoRanking, csoGender, onGenderChange, usesDoublesList]);
 
   const handleNameChange = (v) => {
     onPlayerNameChange(v);
@@ -179,9 +187,11 @@ export default function CsoPlayerNameField({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">
-              {t('tournUseCsoRanking')}
+              {usesDoublesList ? t('tournCsoDoublesRanking') : t('tournUseCsoRanking')}
             </p>
-            <p className="text-[10px] text-slate-500 leading-snug">{t('tournUseCsoRankingHint')}</p>
+            <p className="text-[10px] text-slate-500 leading-snug">
+              {usesDoublesList ? t('tournUseCsoRankingHintDoubles') : t('tournUseCsoRankingHint')}
+            </p>
           </div>
           <button
             type="button"
@@ -203,6 +213,12 @@ export default function CsoPlayerNameField({
 
         {useCsoRanking && (
           <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-800">
+            {usesDoublesList && (
+              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">
+                {t('tournCsoDoublesRanking')}
+              </span>
+            )}
+            {!usesDoublesList && (
             <div className="flex rounded-lg overflow-hidden border border-slate-600">
               {(['men', 'women']).map((g) => (
                 <button
@@ -220,11 +236,12 @@ export default function CsoPlayerNameField({
                 </button>
               ))}
             </div>
+            )}
             <a
-              href={getCsoRankingUrl(csoGender)}
+              href={getCsoRankingUrl(csoListKey)}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={handleExternalLinkClick(getCsoRankingUrl(csoGender))}
+              onClick={handleExternalLinkClick(getCsoRankingUrl(csoListKey))}
               className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-[10px] text-slate-300 hover:text-white"
             >
               <ExternalLink className="w-3 h-3" />
@@ -313,7 +330,7 @@ export default function CsoPlayerNameField({
         {showRankingField && (
           <div>
             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
-              {t('tournRanking')}
+              {usesDoublesList ? t('tournCsoDoublesRanking') : t('tournRanking')}
               {selectedCsoRank != null && (
                 <span className="ml-2 normal-case font-normal text-emerald-400">
                   ({t('tournCsoFromRanking')})

@@ -58,6 +58,12 @@ export default function TabletWaitingRoom({
     match.p1Members.length >= 2 &&
     Array.isArray(match?.p2Members) &&
     match.p2Members.length >= 2;
+  const refereePeople =
+    Array.isArray(match?.referees) && match.referees.length > 0
+      ? match.referees
+      : match?.refereeName
+        ? [{ name: match.refereeName }]
+        : [];
   const allPresent = doublesCheckIn
     ? presentP1a && presentP1b && presentP2a && presentP2b && presentRef
     : presentP1 && presentP2 && presentRef;
@@ -413,7 +419,12 @@ export default function TabletWaitingRoom({
                     {checkInSlotBtn(presentP2b, () => setPresentP2b(true), tt('player2'), match.p2Members[1]?.name)}
                   </div>
                 </div>
-                {checkInSlotBtn(presentRef, () => setPresentRef(true), tt('referee'), match.refereeName)}
+                {checkInSlotBtn(
+                  presentRef,
+                  () => setPresentRef(true),
+                  tt('referee'),
+                  refereePeople[0]?.name || match.refereeName
+                )}
               </>
             ) : (
               <>
