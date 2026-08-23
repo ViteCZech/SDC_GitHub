@@ -32,6 +32,7 @@ import {
   allowsPairing,
   countConfirmedTeams,
   normalizeCompetitionType,
+  normalizeFeeMode,
   usesDoublesRanking,
   usesTeamCapacity,
 } from '../../utils/preregCompetition';
@@ -68,6 +69,57 @@ function registrationStatusLabel(t, status) {
   const key = `preregStatusLabel${status}`;
   const label = t(key);
   return label === key ? status : label;
+}
+
+/** Příjmení pro zápis dvojice (Jalůvka/Armlich). */
+function pairSurname(name) {
+  const s = String(name ?? '')
+    .trim()
+    .replace(/_/g, ' ');
+  if (!s) return '';
+  const parts = s.split(/\s+/).filter(Boolean);
+  const last = parts[parts.length - 1];
+  if (parts.length > 1 && /^\d+$/.test(last)) {
+    return parts[parts.length - 2] || last;
+  }
+  return last || s;
+}
+
+function formatConfirmedPairLine(aName, bName) {
+  return `${pairSurname(aName)}/${pairSurname(bName)}`;
+}
+
+function pairPayer(a, b) {
+  const amt = (r) => Number(r?.payment?.amount ?? 0);
+  if (amt(a) > 0 && amt(b) <= 0) return a;
+  if (amt(b) > 0 && amt(a) <= 0) return b;
+  if (a?.payment?.isPaid && !b?.payment?.isPaid) return a;
+  if (b?.payment?.isPaid && !a?.payment?.isPaid) return b;
+  return a;
+}
+
+/** Potvrzené páry = 1 řádek; nespárovaní zůstanou zvlášť. */
+function buildAdminTableRows(list, pairingOn) {
+  const byId = new Map((list || []).map((r) => [r.id, r]));
+  const used = new Set();
+  const rows = [];
+  for (const r of list || []) {
+    if (used.has(r.id)) continue;
+    const partnerId = String(r?.pair?.partnerRegistrationId ?? '').trim();
+    const partner =
+      pairingOn && String(r?.pair?.status ?? '') === 'CONFIRMED' && partnerId
+        ? byId.get(partnerId)
+        : null;
+    if (partner && String(partner.pair?.status ?? '') === 'CONFIRMED') {
+      used.add(r.id);
+      used.add(partner.id);
+      rows.push({ key: `pair-${r.id}-${partner.id}`, a: r, b: partner });
+    } else {
+      used.add(r.id);
+      rows.push({ key: r.id, a: r, b: null });
+    }
+  }
+  return rows;
 }
 
 function ManualRegistrationModal({
@@ -414,6 +466,8 @@ export default function RegistrationAdminPanel({
   ).length;
   const competitionType = normalizeCompetitionType(tournament?.meta?.competitionType);
   const pairingOn = allowsPairing(competitionType);
+  const feeMode = normalizeFeeMode(tournament);
+  const pairFee = pairingOn && feeMode === 'pair';
   const teamSlots = usesTeamCapacity(competitionType);
   const confirmedTeams = countConfirmedTeams(registrations);
   const capacity = tournament?.meta?.capacity ?? null;
@@ -423,6 +477,10 @@ export default function RegistrationAdminPanel({
     const st = String(r.pair?.status ?? 'NONE');
     return st !== 'CONFIRMED' && st !== 'PENDING_INVITE';
   });
+  const tableRows = useMemo(
+    () => buildAdminTableRows(filtered, pairingOn),
+    [filtered, pairingOn]
+  );
 
   const prizePool = useMemo(() => {
     return calculatePrizePool({
@@ -449,10 +507,14 @@ export default function RegistrationAdminPanel({
     }
   };
 
-  const handleCheckInToggle = (registration) => {
+  const handleCheckInToggle = (registration, opts = {}) => {
     const nextCheckedIn = !registration.attendance?.checkedIn;
-    if (nextCheckedIn && !registration.payment?.isPaid) {
-      setCheckInConfirm(registration);
+    const pairCovered = !!opts.pairPaid;
+    if (nextCheckedIn && !registration.payment?.isPaid && !pairCovered) {
+      setCheckInConfirm({
+        ...registration,
+        _payRegId: opts.payRegId || registration.id,
+      });
       return;
     }
     runAction(registration.id, () =>
@@ -496,7 +558,7 @@ export default function RegistrationAdminPanel({
     const reg = checkInConfirm;
     setCheckInConfirm(null);
     await runAction(reg.id, async () => {
-      await markRegistrationPaid(tournamentId, reg.id, 'CASH');
+      await markRegistrationPaid(tournamentId, reg._payRegId || reg.id, 'CASH');
       await toggleRegistrationCheckIn(tournamentId, reg.id, true);
     });
   };
@@ -529,6 +591,160 @@ export default function RegistrationAdminPanel({
     } finally {
       setDeleting(false);
     }
+  };
+
+  const renderPlayerLineLabel = (name) =>
+    name ? (
+      <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+        {pairSurname(name)}
+      </div>
+    ) : null;
+
+  const renderPaymentInfo = (r, { label } = {}) => (
+    <div className="space-y-0.5">
+      {label ? renderPlayerLineLabel(label) : null}
+      <div className="text-slate-300">
+        {r.payment?.method === 'QR' ? t('preregPayQr') : r.payment?.method === 'CASH' ? t('preregPayCash') : '–'}
+      </div>
+      <div className={r.payment?.isPaid ? 'text-emerald-400' : 'text-amber-400'}>
+        {r.payment?.isPaid ? t('preregPaid') : t('preregUnpaid')}
+      </div>
+      {r.payment?.variableSymbol && (
+        <div className="font-mono text-slate-500">VS {r.payment.variableSymbol}</div>
+      )}
+    </div>
+  );
+
+  const renderPlayerStatus = (r, { label } = {}) => {
+    const isCancelled = r.status === 'CANCELLED';
+    return (
+      <div>
+        {label ? renderPlayerLineLabel(label) : null}
+        <span
+          className={`text-xs font-bold uppercase ${isCancelled ? 'text-red-300' : 'text-slate-200'}`}
+        >
+          {registrationStatusLabel(t, r.status)}
+        </span>
+        {r.attendance?.checkedIn && (
+          <div className="text-emerald-400 text-xs flex items-center gap-1 mt-0.5">
+            <UserCheck className="w-3 h-3" /> {t('preregCheckedIn')}
+          </div>
+        )}
+        {isCancelled && r.cancelledBy === 'PLAYER' && (
+          <div className="text-xs text-slate-500 mt-0.5">{t('preregCancelledByPlayer')}</div>
+        )}
+        {isRefundDue(r) && (
+          <div className="text-xs font-bold text-amber-400 mt-0.5">{t('preregRefundDue')}</div>
+        )}
+        {isCancelled && r.payment?.refundedAt && (
+          <div className="text-xs text-emerald-500 mt-0.5">{t('preregRefunded')}</div>
+        )}
+      </div>
+    );
+  };
+
+  const renderPaymentActions = (r, busy) => {
+    if (r.status === 'CANCELLED' || r.payment?.isPaid) return null;
+    return (
+      <>
+        {r.payment?.method === 'QR' && (
+          <>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setQrModalReg(r)}
+              className="px-2 py-2 rounded-lg bg-slate-800 text-sky-400 hover:bg-slate-700 text-[10px] sm:text-xs font-bold whitespace-nowrap"
+              title={t('preregAdminShowQrBtn')}
+            >
+              📱 QR
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => runAction(r.id, () => markRegistrationPaid(tournamentId, r.id, 'QR'))}
+              className="p-2 rounded-lg bg-slate-800 text-cyan-400 hover:bg-slate-700"
+              title={t('preregMarkPaidQr')}
+            >
+              <QrCode className="w-4 h-4" />
+            </button>
+          </>
+        )}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => runAction(r.id, () => markRegistrationPaid(tournamentId, r.id, 'CASH'))}
+          className="p-2 rounded-lg bg-slate-800 text-amber-400 hover:bg-slate-700"
+          title={t('preregMarkPaidCash')}
+        >
+          <Banknote className="w-4 h-4" />
+        </button>
+      </>
+    );
+  };
+
+  const renderCheckInAction = (r, busy, opts = {}) =>
+    r.status === 'CANCELLED' ? null : (
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => handleCheckInToggle(r, opts)}
+        className={`p-2 rounded-lg bg-slate-800 hover:bg-slate-700 ${
+          r.attendance?.checkedIn ? 'text-emerald-400' : 'text-slate-400'
+        }`}
+        title={`${t('preregToggleCheckIn')}: ${r.player?.name ?? ''}`}
+      >
+        <Check className="w-4 h-4" />
+      </button>
+    );
+
+  const renderCancelAction = (r, busy, title) =>
+    r.status === 'CANCELLED' ? null : (
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => runAction(r.id, () => cancelRegistration(tournamentId, r.id, r.status))}
+        className="p-2 rounded-lg bg-slate-800 text-red-400 hover:bg-slate-700"
+        title={title || t('preregCancelReg')}
+      >
+        <UserX className="w-4 h-4" />
+      </button>
+    );
+
+  const renderCancelledActions = (r, busy) => (
+    <div className="flex flex-wrap gap-1">
+      {isRefundDue(r) && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => runAction(r.id, () => markRegistrationRefunded(tournamentId, r.id))}
+          className="inline-flex items-center gap-1.5 px-2 py-2 rounded-lg bg-slate-800 text-amber-400 hover:bg-slate-700 text-[10px] sm:text-xs font-bold"
+          title={t('preregMarkRefunded')}
+        >
+          <Wallet className="w-4 h-4" />
+          {t('preregMarkRefunded')}
+        </button>
+      )}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => setRestoreReg(r)}
+        className="inline-flex items-center gap-1.5 px-2 py-2 rounded-lg bg-slate-800 text-emerald-400 hover:bg-slate-700 text-[10px] sm:text-xs font-bold"
+        title={t('preregRestoreReg')}
+      >
+        <RotateCcw className="w-4 h-4" />
+        {t('preregRestoreReg')}
+      </button>
+    </div>
+  );
+
+  const renderLiveRank = (name) => {
+    const live = liveRankFor(name);
+    if (live == null) return null;
+    return (
+      <div className="text-xs text-emerald-500/90 font-mono" title={t('tournCsoLiveRank') || 'živý žebříček'}>
+        #{live}
+      </div>
+    );
   };
 
   if (loading) {
@@ -707,13 +923,15 @@ export default function RegistrationAdminPanel({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r) => {
-              const busy = actionId === r.id;
-              const isCancelled = r.status === 'CANCELLED';
-              const highlighted = highlightRegId === r.id;
+            {tableRows.map((row) => {
+              const { a: r, b } = row;
+              const isPair = !!b;
+              const payer = isPair && pairFee ? pairPayer(r, b) : r;
+              const busy = actionId === r.id || (b && actionId === b.id);
+              const highlighted = highlightRegId === r.id || (b && highlightRegId === b.id);
               return (
                 <tr
-                  key={r.id}
+                  key={row.key}
                   id={`prereg-reg-${r.id}`}
                   className={`border-t border-slate-800 ${
                     highlighted
@@ -721,191 +939,188 @@ export default function RegistrationAdminPanel({
                       : 'bg-slate-900/40'
                   }`}
                 >
-                  <td className="p-3">
-                    <div className="font-bold text-white">{r.player?.name}</div>
-                    {pairingOn && r.pair?.status && r.pair.status !== 'NONE' && (
-                      <div className="text-[10px] text-cyan-400 mt-1 font-bold uppercase tracking-wide">
-                        {t(`preregPairStatus_${r.pair.status}`)}
-                        {r.pair.partnerName || r.pair.pendingName
-                          ? ` · ${r.pair.partnerName || r.pair.pendingName}`
-                          : ''}
-                      </div>
-                    )}
-                    {pairingOn &&
-                      r.status !== 'CANCELLED' &&
-                      String(r.pair?.status ?? 'NONE') !== 'CONFIRMED' &&
-                      String(r.pair?.status ?? '') !== 'PENDING_INVITE' && (
-                        <div className="mt-2 flex flex-col gap-1">
-                          <select
-                            value={pairPick[r.id] ?? ''}
-                            onChange={(e) =>
-                              setPairPick((prev) => ({ ...prev, [r.id]: e.target.value }))
-                            }
-                            className="w-full max-w-[180px] px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-[10px] text-white"
-                          >
-                            <option value="">{t('preregAdminPairPick')}</option>
-                            {unpaired
-                              .filter((p) => p.id !== r.id)
-                              .map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.player?.name}
-                                </option>
-                              ))}
-                          </select>
-                          <button
-                            type="button"
-                            disabled={busy || !pairPick[r.id]}
-                            onClick={() =>
-                              runAction(r.id, async () => {
-                                await adminConfirmPair(tournamentId, r.id, pairPick[r.id]);
-                                setPairPick((prev) => ({ ...prev, [r.id]: '' }));
-                              })
-                            }
-                            className="px-2 py-1 rounded-lg bg-cyan-900/50 border border-cyan-600/50 text-[10px] font-bold text-cyan-300 disabled:opacity-40"
-                          >
-                            {t('preregAdminPairConfirm')}
-                          </button>
-                        </div>
-                      )}
-                    {(() => {
-                      const live = liveRankFor(r.player?.name);
-                      if (live == null) return null;
-                      return (
-                        <div className="text-xs text-emerald-500/90 font-mono" title={t('tournCsoLiveRank') || 'živý žebříček'}>
-                          #{live}
-                        </div>
-                      );
-                    })()}
-                  </td>
-                  <td className="p-3 text-slate-400 text-xs">
-                    {r.player?.email && <div>{r.player.email}</div>}
-                    {r.player?.phone && <div>{r.player.phone}</div>}
-                  </td>
-                  <td className="p-3 text-xs">
-                    <div className="text-slate-300">
-                      {r.payment?.method === 'QR' ? t('preregPayQr') : r.payment?.method === 'CASH' ? t('preregPayCash') : '–'}
-                    </div>
-                    <div className={r.payment?.isPaid ? 'text-emerald-400' : 'text-amber-400'}>
-                      {r.payment?.isPaid ? t('preregPaid') : t('preregUnpaid')}
-                    </div>
-                    {r.payment?.variableSymbol && (
-                      <div className="font-mono text-slate-500">VS {r.payment.variableSymbol}</div>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    <span
-                      className={`text-xs font-bold uppercase ${
-                        isCancelled ? 'text-red-300' : 'text-slate-200'
-                      }`}
-                    >
-                      {registrationStatusLabel(t, r.status)}
-                    </span>
-                    {r.attendance?.checkedIn && (
-                      <div className="text-emerald-400 text-xs flex items-center gap-1 mt-1">
-                        <UserCheck className="w-3 h-3" /> {t('preregCheckedIn')}
-                      </div>
-                    )}
-                    {isCancelled && r.cancelledBy === 'PLAYER' && (
-                      <div className="text-xs text-slate-500 mt-1">{t('preregCancelledByPlayer')}</div>
-                    )}
-                    {isRefundDue(r) && (
-                      <div className="text-xs font-bold text-amber-400 mt-1">{t('preregRefundDue')}</div>
-                    )}
-                    {isCancelled && r.payment?.refundedAt && (
-                      <div className="text-xs text-emerald-500 mt-1">{t('preregRefunded')}</div>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    {isCancelled ? (
-                      <div className="flex flex-wrap gap-1">
-                        {isRefundDue(r) && (
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() =>
-                              runAction(r.id, () => markRegistrationRefunded(tournamentId, r.id))
-                            }
-                            className="inline-flex items-center gap-1.5 px-2 py-2 rounded-lg bg-slate-800 text-amber-400 hover:bg-slate-700 text-[10px] sm:text-xs font-bold"
-                            title={t('preregMarkRefunded')}
-                          >
-                            <Wallet className="w-4 h-4" />
-                            {t('preregMarkRefunded')}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => setRestoreReg(r)}
-                          className="inline-flex items-center gap-1.5 px-2 py-2 rounded-lg bg-slate-800 text-emerald-400 hover:bg-slate-700 text-[10px] sm:text-xs font-bold"
-                          title={t('preregRestoreReg')}
+                  <td className="p-3 align-top">
+                    {isPair ? (
+                      <>
+                        <div
+                          className="font-bold text-white"
+                          title={`${r.player?.name ?? ''} / ${b.player?.name ?? ''}`}
                         >
-                          <RotateCcw className="w-4 h-4" />
-                          {t('preregRestoreReg')}
-                        </button>
+                          {formatConfirmedPairLine(r.player?.name, b.player?.name)}
+                        </div>
+                        <div className="text-[10px] text-cyan-400 mt-1 font-bold uppercase tracking-wide">
+                          {t('preregPairStatus_CONFIRMED')}
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-0.5">
+                          {renderLiveRank(r.player?.name)}
+                          {renderLiveRank(b.player?.name)}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="font-bold text-white">{r.player?.name}</div>
+                        {pairingOn && r.pair?.status && r.pair.status !== 'NONE' && (
+                          <div className="text-[10px] text-cyan-400 mt-1 font-bold uppercase tracking-wide">
+                            {t(`preregPairStatus_${r.pair.status}`)}
+                            {r.pair.partnerName || r.pair.pendingName
+                              ? ` · ${r.pair.partnerName || r.pair.pendingName}`
+                              : ''}
+                          </div>
+                        )}
+                        {pairingOn &&
+                          r.status !== 'CANCELLED' &&
+                          String(r.pair?.status ?? 'NONE') !== 'CONFIRMED' &&
+                          String(r.pair?.status ?? '') !== 'PENDING_INVITE' && (
+                            <div className="mt-2 flex flex-col gap-1">
+                              <select
+                                value={pairPick[r.id] ?? ''}
+                                onChange={(e) =>
+                                  setPairPick((prev) => ({ ...prev, [r.id]: e.target.value }))
+                                }
+                                className="w-full max-w-[180px] px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-[10px] text-white"
+                              >
+                                <option value="">{t('preregAdminPairPick')}</option>
+                                {unpaired
+                                  .filter((p) => p.id !== r.id)
+                                  .map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.player?.name}
+                                    </option>
+                                  ))}
+                              </select>
+                              <button
+                                type="button"
+                                disabled={busy || !pairPick[r.id]}
+                                onClick={() =>
+                                  runAction(r.id, async () => {
+                                    await adminConfirmPair(tournamentId, r.id, pairPick[r.id]);
+                                    setPairPick((prev) => ({ ...prev, [r.id]: '' }));
+                                  })
+                                }
+                                className="px-2 py-1 rounded-lg bg-cyan-900/50 border border-cyan-600/50 text-[10px] font-bold text-cyan-300 disabled:opacity-40"
+                              >
+                                {t('preregAdminPairConfirm')}
+                              </button>
+                            </div>
+                          )}
+                        {renderLiveRank(r.player?.name)}
+                      </>
+                    )}
+                  </td>
+                  <td className="p-3 text-slate-400 text-xs align-top">
+                    <div>
+                      {isPair && renderPlayerLineLabel(r.player?.name)}
+                      {r.player?.email || r.player?.phone
+                        ? [r.player?.email, r.player?.phone].filter(Boolean).join(' · ')
+                        : '–'}
+                    </div>
+                    {isPair && (
+                      <div className="mt-2">
+                        {renderPlayerLineLabel(b.player?.name)}
+                        {b.player?.email || b.player?.phone
+                          ? [b.player?.email, b.player?.phone].filter(Boolean).join(' · ')
+                          : '–'}
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-3 text-xs align-top">
+                    {isPair && pairFee ? (
+                      renderPaymentInfo(payer)
+                    ) : isPair ? (
+                      <div className="space-y-2">
+                        {renderPaymentInfo(r, { label: r.player?.name })}
+                        {renderPaymentInfo(b, { label: b.player?.name })}
                       </div>
                     ) : (
-                      <div className="flex flex-wrap gap-1">
-                        {!r.payment?.isPaid && r.payment?.method === 'QR' && (
-                          <>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => setQrModalReg(r)}
-                              className="px-2 py-2 rounded-lg bg-slate-800 text-sky-400 hover:bg-slate-700 text-[10px] sm:text-xs font-bold whitespace-nowrap"
-                              title={t('preregAdminShowQrBtn')}
-                            >
-                              📱 QR
-                            </button>
+                      renderPaymentInfo(r)
+                    )}
+                  </td>
+                  <td className="p-3 align-top">
+                    {isPair ? (
+                      <div className="space-y-2">
+                        {renderPlayerStatus(r, { label: r.player?.name })}
+                        {renderPlayerStatus(b, { label: b.player?.name })}
+                      </div>
+                    ) : (
+                      renderPlayerStatus(r)
+                    )}
+                  </td>
+                  <td className="p-3 align-top">
+                    {r.status === 'CANCELLED' && !isPair ? (
+                      renderCancelledActions(r, busy)
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="space-y-1">
+                          {isPair && pairFee
+                            ? (
+                              <div className="flex flex-wrap gap-1">{renderPaymentActions(payer, busy)}</div>
+                            )
+                            : isPair
+                              ? (
+                                <div className="space-y-2">
+                                  <div>
+                                    {renderPlayerLineLabel(r.player?.name)}
+                                    <div className="flex flex-wrap gap-1">{renderPaymentActions(r, busy)}</div>
+                                  </div>
+                                  <div>
+                                    {renderPlayerLineLabel(b.player?.name)}
+                                    <div className="flex flex-wrap gap-1">{renderPaymentActions(b, busy)}</div>
+                                  </div>
+                                </div>
+                              )
+                              : (
+                                <div className="flex flex-wrap gap-1">{renderPaymentActions(r, busy)}</div>
+                              )}
+                        </div>
+                        <div className="space-y-2">
+                          <div>
+                            {isPair && renderPlayerLineLabel(r.player?.name)}
+                            {renderCheckInAction(r, busy, {
+                              pairPaid: isPair && pairFee && !!payer.payment?.isPaid,
+                              payRegId: isPair && pairFee ? payer.id : r.id,
+                            })}
+                          </div>
+                          {isPair && (
+                            <div>
+                              {renderPlayerLineLabel(b.player?.name)}
+                              {renderCheckInAction(b, busy, {
+                                pairPaid: pairFee && !!payer.payment?.isPaid,
+                                payRegId: pairFee ? payer.id : b.id,
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          {isPair && pairFee ? (
                             <button
                               type="button"
                               disabled={busy}
                               onClick={() =>
-                                runAction(r.id, () => markRegistrationPaid(tournamentId, r.id, 'QR'))
+                                runAction(r.id, async () => {
+                                  await cancelRegistration(tournamentId, r.id, r.status);
+                                  await cancelRegistration(tournamentId, b.id, b.status);
+                                })
                               }
-                              className="p-2 rounded-lg bg-slate-800 text-cyan-400 hover:bg-slate-700"
-                              title={t('preregMarkPaidQr')}
+                              className="p-2 rounded-lg bg-slate-800 text-red-400 hover:bg-slate-700"
+                              title={t('preregCancelPair')}
                             >
-                              <QrCode className="w-4 h-4" />
+                              <UserX className="w-4 h-4" />
                             </button>
-                          </>
-                        )}
-                        {!r.payment?.isPaid && (
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() =>
-                              runAction(r.id, () => markRegistrationPaid(tournamentId, r.id, 'CASH'))
-                            }
-                            className="p-2 rounded-lg bg-slate-800 text-amber-400 hover:bg-slate-700"
-                            title={t('preregMarkPaidCash')}
-                          >
-                            <Banknote className="w-4 h-4" />
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => handleCheckInToggle(r)}
-                          className={`p-2 rounded-lg bg-slate-800 hover:bg-slate-700 ${
-                            r.attendance?.checkedIn ? 'text-emerald-400' : 'text-slate-400'
-                          }`}
-                          title={t('preregToggleCheckIn')}
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() =>
-                            runAction(r.id, () =>
-                              cancelRegistration(tournamentId, r.id, r.status)
-                            )
-                          }
-                          className="p-2 rounded-lg bg-slate-800 text-red-400 hover:bg-slate-700"
-                          title={t('preregCancelReg')}
-                        >
-                          <UserX className="w-4 h-4" />
-                        </button>
+                          ) : (
+                            <>
+                              <div>
+                                {isPair && renderPlayerLineLabel(r.player?.name)}
+                                {renderCancelAction(r, busy, t('preregCancelReg'))}
+                              </div>
+                              {isPair && (
+                                <div>
+                                  {renderPlayerLineLabel(b.player?.name)}
+                                  {renderCancelAction(b, busy, t('preregCancelReg'))}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
                     )}
                   </td>

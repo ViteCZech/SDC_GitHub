@@ -196,7 +196,7 @@ Funkce:
 - Veřejný katalog + stránka turnaje
 - Registrace hráče **jen přes Cloud Function** (ne přímý zápis z klienta)
 - Platba QR (SPD string, `spdQr.js`) nebo hotově
-- Admin: potvrzení platby, check-in, ruční přihláška, import do živého turnaje
+- Admin: potvrzení platby, check-in, ruční přihláška, import do živého turnaje. Potvrzená dvojice je 1 řádek (`Jalůvka/Armlich`); přítomnost vždy po hráčích. Platba a storno: `feeMode=pair` = 1 ikona za pár, `split` = zvlášť.
 - Spolupořadatel přes invite token (`?invite=`)
 - „Mé přihlášky“ přes CF `listMyRegistrations` (index `player_registration_links` — klient nesmí číst)
 
