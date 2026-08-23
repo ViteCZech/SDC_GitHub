@@ -23,7 +23,7 @@ import {
 import { 
   AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, 
   DownloadCloud, FileText, History, Home, Info, Keyboard as KeyboardIcon, 
-  Maximize, Minimize, MousePointer2, Pause, Play, RefreshCw, RotateCcw, 
+  Maximize, Minimize, Monitor, MousePointer2, Pause, Play, RefreshCw, RotateCcw, 
   Target, Trash2, Trophy, Undo2, Unplug, User, Cloud, X, BarChart2, List, Swords, ClipboardList, Lock
 } from 'lucide-react';
 
@@ -44,6 +44,7 @@ import TournamentBracketView from './components/TournamentBracketView';
 import TournamentStatisticsView from './components/TournamentStatisticsView';
 import TabletWaitingRoom from './components/TabletWaitingRoom';
 import TabletBoardQrPanel from './components/TabletBoardQrPanel';
+import VenueDisplayView from './components/VenueDisplayView';
 import TournamentHistory from './components/TournamentHistory';
 import PublicTournamentPage from './components/prereg/PublicTournamentPage';
 import PublicTournamentDirectory from './components/prereg/PublicTournamentDirectory';
@@ -57,6 +58,7 @@ import { resolveAppNav, shouldParkTournamentSession } from './utils/appNavigatio
 import { loadUiResume, saveUiResume } from './utils/uiResumeStorage';
 import { parsePreregRouteFromUrl, isPublicTournamentCatalogPath } from './utils/preregAdmin';
 import { parseTabletRouteFromUrl, ensureBoardAuthTokens } from './utils/tabletBoardQr';
+import { buildVenueDisplayUrl, parseVenueDisplayRouteFromUrl, resolveVenueLang } from './utils/venueDisplay';
 import { loadAdminInviteSession, saveAdminInviteSession } from './utils/preregStorage';
 import {
   verifyAdminInviteToken,
@@ -251,7 +253,12 @@ let skipUiResumePersist = false;
 function getBootUiResumeOnce() {
   if (bootUiResumeCache !== undefined) return bootUiResumeCache;
   try {
-    if (isPublicTournamentCatalogPath() || parsePreregRouteFromUrl() || parseTabletRouteFromUrl()) {
+    if (
+      isPublicTournamentCatalogPath() ||
+      parsePreregRouteFromUrl() ||
+      parseTabletRouteFromUrl() ||
+      parseVenueDisplayRouteFromUrl()
+    ) {
       bootUiResumeCache = null;
       return null;
     }
@@ -5105,14 +5112,26 @@ function AppMain({ lang, setLang }) {
         right={
           <>
             {showTabletQrNav ? (
-              <TabletBoardQrPanel
-                lang={lang}
-                pin={activePin}
-                tournamentData={tournamentData}
-                onNotify={showNotification}
-                onEnsureTokens={handleEnsureBoardAuthTokens}
-                compact
-              />
+              <>
+                <a
+                  href={buildVenueDisplayUrl(activePin, undefined, lang)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-2 rounded-lg bg-slate-800 border border-slate-700 text-amber-400 hover:text-amber-300 hover:bg-slate-700 transition-colors"
+                  title={t('venueTvOpen') || 'TV obrazovka haly'}
+                  aria-label={t('venueTvOpen') || 'TV obrazovka haly'}
+                >
+                  <Monitor className="w-4 h-4" />
+                </a>
+                <TabletBoardQrPanel
+                  lang={lang}
+                  pin={activePin}
+                  tournamentData={tournamentData}
+                  onNotify={showNotification}
+                  onEnsureTokens={handleEnsureBoardAuthTokens}
+                  compact
+                />
+              </>
             ) : null}
             <button
               onClick={toggleFullscreen}
@@ -6362,7 +6381,11 @@ function AppMain({ lang, setLang }) {
 }
 
 export default function App() {
-  const [lang, setLang] = useState('cs');
+  const venueRoute = parseVenueDisplayRouteFromUrl();
+  const [lang, setLang] = useState(() => (venueRoute ? resolveVenueLang() : 'cs'));
+  if (venueRoute) {
+    return <VenueDisplayView pin={venueRoute.pin} invalidPin={venueRoute.invalid} lang={lang} />;
+  }
   return (
     <AdminVirtualKeyboardProvider lang={lang}>
       <AppMain lang={lang} setLang={setLang} />

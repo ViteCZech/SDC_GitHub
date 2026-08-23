@@ -112,6 +112,7 @@ URL deep-linky (bez React Routeru, parsují se z `window.location`):
 
 - `/t/:tournamentId` — veřejná předregistrace (`?invite=` pro spolupořadatele)
 - `/tournaments` — katalog
+- `/tv/:pin` — veřejná TV obrazovka haly (`VenueDisplayView.jsx`), mimo tok `App.jsx` (jen čte `active_tournaments/{pin}`)
 - tablet QR: PIN + číslo terče + token (`tabletBoardQr.js`)
 
 ---
@@ -283,6 +284,7 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 | Stepper turnaje / lock rankingu | `App.jsx`, `TournamentSetup.jsx`, `tournamentRanking.js` |
 | Tablet čekárna / check-in timeout | `TabletWaitingRoom.jsx`, `tabletCheckInTimeout.js` |
 | QR tabletu | `tabletBoardQr.js`, `TabletBoardQrPanel.jsx` |
+| TV obrazovka haly `/tv/:pin` | `VenueDisplayView.jsx`, `utils/venueDisplay.js` |
 | Předregistrace / platby | `tournamentPreRegService.js`, `prereg/*`, `functions/src/registerPlayer.ts` |
 | ČŠO našeptávač | `csoRanking.js`, `CsoPlayerNameField.jsx` |
 | Navigace Domů/Zpět | `appNavigation.js`, `AppNavBar.jsx` |

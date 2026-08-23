@@ -17,4 +17,10 @@ test.describe('SDC smoke', () => {
     await page.goto('/tournaments');
     await expect(page.getByText('Katalog turnajů')).toBeVisible({ timeout: 25_000 });
   });
+
+  test('TV obrazovka /tv/:pin se načte mimo hlavní menu', async ({ page }) => {
+    await page.goto('/tv/0000');
+    await expect(page.getByText('TV obrazovka')).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByRole('heading', { name: 'SIMPLE DART' })).toHaveCount(0);
+  });
 });
