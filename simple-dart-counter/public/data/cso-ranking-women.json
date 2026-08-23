@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-08-22T04:03:00.000Z",
-    "effectiveDate": "2026-08-22",
-    "generatedAt": "2026-08-22 04:03",
-    "fetchedAt": "2026-08-22T05:34:32.193Z",
+    "updatedAt": "2026-08-23T04:03:00.000Z",
+    "effectiveDate": "2026-08-23",
+    "generatedAt": "2026-08-23 04:03",
+    "fetchedAt": "2026-08-23T05:36:04.719Z",
     "totalPlayers": 134
   },
   "players": [
@@ -113,7 +113,7 @@
       "name": "Tereza Sedláčková"
     },
     {
-      "rank": 23,
+      "rank": 22,
       "name": "Tereza Doubravová",
       "club": "PV-Knihovna Olomouc"
     },
@@ -124,17 +124,17 @@
     },
     {
       "rank": 25,
-      "name": "Dagmar Jandová"
+      "name": "Monika Krotká",
+      "club": "Plaská Zvěř"
     },
     {
       "rank": 26,
-      "name": "Martina Vaňková",
-      "club": "Kladno Steel"
+      "name": "Dagmar Jandová"
     },
     {
       "rank": 27,
-      "name": "Monika Krotká",
-      "club": "Plaská Zvěř"
+      "name": "Martina Vaňková",
+      "club": "Kladno Steel"
     },
     {
       "rank": 28,
@@ -205,17 +205,17 @@
     },
     {
       "rank": 43,
-      "name": "Kateřina Vorochtová"
-    },
-    {
-      "rank": 44,
       "name": "Barbora Dlabalová",
       "club": "DC Bull's-eye Riviéra F-M"
     },
     {
-      "rank": 44,
+      "rank": 43,
       "name": "Eliška Panošová",
       "club": "Spolek neratovických šipkařů"
+    },
+    {
+      "rank": 45,
+      "name": "Kateřina Vorochtová"
     },
     {
       "rank": 46,
@@ -261,25 +261,25 @@
     },
     {
       "rank": 55,
-      "name": "Jiřina Zahradníková",
-      "club": "Vostrý koně Pardubice"
-    },
-    {
-      "rank": 56,
       "name": "Alena Vestfálová",
       "club": "DC Vikings Blatná"
     },
     {
-      "rank": 57,
+      "rank": 56,
       "name": "Nela Woleschenská",
       "club": "Plaská Zvěř"
     },
     {
-      "rank": 58,
+      "rank": 57,
       "name": "Michaela  Kolářová"
     },
     {
-      "rank": 59,
+      "rank": 58,
+      "name": "Jiřina Zahradníková",
+      "club": "Vostrý koně Pardubice"
+    },
+    {
+      "rank": 58,
       "name": "Ludmila  Klaubová",
       "club": "Plaská Zvěř"
     },
@@ -390,37 +390,37 @@
     },
     {
       "rank": 85,
-      "name": "Marie Kropíková",
-      "club": "Schovi Darts"
-    },
-    {
-      "rank": 85,
-      "name": "Helena Židková"
-    },
-    {
-      "rank": 85,
       "name": "Veronika Kocařová"
     },
     {
-      "rank": 88,
+      "rank": 86,
+      "name": "Helena Židková"
+    },
+    {
+      "rank": 86,
       "name": "Helena Božiková"
     },
     {
-      "rank": 89,
+      "rank": 88,
       "name": "Miroslava Komanová",
       "club": "DC Vikings Blatná"
     },
     {
-      "rank": 90,
+      "rank": 89,
       "name": "Ivana Vodenková"
     },
     {
-      "rank": 91,
+      "rank": 90,
+      "name": "Marie Kropíková",
+      "club": "Schovi Darts"
+    },
+    {
+      "rank": 90,
       "name": "Lenka Šimůnková",
       "club": "DC Vikings Blatná"
     },
     {
-      "rank": 91,
+      "rank": 90,
       "name": "Adéla Sklenovská"
     },
     {
