@@ -22,6 +22,12 @@ export function usesTeamCapacity(type) {
   return type === 'doubles' || type === 'mixed';
 }
 
+/** ČP dvojice (rankingId=6) — pevné páry, mix i losované. */
+export function usesDoublesRanking(type) {
+  const v = normalizeCompetitionType(type);
+  return v === 'doubles' || v === 'mixed' || v === 'random_doubles';
+}
+
 /**
  * @param {object} tournament
  * @returns {number}

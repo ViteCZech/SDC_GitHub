@@ -161,7 +161,7 @@ Vstup: Domů → Turnaj (`TournamentHub`).
 
 **Stepper admina**
 1. Turnaj (název, formát, legy, 501/out, počet terčů, ČŠO žebříček, cloud)
-2. Hráči (našeptávač ČŠO, duplicity, ranking)
+2. Hráči (našeptávač ČŠO, duplicity, ranking). U `random_doubles` los párů (`drawRandomPairs`) — lichý = rezervní.
 3. Formát skupin / postupující / odhad času
 4. Přiřazení terčů skupinám
 5. Skupiny — zápasy, walkovery, start na tabletu / adminovi
@@ -189,7 +189,7 @@ Stavy přihlášky: `PENDING_PAYMENT` | `CONFIRMED` | `WAITLIST` | `CANCELLED` |
 Hráč se může sám odhlásit (`unregisterPlayer`) jen při `REGISTRATION_OPEN`. Storno uvolní místo a případně posune waitlist; zaplacené startovné označí `payment.refundDue`.
 
 Formát: `meta.competitionType` = `singles` | `doubles` | `mixed` | `random_doubles`.
-Dvojice / mix: kapacita je v **párech** (`counters.confirmedTeams`). Sólo nebo `WAITING_PARTNER` místo nebere. Párování jen přes CF (`listAvailablePartners`, `requestPair`, `confirmPair`, `declinePair`). Potvrzuje hráč vybraný ze seznamu. Mix = 1 M + 1 F. `finance.feeMode` = `pair` (jedno startovné) | `split`. `random_doubles` se hlásí jako jednotlivci (los na místě — pozdější fáze). Cricket a online 1v1 dvojice nemají.
+Dvojice / mix: kapacita je v **párech** (`counters.confirmedTeams`). Sólo nebo `WAITING_PARTNER` místo nebere. Párování jen přes CF (`listAvailablePartners`, `requestPair`, `confirmPair`, `declinePair`). Potvrzuje hráč vybraný ze seznamu. Mix = 1 M + 1 F. `finance.feeMode` = `pair` (jedno startovné) | `split`. `random_doubles` se hlásí jako jednotlivci; páry se losují v `TournamentSetup` (`drawRandomPairs`) až po soupisce, před generováním skupin. Lichý počet = rezervní (mimo soupisku dvojic). Cricket a online 1v1 dvojice nemají.
 
 Funkce:
 - Založení (název, místo, kapacita, waitlist, deadline, startovné, QR/hotovost, bankovní účet, VS, podmínky)
@@ -210,7 +210,7 @@ Typy: `src/types/tournamentPreReg.d.ts` a `functions/src/types.ts` — držet v 
 - **Singles / online 1v1 / lokální zápas:** jen `men` (rankingId=1) a `women` (rankingId=2)
 - **Dvojice / mix / losované dvojice:** `doubles` = Stedar ČP nasazovací (rankingId=6). Nikdy ne id=5.
 - Nasazení páru: součet obou doubles ranků → lepší individuální rank → `seedTieBreak`
-- Import předregistrace u dvojic skládá `players[]` jako týmy (`kind: 'team'`, `members`)
+- Import předregistrace u dvojic skládá `players[]` jako týmy (`kind: 'team'`, `members`). U `random_doubles` importuje jednotlivce; admin v kroku 2 spustí los párů. Seed páru = součet ČP dvojice.
 - **X01 dvojice:** `settings.doubles` + `settings.teams.{p1,p2}.members`. Zápas zůstává 2 sloty (`player1Id`/`player2Id` = tým). Každý leg: začínající dvojice musí vybrat házejícího; druhá může hned, nebo až po prvním hodu. Pak střídání uvnitř páru. Historie hodu má `throwerId`. Výsledek: `result.p1Avg/p2Avg` = pár, `result.members` = 4 hráči, `result.legStarters`. Tablet check-in = 4 hráči + počtář. Skupinová tabulka bere **týmový** průměr. Počtář je **osoba** — `pickWorsePlayerFromTeam` (horší avg v zápase → turnajový avg → horší ČP dvojice). Cricket a online 1v1 dvojice nemají.
 - Scheduled CF denně 7:00 Europe/Prague + ruční tlačítko `CsoRankingUpdateButton`
 - Identita hráče: `playerIdentity.js` / `functions/src/playerIdentity.ts` (nameKey + `csoPlayerId`)

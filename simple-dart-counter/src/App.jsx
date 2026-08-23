@@ -132,6 +132,10 @@ function createDefaultTournamentDraft() {
     csoRankingGender: 'men',
     /** Zapnout oficiální žebříček ČŠO (našeptávač + auto-ranking) v kroku 2 */
     useCsoRanking: false,
+    /** singles | random_doubles | doubles | mixed — doubles/mixed přijdou z importu párů */
+    competitionType: 'singles',
+    pairDrawRoster: null,
+    pairDrawReserve: null,
   };
 }
 
@@ -3224,6 +3228,7 @@ function AppMain({ lang, setLang }) {
             })),
           ],
           useCsoRanking: true,
+          competitionType: competitionType || prev.competitionType || 'singles',
         }));
         setTournamentSetupStep(2);
         setAppState('tournament_setup');
@@ -3248,6 +3253,7 @@ function AppMain({ lang, setLang }) {
           name: tournamentName || prev.name || '',
           players: merged,
           useCsoRanking: true,
+          competitionType: competitionType || prev.competitionType || 'singles',
         };
       });
       setTournamentSetupStep(2);

@@ -22,7 +22,9 @@ export default function ImportToTournamentButton({
   requireImportMode = false,
 }) {
   const t = (k) => translations[lang]?.[k] || k;
-  const pairingOn = allowsPairing(normalizeCompetitionType(tournament?.meta?.competitionType));
+  const competitionType = normalizeCompetitionType(tournament?.meta?.competitionType);
+  const pairingOn = allowsPairing(competitionType);
+  const isRandomDoubles = competitionType === 'random_doubles';
 
   const [modeModalOpen, setModeModalOpen] = useState(false);
   const [pendingPlayers, setPendingPlayers] = useState(null);
@@ -110,7 +112,12 @@ export default function ImportToTournamentButton({
               {t('preregImportTitle')}
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              {pairingOn ? t('preregImportHintTeams') : t('preregImportHint')} ({readyCount})
+              {pairingOn
+                ? t('preregImportHintTeams')
+                : isRandomDoubles
+                  ? t('preregImportHintRandom')
+                  : t('preregImportHint')}{' '}
+              ({readyCount})
             </p>
           </div>
           <button

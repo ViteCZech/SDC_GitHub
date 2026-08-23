@@ -35,6 +35,14 @@ import {
   resolveCsoPlayerId,
 } from '../utils/playerIdentity';
 import { handleExternalLinkClick } from '../utils/openExternalUrl';
+import { normalizeCompetitionType, usesDoublesRanking } from '../utils/preregCompetition';
+import {
+  drawRandomPairs,
+  flattenPairDraw,
+  isPairDrawComplete,
+  isRandomDoublesDraft,
+} from '../utils/drawRandomPairs';
+import RandomPairDrawPanel from './RandomPairDrawPanel';
 
 /** Ranking z inputu: prázdné nebo 0 → null */
 function parseRankingFromInput(val) {
@@ -106,14 +114,20 @@ export default function TournamentSetup({
   const [dupModal, setDupModal] = useState(null); // { mode: 'add'|'edit'|'select', name, csoPlayerId, ranking, existingIndex }
   const [highlightPlayerIndex, setHighlightPlayerIndex] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [pairDrawBusy, setPairDrawBusy] = useState(false);
   const tournamentNameFieldRef = useRef(null);
   const playerNameFieldRef = useRef(null);
   const playerRankingFieldRef = useRef(null);
 
   const players = tournamentDraft.players || [];
   const hasTeams = players.some((p) => p?.kind === 'team');
+  const competitionType = normalizeCompetitionType(tournamentDraft.competitionType);
+  const isRandomDoubles = isRandomDoublesDraft(tournamentDraft);
+  const pairDrawDone = isRandomDoubles && isPairDrawComplete(players);
+  const importedFixedPairs = hasTeams && (competitionType === 'doubles' || competitionType === 'mixed');
+  const usesDoublesCso = usesDoublesRanking(competitionType) || hasTeams;
   const csoGender = tournamentDraft.csoRankingGender === 'women' ? 'women' : 'men';
-  const csoListKey = hasTeams ? 'doubles' : csoGender;
+  const csoListKey = usesDoublesCso ? 'doubles' : csoGender;
   const useCsoRanking = !!tournamentDraft.useCsoRanking;
 
   /** Plovoucí rank pro UI — při zapnutém ČŠO vždy z aktuálního žebříčku. */
@@ -458,12 +472,77 @@ export default function TournamentSetup({
   };
 
   const handleDeletePlayer = (idx) => {
-    setTournamentDraft((prev) => ({
-      ...prev,
-      players: (prev.players || []).filter((_, i) => i !== idx),
-    }));
+    setTournamentDraft((prev) => {
+      const list = prev.players || [];
+      const removed = list[idx];
+      let nextPlayers = list.filter((_, i) => i !== idx);
+      let roster = prev.pairDrawRoster || null;
+      let reserve = prev.pairDrawReserve ?? null;
+      if (removed?.kind === 'team' && Array.isArray(removed.members)) {
+        const keys = new Set(
+          removed.members.flatMap((m) => [String(m.id ?? ''), String(m.name ?? '').trim()].filter(Boolean))
+        );
+        roster = (roster || []).filter(
+          (p) => !keys.has(String(p.id ?? '')) && !keys.has(String(p.name ?? '').trim())
+        );
+      }
+      if (nextPlayers.length === 0 && roster?.length) {
+        nextPlayers = roster;
+        roster = null;
+        reserve = null;
+      }
+      return {
+        ...prev,
+        players: nextPlayers,
+        pairDrawRoster: roster,
+        pairDrawReserve: reserve,
+      };
+    });
     if (editingIndex === idx) setEditingIndex(null);
     else if (editingIndex !== null && editingIndex > idx) setEditingIndex((i) => i - 1);
+  };
+
+  const applyPairDraw = async () => {
+    const roster = (tournamentDraft.pairDrawRoster?.length
+      ? tournamentDraft.pairDrawRoster
+      : players.filter((p) => p?.kind !== 'team'));
+    if (roster.length < 2 || pairDrawBusy) return;
+    setPairDrawBusy(true);
+    try {
+      let doublesPlayers = [];
+      if (useCsoRanking) {
+        try {
+          const data = await loadCsoRanking('doubles', { bypassCache: true });
+          doublesPlayers = data.players ?? [];
+        } catch {
+          doublesPlayers = [];
+        }
+      }
+      const { teams, reserve } = drawRandomPairs(roster, { doublesPlayers });
+      setTournamentDraft((prev) => ({
+        ...prev,
+        pairDrawRoster: roster,
+        pairDrawReserve: reserve,
+        players: teams,
+      }));
+    } finally {
+      setPairDrawBusy(false);
+    }
+  };
+
+  const handleDissolvePairs = () => {
+    const people =
+      flattenPairDraw(
+        players.filter((p) => p?.kind === 'team'),
+        tournamentDraft.pairDrawReserve
+      );
+    const fallback = tournamentDraft.pairDrawRoster?.length ? tournamentDraft.pairDrawRoster : people;
+    setTournamentDraft((prev) => ({
+      ...prev,
+      players: fallback.length ? fallback : people,
+      pairDrawReserve: null,
+      pairDrawRoster: null,
+    }));
   };
 
   const handleEditPlayer = (idx) => {
@@ -569,6 +648,15 @@ export default function TournamentSetup({
   const grpFmtStep = isTournamentGroupsThenBracketFormat(tournamentDraft.format);
   const fmtBracketOnly = isTournamentBracketOnlyFormat(tournamentDraft.format);
   const minPlayersRequired = grpFmtStep ? GROUP_SIZE_MIN : 2;
+  const competitiveSlots = hasTeams
+    ? players.filter((p) => p?.kind === 'team')
+    : isRandomDoubles
+      ? []
+      : players;
+  const canContinueStep2 =
+    competitiveSlots.length >= minPlayersRequired &&
+    !hasAnyDuplicates() &&
+    (!isRandomDoubles || pairDrawDone);
 
   const totalAdvancees = useMemo(() => {
     if (!grpFmtStep) return players.length;
@@ -609,7 +697,18 @@ export default function TournamentSetup({
       );
 
   const handleGenerate = async () => {
-    if (players.length < minPlayersRequired || hasAnyDuplicates() || isCustomInvalid || isGenerating) return;
+    if (
+      competitiveSlots.length < minPlayersRequired ||
+      hasAnyDuplicates() ||
+      isCustomInvalid ||
+      isGenerating ||
+      (isRandomDoubles && !pairDrawDone)
+    ) {
+      if (isRandomDoubles && !pairDrawDone) {
+        setValidationError(t('tournNeedPairDraw') || 'Nejdřív vylosujte páry.');
+      }
+      return;
+    }
     try {
       const parsedBoards = Number(tournamentDraft.numBoards);
       if (!Number.isFinite(parsedBoards) || parsedBoards <= 0) {
@@ -653,8 +752,8 @@ export default function TournamentSetup({
         const built = buildDrawRankingSnapshot({
           players,
           rankingData,
-          gender: hasTeams ? 'doubles' : csoGender,
-          rankingKind: hasTeams ? 'doubles' : 'singles',
+          gender: usesDoublesCso ? 'doubles' : csoGender,
+          rankingKind: usesDoublesCso ? 'doubles' : 'singles',
           useCsoRanking: true,
         });
         snapPlayers = built.players.map((p) => {
@@ -717,6 +816,8 @@ export default function TournamentSetup({
           tournamentDraft.cloudEnabled && isLoggedIn
             ? String(tournamentDraft.tabletPassword ?? '').trim().slice(0, 5)
             : null,
+        competitionType,
+        pairDrawReserve: isRandomDoubles ? tournamentDraft.pairDrawReserve ?? null : null,
       };
       onComplete?.(data);
     } catch (error) {
@@ -805,6 +906,68 @@ export default function TournamentSetup({
                       {t('tournFormatKoOnlyHint') || 'Přímý pavouk bez skupin'}
                     </span>
                   </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mt-3 max-w-md">
+                  {importedFixedPairs ? (
+                    <div className="col-span-2 px-4 py-3 rounded-xl border border-emerald-500/40 bg-emerald-950/30">
+                      <p className="text-xs font-black uppercase tracking-wide text-emerald-300">
+                        {t(`preregCompType_${competitionType}`)}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-1">{t('tournCompTypeImportedHint')}</p>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setTournamentDraft((prev) => {
+                            if (normalizeCompetitionType(prev.competitionType) === 'singles') return prev;
+                            const teams = (prev.players || []).filter((p) => p?.kind === 'team');
+                            const people = teams.length
+                              ? flattenPairDraw(teams, prev.pairDrawReserve)
+                              : prev.players;
+                            return {
+                              ...prev,
+                              competitionType: 'singles',
+                              players: people,
+                              pairDrawReserve: null,
+                              pairDrawRoster: null,
+                            };
+                          })
+                        }
+                        className={`px-4 py-3 rounded-xl border-2 text-left font-black uppercase tracking-wide text-xs sm:text-sm transition-all ${
+                          competitionType === 'singles'
+                            ? 'bg-emerald-900/40 border-emerald-500 text-white shadow-lg shadow-emerald-900/20'
+                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                        }`}
+                      >
+                        {t('preregCompType_singles')}
+                        <span className="block text-[10px] font-normal normal-case tracking-normal text-slate-400 mt-1">
+                          {t('tournCompTypeSinglesHint')}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setTournamentDraft((prev) => ({
+                            ...prev,
+                            competitionType: 'random_doubles',
+                          }))
+                        }
+                        className={`px-4 py-3 rounded-xl border-2 text-left font-black uppercase tracking-wide text-xs sm:text-sm transition-all ${
+                          isRandomDoubles
+                            ? 'bg-emerald-900/40 border-emerald-500 text-white shadow-lg shadow-emerald-900/20'
+                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                        }`}
+                      >
+                        {t('preregCompType_random_doubles')}
+                        <span className="block text-[10px] font-normal normal-case tracking-normal text-slate-400 mt-1">
+                          {t('preregCompTypeHint_random_doubles')}
+                        </span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -971,7 +1134,7 @@ export default function TournamentSetup({
                 <button
                   type="button"
                   onClick={() => setStep(3)}
-                  disabled={players.length < minPlayersRequired || hasAnyDuplicates()}
+                  disabled={!canContinueStep2}
                   className={`${btnBase} bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed`}
                 >
                   {t('tournContinue') || 'Pokračovat'}
@@ -1023,13 +1186,34 @@ export default function TournamentSetup({
                 </div>
               </div>
 
+              {isRandomDoubles && (
+                <RandomPairDrawPanel
+                  lang={lang}
+                  playerCount={
+                    pairDrawDone
+                      ? (tournamentDraft.pairDrawRoster?.length ??
+                        players.reduce((n, p) => n + (p.members?.length ?? 0), 0) +
+                          (tournamentDraft.pairDrawReserve ? 1 : 0))
+                      : players.length
+                  }
+                  teamCount={players.filter((p) => p?.kind === 'team').length}
+                  reserve={tournamentDraft.pairDrawReserve ?? null}
+                  drawn={pairDrawDone}
+                  canDraw={!pairDrawDone && players.filter((p) => p?.kind !== 'team').length >= 2}
+                  busy={pairDrawBusy}
+                  onDraw={applyPairDraw}
+                  onRedraw={applyPairDraw}
+                  onDissolve={handleDissolvePairs}
+                />
+              )}
+
               <div className="p-4 border rounded-xl bg-slate-900 border-slate-800">
                   {useCsoRanking && (
                   <div className="flex flex-wrap items-center gap-3 mb-4 pb-4 border-b border-slate-800">
                     <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                      {hasTeams ? t('tournCsoDoublesRanking') : t('tournCsoRanking')}
+                      {usesDoublesCso ? t('tournCsoDoublesRanking') : t('tournCsoRanking')}
                     </span>
-                    {!hasTeams && (
+                    {!usesDoublesCso && (
                     <div className="flex rounded-lg overflow-hidden border border-slate-600">
                       {(['men', 'women']).map((g) => (
                         <button
@@ -1083,8 +1267,11 @@ export default function TournamentSetup({
                       compact
                       onUpdated={(result) => {
                         // Okamžitě zobraz datum ze Stedar (odpověď CF), ať badge nesedí na starém static JSON.
-                        const side =
-                          csoGender === 'women' ? result?.women : result?.men;
+                        const side = usesDoublesCso
+                          ? result?.doubles
+                          : csoGender === 'women'
+                            ? result?.women
+                            : result?.men;
                         const updatedAt = side?.updatedAt || result?.updatedAt;
                         if (updatedAt) {
                           setCsoMeta((prev) => ({
@@ -1102,6 +1289,10 @@ export default function TournamentSetup({
                     />
                   </div>
                   )}
+                  {pairDrawDone ? (
+                    <p className="text-xs text-slate-400">{t('tournRandomAddLocked')}</p>
+                  ) : (
+                  <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="relative">
                       <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
@@ -1258,13 +1449,25 @@ export default function TournamentSetup({
                       {step2Error}
                     </div>
                   )}
+                  </>
+                  )}
                 </div>
               <div className="flex flex-col w-full min-w-0">
                 <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                   <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                    {t('tournPlayerList') || 'Registrovaní hráči'} ({players.length})
+                    {hasTeams
+                      ? `${t('tournTeamList') || t('tournPlayerList')} (${players.length})`
+                      : `${t('tournPlayerList') || 'Registrovaní hráči'} (${players.length})`}
                   </span>
-                  {players.length < minPlayersRequired && (
+                  {isRandomDoubles && !pairDrawDone && (
+                    <span className="text-xs text-amber-400">{t('tournNeedPairDraw')}</span>
+                  )}
+                  {pairDrawDone && competitiveSlots.length < minPlayersRequired && (
+                    <span className="text-xs text-amber-400">
+                      {minPlayersRequired <= 2 ? t('tournMinTeamsKo') : t('tournMinTeams')}
+                    </span>
+                  )}
+                  {!isRandomDoubles && players.length < minPlayersRequired && (
                     <span className="text-xs text-amber-400">
                       {minPlayersRequired <= 2
                         ? t('tournMinPlayersKo') || 'Min. 2 hráči'
@@ -1312,6 +1515,11 @@ export default function TournamentSetup({
                                   </span>
                                 )}
                               </div>
+                              {p.kind === 'team' && Array.isArray(p.members) && (
+                                <span className="text-[10px] text-slate-500 truncate">
+                                  {p.members.map((m) => m.name).filter(Boolean).join(' · ')}
+                                </span>
+                              )}
                               {dupName[p._origIdx] && (
                                 <span className="text-[10px] text-amber-400 font-medium">
                                   {t('tournDupName') || 'Duplicitní jméno'}
@@ -1319,6 +1527,7 @@ export default function TournamentSetup({
                               )}
                             </div>
                             <div className="flex gap-1 shrink-0">
+                              {p.kind !== 'team' && (
                               <button
                                 type="button"
                                 onClick={() => handleEditPlayer(p._origIdx)}
@@ -1327,6 +1536,7 @@ export default function TournamentSetup({
                               >
                                 <Edit2 className="w-4 h-4" />
                               </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => handleDeletePlayer(p._origIdx)}
@@ -1352,7 +1562,7 @@ export default function TournamentSetup({
               <button
                 type="button"
                 onClick={() => setStep(3)}
-                disabled={players.length < minPlayersRequired || hasAnyDuplicates()}
+                disabled={!canContinueStep2}
                 className={`${btnBase} bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 disabled:opacity-40`}
               >
                 {t('tournContinue') || 'Pokračovat'}
@@ -1377,10 +1587,11 @@ export default function TournamentSetup({
                     type="button"
                     onClick={handleGenerate}
                     disabled={
-                      players.length < minPlayersRequired ||
+                      competitiveSlots.length < minPlayersRequired ||
                       hasAnyDuplicates() ||
                       isCustomInvalid ||
-                      isGenerating
+                      isGenerating ||
+                      (isRandomDoubles && !pairDrawDone)
                     }
                     className={`${btnBase} w-full bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
