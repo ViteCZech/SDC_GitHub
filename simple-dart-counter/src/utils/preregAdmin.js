@@ -65,6 +65,36 @@ export function isDeadlineAfterStart(deadlineVal, startVal) {
 }
 
 /**
+ * Ořízne datetime-local na interval min…max (včetně).
+ * @param {string|null|undefined} value
+ * @param {{ min?: string|null, max?: string|null }} [bounds]
+ * @returns {string}
+ */
+export function clampDateTimeLocal(value, bounds = {}) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  const current = parseOptionalDateTimeLocal(raw);
+  if (!current) return raw;
+
+  const toLocal = (d) => {
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    return `${y}-${mo}-${day}T${h}:${mi}`;
+  };
+
+  let next = current;
+  const maxD = parseOptionalDateTimeLocal(bounds.max);
+  if (maxD && next.getTime() > maxD.getTime()) next = maxD;
+  const minD = parseOptionalDateTimeLocal(bounds.min);
+  if (minD && next.getTime() < minD.getTime()) next = minD;
+
+  return next === current ? raw : toLocal(next);
+}
+
+/**
  * @param {string} tournamentId
  * @returns {string}
  */

@@ -3,6 +3,7 @@ import { BookmarkPlus, CheckCircle, Copy, Eye, EyeOff, Loader2, Trash2, Trophy }
 import { translations } from '../../translations';
 import { createPreRegTournament } from '../../services/tournamentPreRegService';
 import {
+  clampDateTimeLocal,
   isDeadlineAfterStart,
   parseOptionalDateTimeLocal,
   parseOptionalNumber,
@@ -211,12 +212,9 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
   };
 
   const handleDeadlineChange = (val) => {
-    if (startsAt && isDeadlineAfterStart(val, startsAt)) {
-      setError(t('preregAdminErrDeadlineAfterStart'));
-      return;
-    }
+    const next = startsAt ? clampDateTimeLocal(val, { max: startsAt }) : val;
     setError('');
-    setRegistrationDeadline(val);
+    setRegistrationDeadline(next);
   };
 
   const copyText = async (text) => {
@@ -509,6 +507,21 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
                 timeLabel={t('preregAdminTime')}
               />
             </div>
+            <div>
+              <label className={labelCls}>{t('preregAdminDeadline')}</label>
+              <DateTimeLocalFields
+                value={registrationDeadline}
+                onChange={handleDeadlineChange}
+                max={startsAt || undefined}
+                inputClassName={inputCls}
+                disabled={loading}
+                dateLabel={t('preregAdminDate')}
+                timeLabel={t('preregAdminTime')}
+              />
+              {startsAt && (
+                <p className="text-[10px] text-slate-500 mt-1">{t('preregAdminDeadlineHint')}</p>
+              )}
+            </div>
           </div>
           <label className="flex items-center gap-2 text-sm text-slate-300 pt-1">
             <input
@@ -597,21 +610,6 @@ export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, o
             />
             {t('preregAdminWaitlist')}
           </label>
-          <div>
-            <label className={labelCls}>{t('preregAdminDeadline')}</label>
-            <DateTimeLocalFields
-              value={registrationDeadline}
-              onChange={handleDeadlineChange}
-              max={startsAt || undefined}
-              inputClassName={inputCls}
-              disabled={loading}
-              dateLabel={t('preregAdminDate')}
-              timeLabel={t('preregAdminTime')}
-            />
-            {startsAt && (
-              <p className="text-[10px] text-slate-500 mt-1">{t('preregAdminDeadlineHint')}</p>
-            )}
-          </div>
         </section>
 
         <section className="p-4 rounded-xl border border-slate-800 bg-slate-900/80 space-y-4">

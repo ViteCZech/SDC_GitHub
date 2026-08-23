@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { clampDateTimeLocal } from '../../utils/preregAdmin';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
 const MINUTE_STEP = 5;
@@ -64,17 +65,52 @@ export default function DateTimeLocalFields({
   const maxParts = splitDateTimeLocal(max);
   const minParts = splitDateTimeLocal(min);
 
-  const minuteOptions = useMemo(() => {
-    if (minute && !MINUTES_BASE.includes(minute)) {
-      return [...MINUTES_BASE, minute].sort();
+  const hourOptions = useMemo(() => {
+    let list = HOURS;
+    if (date && maxParts.date === date && maxParts.hour) {
+      list = list.filter((h) => h <= maxParts.hour);
     }
-    return MINUTES_BASE;
-  }, [minute]);
+    if (date && minParts.date === date && minParts.hour) {
+      list = list.filter((h) => h >= minParts.hour);
+    }
+    if (hour && !list.includes(hour)) {
+      list = [...list, hour].sort();
+    }
+    return list;
+  }, [date, hour, maxParts.date, maxParts.hour, minParts.date, minParts.hour]);
+
+  const minuteOptions = useMemo(() => {
+    let list = MINUTES_BASE;
+    if (minute && !list.includes(minute)) {
+      list = [...list, minute].sort();
+    }
+    if (date && maxParts.date === date && hour && hour === maxParts.hour && maxParts.minute) {
+      list = list.filter((m) => m <= maxParts.minute);
+    }
+    if (date && minParts.date === date && hour && hour === minParts.hour && minParts.minute) {
+      list = list.filter((m) => m >= minParts.minute);
+    }
+    if (minute && !list.includes(minute)) {
+      list = [...list, minute].sort();
+    }
+    return list;
+  }, [
+    date,
+    hour,
+    minute,
+    maxParts.date,
+    maxParts.hour,
+    maxParts.minute,
+    minParts.date,
+    minParts.hour,
+    minParts.minute,
+  ]);
 
   const selectCls = `${inputClassName} min-w-0`.trim();
 
   const emit = (nextDate, nextHour, nextMinute) => {
-    onChange(joinDateTimeLocal(nextDate, nextHour, nextMinute));
+    const joined = joinDateTimeLocal(nextDate, nextHour, nextMinute);
+    onChange(clampDateTimeLocal(joined, { min, max }));
   };
 
   const onDateChange = (nextDate) => {
@@ -128,7 +164,7 @@ export default function DateTimeLocalFields({
             aria-label={timeLabel ? `${timeLabel} – hodiny` : 'Hodiny'}
           >
             <option value="">{disabled || !date ? '––' : 'HH'}</option>
-            {HOURS.map((h) => (
+            {hourOptions.map((h) => (
               <option key={h} value={h}>
                 {h}
               </option>
