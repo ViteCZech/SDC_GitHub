@@ -27,9 +27,10 @@ export function isTournamentRankingLocked(tournamentData, isTournamentLive = fal
 export function stripPlayerRankingsForLive(players) {
   return (players || [])
     .map((p, i) => ({
+      ...p,
       id: p?.id ?? `p${i + 1}`,
       name: String(p?.name ?? '').trim(),
-      ranking: null,
+      ranking: p?.kind === 'team' ? p.ranking ?? null : null,
     }))
     .filter((p) => p.name);
 }

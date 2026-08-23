@@ -653,6 +653,7 @@ export default function RegistrationAdminPanel({
 
       <ImportToTournamentButton
         lang={lang}
+        tournament={tournament}
         registrations={registrations}
         requireImportMode={requireImportMode}
         onImport={(payload) =>
@@ -660,6 +661,7 @@ export default function RegistrationAdminPanel({
             players: payload.players,
             tournamentName: tournament.meta?.name ?? null,
             importMode: payload.importMode ?? 'fresh',
+            competitionType: tournament.meta?.competitionType,
           })
         }
       />

@@ -1,32 +1,40 @@
 import React, { useState } from 'react';
-import { ArrowRight, Download } from 'lucide-react';
+import { ArrowRight, Download, Loader2 } from 'lucide-react';
 import { translations } from '../../translations';
+import { allowsPairing, normalizeCompetitionType } from '../../utils/preregCompetition';
+import { loadCsoRanking } from '../../utils/csoRanking';
+import { buildImportedTeams } from '../../utils/preregTeamImport';
 
 /**
  * @param {{
  *   lang: string,
  *   registrations: object[],
- *   onImport: (payload: { players: Array<{ name: string, ranking: number|null }>, importMode: string }) => void,
+ *   tournament?: object,
+ *   onImport: (payload: { players: Array<object>, importMode: string }) => void,
  *   requireImportMode?: boolean,
  * }} props
  */
 export default function ImportToTournamentButton({
   lang,
   registrations,
+  tournament = null,
   onImport,
   requireImportMode = false,
 }) {
   const t = (k) => translations[lang]?.[k] || k;
+  const pairingOn = allowsPairing(normalizeCompetitionType(tournament?.meta?.competitionType));
 
   const [modeModalOpen, setModeModalOpen] = useState(false);
   const [pendingPlayers, setPendingPlayers] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [hint, setHint] = useState('');
 
-  const eligible = (registrations || []).filter(
+  const eligiblePeople = (registrations || []).filter(
     (r) => r.status === 'CONFIRMED' && r.attendance?.checkedIn === true
   );
 
-  const buildPlayers = () =>
-    eligible
+  const buildSinglesPlayers = () =>
+    eligiblePeople
       .map((r) => ({
         name: r.player?.name ?? '',
         ranking: null,
@@ -35,10 +43,49 @@ export default function ImportToTournamentButton({
       }))
       .filter((p) => p.name.trim());
 
-  const handleImport = () => {
-    const players = buildPlayers();
-    if (players.length < 2) return;
+  const readyCount = pairingOn
+    ? Math.floor(
+        eligiblePeople.filter((r) => String(r.pair?.status ?? '') === 'CONFIRMED').length / 2
+      )
+    : eligiblePeople.length;
+  const minReady = pairingOn ? 2 : 2;
 
+  const handleImport = async () => {
+    setHint('');
+    if (pairingOn) {
+      setBusy(true);
+      try {
+        let doublesPlayers = [];
+        try {
+          const data = await loadCsoRanking('doubles', { bypassCache: true });
+          doublesPlayers = data.players ?? [];
+        } catch {
+          doublesPlayers = [];
+        }
+        const { teams, leftover } = buildImportedTeams(registrations, doublesPlayers);
+        if (teams.length < minReady) {
+          setHint(t('preregImportMinTeams'));
+          return;
+        }
+        if (leftover.length > 0) {
+          setHint(
+            (t('preregImportLeftoverHint') || '').replace('{count}', String(leftover.length))
+          );
+        }
+        if (requireImportMode) {
+          setPendingPlayers(teams);
+          setModeModalOpen(true);
+          return;
+        }
+        onImport({ players: teams, importMode: 'fresh' });
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
+    const players = buildSinglesPlayers();
+    if (players.length < 2) return;
     if (requireImportMode) {
       setPendingPlayers(players);
       setModeModalOpen(true);
@@ -63,23 +110,26 @@ export default function ImportToTournamentButton({
               {t('preregImportTitle')}
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              {t('preregImportHint')} ({eligible.length})
+              {pairingOn ? t('preregImportHintTeams') : t('preregImportHint')} ({readyCount})
             </p>
           </div>
           <button
             type="button"
             onClick={handleImport}
-            disabled={eligible.length < 2}
+            disabled={busy || readyCount < minReady}
             className="flex items-center gap-2 px-4 py-3 rounded-xl font-black uppercase tracking-wide text-sm bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Download className="w-4 h-4" />
-            {t('preregImportBtn')}
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {pairingOn ? t('preregImportBtnTeams') : t('preregImportBtn')}
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
-        {eligible.length > 0 && eligible.length < 2 && (
-          <p className="text-xs text-amber-400">{t('preregImportMinPlayers')}</p>
+        {eligiblePeople.length > 0 && readyCount < minReady && (
+          <p className="text-xs text-amber-400">
+            {pairingOn ? t('preregImportMinTeams') : t('preregImportMinPlayers')}
+          </p>
         )}
+        {hint && <p className="text-xs text-amber-300">{hint}</p>}
       </div>
 
       {modeModalOpen && (

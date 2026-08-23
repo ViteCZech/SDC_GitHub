@@ -1,3 +1,5 @@
+import { compareTeamSeeds, isTeamPlayer } from './doublesSeeding';
+
 /**
  * Čisté pomocné funkce pro generování turnajových skupin a rozpisu zápasů.
  */
@@ -14,6 +16,9 @@ function sortPlayers(players) {
   }));
 
   return [...withIds].sort((a, b) => {
+    if (isTeamPlayer(a) || isTeamPlayer(b) || a.seedTieBreak != null || b.seedTieBreak != null) {
+      return compareTeamSeeds(a, b);
+    }
     const ra = a.ranking;
     const rb = b.ranking;
     const hasA = ra != null && !Number.isNaN(ra);

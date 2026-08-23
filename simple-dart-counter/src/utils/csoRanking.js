@@ -1,27 +1,40 @@
 import { doc, getDoc, getDocFromServer } from 'firebase/firestore';
 import { db } from '../firebase';
+import { compareTeamSeeds, computeTeamSeed, isTeamPlayer } from './doublesSeeding';
 
 const CSO_BASE_URL = 'https://www.stedar.org/alms/league/rankings.view?orgId=1';
 
 export const CSO_RANKING_URLS = {
   men: `${CSO_BASE_URL}&rankingId=1`,
   women: `${CSO_BASE_URL}&rankingId=2`,
+  /** ČP – dvojice nasazovací. Jen turnaje doubles/mixed/random_doubles. */
+  doubles: `${CSO_BASE_URL}&rankingId=6`,
 };
 
 export const CSO_RANKING_FILES = {
   men: '/data/cso-ranking-men.json',
   women: '/data/cso-ranking-women.json',
+  doubles: '/data/cso-ranking-doubles.json',
 };
 
-/** @type {Map<'men'|'women', { meta: object, players: Array<{ rank: number, name: string, club?: string }> }>} */
+/** @type {Map<'men'|'women'|'doubles', { meta: object, players: Array<{ rank: number, name: string, club?: string, regNumber?: string }> }>} */
 const cache = new Map();
 
 /**
+ * @param {string} key
+ * @returns {'men'|'women'|'doubles'}
+ */
+export function normalizeCsoListKey(key) {
+  if (key === 'women' || key === 'doubles') return key;
+  return 'men';
+}
+
+/**
  * Vymaže in-memory cache (po ruční aktualizaci z Firestore).
- * @param {'men'|'women'|null} [gender] null = oba
+ * @param {'men'|'women'|'doubles'|null} [gender] null = všechny
  */
 export function clearCsoRankingCache(gender = null) {
-  if (gender === 'men' || gender === 'women') {
+  if (gender === 'men' || gender === 'women' || gender === 'doubles') {
     cache.delete(gender);
     return;
   }
@@ -29,9 +42,9 @@ export function clearCsoRankingCache(gender = null) {
 }
 
 /**
- * @param {'men'|'women'} gender
+ * @param {'men'|'women'|'doubles'} gender
  * @param {{ fromServer?: boolean }} [options]
- * @returns {Promise<{ meta: object, players: Array<{ rank: number, name: string, club?: string }> }|null>}
+ * @returns {Promise<{ meta: object, players: Array<{ rank: number, name: string, club?: string, regNumber?: string }> }|null>}
  */
 async function loadCsoRankingFromFirestore(gender, options = {}) {
   if (!db) return null;
@@ -52,8 +65,8 @@ async function loadCsoRankingFromFirestore(gender, options = {}) {
 }
 
 /**
- * @param {'men'|'women'} gender
- * @returns {Promise<{ meta: object, players: Array<{ rank: number, name: string, club?: string }> }>}
+ * @param {'men'|'women'|'doubles'} gender
+ * @returns {Promise<{ meta: object, players: Array<{ rank: number, name: string, club?: string, regNumber?: string }> }>}
  */
 async function loadCsoRankingFromStatic(gender) {
   const sep = CSO_RANKING_FILES[gender].includes('?') ? '&' : '?';
@@ -73,6 +86,7 @@ async function loadCsoRankingFromStatic(gender) {
  * @returns {string}
  */
 export function getCsoRankingUrl(gender) {
+  if (gender === 'doubles') return CSO_RANKING_URLS.doubles;
   return gender === 'women' ? CSO_RANKING_URLS.women : CSO_RANKING_URLS.men;
 }
 
@@ -126,12 +140,12 @@ export function getCsoRankingDisplayDate(meta) {
 
 /**
  * Načte žebříček — priorita Firestore (Cloud Function), fallback statické JSON v public/data.
- * @param {'men'|'women'|string} gender
+ * @param {'men'|'women'|'doubles'|string} gender
  * @param {{ bypassCache?: boolean }} [options]
- * @returns {Promise<{ meta: object, players: Array<{ rank: number, name: string, club?: string }> }>}
+ * @returns {Promise<{ meta: object, players: Array<{ rank: number, name: string, club?: string, regNumber?: string }> }>}
  */
 export async function loadCsoRanking(gender, options = {}) {
-  const g = gender === 'women' ? 'women' : 'men';
+  const g = normalizeCsoListKey(gender);
   if (!options.bypassCache && cache.has(g)) return cache.get(g);
 
   const fromFirestore = await loadCsoRankingFromFirestore(g, {
@@ -184,6 +198,22 @@ export function findCsoPlayerByName(players, name) {
 }
 
 /**
+ * Shoda v žebříčku podle ČŠO Reg. #, jinak podle jména.
+ * @param {Array<{ rank: number, name: string, regNumber?: string }>} players
+ * @param {{ name?: string, csoPlayerId?: string|null }} player
+ */
+export function findCsoPlayerEntry(players, player) {
+  if (!Array.isArray(players) || !player) return null;
+  const rawId = String(player.csoPlayerId ?? '').trim();
+  const regFromId = rawId.startsWith('cso:') ? rawId.slice(4) : '';
+  if (regFromId) {
+    const byReg = players.find((p) => String(p?.regNumber ?? '').trim() === regFromId);
+    if (byReg) return byReg;
+  }
+  return findCsoPlayerByName(players, player.name);
+}
+
+/**
  * @param {string} name
  * @param {Array<{ rank: number, name: string }>|null|undefined} players
  * @returns {number|null}
@@ -228,13 +258,44 @@ export function resolvePlayerLiveRankFromLists(name, ...lists) {
  */
 export function buildDrawRankingSnapshot(opts) {
   const useCso = !!opts?.useCsoRanking;
+  const rankingKind = opts?.rankingKind === 'doubles' ? 'doubles' : 'singles';
   const gender =
-    opts?.gender === 'women' ? 'women' : opts?.gender === 'men' ? 'men' : useCso ? 'men' : null;
+    rankingKind === 'doubles'
+      ? 'doubles'
+      : opts?.gender === 'women'
+        ? 'women'
+        : opts?.gender === 'men'
+          ? 'men'
+          : useCso
+            ? 'men'
+            : null;
   const list = opts?.rankingData?.players ?? [];
   const players = (opts?.players || []).map((p) => {
     const name = String(p?.name ?? '').trim();
+    if (isTeamPlayer(p) || rankingKind === 'doubles') {
+      const members = (p.members ?? []).map((m) => {
+        const memberName = String(m?.name ?? '').trim();
+        let doublesRank = m?.doublesRank ?? null;
+        if (useCso && rankingKind === 'doubles') {
+          const hit = findCsoPlayerEntry(list, m);
+          doublesRank = hit?.rank != null ? Number(hit.rank) : null;
+        }
+        return { ...m, name: memberName, doublesRank };
+      });
+      const seed = computeTeamSeed(members, p.seedTieBreak);
+      return {
+        ...p,
+        kind: 'team',
+        name,
+        members,
+        ranking: seed.ranking,
+        seedBestMemberRank: seed.seedBestMemberRank,
+        seedTieBreak: seed.seedTieBreak,
+      };
+    }
+
     let ranking = null;
-    if (useCso) {
+    if (useCso && rankingKind === 'singles') {
       ranking = resolvePlayerLiveRank(name, list);
     } else if (p?.ranking != null && !Number.isNaN(Number(p.ranking))) {
       ranking = Number(p.ranking);
@@ -246,20 +307,24 @@ export function buildDrawRankingSnapshot(opts) {
     };
   });
 
-  // Seřadit: nižší rank = lepší; bez ranku na konec (abecedně)
-  players.sort((a, b) => {
-    const ha = a.ranking != null;
-    const hb = b.ranking != null;
-    if (ha && hb) return a.ranking - b.ranking;
-    if (ha && !hb) return -1;
-    if (!ha && hb) return 1;
-    return String(a.name).localeCompare(String(b.name), 'cs');
-  });
+  if (rankingKind === 'doubles' || players.some((p) => isTeamPlayer(p))) {
+    players.sort(compareTeamSeeds);
+  } else {
+    players.sort((a, b) => {
+      const ha = a.ranking != null;
+      const hb = b.ranking != null;
+      if (ha && hb) return a.ranking - b.ranking;
+      if (ha && !hb) return -1;
+      if (!ha && hb) return 1;
+      return String(a.name).localeCompare(String(b.name), 'cs');
+    });
+  }
 
   return {
     players,
     rankingSnapshot: {
       gender,
+      rankingKind,
       useCsoRanking: useCso,
       snappedAt: Date.now(),
       sourceMeta: opts?.rankingData?.meta ?? null,

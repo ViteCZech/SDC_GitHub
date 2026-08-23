@@ -20,6 +20,12 @@ const RANKINGS = [
     file: 'cso-ranking-women.json',
     url: 'https://www.stedar.org/alms/league/rankings.view?orgId=1&rankingId=2',
   },
+  {
+    gender: 'doubles',
+    rankingId: 6,
+    file: 'cso-ranking-doubles.json',
+    url: 'https://www.stedar.org/alms/league/rankings.view?orgId=1&rankingId=6',
+  },
 ];
 
 function withCacheBust(url) {
@@ -121,13 +127,17 @@ function parseRankingTable(html) {
     if (!Number.isFinite(rank)) return;
 
     const name = $(cells[1]).text().trim();
+    const regRaw = $(cells[2]).text().trim();
     const club = $(cells[3]).text().trim();
     if (!name) return;
+
+    const regNumber = regRaw && regRaw !== '–' && regRaw !== '-' ? regRaw : undefined;
 
     players.push({
       rank,
       name,
       ...(club ? { club } : {}),
+      ...(regNumber ? { regNumber } : {}),
     });
   });
 
@@ -193,7 +203,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('Hotovo – oba žebříčky aktualizovány.');
+  console.log('Hotovo – žebříčky aktualizovány (muži, ženy, dvojice).');
 }
 
 main().catch((err) => {

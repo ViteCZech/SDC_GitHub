@@ -204,9 +204,13 @@ Typy: `src/types/tournamentPreReg.d.ts` a `functions/src/types.ts` — držet v 
 
 ### 5. Žebříček ČŠO (Stedar)
 
-- Firestore `cso_rankings/{men|women}` — write jen Admin SDK
+- Firestore `cso_rankings/{men|women|doubles}` — write jen Admin SDK
 - Fallback JSON v `public/data/cso-ranking-*.json`
 - Klient: `utils/csoRanking.js` (našeptávač jmen, live rank)
+- **Singles / online 1v1 / lokální zápas:** jen `men` (rankingId=1) a `women` (rankingId=2)
+- **Dvojice / mix / losované dvojice:** `doubles` = Stedar ČP nasazovací (rankingId=6). Nikdy ne id=5.
+- Nasazení páru: součet obou doubles ranků → lepší individuální rank → `seedTieBreak`
+- Import předregistrace u dvojic skládá `players[]` jako týmy (`kind: 'team'`, `members`)
 - Scheduled CF denně 7:00 Europe/Prague + ruční tlačítko `CsoRankingUpdateButton`
 - Identita hráče: `playerIdentity.js` / `functions/src/playerIdentity.ts` (nameKey + `csoPlayerId`)
 

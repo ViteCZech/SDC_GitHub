@@ -4,6 +4,8 @@ import { initializeApp, getApp, getApps } from 'firebase-admin/app';
 import * as logger from 'firebase-functions/logger';
 
 export type CsoGender = 'men' | 'women';
+/** Dokument ve Firestore `cso_rankings/{id}` — doubles jen pro turnaje dvojic. */
+export type CsoRankingDocId = CsoGender | 'doubles';
 
 export interface CsoPlayer {
   rank: number;
@@ -24,7 +26,7 @@ export interface CsoRankingPageMeta {
 
 export interface CsoRankingPayload {
   meta: {
-    gender: CsoGender;
+    gender: CsoRankingDocId;
     updatedAt: string;
     effectiveDate?: string | null;
     generatedAt?: string | null;
@@ -34,7 +36,7 @@ export interface CsoRankingPayload {
   players: CsoPlayer[];
 }
 
-const RANKING_CONFIG: Array<{ gender: CsoGender; url: string }> = [
+const SINGLES_RANKING_CONFIG: Array<{ gender: CsoGender; url: string }> = [
   {
     gender: 'men',
     url: 'https://www.stedar.org/alms/league/rankings.view?orgId=1&rankingId=1',
@@ -44,6 +46,12 @@ const RANKING_CONFIG: Array<{ gender: CsoGender; url: string }> = [
     url: 'https://www.stedar.org/alms/league/rankings.view?orgId=1&rankingId=2',
   },
 ];
+
+/** ČP – dvojice nasazovací. Nikdy nepoužívat pro singles / online 1v1. */
+const DOUBLES_RANKING_CONFIG = {
+  gender: 'doubles' as const,
+  url: 'https://www.stedar.org/alms/league/rankings.view?orgId=1&rankingId=6',
+};
 
 if (getApps().length === 0) {
   initializeApp();
@@ -167,7 +175,10 @@ export function parseRankingTable(html: string): CsoPlayer[] {
   return players;
 }
 
-export async function fetchCsoRanking(gender: CsoGender, url: string): Promise<CsoRankingPayload> {
+export async function fetchCsoRanking(
+  gender: CsoRankingDocId,
+  url: string
+): Promise<CsoRankingPayload> {
   logger.info(`CSO ranking fetch start: ${gender}`, { url });
   const html = await fetchHtml(url);
   const pageMeta = parseRankingPageMeta(html);
@@ -219,6 +230,7 @@ export interface CsoRankingUpdateResult {
   updatedAt: string;
   men: { totalPlayers: number; updatedAt: string };
   women: { totalPlayers: number; updatedAt: string };
+  doubles: { totalPlayers: number; updatedAt: string } | null;
   totalPlayers: number;
 }
 
@@ -229,7 +241,7 @@ export interface CsoRankingUpdateResult {
 export async function runCsoRankingUpdate(): Promise<CsoRankingUpdateResult> {
   const results: CsoRankingPayload[] = [];
 
-  for (const cfg of RANKING_CONFIG) {
+  for (const cfg of SINGLES_RANKING_CONFIG) {
     try {
       const payload = await fetchCsoRanking(cfg.gender, cfg.url);
       await saveRankingToFirestore(payload);
@@ -246,6 +258,20 @@ export async function runCsoRankingUpdate(): Promise<CsoRankingUpdateResult> {
     }
   }
 
+  let doublesPayload: CsoRankingPayload | null = null;
+  try {
+    doublesPayload = await fetchCsoRanking(DOUBLES_RANKING_CONFIG.gender, DOUBLES_RANKING_CONFIG.url);
+    await saveRankingToFirestore(doublesPayload);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error('CSO ranking update failed for doubles (singles uloženy)', {
+      gender: 'doubles',
+      url: DOUBLES_RANKING_CONFIG.url,
+      error: message,
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+  }
+
   const men = results.find((r) => r.meta.gender === 'men')!;
   const women = results.find((r) => r.meta.gender === 'women')!;
 
@@ -257,6 +283,9 @@ export async function runCsoRankingUpdate(): Promise<CsoRankingUpdateResult> {
     updatedAt,
     men: { totalPlayers: men.meta.totalPlayers, updatedAt: men.meta.updatedAt },
     women: { totalPlayers: women.meta.totalPlayers, updatedAt: women.meta.updatedAt },
+    doubles: doublesPayload
+      ? { totalPlayers: doublesPayload.meta.totalPlayers, updatedAt: doublesPayload.meta.updatedAt }
+      : null,
     totalPlayers: men.meta.totalPlayers + women.meta.totalPlayers,
   };
 }

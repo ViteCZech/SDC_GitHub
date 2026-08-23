@@ -111,11 +111,19 @@ export default function TournamentSetup({
   const playerRankingFieldRef = useRef(null);
 
   const players = tournamentDraft.players || [];
+  const hasTeams = players.some((p) => p?.kind === 'team');
   const csoGender = tournamentDraft.csoRankingGender === 'women' ? 'women' : 'men';
+  const csoListKey = hasTeams ? 'doubles' : csoGender;
   const useCsoRanking = !!tournamentDraft.useCsoRanking;
 
   /** Plovoucí rank pro UI — při zapnutém ČŠO vždy z aktuálního žebříčku. */
   const getDisplayRanking = (player) => {
+    if (player?.kind === 'team') {
+      if (player.ranking != null && Number.isFinite(Number(player.ranking))) {
+        return Number(player.ranking);
+      }
+      return null;
+    }
     if (useCsoRanking) {
       return resolvePlayerLiveRank(player?.name, csoList);
     }
@@ -149,7 +157,7 @@ export default function TournamentSetup({
     setNameSuggestions((prev) => (prev.length === 0 ? prev : []));
     setSelectedCsoRank(null);
 
-    loadCsoRanking(csoGender, { bypassCache: true })
+    loadCsoRanking(csoListKey, { bypassCache: true })
       .then((data) => {
         if (!cancelled) {
           setCsoList(data.players ?? []);
@@ -187,7 +195,7 @@ export default function TournamentSetup({
       cancelled = true;
     };
     // `lang` místo `t` — `t` je nová funkce při každém renderu a způsobovalo nekonečný re-render (zamrznutí UI).
-  }, [step, csoGender, useCsoRanking, csoReloadKey, lang]);
+  }, [step, csoListKey, useCsoRanking, csoReloadKey, lang]);
 
   const handlePlayerNameChange = (v) => {
     if (editingIndex !== null) setEditName(v);
@@ -580,17 +588,25 @@ export default function TournamentSetup({
   /** Seřazení hráčů podle rankingu (při ČŠO z živého žebříčku — finální snapshot až při generate). */
   const getSortedPlayersForTournament = () =>
     [...players]
-      .map((p) => ({
-        name: p.name,
-        ranking: useCsoRanking ? resolvePlayerLiveRank(p.name, csoList) : p.ranking ?? null,
-        id: p.id,
-      }))
+      .map((p) =>
+        p.kind === 'team'
+          ? { ...p }
+          : {
+              name: p.name,
+              ranking: useCsoRanking ? resolvePlayerLiveRank(p.name, csoList) : p.ranking ?? null,
+              id: p.id,
+            }
+      )
       .sort((a, b) => {
         const ra = a.ranking != null ? Number(a.ranking) : Infinity;
         const rb = b.ranking != null ? Number(b.ranking) : Infinity;
         return ra - rb;
       })
-      .map((p) => ({ name: p.name, ranking: p.ranking, ...(p.id ? { id: p.id } : {}) }));
+      .map((p) =>
+        p.kind === 'team'
+          ? p
+          : { name: p.name, ranking: p.ranking, ...(p.id ? { id: p.id } : {}) }
+      );
 
   const handleGenerate = async () => {
     if (players.length < minPlayersRequired || hasAnyDuplicates() || isCustomInvalid || isGenerating) return;
@@ -633,20 +649,31 @@ export default function TournamentSetup({
       let snapPlayers;
       let rankingSnapshot;
       if (useCsoRanking) {
-        const rankingData = await loadCsoRanking(csoGender, { bypassCache: true });
+        const rankingData = await loadCsoRanking(csoListKey, { bypassCache: true });
         const built = buildDrawRankingSnapshot({
           players,
           rankingData,
-          gender: csoGender,
+          gender: hasTeams ? 'doubles' : csoGender,
+          rankingKind: hasTeams ? 'doubles' : 'singles',
           useCsoRanking: true,
         });
-        snapPlayers = built.players.map(({ name, ranking, id, csoPlayerId, duplicateOk }) => ({
-          name,
-          ranking,
-          ...(id ? { id } : {}),
-          ...(csoPlayerId ? { csoPlayerId } : {}),
-          ...(duplicateOk ? { duplicateOk: true } : {}),
-        }));
+        snapPlayers = built.players.map((p) => {
+          if (p.kind === 'team') {
+            return {
+              ...p,
+              name: p.name,
+              ranking: p.ranking ?? null,
+              ...(p.id ? { id: p.id } : {}),
+            };
+          }
+          return {
+            name: p.name,
+            ranking: p.ranking,
+            ...(p.id ? { id: p.id } : {}),
+            ...(p.csoPlayerId ? { csoPlayerId: p.csoPlayerId } : {}),
+            ...(p.duplicateOk ? { duplicateOk: true } : {}),
+          };
+        });
         rankingSnapshot = built.rankingSnapshot;
         setCsoList(rankingData.players ?? []);
         setCsoMeta(rankingData.meta ?? null);
@@ -976,7 +1003,9 @@ export default function TournamentSetup({
                           useCsoRanking: nextOn,
                           // Při zapnutí ČŠO smaž uložené ranky — UI bere živý žebříček.
                           players: nextOn
-                            ? (prev.players || []).map((p) => ({ ...p, ranking: null }))
+                            ? (prev.players || []).map((p) =>
+                                p?.kind === 'team' ? p : { ...p, ranking: null }
+                              )
                             : prev.players,
                         };
                       })
@@ -998,8 +1027,9 @@ export default function TournamentSetup({
                   {useCsoRanking && (
                   <div className="flex flex-wrap items-center gap-3 mb-4 pb-4 border-b border-slate-800">
                     <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                      {t('tournCsoRanking')}
+                      {hasTeams ? t('tournCsoDoublesRanking') : t('tournCsoRanking')}
                     </span>
+                    {!hasTeams && (
                     <div className="flex rounded-lg overflow-hidden border border-slate-600">
                       {(['men', 'women']).map((g) => (
                         <button
@@ -1018,11 +1048,12 @@ export default function TournamentSetup({
                         </button>
                       ))}
                     </div>
+                    )}
                     <a
-                      href={getCsoRankingUrl(csoGender)}
+                      href={getCsoRankingUrl(csoListKey)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      onClick={handleExternalLinkClick(getCsoRankingUrl(csoGender))}
+                      onClick={handleExternalLinkClick(getCsoRankingUrl(csoListKey))}
                       className={`${btnBase} bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm`}
                     >
                       <ExternalLink className="w-4 h-4" />

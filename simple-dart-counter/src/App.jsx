@@ -3064,7 +3064,12 @@ function AppMain({ lang, setLang }) {
     setAppState('prereg_admin');
   };
 
-  const handlePreRegImportToSetup = ({ players, tournamentName, importMode = 'fresh' }) => {
+  const handlePreRegImportToSetup = ({
+    players,
+    tournamentName,
+    importMode = 'fresh',
+    competitionType,
+  }) => {
     setUserRole('admin');
     if (activePreRegTournamentId) {
       setPreRegImportSourceId(activePreRegTournamentId);
@@ -3075,6 +3080,14 @@ function AppMain({ lang, setLang }) {
     const importedPlayers = (players || [])
       .map((p, i) => {
         const name = String(p.name ?? '').trim();
+        if (p.kind === 'team') {
+          return {
+            ...p,
+            name,
+            id: p.id || `t${i + 1}`,
+            ranking: p.ranking ?? null,
+          };
+        }
         return {
           name,
           ranking: null,
@@ -3110,7 +3123,11 @@ function AppMain({ lang, setLang }) {
             }
             const id = `p-late-${seq + 1}`;
             seq += 1;
-            const row = { ...p, id, ranking: null };
+            const row = {
+              ...p,
+              id,
+              ranking: p.kind === 'team' ? p.ranking ?? null : null,
+            };
             groups[minIdx].players.push(row);
             addedPlayers.push(row);
           }
@@ -3144,7 +3161,11 @@ function AppMain({ lang, setLang }) {
           name: tournamentName || prev.name || tournamentData?.name || '',
           players: [
             ...existing,
-            ...toAdd.map((p, i) => ({ ...p, id: `p${existing.length + i + 1}`, ranking: null })),
+            ...toAdd.map((p, i) => ({
+              ...p,
+              id: p.id ?? `p${existing.length + i + 1}`,
+              ranking: p.kind === 'team' ? p.ranking ?? null : null,
+            })),
           ],
           useCsoRanking: true,
         }));
@@ -3160,7 +3181,11 @@ function AppMain({ lang, setLang }) {
         if (toAdd.length === 0) return prev;
         const merged = [
           ...existing,
-          ...toAdd.map((p, i) => ({ ...p, id: `p${existing.length + i + 1}`, ranking: null })),
+          ...toAdd.map((p, i) => ({
+            ...p,
+            id: p.id ?? `p${existing.length + i + 1}`,
+            ranking: p.kind === 'team' ? p.ranking ?? null : null,
+          })),
         ];
         return {
           ...prev,
@@ -3186,8 +3211,13 @@ function AppMain({ lang, setLang }) {
         ...prev,
         pin: pinToUse,
         name: tournamentName || prev.name || '',
-        players: importedPlayers.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}`, ranking: null })),
+        players: importedPlayers.map((p, i) => ({
+          ...p,
+          id: p.id ?? (p.kind === 'team' ? `t${i + 1}` : `p${i + 1}`),
+          ranking: p.kind === 'team' ? p.ranking ?? null : null,
+        })),
         useCsoRanking: true,
+        competitionType: competitionType || prev.competitionType || 'singles',
         boardAssignments: {},
       };
     });

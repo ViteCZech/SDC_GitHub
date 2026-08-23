@@ -4,6 +4,7 @@
  */
 
 import { distributePlayersToFixedGroups } from './tournamentGenerator';
+import { compareTeamSeeds, isTeamPlayer } from './doublesSeeding';
 
 const BRACKET_BYE_LABEL = 'Volný los';
 
@@ -1508,6 +1509,9 @@ export const GROUP_SIZE_MAX = 5;
  */
 export function sortPlayersForBracketSeeding(players) {
   return [...(players || [])].sort((a, b) => {
+    if (isTeamPlayer(a) || isTeamPlayer(b) || a.seedTieBreak != null || b.seedTieBreak != null) {
+      return compareTeamSeeds(a, b);
+    }
     const ra =
       a.ranking != null && Number.isFinite(Number(a.ranking)) ? Number(a.ranking) : Infinity;
     const rb =
