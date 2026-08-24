@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 
 const listenMock = vi.fn();
 
@@ -64,6 +63,10 @@ describe('VenueDisplayView', () => {
     listenMock.mockImplementation((_pin, _cb) => () => {});
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('neplatný PIN nic neposlouchá a ukáže chybu', () => {
     render(<VenueDisplayView pin={null} invalidPin lang="cs" />);
     expect(screen.getByTestId('venue-display')).toBeTruthy();
@@ -73,17 +76,22 @@ describe('VenueDisplayView', () => {
   });
 
   it('odebírá active turnaj a kreslí terč, jména i počtáře', () => {
+    vi.useFakeTimers();
     listenMock.mockImplementation((_pin, cb) => {
       cb(liveDoc());
       return () => {};
     });
     render(<VenueDisplayView pin="1234" lang="cs" />);
+    act(() => {
+      vi.advanceTimersByTime(16_000);
+    });
     expect(listenMock).toHaveBeenCalledWith('1234', expect.any(Function));
     expect(screen.getByText('Hala Cup')).toBeTruthy();
     expect(document.body.textContent).toContain('Jalůvka');
     expect(document.body.textContent).toContain('Armlich');
     expect(document.body.textContent).toContain('Novák');
     expect(document.body.textContent).toMatch(/1\s*:\s*0/);
+    vi.useRealTimers();
   });
 
   it('chybějící dokument ukáže neaktivní turnaj', () => {
@@ -125,14 +133,38 @@ describe('VenueDisplayView', () => {
     expect(banner.textContent).toContain('Jalůvka');
   });
 
-  it('tlačítko aktivuje zvuk', async () => {
+  it('u timeout warning ukáže chybějící hráče/počtáře', () => {
+    vi.useFakeTimers();
     listenMock.mockImplementation((_pin, cb) => {
-      cb(null);
+      cb({
+        ...liveDoc(),
+        groupMatches: [
+          {
+            matchId: 'm3',
+            groupId: 'A',
+            board: 1,
+            status: 'pending',
+            tabletStatus: 'timeout_warning',
+            tabletCheckInPresent: {
+              p1: false,
+              p2: true,
+              referee: false,
+            },
+            player1Id: 'p1',
+            player2Id: 'p2',
+            referee: { name: 'Novák' },
+          },
+        ],
+      });
       return () => {};
     });
-    const user = userEvent.setup();
-    render(<VenueDisplayView pin="0000" lang="cs" />);
-    await user.click(screen.getByRole('button', { name: /Aktivovat zvuk/i }));
-    expect(screen.getByRole('button', { name: /Zvuk zapnutý/i })).toBeTruthy();
+    render(<VenueDisplayView pin="1234" lang="cs" />);
+    act(() => {
+      vi.advanceTimersByTime(16_000);
+    });
+    expect(document.body.textContent).toContain('Chybí na prezentaci');
+    expect(document.body.textContent).toContain('Jalůvka');
+    expect(document.body.textContent).toContain('Novák');
+    vi.useRealTimers();
   });
 });

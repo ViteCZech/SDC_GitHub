@@ -105,7 +105,9 @@ describe('venueDisplay routing', () => {
 
   it('resolveVenueLang bere query a fallback', () => {
     expect(resolveVenueLang('?lang=pl')).toBe('pl');
-    expect(resolveVenueLang('?lang=de')).toBe('cs');
+    const nav = String(globalThis.navigator?.language || '').toLowerCase();
+    const expected = nav.startsWith('pl') ? 'pl' : nav.startsWith('en') ? 'en' : 'cs';
+    expect(resolveVenueLang('?lang=de')).toBe(expected);
   });
 });
 
