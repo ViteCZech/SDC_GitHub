@@ -153,35 +153,6 @@ function createDefaultTournamentDraft() {
   };
 }
 
-function resolvePreRegStartsAtMs(rawStartsAt) {
-  if (!rawStartsAt) return null;
-  try {
-    if (typeof rawStartsAt?.toMillis === 'function') {
-      const ms = Number(rawStartsAt.toMillis());
-      return Number.isFinite(ms) ? ms : null;
-    }
-    if (typeof rawStartsAt?.toDate === 'function') {
-      const ms = rawStartsAt.toDate()?.getTime?.();
-      return Number.isFinite(ms) ? ms : null;
-    }
-    const ms = new Date(rawStartsAt).getTime();
-    return Number.isNaN(ms) ? null : ms;
-  } catch {
-    return null;
-  }
-}
-
-function formatPreRegStartsAt(ms, lang) {
-  return new Date(ms).toLocaleString(lang === 'en' ? 'en-US' : lang === 'pl' ? 'pl-PL' : 'cs-CZ');
-}
-
-function buildPreRegFutureStartMessage(lang, startsAtMs) {
-  const template =
-    translations[lang]?.preregImportFutureStart ||
-    'Živý turnaj lze vygenerovat nejdříve v termínu startu ({date}).';
-  return template.replace('{date}', formatPreRegStartsAt(startsAtMs, lang));
-}
-
 const safeStorage = {
   getItem: (key) => { try { return localStorage.getItem(key); } catch { return null; } },
   setItem: (key, value) => { try { localStorage.setItem(key, value); } catch {} },
@@ -2979,6 +2950,7 @@ function AppMain({ lang, setLang }) {
         setTournamentMatchContext(null);
         setUserRole(null);
         setActivePin('');
+        setPreRegImportSourceId(null);
         clearTournamentWip();
         try {
           safeStorage.removeItem('dartsTournamentData');
@@ -3054,6 +3026,7 @@ function AppMain({ lang, setLang }) {
       setTournamentData(null);
       setTournamentMatches([]);
       setTournamentBracket([]);
+      setPreRegImportSourceId(null);
       try {
         safeStorage.removeItem('dartsTournamentData');
       } catch {}
@@ -3483,7 +3456,7 @@ function AppMain({ lang, setLang }) {
         setTournamentDraft((prev) => ({
           ...createDefaultTournamentDraft(),
           ...prev,
-          name: tournamentName || prev.name || tournamentData?.name || '',
+          name: String(tournamentName || '').trim() || prev.name || tournamentData?.name || '',
           players: [
             ...existing,
             ...toAdd.map((p, i) => ({
@@ -3515,7 +3488,7 @@ function AppMain({ lang, setLang }) {
         ];
         return {
           ...prev,
-          name: tournamentName || prev.name || '',
+          name: String(tournamentName || '').trim() || prev.name || '',
           players: merged,
           useCsoRanking: true,
           competitionType: competitionType || prev.competitionType || 'singles',
@@ -3537,14 +3510,14 @@ function AppMain({ lang, setLang }) {
         ...createDefaultTournamentDraft(),
         ...prev,
         pin: pinToUse,
-        name: tournamentName || prev.name || '',
+        name: String(tournamentName || '').trim(),
         players: importedPlayers.map((p, i) => ({
           ...p,
           id: p.id ?? (p.kind === 'team' ? `t${i + 1}` : `p${i + 1}`),
           ranking: p.kind === 'team' ? p.ranking ?? null : null,
         })),
         useCsoRanking: true,
-        competitionType: competitionType || prev.competitionType || 'singles',
+        competitionType: competitionType || 'singles',
         boardAssignments: {},
       };
     });
@@ -5794,18 +5767,6 @@ function AppMain({ lang, setLang }) {
                 'error'
               );
               return;
-            }
-            if (preRegImportSourceId) {
-              try {
-                const sourceTournament = await getOwnerTournamentData(preRegImportSourceId);
-                const startsAtMs = resolvePreRegStartsAtMs(sourceTournament?.meta?.startsAt);
-                if (startsAtMs != null && startsAtMs > Date.now()) {
-                  showNotification(buildPreRegFutureStartMessage(lang, startsAtMs), 'error');
-                  return;
-                }
-              } catch (err) {
-                console.warn('PreReg start validation failed:', err);
-              }
             }
             const generatedPin = String(data.pin || activePin || generatePin()).trim();
             let playersWithIds = (data.players || []).map((p, i) => ({

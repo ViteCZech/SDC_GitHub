@@ -126,6 +126,8 @@ export default function TournamentSetup({
   const isRandomDoubles = isRandomDoublesDraft(tournamentDraft);
   const pairDrawDone = isRandomDoubles && isPairDrawComplete(players);
   const importedFixedPairs = hasTeams && (competitionType === 'doubles' || competitionType === 'mixed');
+  const fromPreReg = !!preRegTournamentId;
+  const lockCompetitionType = fromPreReg || importedFixedPairs;
   const usesDoublesCso = usesDoublesRanking(competitionType) || hasTeams;
   const csoGender = tournamentDraft.csoRankingGender === 'women' ? 'women' : 'men';
   const csoListKey = usesDoublesCso ? 'doubles' : csoGender;
@@ -308,8 +310,12 @@ export default function TournamentSetup({
   const isLoggedIn = user && !user.isAnonymous;
 
   const stepLabels = {
-    tournStep1: t('tournStep1') || 'Krok 1: Založení',
-    tournStep2: t('tournStep2') || 'Krok 2: Registrace hráčů',
+    tournStep1: fromPreReg
+      ? (t('tournStep1FromPrereg') || 'Krok 1: Nastavení živého běhu')
+      : (t('tournStep1') || 'Krok 1: Založení'),
+    tournStep2: fromPreReg
+      ? (t('tournStep2FromPrereg') || 'Krok 2: Soupiska z předregistrace')
+      : (t('tournStep2') || 'Krok 2: Registrace hráčů'),
     tournStep3: t('tournStep3') || 'Krok 3: Kontrola nasazení',
   };
 
@@ -910,12 +916,16 @@ export default function TournamentSetup({
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 mt-3 max-w-md">
-                  {importedFixedPairs ? (
+                  {lockCompetitionType ? (
                     <div className="col-span-2 px-4 py-3 rounded-xl border border-emerald-500/40 bg-emerald-950/30">
                       <p className="text-xs font-black uppercase tracking-wide text-emerald-300">
                         {t(`preregCompType_${competitionType}`)}
                       </p>
-                      <p className="text-[10px] text-slate-400 mt-1">{t('tournCompTypeImportedHint')}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {importedFixedPairs
+                          ? t('tournCompTypeImportedHint')
+                          : t('tournCompTypeLockedHint')}
+                      </p>
                     </div>
                   ) : (
                     <>
@@ -992,14 +1002,25 @@ export default function TournamentSetup({
                   fieldRef={tournamentNameFieldRef}
                   id="tournament-setup-tournament-name"
                   value={tournamentDraft.name}
-                  onValueChange={(v) => setTournamentDraft((prev) => ({ ...prev, name: v }))}
+                  readOnly={fromPreReg}
+                  disabled={fromPreReg}
+                  onValueChange={(v) => {
+                    if (fromPreReg) return;
+                    setTournamentDraft((prev) => ({ ...prev, name: v }));
+                  }}
                   onEnterPress={() => {
+                    if (fromPreReg) return;
                     vkOpt?.closeKeyboard?.();
                     handleStep1Continue();
                   }}
                   placeholder={t('tournNamePlaceholder') || 'např. Páteční turnaj'}
-                  className={inputBase}
+                  className={`${inputBase}${fromPreReg ? ' opacity-80 cursor-not-allowed' : ''}`}
                 />
+                {fromPreReg && (
+                  <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
+                    {t('tournNameLockedHint')}
+                  </p>
+                )}
               </div>
               {showSetupPin && (
                 <div className="rounded-xl border border-amber-500/25 bg-slate-950/90 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1296,7 +1317,9 @@ export default function TournamentSetup({
                     />
                   </div>
                   )}
-                  {pairDrawDone ? (
+                  {fromPreReg ? (
+                    <p className="text-xs text-slate-400 leading-snug">{t('tournRosterFromPreregHint')}</p>
+                  ) : pairDrawDone ? (
                     <p className="text-xs text-slate-400">{t('tournRandomAddLocked')}</p>
                   ) : (
                   <>
@@ -1534,7 +1557,7 @@ export default function TournamentSetup({
                               )}
                             </div>
                             <div className="flex gap-1 shrink-0">
-                              {p.kind !== 'team' && (
+                              {!fromPreReg && p.kind !== 'team' && (
                               <button
                                 type="button"
                                 onClick={() => handleEditPlayer(p._origIdx)}
@@ -1544,6 +1567,7 @@ export default function TournamentSetup({
                                 <Edit2 className="w-4 h-4" />
                               </button>
                               )}
+                              {!fromPreReg && (
                               <button
                                 type="button"
                                 onClick={() => handleDeletePlayer(p._origIdx)}
@@ -1552,6 +1576,7 @@ export default function TournamentSetup({
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
+                              )}
                             </div>
                           </li>
                         ));

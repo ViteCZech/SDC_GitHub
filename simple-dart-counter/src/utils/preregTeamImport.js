@@ -1,14 +1,17 @@
 import { findCsoPlayerEntry } from './csoRanking';
 import { computeTeamSeed } from './doublesSeeding';
 
+/** Potvrzená přihláška — check-in u terče není podmínka importu / losu. */
+export function isPreregImportEligible(registration) {
+  return String(registration?.status ?? '') === 'CONFIRMED';
+}
+
 /**
- * Potvrzené páry, kde oba mají check-in.
+ * Potvrzené páry (oba CONFIRMED). Check-in se nevyžaduje — los jde udělat před termínem.
  * @param {object[]} registrations
  */
 export function collectCheckedInPairs(registrations) {
-  const eligible = (registrations ?? []).filter(
-    (r) => r.status === 'CONFIRMED' && r.attendance?.checkedIn === true
-  );
+  const eligible = (registrations ?? []).filter(isPreregImportEligible);
   const byId = new Map(eligible.map((r) => [r.id, r]));
   const seen = new Set();
   const pairs = [];

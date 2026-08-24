@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildImportedTeams, collectCheckedInPairs } from '../preregTeamImport';
+import { buildImportedTeams, collectCheckedInPairs, isPreregImportEligible } from '../preregTeamImport';
 
 const pair = (id, partnerId, extra = {}) => ({
   id,
@@ -11,7 +11,7 @@ const pair = (id, partnerId, extra = {}) => ({
 });
 
 describe('preregTeamImport', () => {
-  it('collectCheckedInPairs bere jen check-in + potvrzený pár, zbytek leftover', () => {
+  it('collectCheckedInPairs bere potvrzené páry i bez check-inu', () => {
     const regs = [
       pair('a', 'b', { name: 'Ada' }),
       pair('b', 'a', { name: 'Bo' }),
@@ -23,12 +23,19 @@ describe('preregTeamImport', () => {
         pair: { status: 'WAITING_PARTNER' },
         player: { name: 'Solo' },
       },
+      {
+        id: 'pending',
+        status: 'PENDING_PAYMENT',
+        attendance: { checkedIn: true },
+        pair: { status: 'NONE' },
+        player: { name: 'Pend' },
+      },
     ];
     const { pairs, leftover, eligibleCount } = collectCheckedInPairs(regs);
-    expect(eligibleCount).toBe(3);
+    expect(eligibleCount).toBe(4);
     expect(pairs).toHaveLength(1);
     expect(pairs[0].map((r) => r.id).sort()).toEqual(['a', 'b']);
-    expect(leftover.map((r) => r.id)).toEqual(['solo']);
+    expect(leftover.map((r) => r.id).sort()).toEqual(['c', 'solo']);
   });
 
   it('buildImportedTeams sestaví tým a sečte ČP dvojice', () => {
@@ -44,5 +51,12 @@ describe('preregTeamImport', () => {
     expect(teams[0].kind).toBe('team');
     expect(teams[0].name).toBe('Ada / Bo');
     expect(teams[0].ranking).toBe(14);
+  });
+
+  it('isPreregImportEligible bere jen CONFIRMED, check-in nerozhoduje', () => {
+    expect(isPreregImportEligible({ status: 'CONFIRMED', attendance: { checkedIn: false } })).toBe(true);
+    expect(isPreregImportEligible({ status: 'CONFIRMED', attendance: { checkedIn: true } })).toBe(true);
+    expect(isPreregImportEligible({ status: 'PENDING_PAYMENT', attendance: { checkedIn: true } })).toBe(false);
+    expect(isPreregImportEligible({ status: 'WAITLIST' })).toBe(false);
   });
 });

@@ -3,7 +3,7 @@ import { ArrowRight, Download, Loader2 } from 'lucide-react';
 import { translations } from '../../translations';
 import { allowsPairing, normalizeCompetitionType } from '../../utils/preregCompetition';
 import { loadCsoRanking } from '../../utils/csoRanking';
-import { buildImportedTeams } from '../../utils/preregTeamImport';
+import { buildImportedTeams, isPreregImportEligible } from '../../utils/preregTeamImport';
 
 /**
  * @param {{
@@ -31,9 +31,7 @@ export default function ImportToTournamentButton({
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState('');
 
-  const eligiblePeople = (registrations || []).filter(
-    (r) => r.status === 'CONFIRMED' && r.attendance?.checkedIn === true
-  );
+  const eligiblePeople = (registrations || []).filter(isPreregImportEligible);
 
   const buildSinglesPlayers = () =>
     eligiblePeople

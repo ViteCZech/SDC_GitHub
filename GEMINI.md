@@ -161,8 +161,8 @@ Vstup: Domů → Turnaj (`TournamentHub`).
 - čistý KO pavouk (`bracket` / `direct-ko`) — seeding podle ranku
 
 **Stepper admina**
-1. Turnaj (název, formát, legy, 501/out, počet terčů, ČŠO žebříček, cloud)
-2. Hráči (našeptávač ČŠO, duplicity, ranking). U `random_doubles` los párů (`drawRandomPairs`) — lichý = rezervní.
+1. Turnaj (název, formát, legy, 501/out, počet terčů, ČŠO žebříček, cloud). Z předregistrace: název a typ soutěže zamčené.
+2. Hráči (našeptávač ČŠO, duplicity, ranking). U `random_doubles` los párů (`drawRandomPairs`) — lichý = rezervní. Z předregistrace: soupiska jen náhled, editace ve správě přihlášek + re-import.
 3. Formát skupin / postupující / odhad času
 4. Přiřazení terčů skupinám
 5. Skupiny — zápasy, walkovery, start na tabletu / adminovi
@@ -197,7 +197,8 @@ Funkce:
 - Veřejný katalog + stránka turnaje
 - Registrace hráče **jen přes Cloud Function** (ne přímý zápis z klienta)
 - Platba QR (SPD string, `spdQr.js`) nebo hotově
-- Admin: potvrzení platby, check-in, ruční přihláška, import do živého turnaje. Potvrzená dvojice je 1 řádek (`Jalůvka/Armlich`); přítomnost vždy po hráčích. Platba a storno: `feeMode=pair` = 1 ikona za pár, `split` = zvlášť.
+- Admin: potvrzení platby, check-in (přítomnost v den turnaje), ruční přihláška, **import potvrzených** do živého turnaje. Check-in u terče **není** podmínka importu ani losu skupin — los jde udělat dny před `meta.startsAt`. Potvrzená dvojice je 1 řádek (`Jalůvka/Armlich`); přítomnost vždy po hráčích. Platba a storno: `feeMode=pair` = 1 ikona za pár, `split` = zvlášť.
+- Import do `TournamentSetup` **není** založení nového rychlého turnaje: název, typ soutěže a soupiska jsou z předregistrace (zamčené). Hráče se přidávají ve správě přihlášek a znovu importují. Krok 1 u importu = formát / PIN / tablety / terče, ne přejmenování.
 - Spolupořadatel přes invite token (`?invite=`)
 - „Mé přihlášky“ přes CF `listMyRegistrations` (index `player_registration_links` — klient nesmí číst)
 
