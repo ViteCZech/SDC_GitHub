@@ -40,6 +40,10 @@ import { calculatePrizePool, distributePrizePool, getDistributionTemplate } from
 import { getPublicRegistrationUrl } from '../../utils/preregAdmin';
 import { clearAdminInviteSession } from '../../utils/preregStorage';
 import {
+  isOnSiteRegistration,
+  sumConfirmedEntryFees,
+} from '../../utils/preregFinance';
+import {
   loadCsoRanking,
   resolvePlayerLiveRankFromLists,
 } from '../../utils/csoRanking';
@@ -465,6 +469,9 @@ export default function RegistrationAdminPanel({
   const paidCount = registrations.filter(
     (r) => r.status === 'CONFIRMED' && r.payment?.isPaid
   ).length;
+  const onSiteCount = registrations.filter(
+    (r) => r.status === 'CONFIRMED' && isOnSiteRegistration(r)
+  ).length;
   const competitionType = normalizeCompetitionType(tournament?.meta?.competitionType);
   const pairingOn = allowsPairing(competitionType);
   const feeMode = normalizeFeeMode(tournament);
@@ -473,6 +480,20 @@ export default function RegistrationAdminPanel({
   const confirmedTeams = countConfirmedTeams(registrations);
   const capacity = tournament?.meta?.capacity ?? null;
   const unlimited = capacity == null || capacity === 0;
+  const fallbackEntryFee = Number(tournament?.finance?.entryFee ?? 0);
+  const payoutEntryFees = useMemo(
+    () => sumConfirmedEntryFees(registrations, fallbackEntryFee),
+    [registrations, fallbackEntryFee]
+  );
+  const collectedEntryFees = useMemo(
+    () => sumConfirmedEntryFees(registrations, fallbackEntryFee, { paidOnly: true }),
+    [registrations, fallbackEntryFee]
+  );
+  const payoutEntryCount =
+    Number.isFinite(fallbackEntryFee) && fallbackEntryFee > 0
+      ? payoutEntryFees / fallbackEntryFee
+      : 0;
+  const payoutDistributionCount = teamSlots ? confirmedTeams : confirmedCount;
   const unpaired = registrations.filter((r) => {
     if (r.status === 'CANCELLED' || r.status === 'NO_SHOW') return false;
     const st = String(r.pair?.status ?? 'NONE');
@@ -485,17 +506,20 @@ export default function RegistrationAdminPanel({
 
   const prizePool = useMemo(() => {
     return calculatePrizePool({
-      entryFee: tournament?.finance?.entryFee ?? null,
-      confirmedCount: paidCount,
+      entryFee:
+        Number.isFinite(fallbackEntryFee) && fallbackEntryFee > 0
+          ? fallbackEntryFee
+          : null,
+      confirmedCount: payoutEntryCount,
       payoutPercent: tournament?.finance?.payoutPercent ?? null,
       sponsorMoney: tournament?.finance?.addedSponsorMoney ?? null,
     });
-  }, [tournament, paidCount]);
+  }, [tournament, fallbackEntryFee, payoutEntryCount]);
 
   const distribution = useMemo(() => {
-    const template = getDistributionTemplate(paidCount || confirmedCount);
+    const template = getDistributionTemplate(payoutDistributionCount);
     return distributePrizePool(prizePool.prizePool, template);
-  }, [prizePool.prizePool, paidCount, confirmedCount]);
+  }, [prizePool.prizePool, payoutDistributionCount]);
 
   const runAction = async (id, fn) => {
     setActionId(id);
@@ -626,6 +650,11 @@ export default function RegistrationAdminPanel({
         >
           {registrationStatusLabel(t, r.status)}
         </span>
+        {isOnSiteRegistration(r) && (
+          <div className="mt-1 inline-flex rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-cyan-300">
+            {t('preregSourceOnSite') || 'Na místě'}
+          </div>
+        )}
         {r.attendance?.checkedIn && (
           <div className="text-emerald-400 text-xs flex items-center gap-1 mt-0.5">
             <UserCheck className="w-3 h-3" /> {t('preregCheckedIn')}
@@ -827,6 +856,7 @@ export default function RegistrationAdminPanel({
           </p>
           <p className="text-xs text-slate-500 mt-1">
             {t('preregAdminPaidCount')}: {paidCount}
+            {onSiteCount > 0 ? ` · ${t('preregSourceOnSite') || 'Na místě'}: ${onSiteCount}` : ''}
             {teamSlots ? ` · ${confirmedCount} ${t('preregCatalogPlayers')}` : ''}
           </p>
           {pairingOn && (
@@ -842,6 +872,10 @@ export default function RegistrationAdminPanel({
           </p>
           <p className="text-xs text-slate-500 mt-1">
             {t('preregAdminGross')}: {prizePool.gross.toLocaleString('cs-CZ')} Kč
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            {t('preregAdminCollectedFees') || 'Vybrané startovné'}:{' '}
+            {collectedEntryFees.toLocaleString('cs-CZ')} Kč
           </p>
         </div>
         <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/80">

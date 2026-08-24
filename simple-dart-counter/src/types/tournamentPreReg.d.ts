@@ -69,7 +69,7 @@
  * @property {{ method: PaymentMethod|null, variableSymbol: string|null, amount: number|null, isPaid: boolean, verifiedByAdmin: boolean, refundDue?: boolean, refundedAt?: import('firebase/firestore').Timestamp|null }} payment
  * @property {{ checkedIn: boolean }} attendance
  * @property {import('firebase/firestore').Timestamp} [termsAcceptedAt]
- * @property {'PUBLIC'|'ADMIN_MANUAL'} source
+ * @property {'PUBLIC'|'ADMIN_MANUAL'|'ON_SITE'} source
  * @property {'PLAYER'|'ADMIN'|null} [cancelledBy]
  * @property {import('firebase/firestore').Timestamp} [cancelledAt]
  */

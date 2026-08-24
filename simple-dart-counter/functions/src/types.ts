@@ -116,6 +116,8 @@ export interface CreateManualRegistrationPayload {
   isPaid?: boolean;
   checkedIn?: boolean;
   duplicateOk?: boolean;
+  source?: 'ADMIN_MANUAL' | 'ON_SITE';
+  forceConfirmed?: boolean;
 }
 
 export interface CreateManualRegistrationResult {

@@ -869,6 +869,8 @@ export async function createManualRegistration(tournamentId, input) {
       isPaid: !!input?.isPaid,
       checkedIn: !!input?.checkedIn,
       duplicateOk: !!input?.duplicateOk,
+      source: input?.source ?? 'ADMIN_MANUAL',
+      forceConfirmed: !!input?.forceConfirmed,
     });
     return /** @type {{ registrationId: string, status: string, variableSymbol: string }} */ (
       result.data
@@ -881,6 +883,25 @@ export async function createManualRegistration(tournamentId, input) {
     error.code = code.replace(/^functions\//, '') || PREREG_REGISTRATION_FAILED;
     throw error;
   }
+}
+
+/**
+ * Jednorázové načtení přihlášek turnaje pro admin workflow.
+ * @param {string} tournamentId
+ * @returns {Promise<object[]>}
+ */
+export async function listTournamentRegistrations(tournamentId) {
+  const id = String(tournamentId ?? '').trim();
+  if (!id) throw new Error(PREREG_NOT_FOUND);
+  await requireAdminAccess(id);
+  const snap = await getDocs(collection(requireDb(), 'tournaments', id, 'registrations'));
+  const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  list.sort((a, b) => {
+    const ta = a.createdAt?.toMillis?.() ?? 0;
+    const tb = b.createdAt?.toMillis?.() ?? 0;
+    return tb - ta;
+  });
+  return list;
 }
 
 export async function markRegistrationPaid(tournamentId, regId, method) {

@@ -61,6 +61,10 @@ import { parseTabletRouteFromUrl, ensureBoardAuthTokens } from './utils/tabletBo
 import { buildVenueDisplayUrl, parseVenueDisplayRouteFromUrl, resolveVenueLang } from './utils/venueDisplay';
 import { loadAdminInviteSession, saveAdminInviteSession } from './utils/preregStorage';
 import {
+  adminConfirmPair,
+  createManualRegistration,
+  getOwnerTournamentData,
+  listTournamentRegistrations,
   verifyAdminInviteToken,
   claimAdminInviteAccess,
 } from './services/tournamentPreRegService';
@@ -87,7 +91,8 @@ import {
   stripPlayerRankingsForLive,
   withRankingsLocked,
 } from './utils/tournamentRanking';
-import { normalizePlayerNameKey, resolveCsoPlayerId } from './utils/playerIdentity';
+import { findDuplicateRegistration, normalizePlayerNameKey, resolveCsoPlayerId } from './utils/playerIdentity';
+import { allowsPairing, normalizeCompetitionType, normalizeFeeMode } from './utils/preregCompetition';
 import { isTeamPlayer } from './utils/doublesSeeding';
 import { formatRefereeNames, resolveRefereePerson } from './utils/doublesReferee';
 import {
@@ -103,6 +108,7 @@ import {
 import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
 
 const APP_VERSION = "v1.10.1";
+const ACTIVE_PREREG_STATUSES = new Set(['CONFIRMED', 'WAITLIST', 'PENDING_PAYMENT']);
 
 function generatePin() {
   return Math.floor(1000 + Math.random() * 9000).toString();
@@ -1276,6 +1282,180 @@ function AppMain({ lang, setLang }) {
   /** Zabrání dvojímu zápisu historie při `status: completed` + lokálním dokončení. */
   const processedOnlineMatchHistoryRef = React.useRef(new Set());
   const t = (k) => translations[lang]?.[k] || k;
+
+  const rosterIdentityFromPlayer = (rawPlayer) => {
+    const name = String(rawPlayer?.name ?? '').trim();
+    if (!name) return null;
+    const csoPlayerId = resolveCsoPlayerId({
+      name,
+      csoPlayerId: rawPlayer?.csoPlayerId ?? null,
+    });
+    const nameKey = normalizePlayerNameKey(name) || null;
+    return {
+      name,
+      csoPlayerId,
+      nameKey,
+      dedupeKey: csoPlayerId || `name:${nameKey || name.toLowerCase()}`,
+    };
+  };
+
+  const syncRosterOnSiteRegistrations = async ({
+    tournamentId,
+    rosterPlayers,
+    competitionType,
+  }) => {
+    const sourceTournamentId = String(tournamentId ?? '').trim();
+    if (!sourceTournamentId || !Array.isArray(rosterPlayers) || rosterPlayers.length === 0) {
+      return { createdCount: 0, pairedCount: 0 };
+    }
+
+    const sourceTournament = await getOwnerTournamentData(sourceTournamentId);
+    const resolvedCompetitionType = normalizeCompetitionType(
+      sourceTournament?.meta?.competitionType ?? competitionType
+    );
+    const pairingOn = allowsPairing(resolvedCompetitionType);
+    const pairFeeMode = pairingOn && normalizeFeeMode(sourceTournament) === 'pair';
+    const activeRegistrations = await listTournamentRegistrations(sourceTournamentId);
+    const trackedRegs = activeRegistrations.filter((row) =>
+      ACTIVE_PREREG_STATUSES.has(String(row?.status ?? ''))
+    );
+    const trackedByIdentity = new Map();
+    for (const reg of trackedRegs) {
+      const player = reg?.player ?? {};
+      const identity = rosterIdentityFromPlayer({
+        name: player.name,
+        csoPlayerId: player.csoPlayerId ?? (player.nameKey ? `name:${player.nameKey}` : null),
+      });
+      if (!identity || trackedByIdentity.has(identity.dedupeKey)) continue;
+      trackedByIdentity.set(identity.dedupeKey, reg);
+    }
+
+    const ensureRegistration = async (candidate, { markPaid = true } = {}) => {
+      if (!candidate?.name) return null;
+      const existing = trackedByIdentity.get(candidate.dedupeKey) ||
+        findDuplicateRegistration(trackedRegs, {
+          name: candidate.name,
+          csoPlayerId: candidate.csoPlayerId,
+        });
+      if (existing) {
+        trackedByIdentity.set(candidate.dedupeKey, existing);
+        return existing;
+      }
+
+      const created = await createManualRegistration(sourceTournamentId, {
+        playerName: candidate.name,
+        csoPlayerId: candidate.csoPlayerId ?? null,
+        nameKey: candidate.nameKey ?? null,
+        paymentMethod: 'CASH',
+        isPaid: !!markPaid,
+        checkedIn: true,
+        duplicateOk: true,
+        source: 'ON_SITE',
+        forceConfirmed: true,
+      });
+      const createdReg = {
+        id: created.registrationId,
+        status: 'CONFIRMED',
+        source: 'ON_SITE',
+        player: {
+          name: candidate.name,
+          csoPlayerId: candidate.csoPlayerId ?? null,
+          nameKey: candidate.nameKey ?? null,
+        },
+        payment: {
+          isPaid: !!markPaid,
+        },
+        pair: {
+          status: 'NONE',
+          partnerRegistrationId: null,
+        },
+      };
+      trackedRegs.push(createdReg);
+      trackedByIdentity.set(candidate.dedupeKey, createdReg);
+      return createdReg;
+    };
+
+    const uniqueIndividuals = new Map();
+    const paidFlagByIdentity = new Map();
+    const teamIdentityPairs = [];
+    for (const player of rosterPlayers) {
+      if (isTeamPlayer(player) && Array.isArray(player?.members)) {
+        const members = player.members
+          .map((member) => rosterIdentityFromPlayer(member))
+          .filter(Boolean);
+        members.forEach((member, memberIdx) => {
+          if (!uniqueIndividuals.has(member.dedupeKey)) {
+            uniqueIndividuals.set(member.dedupeKey, member);
+          }
+          if (!paidFlagByIdentity.has(member.dedupeKey)) {
+            paidFlagByIdentity.set(member.dedupeKey, !(pairFeeMode && memberIdx > 0));
+          }
+        });
+        if (pairingOn && members.length >= 2) {
+          teamIdentityPairs.push([members[0], members[1]]);
+        }
+        continue;
+      }
+
+      const single = rosterIdentityFromPlayer(player);
+      if (!single || uniqueIndividuals.has(single.dedupeKey)) continue;
+      uniqueIndividuals.set(single.dedupeKey, single);
+      if (!paidFlagByIdentity.has(single.dedupeKey)) {
+        paidFlagByIdentity.set(single.dedupeKey, true);
+      }
+    }
+
+    let createdCount = 0;
+    for (const individual of uniqueIndividuals.values()) {
+      const before = trackedByIdentity.has(individual.dedupeKey);
+      await ensureRegistration(individual, {
+        markPaid: paidFlagByIdentity.get(individual.dedupeKey) !== false,
+      });
+      if (!before) createdCount += 1;
+    }
+
+    let pairedCount = 0;
+    if (pairingOn && teamIdentityPairs.length > 0) {
+      for (const [first, second] of teamIdentityPairs) {
+        const regA = await ensureRegistration(first, {
+          markPaid: paidFlagByIdentity.get(first.dedupeKey) !== false,
+        });
+        const regB = await ensureRegistration(second, {
+          markPaid: paidFlagByIdentity.get(second.dedupeKey) !== false,
+        });
+        if (!regA?.id || !regB?.id || regA.id === regB.id) continue;
+
+        const aPartner = String(regA?.pair?.partnerRegistrationId ?? '').trim();
+        const bPartner = String(regB?.pair?.partnerRegistrationId ?? '').trim();
+        const aStatus = String(regA?.pair?.status ?? 'NONE');
+        const bStatus = String(regB?.pair?.status ?? 'NONE');
+        const alreadyTogether =
+          aStatus === 'CONFIRMED' &&
+          bStatus === 'CONFIRMED' &&
+          aPartner === regB.id &&
+          bPartner === regA.id;
+        const takenByOther =
+          (aStatus === 'CONFIRMED' && aPartner && aPartner !== regB.id) ||
+          (bStatus === 'CONFIRMED' && bPartner && bPartner !== regA.id);
+        if (alreadyTogether || takenByOther) continue;
+
+        await adminConfirmPair(sourceTournamentId, regA.id, regB.id);
+        pairedCount += 1;
+        const nextA = {
+          ...regA,
+          pair: { ...(regA?.pair ?? {}), status: 'CONFIRMED', partnerRegistrationId: regB.id },
+        };
+        const nextB = {
+          ...regB,
+          pair: { ...(regB?.pair ?? {}), status: 'CONFIRMED', partnerRegistrationId: regA.id },
+        };
+        trackedByIdentity.set(first.dedupeKey, nextA);
+        trackedByIdentity.set(second.dedupeKey, nextB);
+      }
+    }
+
+    return { createdCount, pairedCount };
+  };
 
   const stopMediaStream = (s) => {
     if (!s) return;
@@ -5545,7 +5725,7 @@ function AppMain({ lang, setLang }) {
                 }
               : undefined
           }
-          onComplete={(data) => {
+          onComplete={async (data) => {
             if (isTournamentLive || tournamentData?.rankingsLocked) {
               showNotification(
                 t('tournLiveLockedHint') ||
@@ -5554,12 +5734,39 @@ function AppMain({ lang, setLang }) {
               );
               return;
             }
-            clearTournamentWip();
             const generatedPin = String(data.pin || activePin || generatePin()).trim();
             let playersWithIds = (data.players || []).map((p, i) => ({
               ...p,
               id: p.id ?? `p${i + 1}`,
             }));
+
+            if (preRegImportSourceId && playersWithIds.length > 0) {
+              try {
+                const syncResult = await syncRosterOnSiteRegistrations({
+                  tournamentId: preRegImportSourceId,
+                  rosterPlayers: playersWithIds,
+                  competitionType: data.competitionType,
+                });
+                if ((syncResult.createdCount ?? 0) > 0) {
+                  const msgTemplate =
+                    t('preregOnSiteSyncDone') ||
+                    'Do předregistrace doplněno {count} hráčů na místě.';
+                  showNotification(
+                    msgTemplate.replace('{count}', String(syncResult.createdCount)),
+                    'success'
+                  );
+                }
+              } catch (syncErr) {
+                console.error('on-site roster sync failed', syncErr);
+                showNotification(
+                  t('preregOnSiteSyncFailed') ||
+                    'Nepodařilo se synchronizovat hráče na místě do přihlášek. Opravte to ve správě předregistrace a zkuste znovu.',
+                  'error'
+                );
+                return;
+              }
+            }
+            clearTournamentWip();
             const tournamentId =
               data.tournamentId ||
               (typeof crypto !== 'undefined' && crypto.randomUUID
