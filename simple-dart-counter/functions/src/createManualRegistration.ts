@@ -45,6 +45,10 @@ function resolveStoredCsoPlayerId(
   });
 }
 
+function normalizeManualSource(raw: unknown): 'ADMIN_MANUAL' | 'ON_SITE' {
+  return String(raw ?? '').trim().toUpperCase() === 'ON_SITE' ? 'ON_SITE' : 'ADMIN_MANUAL';
+}
+
 async function assertTournamentAdmin(tournamentId: string, uid: string): Promise<TournamentDocument> {
   const tourRef = db.collection('tournaments').doc(tournamentId);
   const tourSnap = await tourRef.get();
@@ -81,6 +85,8 @@ export const createManualRegistration = onCall(
     const tournamentId = String(data.tournamentId ?? '').trim();
     const playerName = String(data.playerName ?? '').trim();
     const duplicateOk = !!data.duplicateOk;
+    const forceConfirmed = !!data.forceConfirmed;
+    const source = normalizeManualSource(data.source);
 
     if (!tournamentId || !playerName) {
       throw new HttpsError('invalid-argument', 'Jméno hráče a ID turnaje jsou povinné.');
@@ -109,16 +115,18 @@ export const createManualRegistration = onCall(
       );
 
       let newStatus: 'CONFIRMED' | 'WAITLIST' = 'CONFIRMED';
-      if (
-        !teamCapacity &&
-        !unlimited &&
-        Number(maxCapacity) > 0 &&
-        currentConfirmed >= Number(maxCapacity)
-      ) {
-        if (!fresh.meta?.waitlistEnabled) {
-          throw new HttpsError('resource-exhausted', 'Kapacita turnaje je naplněna.');
+      if (!forceConfirmed) {
+        if (
+          !teamCapacity &&
+          !unlimited &&
+          Number(maxCapacity) > 0 &&
+          currentConfirmed >= Number(maxCapacity)
+        ) {
+          if (!fresh.meta?.waitlistEnabled) {
+            throw new HttpsError('resource-exhausted', 'Kapacita turnaje je naplněna.');
+          }
+          newStatus = 'WAITLIST';
         }
-        newStatus = 'WAITLIST';
       }
 
       if (!duplicateOk) {
@@ -174,7 +182,7 @@ export const createManualRegistration = onCall(
         },
         createdAt: now,
         updatedAt: now,
-        source: 'ADMIN_MANUAL',
+        source,
       });
 
       if (newStatus === 'CONFIRMED') {
@@ -201,6 +209,8 @@ export const createManualRegistration = onCall(
       registrationId: result.registrationId,
       status: result.status,
       duplicateOk,
+      source,
+      forceConfirmed,
     });
 
     try {
