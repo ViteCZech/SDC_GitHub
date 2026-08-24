@@ -26,7 +26,25 @@ function boardGridStyle(boardCount) {
 function groupsGridClass(count) {
   if (count <= 1) return 'grid-cols-1';
   if (count <= 4) return 'grid-cols-2';
-  return 'grid-cols-3';
+  if (count <= 6) return 'grid-cols-3';
+  return 'grid-cols-4';
+}
+
+function resolveGroupsPageSize(totalGroups) {
+  const total = Math.max(0, Number(totalGroups) || 0);
+  if (total === 0) return 0;
+  // Menší počty skupin nechat větší; od 5 výš plnit až 8 slotů na screen.
+  if (total <= 4) return 4;
+  return 8;
+}
+
+function chunkGroups(groups, size) {
+  if (!Array.isArray(groups) || size <= 0) return [];
+  const out = [];
+  for (let i = 0; i < groups.length; i += size) {
+    out.push(groups.slice(i, i + size));
+  }
+  return out;
 }
 
 function BoardCard({ board, lang, boardCount }) {
@@ -105,7 +123,7 @@ function BoardCard({ board, lang, boardCount }) {
   );
 }
 
-function GroupsSlide({ groups, lang }) {
+function GroupsSlide({ groups, lang, blockIndex = 0, blockCount = 1 }) {
   if (!groups.length) {
     return (
       <p className="m-auto text-2xl font-black text-slate-600 uppercase tracking-widest">
@@ -115,10 +133,17 @@ function GroupsSlide({ groups, lang }) {
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto h-full min-h-0">
-      <div className={`grid gap-6 min-h-0 h-full ${groupsGridClass(groups.length)}`}>
+    <div className="w-full max-w-7xl mx-auto h-full min-h-0 flex flex-col">
+      {blockCount > 1 ? (
+        <div className="shrink-0 mb-2 text-right">
+          <span className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+            {tv(lang, 'groups')} {blockIndex + 1}/{blockCount}
+          </span>
+        </div>
+      ) : null}
+      <div className={`grid gap-6 min-h-0 h-full auto-rows-fr ${groupsGridClass(groups.length)}`}>
         {groups.map((g) => (
-          <section key={g.groupId} className="min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/95 px-4 py-3">
+          <section key={g.groupId} className="h-full min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/95 px-4 py-3">
             <h2 className="text-lg xl:text-xl font-black uppercase tracking-wider text-emerald-400 mb-2">
             {g.name}
             </h2>
@@ -275,6 +300,17 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
       })
       .filter((g) => g.groupId && g.rows.length > 0);
   }, [model, lang]);
+  const groupSlides = useMemo(() => {
+    const pageSize = resolveGroupsPageSize(groupsData.length);
+    if (!pageSize) return [];
+    const blocks = chunkGroups(groupsData, pageSize);
+    return blocks.map((groups, index) => ({
+      type: 'groups',
+      groups,
+      blockIndex: index,
+      blockCount: blocks.length,
+    }));
+  }, [groupsData]);
 
   useEffect(() => {
     if (!model?.boards) return;
@@ -305,9 +341,9 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
 
   const slides = useMemo(() => {
     const out = [{ type: 'boards' }];
-    if (groupsData.length > 0) out.push({ type: 'groups' });
+    if (groupSlides.length > 0) out.push(...groupSlides);
     return out;
-  }, [groupsData.length]);
+  }, [groupSlides]);
   const canRotate = !activeCall && slides.length > 1;
   const slideSafeIdx = slideIdx % slides.length;
   const slide = slides[slideSafeIdx];
@@ -399,7 +435,14 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
           )
         ) : null}
 
-        {model && slide?.type === 'groups' ? <GroupsSlide groups={groupsData} lang={lang} /> : null}
+        {model && slide?.type === 'groups' ? (
+          <GroupsSlide
+            groups={slide.groups}
+            lang={lang}
+            blockIndex={slide.blockIndex}
+            blockCount={slide.blockCount}
+          />
+        ) : null}
       </main>
 
       <CallOverlay call={activeCall} lang={lang} />
