@@ -24,12 +24,45 @@ function boardGridClass(n) {
   return 'grid-cols-4';
 }
 
-function BoardCard({ board, lang, huge }) {
+function BoardCard({ board, lang, huge, boardCount }) {
   const cur = board.current;
-  const nameCls = huge ? 'text-5xl xl:text-7xl' : 'text-3xl xl:text-5xl';
+  const compact = boardCount >= 8;
+  const medium = boardCount >= 6;
+  const boardTitleCls = compact
+    ? 'text-lg xl:text-xl'
+    : medium
+      ? 'text-xl xl:text-2xl'
+      : huge
+        ? 'text-3xl xl:text-4xl'
+        : 'text-2xl xl:text-3xl';
+  const scoreCls = compact
+    ? 'text-2xl xl:text-3xl'
+    : medium
+      ? 'text-3xl xl:text-4xl'
+      : huge
+        ? 'text-6xl xl:text-8xl'
+        : 'text-4xl xl:text-6xl';
+  const nowNamesCls = compact
+    ? 'text-lg xl:text-xl'
+    : medium
+      ? 'text-xl xl:text-2xl'
+      : huge
+        ? 'text-4xl xl:text-6xl'
+        : 'text-3xl xl:text-4xl';
+  const nextNamesCls = compact
+    ? 'text-sm xl:text-base'
+    : medium
+      ? 'text-base xl:text-lg'
+      : huge
+        ? 'text-2xl xl:text-3xl'
+        : 'text-xl xl:text-2xl';
+  const sectionLabelCls = compact
+    ? 'text-[10px] tracking-[0.24em]'
+    : 'text-[11px] xl:text-sm tracking-[0.3em]';
+  const refereeName = cur?.refereeName || board.next?.refereeName || '—';
   return (
     <article
-      className={`flex min-h-0 flex-col rounded-3xl border-2 px-5 py-4 ${
+      className={`flex h-full min-h-0 flex-col justify-between rounded-3xl border-2 p-4 gap-3 ${
         cur?.playing
           ? 'border-amber-400 bg-slate-900 shadow-[0_0_40px_rgba(251,191,36,0.18)]'
           : cur
@@ -37,61 +70,75 @@ function BoardCard({ board, lang, huge }) {
             : 'border-slate-800 bg-slate-950'
       }`}
     >
-      <header className="flex items-baseline justify-between gap-4">
-        <h2 className="font-black uppercase tracking-[0.25em] text-amber-400 text-2xl xl:text-4xl">
+      <header className="flex items-center justify-between gap-3">
+        <h2 className={`font-black uppercase tracking-[0.22em] text-amber-300 leading-tight ${boardTitleCls}`}>
           {tv(lang, 'board')} {board.board}
         </h2>
         {cur ? (
-          <p className={`font-mono font-black tabular-nums text-white ${huge ? 'text-6xl xl:text-8xl' : 'text-4xl xl:text-6xl'}`}>
-            {cur.legsP1}:{cur.legsP2}
+          <p className={`font-mono font-black tabular-nums text-white leading-tight ${scoreCls}`}>
+            {cur.legsP1} : {cur.legsP2}
           </p>
         ) : (
-          <p className="text-slate-600 font-black uppercase tracking-widest text-xl">{tv(lang, 'free')}</p>
+          <p className={`text-slate-600 font-black uppercase tracking-widest leading-tight ${compact ? 'text-base' : 'text-lg xl:text-xl'}`}>
+            {tv(lang, 'free')}
+          </p>
         )}
       </header>
 
-      {cur ? (
-        <div className="mt-4 flex-1 flex flex-col justify-center min-h-0">
-          <p className="text-[11px] xl:text-sm font-black uppercase tracking-[0.35em] text-slate-500">
-            {cur.playing ? tv(lang, 'nowPlaying') : tv(lang, 'prepare')}
+      <div className="flex-1 min-h-0 flex flex-col gap-3">
+        <section
+          className={`rounded-2xl border px-3 py-3 min-h-0 ${
+            cur?.playing
+              ? 'border-amber-400/60 bg-amber-500/10'
+              : cur
+                ? 'border-emerald-500/45 bg-emerald-500/5'
+                : 'border-slate-800 bg-slate-900/70'
+          }`}
+        >
+          <p className={`font-black uppercase text-slate-400 ${sectionLabelCls} leading-tight`}>
+            {cur?.playing ? tv(lang, 'nowPlaying') : tv(lang, 'prepare')}
           </p>
-          <p className={`mt-1 font-black leading-tight text-white break-words ${nameCls}`}>
-            {cur.player1Name}
-            <span className="mx-3 text-slate-500 font-bold">{tv(lang, 'vs')}</span>
-            {cur.player2Name}
-          </p>
-          {cur.refereeName ? (
-            <p className="mt-3 text-xl xl:text-3xl font-bold text-slate-300">
-              <span className="text-slate-500 font-black uppercase tracking-widest text-sm xl:text-lg mr-2">
-                {tv(lang, 'referee')}
+          {cur ? (
+            <div className="mt-2 flex flex-col gap-1 min-h-0">
+              <span className={`block truncate font-black text-white leading-tight ${nowNamesCls}`}>{cur.player1Name}</span>
+              <span className={`font-black text-slate-500 uppercase leading-tight ${compact ? 'text-xs' : 'text-sm xl:text-base'}`}>
+                {tv(lang, 'vs')}
               </span>
-              {cur.refereeName}
+              <span className={`block truncate font-black text-white leading-tight ${nowNamesCls}`}>{cur.player2Name}</span>
+            </div>
+          ) : (
+            <p className={`mt-2 font-black uppercase text-slate-600 leading-tight ${compact ? 'text-lg' : 'text-2xl xl:text-3xl'}`}>
+              {tv(lang, 'free')}
             </p>
-          ) : null}
-        </div>
-      ) : (
-        <div className="mt-6 flex-1 flex items-center">
-          <p className="text-4xl xl:text-6xl font-black text-slate-700 uppercase tracking-widest">{tv(lang, 'free')}</p>
-        </div>
-      )}
+          )}
+        </section>
 
-      {board.next ? (
-        <footer className="mt-4 pt-3 border-t border-slate-800">
-          <p className="text-[11px] xl:text-sm font-black uppercase tracking-[0.3em] text-emerald-400">
+        <section className="rounded-2xl border border-slate-800 bg-slate-950/70 px-3 py-2 min-h-0">
+          <p className={`font-black uppercase text-emerald-400 ${sectionLabelCls} leading-tight`}>
             {tv(lang, 'upNext')}
           </p>
-          <p className="mt-1 text-2xl xl:text-4xl font-black text-slate-100 leading-tight break-words">
-            {board.next.player1Name}
-            <span className="mx-2 text-slate-500">{tv(lang, 'vs')}</span>
-            {board.next.player2Name}
-          </p>
-          {board.next.refereeName ? (
-            <p className="mt-1 text-lg xl:text-2xl font-bold text-slate-400">
-              {tv(lang, 'referee')}: {board.next.refereeName}
+          {board.next ? (
+            <div className="mt-2 flex flex-col gap-1 min-h-0">
+              <span className={`block truncate font-black text-slate-100 leading-tight ${nextNamesCls}`}>{board.next.player1Name}</span>
+              <span className={`font-black text-slate-500 uppercase leading-tight ${compact ? 'text-[10px]' : 'text-xs xl:text-sm'}`}>
+                {tv(lang, 'vs')}
+              </span>
+              <span className={`block truncate font-black text-slate-100 leading-tight ${nextNamesCls}`}>{board.next.player2Name}</span>
+            </div>
+          ) : (
+            <p className={`mt-2 font-bold text-slate-600 uppercase leading-tight ${compact ? 'text-xs' : 'text-sm'}`}>
+              {tv(lang, 'preparing')}
             </p>
-          ) : null}
-        </footer>
-      ) : null}
+          )}
+        </section>
+      </div>
+
+      <footer className="pt-2 border-t border-slate-800">
+        <p className="text-gray-400 text-sm leading-tight truncate block">
+          <span className="font-black uppercase tracking-[0.15em] text-slate-500 mr-2">{tv(lang, 'referee')}:</span>
+          <span className="font-bold">{refereeName}</span>
+        </p>
+      </footer>
     </article>
   );
 }
@@ -348,7 +395,13 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
           ) : (
             <div className={`grid gap-4 xl:gap-5 flex-1 min-h-0 ${boardGridClass(model.boards.length)}`}>
               {model.boards.map((b) => (
-                <BoardCard key={b.board} board={b} lang={lang} huge={model.boards.length <= 2} />
+                <BoardCard
+                  key={b.board}
+                  board={b}
+                  lang={lang}
+                  huge={model.boards.length <= 2}
+                  boardCount={model.boards.length}
+                />
               ))}
             </div>
           )
