@@ -114,6 +114,20 @@ export function getAdminInviteUrl(tournamentId, inviteToken) {
 }
 
 /**
+ * Po obnově storna drží filtr stabilní, aby řádky "nemizely" neočekávaně.
+ * Pokud aktivní filtr obnovený status nezobrazuje, vrátí ALL.
+ * @param {string} currentFilter
+ * @param {string|null|undefined} restoredStatus
+ * @returns {string}
+ */
+export function resolveFilterAfterRestore(currentFilter, restoredStatus) {
+  const nextStatus = String(restoredStatus ?? '').trim();
+  if (!nextStatus) return currentFilter || 'ALL';
+  if (currentFilter === 'ALL' || currentFilter === nextStatus) return currentFilter;
+  return 'ALL';
+}
+
+/**
  * @returns {{ tournamentId: string, inviteToken: string|null }|null}
  */
 export function parsePreregRouteFromUrl() {

@@ -6,6 +6,7 @@ import {
   isDeadlineAfterStart,
   parseOptionalNumber,
   parseOptionalString,
+  resolveFilterAfterRestore,
 } from '../preregAdmin';
 
 describe('preregAdmin datetime', () => {
@@ -46,5 +47,18 @@ describe('preregAdmin helpers', () => {
     expect(h).toMatch(/^[a-f0-9]{64}$/);
     expect(h).toBe(await hashAdminPin('1234'));
     expect(h).not.toBe(await hashAdminPin('1235'));
+  });
+
+  it('resolveFilterAfterRestore drží filtr ALL beze změny', () => {
+    expect(resolveFilterAfterRestore('ALL', 'CONFIRMED')).toBe('ALL');
+  });
+
+  it('resolveFilterAfterRestore nepřepíná na status, když je stejný filtr aktivní', () => {
+    expect(resolveFilterAfterRestore('CONFIRMED', 'CONFIRMED')).toBe('CONFIRMED');
+  });
+
+  it('resolveFilterAfterRestore vrátí ALL, když by obnovený hráč ve filtru zmizel', () => {
+    expect(resolveFilterAfterRestore('CANCELLED', 'CONFIRMED')).toBe('ALL');
+    expect(resolveFilterAfterRestore('REFUND_DUE', 'PENDING_PAYMENT')).toBe('ALL');
   });
 });

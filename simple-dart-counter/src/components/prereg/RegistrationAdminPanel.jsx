@@ -37,7 +37,7 @@ import {
   usesTeamCapacity,
 } from '../../utils/preregCompetition';
 import { calculatePrizePool, distributePrizePool, getDistributionTemplate } from '../../utils/prizePool';
-import { getPublicRegistrationUrl } from '../../utils/preregAdmin';
+import { getPublicRegistrationUrl, resolveFilterAfterRestore } from '../../utils/preregAdmin';
 import { clearAdminInviteSession } from '../../utils/preregStorage';
 import {
   isOnSiteRegistration,
@@ -565,11 +565,7 @@ export default function RegistrationAdminPanel({
         if (result?.status === 'WAITLIST' && targetStatus === 'CONFIRMED') {
           onNotify?.(t('preregRestoreWaitlistNote'), 'success');
         }
-        if (result?.status && FILTERS.includes(result.status)) {
-          setFilter(result.status);
-        } else {
-          setFilter('ALL');
-        }
+        setFilter((prev) => resolveFilterAfterRestore(prev, result?.status));
         setHighlightRegId(reg.id);
         window.setTimeout(() => setHighlightRegId(null), 4500);
       } catch (err) {
