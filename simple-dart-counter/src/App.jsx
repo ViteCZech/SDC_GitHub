@@ -153,6 +153,35 @@ function createDefaultTournamentDraft() {
   };
 }
 
+function resolvePreRegStartsAtMs(rawStartsAt) {
+  if (!rawStartsAt) return null;
+  try {
+    if (typeof rawStartsAt?.toMillis === 'function') {
+      const ms = Number(rawStartsAt.toMillis());
+      return Number.isFinite(ms) ? ms : null;
+    }
+    if (typeof rawStartsAt?.toDate === 'function') {
+      const ms = rawStartsAt.toDate()?.getTime?.();
+      return Number.isFinite(ms) ? ms : null;
+    }
+    const ms = new Date(rawStartsAt).getTime();
+    return Number.isNaN(ms) ? null : ms;
+  } catch {
+    return null;
+  }
+}
+
+function formatPreRegStartsAt(ms, lang) {
+  return new Date(ms).toLocaleString(lang === 'en' ? 'en-US' : lang === 'pl' ? 'pl-PL' : 'cs-CZ');
+}
+
+function buildPreRegFutureStartMessage(lang, startsAtMs) {
+  const template =
+    translations[lang]?.preregImportFutureStart ||
+    'Turnaj lze importovat do živého režimu nejdříve v termínu startu ({date}).';
+  return template.replace('{date}', formatPreRegStartsAt(startsAtMs, lang));
+}
+
 const safeStorage = {
   getItem: (key) => { try { return localStorage.getItem(key); } catch { return null; } },
   setItem: (key, value) => { try { localStorage.setItem(key, value); } catch {} },
@@ -3365,7 +3394,13 @@ function AppMain({ lang, setLang }) {
     tournamentName,
     importMode = 'fresh',
     competitionType,
+    tournamentStartsAt = null,
   }) => {
+    const startsAtMs = resolvePreRegStartsAtMs(tournamentStartsAt);
+    if (startsAtMs != null && startsAtMs > Date.now()) {
+      showNotification(buildPreRegFutureStartMessage(lang, startsAtMs), 'error');
+      return;
+    }
     setUserRole('admin');
     if (activePreRegTournamentId) {
       setPreRegImportSourceId(activePreRegTournamentId);
@@ -3520,7 +3555,7 @@ function AppMain({ lang, setLang }) {
       };
     });
     setActivePin(pinToUse);
-    setTournamentSetupStep(2);
+    setTournamentSetupStep(1);
     setAppState('tournament_setup');
   };
 
@@ -5765,6 +5800,18 @@ function AppMain({ lang, setLang }) {
                 'error'
               );
               return;
+            }
+            if (preRegImportSourceId) {
+              try {
+                const sourceTournament = await getOwnerTournamentData(preRegImportSourceId);
+                const startsAtMs = resolvePreRegStartsAtMs(sourceTournament?.meta?.startsAt);
+                if (startsAtMs != null && startsAtMs > Date.now()) {
+                  showNotification(buildPreRegFutureStartMessage(lang, startsAtMs), 'error');
+                  return;
+                }
+              } catch (err) {
+                console.warn('PreReg start validation failed:', err);
+              }
             }
             const generatedPin = String(data.pin || activePin || generatePin()).trim();
             let playersWithIds = (data.players || []).map((p, i) => ({

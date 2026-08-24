@@ -359,7 +359,7 @@ function ManualRegistrationModal({
  *   user: object|null,
  *   onBack: () => void,
  *   onDeleted?: () => void,
- *   onImportToSetup: (payload: { players: object[], tournamentName: string|null, importMode?: string }) => void,
+ *   onImportToSetup: (payload: { players: object[], tournamentName: string|null, importMode?: string, tournamentStartsAt?: unknown }) => void,
  *   onGoogleLogin?: () => void,
  *   requireImportMode?: boolean,
  * }} props
@@ -911,6 +911,7 @@ export default function RegistrationAdminPanel({
             tournamentName: tournament.meta?.name ?? null,
             importMode: payload.importMode ?? 'fresh',
             competitionType: tournament.meta?.competitionType,
+            tournamentStartsAt: tournament.meta?.startsAt ?? null,
           })
         }
       />

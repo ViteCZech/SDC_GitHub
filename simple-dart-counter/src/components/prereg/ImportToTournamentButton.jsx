@@ -4,6 +4,7 @@ import { translations } from '../../translations';
 import { allowsPairing, normalizeCompetitionType } from '../../utils/preregCompetition';
 import { loadCsoRanking } from '../../utils/csoRanking';
 import { buildImportedTeams } from '../../utils/preregTeamImport';
+import { getStartsAtMs } from '../../utils/preregTournamentList';
 
 /**
  * @param {{
@@ -30,6 +31,21 @@ export default function ImportToTournamentButton({
   const [pendingPlayers, setPendingPlayers] = useState(null);
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState('');
+  const startsAtMs = getStartsAtMs(tournament);
+  const isFutureTournament = startsAtMs != null && startsAtMs > Date.now();
+  const startDateLabel =
+    startsAtMs == null
+      ? ''
+      : new Date(startsAtMs).toLocaleString(
+          lang === 'en' ? 'en-US' : lang === 'pl' ? 'pl-PL' : 'cs-CZ'
+        );
+  const futureStartHint = isFutureTournament
+    ? (t('preregImportFutureStart') ||
+        'Turnaj lze importovat do živého režimu nejdříve v termínu startu ({date}).').replace(
+        '{date}',
+        startDateLabel
+      )
+    : '';
 
   const eligiblePeople = (registrations || []).filter(
     (r) => r.status === 'CONFIRMED' && r.attendance?.checkedIn === true
@@ -54,6 +70,7 @@ export default function ImportToTournamentButton({
 
   const handleImport = async () => {
     setHint('');
+    if (isFutureTournament) return;
     if (pairingOn) {
       setBusy(true);
       try {
@@ -123,7 +140,7 @@ export default function ImportToTournamentButton({
           <button
             type="button"
             onClick={handleImport}
-            disabled={busy || readyCount < minReady}
+            disabled={busy || readyCount < minReady || isFutureTournament}
             className="flex items-center gap-2 px-4 py-3 rounded-xl font-black uppercase tracking-wide text-sm bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
@@ -135,6 +152,9 @@ export default function ImportToTournamentButton({
           <p className="text-xs text-amber-400">
             {pairingOn ? t('preregImportMinTeams') : t('preregImportMinPlayers')}
           </p>
+        )}
+        {isFutureTournament && (
+          <p className="text-xs text-amber-400">{futureStartHint}</p>
         )}
         {hint && <p className="text-xs text-amber-300">{hint}</p>}
       </div>
