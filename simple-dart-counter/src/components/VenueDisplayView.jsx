@@ -11,195 +11,160 @@ import {
   detectVenueMatchCalls,
   playVenueGong,
 } from '../utils/venueDisplay';
+import { calculateGroupStandings } from '../utils/tournamentLogic';
 
 function tv(lang, key) {
   return translations[lang]?.venueDisplay?.[key] ?? translations.cs?.venueDisplay?.[key] ?? key;
 }
 
-function boardGridClass(n) {
-  if (n <= 1) return 'grid-cols-1';
-  if (n === 2) return 'grid-cols-2';
-  if (n <= 4) return 'grid-cols-2';
-  if (n <= 6) return 'grid-cols-3';
-  return 'grid-cols-4';
+function boardGridStyle(boardCount) {
+  const count = Math.max(1, Number(boardCount) || 1);
+  const cols = Math.max(1, Math.ceil(count / 2));
+  return { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` };
 }
 
-function BoardCard({ board, lang, huge, boardCount }) {
+function groupsGridClass(count) {
+  if (count <= 1) return 'grid-cols-1';
+  if (count <= 4) return 'grid-cols-2';
+  return 'grid-cols-3';
+}
+
+function BoardCard({ board, lang, boardCount }) {
   const cur = board.current;
+  const next = board.next;
+  const hasManyBoards = boardCount >= 7;
   const compact = boardCount >= 8;
-  const medium = boardCount >= 6;
-  const boardTitleCls = compact
-    ? 'text-lg xl:text-xl'
-    : medium
-      ? 'text-xl xl:text-2xl'
-      : huge
-        ? 'text-3xl xl:text-4xl'
-        : 'text-2xl xl:text-3xl';
-  const scoreCls = compact
-    ? 'text-2xl xl:text-3xl'
-    : medium
-      ? 'text-3xl xl:text-4xl'
-      : huge
-        ? 'text-6xl xl:text-8xl'
-        : 'text-4xl xl:text-6xl';
-  const nowNamesCls = compact
-    ? 'text-lg xl:text-xl'
-    : medium
-      ? 'text-xl xl:text-2xl'
-      : huge
-        ? 'text-4xl xl:text-6xl'
-        : 'text-3xl xl:text-4xl';
-  const nextNamesCls = compact
-    ? 'text-sm xl:text-base'
-    : medium
-      ? 'text-base xl:text-lg'
-      : huge
-        ? 'text-2xl xl:text-3xl'
-        : 'text-xl xl:text-2xl';
-  const sectionLabelCls = compact
-    ? 'text-[10px] tracking-[0.24em]'
-    : 'text-[11px] xl:text-sm tracking-[0.3em]';
-  const refereeName = cur?.refereeName || board.next?.refereeName || '—';
+  const titleCls = hasManyBoards ? 'text-base xl:text-lg' : 'text-lg xl:text-2xl';
+  const scoreCls = compact ? 'text-xl xl:text-2xl' : hasManyBoards ? 'text-2xl xl:text-3xl' : 'text-3xl xl:text-4xl';
+  const nowCls = compact ? 'text-lg xl:text-xl' : hasManyBoards ? 'text-xl xl:text-2xl' : 'text-2xl xl:text-3xl';
+  const prepCls = compact ? 'text-sm xl:text-base' : hasManyBoards ? 'text-base xl:text-lg' : 'text-lg xl:text-xl';
+  const refereeName = cur?.refereeName || next?.refereeName || '—';
+
   return (
     <article
-      className={`flex h-full min-h-0 flex-col justify-between rounded-3xl border-2 p-4 gap-3 ${
+      className={`flex h-full min-h-[190px] flex-col rounded-2xl border px-4 py-3 ${
         cur?.playing
-          ? 'border-amber-400 bg-slate-900 shadow-[0_0_40px_rgba(251,191,36,0.18)]'
+          ? 'border-amber-400/70 bg-slate-900'
           : cur
-            ? 'border-emerald-500/70 bg-slate-900'
-            : 'border-slate-800 bg-slate-950'
+            ? 'border-emerald-500/60 bg-slate-900'
+            : 'border-slate-800 bg-slate-900/95'
       }`}
     >
-      <header className="flex items-center justify-between gap-3">
-        <h2 className={`font-black uppercase tracking-[0.22em] text-amber-300 leading-tight ${boardTitleCls}`}>
+      <header className="flex items-center justify-between gap-2">
+        <h2 className={`font-black uppercase tracking-wider text-amber-300 leading-tight ${titleCls}`}>
           {tv(lang, 'board')} {board.board}
         </h2>
         {cur ? (
-          <p className={`font-mono font-black tabular-nums text-white leading-tight ${scoreCls}`}>
+          <p className={`font-mono font-black tabular-nums text-white leading-tight shrink-0 ${scoreCls}`}>
             {cur.legsP1} : {cur.legsP2}
           </p>
         ) : (
-          <p className={`text-slate-600 font-black uppercase tracking-widest leading-tight ${compact ? 'text-base' : 'text-lg xl:text-xl'}`}>
+          <p className={`text-slate-600 font-black uppercase tracking-wider leading-tight ${compact ? 'text-sm' : 'text-base xl:text-lg'}`}>
             {tv(lang, 'free')}
           </p>
         )}
       </header>
 
-      <div className="flex-1 min-h-0 flex flex-col gap-3">
-        <section
-          className={`rounded-2xl border px-3 py-3 min-h-0 ${
-            cur?.playing
-              ? 'border-amber-400/60 bg-amber-500/10'
-              : cur
-                ? 'border-emerald-500/45 bg-emerald-500/5'
-                : 'border-slate-800 bg-slate-900/70'
-          }`}
-        >
-          <p className={`font-black uppercase text-slate-400 ${sectionLabelCls} leading-tight`}>
+      <div className="mt-3 flex-1 min-h-0 flex flex-col justify-between gap-3">
+        <section className="min-h-0">
+          <p className="text-[11px] uppercase tracking-wider font-black text-slate-500 leading-tight">
             {cur?.playing ? tv(lang, 'nowPlaying') : tv(lang, 'prepare')}
           </p>
           {cur ? (
-            <div className="mt-2 flex flex-col gap-1 min-h-0">
-              <span className={`block truncate font-black text-white leading-tight ${nowNamesCls}`}>{cur.player1Name}</span>
-              <span className={`font-black text-slate-500 uppercase leading-tight ${compact ? 'text-xs' : 'text-sm xl:text-base'}`}>
-                {tv(lang, 'vs')}
-              </span>
-              <span className={`block truncate font-black text-white leading-tight ${nowNamesCls}`}>{cur.player2Name}</span>
-            </div>
+            <p className={`mt-1 font-black text-white leading-tight truncate block ${nowCls}`}>
+              {cur.player1Name} <span className="text-slate-500">{tv(lang, 'vs')}</span> {cur.player2Name}
+            </p>
           ) : (
-            <p className={`mt-2 font-black uppercase text-slate-600 leading-tight ${compact ? 'text-lg' : 'text-2xl xl:text-3xl'}`}>
+            <p className={`mt-1 font-black text-slate-600 uppercase leading-tight ${compact ? 'text-base' : 'text-lg xl:text-xl'}`}>
               {tv(lang, 'free')}
             </p>
           )}
         </section>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-950/70 px-3 py-2 min-h-0">
-          <p className={`font-black uppercase text-emerald-400 ${sectionLabelCls} leading-tight`}>
+        <section className="min-h-0">
+          <p className="text-[10px] uppercase tracking-wider font-black text-emerald-400 leading-tight">
             {tv(lang, 'upNext')}
           </p>
-          {board.next ? (
-            <div className="mt-2 flex flex-col gap-1 min-h-0">
-              <span className={`block truncate font-black text-slate-100 leading-tight ${nextNamesCls}`}>{board.next.player1Name}</span>
-              <span className={`font-black text-slate-500 uppercase leading-tight ${compact ? 'text-[10px]' : 'text-xs xl:text-sm'}`}>
-                {tv(lang, 'vs')}
-              </span>
-              <span className={`block truncate font-black text-slate-100 leading-tight ${nextNamesCls}`}>{board.next.player2Name}</span>
-            </div>
+          {next ? (
+            <p className={`mt-1 font-semibold text-slate-200 leading-tight truncate block ${prepCls}`}>
+              {next.player1Name} <span className="text-slate-500">{tv(lang, 'vs')}</span> {next.player2Name}
+            </p>
           ) : (
-            <p className={`mt-2 font-bold text-slate-600 uppercase leading-tight ${compact ? 'text-xs' : 'text-sm'}`}>
+            <p className="mt-1 text-xs font-semibold uppercase text-slate-600 leading-tight">
               {tv(lang, 'preparing')}
             </p>
           )}
         </section>
-      </div>
 
-      <footer className="pt-2 border-t border-slate-800">
-        <p className="text-gray-400 text-sm leading-tight truncate block">
-          <span className="font-black uppercase tracking-[0.15em] text-slate-500 mr-2">{tv(lang, 'referee')}:</span>
+        <p className="text-gray-400 text-sm leading-tight truncate block border-t border-slate-800 pt-2">
+          <span className="font-black uppercase tracking-wider text-slate-500 mr-2">{tv(lang, 'referee')}:</span>
           <span className="font-bold">{refereeName}</span>
         </p>
-      </footer>
+      </div>
     </article>
   );
 }
 
-function GroupsSlide({ standings, lang }) {
-  return (
-    <div className={`grid gap-6 min-h-0 flex-1 ${standings.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-      {standings.map((g) => (
-        <section key={g.groupId} className="min-h-0 overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 px-6 py-5">
-          <h2 className="text-3xl xl:text-5xl font-black uppercase tracking-widest text-emerald-400 mb-4">
-            {g.name}
-          </h2>
-          <table className="w-full text-left">
-            <thead>
-              <tr className="text-slate-500 text-sm xl:text-xl uppercase tracking-widest">
-                <th className="pb-2 font-black">#</th>
-                <th className="pb-2 font-black">{tv(lang, 'player')}</th>
-                <th className="pb-2 font-black text-right">{tv(lang, 'pts')}</th>
-                <th className="pb-2 font-black text-right">{tv(lang, 'legs')}</th>
-                <th className="pb-2 font-black text-right">{tv(lang, 'avg')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {g.rows.map((row, idx) => (
-                <tr key={row.id ?? row.name} className="border-t border-slate-800">
-                  <td className="py-2 pr-3 font-mono text-2xl xl:text-4xl font-black text-slate-400">{idx + 1}</td>
-                  <td className="py-2 text-2xl xl:text-4xl font-black text-white">{row.name}</td>
-                  <td className="py-2 text-right font-mono text-2xl xl:text-4xl font-black text-amber-400">
-                    {row.points ?? row.matchesWon}
-                  </td>
-                  <td className="py-2 text-right font-mono text-2xl xl:text-4xl font-bold text-slate-200">
-                    {row.legsWon}:{row.legsLost}
-                  </td>
-                  <td className="py-2 text-right font-mono text-2xl xl:text-4xl font-bold text-slate-300">
-                    {Number(row.average ?? 0).toFixed(2)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      ))}
-    </div>
-  );
-}
+function GroupsSlide({ groups, lang }) {
+  if (!groups.length) {
+    return (
+      <p className="m-auto text-2xl font-black text-slate-600 uppercase tracking-widest">
+        {tv(lang, 'preparing')}
+      </p>
+    );
+  }
 
-function StatsSlide({ title, rows, valueKey }) {
   return (
-    <section className="flex-1 flex flex-col justify-center rounded-3xl border border-slate-800 bg-slate-900 px-10 py-8">
-      <h2 className="text-3xl xl:text-5xl font-black uppercase tracking-[0.25em] text-amber-400">{title}</h2>
-      <ol className="mt-10 space-y-6">
-        {rows.map((row, idx) => (
-          <li key={`${row.name}-${idx}`} className="flex items-center justify-between gap-8">
-            <span className="text-4xl xl:text-7xl font-black text-white truncate">{row.name}</span>
-            <span className="font-mono text-5xl xl:text-8xl font-black text-amber-400 tabular-nums">
-              {row[valueKey]}
-            </span>
-          </li>
+    <div className="w-full max-w-7xl mx-auto h-full min-h-0">
+      <div className={`grid gap-6 min-h-0 h-full ${groupsGridClass(groups.length)}`}>
+        {groups.map((g) => (
+          <section key={g.groupId} className="min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/95 px-4 py-3">
+            <h2 className="text-lg xl:text-xl font-black uppercase tracking-wider text-emerald-400 mb-2">
+            {g.name}
+            </h2>
+            <div className="w-full min-w-0 overflow-hidden rounded-lg border border-slate-800">
+              <table className="w-full table-fixed border-collapse text-left">
+                <colgroup>
+                  <col className="w-9" />
+                  <col />
+                  <col className="w-12" />
+                  <col className="w-[4.25rem]" />
+                  <col className="w-[4.5rem]" />
+                </colgroup>
+                <thead>
+                  <tr className="border-b border-slate-700 text-slate-500 text-[10px] uppercase tracking-wider">
+                    <th className="py-1.5 px-2 font-black">#</th>
+                    <th className="py-1.5 px-2 font-black">{tv(lang, 'player')}</th>
+                    <th className="py-1.5 px-2 font-black text-right">{tv(lang, 'pts')}</th>
+                    <th className="py-1.5 px-2 font-black text-right">{tv(lang, 'legs')}</th>
+                    <th className="py-1.5 px-2 font-black text-right">{tv(lang, 'avg')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {g.rows.map((row, idx) => (
+                    <tr key={row.id ?? row.name} className="border-t border-slate-800 text-sm">
+                      <td className="py-1.5 px-2 text-slate-300 font-mono tabular-nums">{idx + 1}</td>
+                      <td className="py-1.5 px-2 min-w-0">
+                        <span className="block truncate text-slate-100 font-semibold leading-tight">{row.name}</span>
+                      </td>
+                      <td className="py-1.5 px-2 text-right text-amber-400 font-mono font-bold tabular-nums">
+                        {row.points ?? row.matchesWon}
+                      </td>
+                      <td className="py-1.5 px-2 text-right text-slate-200 font-mono tabular-nums">
+                        {row.legsWon}:{row.legsLost}
+                      </td>
+                      <td className="py-1.5 px-2 text-right text-slate-300 font-mono tabular-nums">
+                        {Number(row.average ?? 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
         ))}
-      </ol>
-    </section>
+      </div>
+    </div>
   );
 }
 
@@ -291,6 +256,25 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
   }, []);
 
   const model = useMemo(() => (doc ? buildVenueDisplayModel(doc) : null), [doc]);
+  const groupsData = useMemo(() => {
+    const unpacked = model?.unpacked;
+    if (!unpacked?.groups?.length) return [];
+    const gm = Array.isArray(unpacked.groupMatches) ? unpacked.groupMatches : [];
+    return unpacked.groups
+      .map((g) => {
+        const groupId = g.groupId ?? g.id ?? g.name ?? '';
+        const rows = calculateGroupStandings(
+          Array.isArray(g.players) ? g.players : [],
+          gm.filter((m) => String(m.groupId ?? m.group ?? '') === String(groupId))
+        );
+        return {
+          groupId: String(groupId),
+          name: String(g.name || `${tv(lang, 'group')} ${groupId}`),
+          rows,
+        };
+      })
+      .filter((g) => g.groupId && g.rows.length > 0);
+  }, [model, lang]);
 
   useEffect(() => {
     if (!model?.boards) return;
@@ -319,7 +303,11 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
     return () => window.clearTimeout(id);
   }, [activeCall, soundOn]);
 
-  const slides = model?.slides ?? [{ type: 'boards' }];
+  const slides = useMemo(() => {
+    const out = [{ type: 'boards' }];
+    if (groupsData.length > 0) out.push({ type: 'groups' });
+    return out;
+  }, [groupsData.length]);
   const canRotate = !activeCall && slides.length > 1;
   const slideSafeIdx = slideIdx % slides.length;
   const slide = slides[slideSafeIdx];
@@ -393,27 +381,25 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
           model.boards.length === 0 ? (
             <p className="m-auto text-3xl font-black text-slate-600 uppercase tracking-widest">{tv(lang, 'preparing')}</p>
           ) : (
-            <div className={`grid gap-4 xl:gap-5 flex-1 min-h-0 ${boardGridClass(model.boards.length)}`}>
-              {model.boards.map((b) => (
-                <BoardCard
-                  key={b.board}
-                  board={b}
-                  lang={lang}
-                  huge={model.boards.length <= 2}
-                  boardCount={model.boards.length}
-                />
-              ))}
+            <div className="w-full max-w-7xl mx-auto flex-1 min-h-0">
+              <div
+                className="grid gap-6 h-full auto-rows-fr"
+                style={boardGridStyle(model.boards.length)}
+              >
+                {model.boards.map((b) => (
+                  <BoardCard
+                    key={b.board}
+                    board={b}
+                    lang={lang}
+                    boardCount={model.boards.length}
+                  />
+                ))}
+              </div>
             </div>
           )
         ) : null}
 
-        {model && slide?.type === 'groups' ? <GroupsSlide standings={slide.standings} lang={lang} /> : null}
-        {model && slide?.type === 'top180s' ? (
-          <StatsSlide title={tv(lang, 'top180s')} rows={slide.rows} valueKey="count" />
-        ) : null}
-        {model && slide?.type === 'topCheckouts' ? (
-          <StatsSlide title={tv(lang, 'topCheckouts')} rows={slide.rows} valueKey="checkout" />
-        ) : null}
+        {model && slide?.type === 'groups' ? <GroupsSlide groups={groupsData} lang={lang} /> : null}
       </main>
 
       <CallOverlay call={activeCall} lang={lang} />
