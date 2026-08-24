@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-08-23T04:03:00.000Z",
-    "effectiveDate": "2026-08-23",
-    "generatedAt": "2026-08-23 04:03",
-    "fetchedAt": "2026-08-23T07:55:37.599Z",
+    "updatedAt": "2026-08-24T04:03:00.000Z",
+    "effectiveDate": "2026-08-24",
+    "generatedAt": "2026-08-24 04:03",
+    "fetchedAt": "2026-08-24T05:44:34.029Z",
     "totalPlayers": 134
   },
   "players": [
@@ -231,14 +231,14 @@
     },
     {
       "rank": 40,
-      "name": "Hana Schmidtová",
-      "regNumber": "6556"
-    },
-    {
-      "rank": 41,
       "name": "Jitka Šnejdarová",
       "club": "Dřeváci",
       "regNumber": "3606"
+    },
+    {
+      "rank": 40,
+      "name": "Hana Schmidtová",
+      "regNumber": "6556"
     },
     {
       "rank": 42,
@@ -309,15 +309,15 @@
     },
     {
       "rank": 54,
-      "name": "Anna Votavová",
-      "club": "ŠK Pivnice Radegast",
-      "regNumber": "1854"
-    },
-    {
-      "rank": 55,
       "name": "Alena Vestfálová",
       "club": "DC Vikings Blatná",
       "regNumber": "1069"
+    },
+    {
+      "rank": 55,
+      "name": "Anna Votavová",
+      "club": "ŠK Pivnice Radegast",
+      "regNumber": "1854"
     },
     {
       "rank": 56,
