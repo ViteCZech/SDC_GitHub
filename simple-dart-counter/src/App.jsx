@@ -13,6 +13,7 @@ import {
   mergeAdminGroupMatchesFromTabletCloud,
   mergeAdminBracketFromTabletCloud,
   registerTabletBoardOnline,
+  releaseTabletBoardPresence,
 } from './services/tournamentSync';
 import { cancelOnlineGame, getOnlineGameById, abandonOnlineGameSession } from './services/onlineGamesService';
 import {
@@ -2525,6 +2526,18 @@ function AppMain({ lang, setLang }) {
   ]);
 
   const tabletBoardStr = String(tournamentDraft?.hubTabletBoard ?? '').trim();
+  const tabletPresence = React.useMemo(() => {
+    const pin = String(activePin ?? '').trim();
+    const board = String(tabletBoardStr ?? '').trim();
+    if (!/^\d{4}$/.test(pin) || !board) return null;
+    const auth = tabletCloudAuthOpts();
+    return {
+      pin,
+      board,
+      boardToken: String(auth.boardToken ?? '').trim(),
+      tabletPassword: String(auth.tabletPassword ?? '').trim().slice(0, 5),
+    };
+  }, [activePin, tabletBoardStr]);
   const pinBarTitle =
     tournamentData?.name ??
     tournamentMatchContext?.tabletTitle ??
@@ -3097,6 +3110,19 @@ function AppMain({ lang, setLang }) {
   };
 
   const handleSpectatorDisconnect = () => {
+    if (userRole === 'tablet') {
+      const pin = String(activePin ?? '').trim();
+      const board = String(tournamentDraft?.hubTabletBoard ?? loadStoredTabletBoard()).trim();
+      const auth = tabletCloudAuthOpts();
+      if (/^\d{4}$/.test(pin) && board) {
+        void releaseTabletBoardPresence({
+          pin,
+          board,
+          boardToken: String(auth.boardToken ?? '').trim(),
+          tabletPassword: String(auth.tabletPassword ?? '').trim().slice(0, 5),
+        }).catch((err) => console.warn('releaseTabletBoardPresence(disconnect):', err));
+      }
+    }
     clearSpectatorSession();
     setUserRole(null);
     setActivePin('');
@@ -5071,6 +5097,11 @@ function AppMain({ lang, setLang }) {
                     lang={lang}
                     isLandscape={isLandscape}
                     isPC={isPC}
+                    tabletPresence={
+                      userRole === 'tablet' && tournamentMatchContext?.type === 'tablet'
+                        ? tabletPresence
+                        : null
+                    }
                     onlineGameId={onlineGameId || undefined}
                     myOnlineRole={myOnlineRole || undefined}
                     onlineLocalStream={onlineLocalStream || undefined}
@@ -5679,6 +5710,7 @@ function AppMain({ lang, setLang }) {
           tournamentGroups={tournamentGroups}
           tournamentMatches={tournamentMatches}
           tournamentBracket={tournamentBracket}
+          tabletPresence={tabletPresence}
           onCheckInComplete={handleTabletCheckInComplete}
           onTabletTimeoutWarning={handleTabletTimeoutWarning}
           onStartGame={handleTabletStartGame}

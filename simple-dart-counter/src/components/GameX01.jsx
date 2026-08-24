@@ -10,6 +10,10 @@ import {
   updateHeartbeat,
   updateOnlineGameStartPlayer,
 } from '../services/onlineGamesService';
+import {
+  heartbeatTabletBoardPresence,
+  releaseTabletBoardPresenceOnUnload,
+} from '../services/tournamentSync';
 import OnlineVideoContainer from './online/OnlineVideoContainer';
 import PostMatchView from './online/PostMatchView';
 import DoublesThrowerPicker from './DoublesThrowerPicker';
@@ -215,6 +219,7 @@ export default function GameX01({
   onMatchComplete,
   isLandscape,
   isPC,
+  tabletPresence = null,
   restoredGameState,
   onRestoredConsumed,
   /** Volitelně: po kroku zpět z checkoutu, který ukončil leg (vrácení do probíhajícího zápasu). */
@@ -325,6 +330,7 @@ export default function GameX01({
   const blockStarterScoreClickRef = useRef(false);
 
   const [quickButtons, setQuickButtons] = useState(settings.quickButtons || [41, 45, 60, 100, 140, 180]);
+  const tabletPresenceRef = useRef(tabletPresence);
 
   const isOnlineInputLocked = () =>
     Boolean(
@@ -336,6 +342,52 @@ export default function GameX01({
           gameState.matchWinner ||
           (gameState.currentPlayer !== myOnlineRole && !gameState.winner && !gameState.matchWinner)))
     );
+
+  useEffect(() => {
+    tabletPresenceRef.current = tabletPresence;
+  }, [tabletPresence]);
+
+  useEffect(() => {
+    const pin = String(tabletPresence?.pin ?? '').trim();
+    const board = String(tabletPresence?.board ?? '').trim();
+    const boardToken = String(tabletPresence?.boardToken ?? '').trim();
+    const tabletPassword = String(tabletPresence?.tabletPassword ?? '').trim().slice(0, 5);
+    if (!/^\d{4}$/.test(pin) || !board || (!boardToken && !tabletPassword)) return undefined;
+    const tick = () => {
+      void heartbeatTabletBoardPresence({
+        pin,
+        board,
+        boardToken,
+        tabletPassword,
+      }).catch((err) => console.warn('tabletHeartbeat(game)', err));
+    };
+    tick();
+    const id = window.setInterval(tick, 15_000);
+    return () => window.clearInterval(id);
+  }, [
+    tabletPresence?.pin,
+    tabletPresence?.board,
+    tabletPresence?.boardToken,
+    tabletPresence?.tabletPassword,
+  ]);
+
+  useEffect(() => {
+    const pin = String(tabletPresence?.pin ?? '').trim();
+    const board = String(tabletPresence?.board ?? '').trim();
+    const boardToken = String(tabletPresence?.boardToken ?? '').trim();
+    const tabletPassword = String(tabletPresence?.tabletPassword ?? '').trim().slice(0, 5);
+    if (!/^\d{4}$/.test(pin) || !board || (!boardToken && !tabletPassword)) return undefined;
+    const handleBeforeUnload = () => {
+      releaseTabletBoardPresenceOnUnload(tabletPresenceRef.current);
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [
+    tabletPresence?.pin,
+    tabletPresence?.board,
+    tabletPresence?.boardToken,
+    tabletPresence?.tabletPassword,
+  ]);
 
     useEffect(() => {
       gameStateRef.current = gameState;

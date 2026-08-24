@@ -66,13 +66,13 @@ function BoardQrModal({ lang, board, url, online, connected, onClose }) {
   );
 }
 
-function BoardGrid({ lang, boards, boardStatuses, tokens, onOpenBoard }) {
+function BoardGrid({ lang, boards, boardStatuses, tokens, nowMs, onOpenBoard }) {
   const t = (k) => translations[lang]?.[k] ?? k;
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
       {boards.map((board) => {
-        const online = isBoardOnline(boardStatuses, board);
+        const online = isBoardOnline(boardStatuses, board, nowMs);
         const token = tokens[String(board)];
         return (
           <button
@@ -128,6 +128,7 @@ export default function TabletBoardQrPanel({
   const [boardStatuses, setBoardStatuses] = useState({});
   const [openBoard, setOpenBoard] = useState(null);
   const [connectedBoard, setConnectedBoard] = useState(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const prevStatusesRef = useRef({});
   const notifiedRef = useRef(new Set());
 
@@ -196,10 +197,15 @@ export default function TabletBoardQrPanel({
     prevStatusesRef.current = boardStatuses;
   }, [boardStatuses, pin, openBoard, onNotify, t]);
 
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
   if (totalBoards <= 0) return null;
 
   const boards = Array.from({ length: totalBoards }, (_, i) => i + 1);
-  const onlineCount = boards.filter((b) => isBoardOnline(boardStatuses, b)).length;
+  const onlineCount = boards.filter((b) => isBoardOnline(boardStatuses, b, nowMs)).length;
 
   const handleOpenBoard = (board) => {
     setConnectedBoard(null);
@@ -216,7 +222,7 @@ export default function TabletBoardQrPanel({
           board: openBoard,
           token: tokens[String(openBoard)],
         })}
-        online={isBoardOnline(boardStatuses, openBoard)}
+        online={isBoardOnline(boardStatuses, openBoard, nowMs)}
         connected={connectedBoard === openBoard}
         onClose={() => {
           setOpenBoard(null);
@@ -278,6 +284,7 @@ export default function TabletBoardQrPanel({
                 boards={boards}
                 boardStatuses={boardStatuses}
                 tokens={tokens}
+                nowMs={nowMs}
                 onOpenBoard={handleOpenBoard}
               />
             </div>
@@ -310,6 +317,7 @@ export default function TabletBoardQrPanel({
           boards={boards}
           boardStatuses={boardStatuses}
           tokens={tokens}
+          nowMs={nowMs}
           onOpenBoard={handleOpenBoard}
         />
       </section>

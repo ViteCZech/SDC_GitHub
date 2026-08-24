@@ -3,6 +3,8 @@
  * URL: /tablet?t=[pin]&board=[n]&token=[boardAuthToken]
  */
 
+export const TABLET_LAST_SEEN_OFFLINE_MS = 30_000;
+
 /** @returns {number} */
 export function resolveTotalBoards(tournamentData) {
   return (
@@ -79,8 +81,28 @@ export function parseTabletRouteFromUrl() {
   return { pin, board, token };
 }
 
-/** @param {Record<string, { status?: string }>|null|undefined} boardStatuses @param {string|number} board */
-export function isBoardOnline(boardStatuses, board) {
+function toMillis(ts) {
+  if (!ts) return null;
+  if (typeof ts?.toMillis === 'function') {
+    const ms = Number(ts.toMillis());
+    return Number.isFinite(ms) ? ms : null;
+  }
+  if (typeof ts === 'number' && Number.isFinite(ts)) return ts;
+  if (typeof ts?.seconds === 'number' && Number.isFinite(ts.seconds)) {
+    const nanos = typeof ts?.nanoseconds === 'number' && Number.isFinite(ts.nanoseconds)
+      ? ts.nanoseconds
+      : 0;
+    return Math.floor(ts.seconds * 1000 + nanos / 1e6);
+  }
+  return null;
+}
+
+/** @param {Record<string, { status?: string, lastSeen?: any }>|null|undefined} boardStatuses @param {string|number} board */
+export function isBoardOnline(boardStatuses, board, nowMs = Date.now()) {
   const key = String(board);
-  return boardStatuses?.[key]?.status === 'online';
+  const row = boardStatuses?.[key];
+  if (!row || row.status !== 'online') return false;
+  const lastSeenMs = toMillis(row.lastSeen);
+  if (!Number.isFinite(lastSeenMs)) return false;
+  return nowMs - lastSeenMs <= TABLET_LAST_SEEN_OFFLINE_MS;
 }

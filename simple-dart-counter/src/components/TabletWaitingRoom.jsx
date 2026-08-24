@@ -3,6 +3,10 @@ import { Minus, Plus } from 'lucide-react';
 import { translations } from '../translations';
 import TournamentStatisticsView from './TournamentStatisticsView';
 import { TABLET_CHECKIN_DEFAULT_SECONDS } from '../utils/tabletCheckInTimeout';
+import {
+  heartbeatTabletBoardPresence,
+  releaseTabletBoardPresenceOnUnload,
+} from '../services/tournamentSync';
 
 const CHECKIN_SECONDS = TABLET_CHECKIN_DEFAULT_SECONDS;
 
@@ -34,6 +38,7 @@ export default function TabletWaitingRoom({
   tournamentGroups = [],
   tournamentMatches = [],
   tournamentBracket = [],
+  tabletPresence = null,
 }) {
   const tt = (k) => translations[lang]?.tablet?.[k] ?? k;
   const match = activeMatch ?? assignedMatch;
@@ -68,6 +73,7 @@ export default function TabletWaitingRoom({
     ? presentP1a && presentP1b && presentP2a && presentP2b && presentRef
     : presentP1 && presentP2 && presentRef;
   const matchKey = match ? String(match.matchId ?? match.id ?? '') : '';
+  const tabletPresenceRef = useRef(tabletPresence);
 
   const matchP1 = !match
     ? ''
@@ -98,6 +104,52 @@ export default function TabletWaitingRoom({
     setPresentP2b(false);
     setPresentRef(false);
   }, []);
+
+  useEffect(() => {
+    tabletPresenceRef.current = tabletPresence;
+  }, [tabletPresence]);
+
+  useEffect(() => {
+    const pin = String(tabletPresence?.pin ?? '').trim();
+    const board = String(tabletPresence?.board ?? '').trim();
+    const boardToken = String(tabletPresence?.boardToken ?? '').trim();
+    const tabletPassword = String(tabletPresence?.tabletPassword ?? '').trim().slice(0, 5);
+    if (!/^\d{4}$/.test(pin) || !board || (!boardToken && !tabletPassword)) return undefined;
+    const tick = () => {
+      void heartbeatTabletBoardPresence({
+        pin,
+        board,
+        boardToken,
+        tabletPassword,
+      }).catch((err) => console.warn('tabletHeartbeat(waiting)', err));
+    };
+    tick();
+    const id = window.setInterval(tick, 15_000);
+    return () => window.clearInterval(id);
+  }, [
+    tabletPresence?.pin,
+    tabletPresence?.board,
+    tabletPresence?.boardToken,
+    tabletPresence?.tabletPassword,
+  ]);
+
+  useEffect(() => {
+    const pin = String(tabletPresence?.pin ?? '').trim();
+    const board = String(tabletPresence?.board ?? '').trim();
+    const boardToken = String(tabletPresence?.boardToken ?? '').trim();
+    const tabletPassword = String(tabletPresence?.tabletPassword ?? '').trim().slice(0, 5);
+    if (!/^\d{4}$/.test(pin) || !board || (!boardToken && !tabletPassword)) return undefined;
+    const handleBeforeUnload = () => {
+      releaseTabletBoardPresenceOnUnload(tabletPresenceRef.current);
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [
+    tabletPresence?.pin,
+    tabletPresence?.board,
+    tabletPresence?.boardToken,
+    tabletPresence?.tabletPassword,
+  ]);
 
   useEffect(() => {
     if (!showStandingsPanel && showSchedulePanel) setIdleTab('schedule');

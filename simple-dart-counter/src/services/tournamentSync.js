@@ -15,6 +15,17 @@ const COLLECTION = 'active_tournaments';
 const PAST_COLLECTION = 'past_tournaments';
 const FUNCTIONS_REGION = 'europe-west1';
 
+function resolveFunctionsProjectId() {
+  const fromApp = String(app?.options?.projectId ?? '').trim();
+  if (fromApp) return fromApp;
+  return 'simple-dart-counter-12ff2';
+}
+
+function buildRegisterTabletBoardOnlineUrl() {
+  const projectId = resolveFunctionsProjectId();
+  return `https://${FUNCTIONS_REGION}-${projectId}.cloudfunctions.net/registerTabletBoardOnline`;
+}
+
 function isMatchTerminal(m) {
   const s = m?.status;
   return s === 'completed' || s === 'walkover' || m?.walkover === true;
@@ -245,8 +256,9 @@ export async function archivePastTournamentAndDeleteActive(userId, pin, name, fu
  * @param {string} pin
  * @param {string|number} board
  * @param {string} token
+ * @param {{ status?: 'online'|'offline', tabletPassword?: string }} [opts]
  */
-export async function registerTabletBoardOnline(pin, board, token) {
+export async function registerTabletBoardOnline(pin, board, token, opts = {}) {
   if (!app) throw new Error('Firebase app není dostupná.');
   const id = String(pin ?? '').trim();
   if (!/^\d{4}$/.test(id)) throw new Error('Neplatný PIN turnaje.');
@@ -254,12 +266,19 @@ export async function registerTabletBoardOnline(pin, board, token) {
   const boardNum = parseInt(boardStr, 10);
   if (!Number.isFinite(boardNum) || boardNum < 1) throw new Error('Neplatné číslo terče.');
   const authToken = String(token ?? '').trim();
-  if (!authToken) throw new Error('Chybí autorizační token.');
+  const tabletPassword = String(opts.tabletPassword ?? '').trim().slice(0, 5);
+  if (!authToken && !tabletPassword) throw new Error('Chybí autorizační token.');
 
   const functions = getFunctions(app, FUNCTIONS_REGION);
   const fn = httpsCallable(functions, 'registerTabletBoardOnline');
   try {
-    await fn({ pin: id, board: boardStr, token: authToken });
+    await fn({
+      pin: id,
+      board: boardStr,
+      token: authToken || undefined,
+      tabletPassword: tabletPassword || undefined,
+      status: opts.status === 'offline' ? 'offline' : 'online',
+    });
   } catch (err) {
     const message =
       err && typeof err === 'object' && 'message' in err ? String(err.message) : '';
@@ -268,6 +287,71 @@ export async function registerTabletBoardOnline(pin, board, token) {
       .replace(/^functions\/[a-z-]+:\s*/i, '')
       .trim();
     throw new Error(clean || 'Nepodařilo se potvrdit připojení tabletu.');
+  }
+}
+
+/**
+ * Herní tablet: heartbeat stavu terče (online + lastSeen).
+ * @param {{ pin: string, board: string|number, boardToken?: string, tabletPassword?: string }} presence
+ */
+export async function heartbeatTabletBoardPresence(presence) {
+  const pin = String(presence?.pin ?? '').trim();
+  const board = String(presence?.board ?? '').trim();
+  const boardToken = String(presence?.boardToken ?? '').trim();
+  const tabletPassword = String(presence?.tabletPassword ?? '').trim().slice(0, 5);
+  if (!/^\d{4}$/.test(pin) || !board) return;
+  await registerTabletBoardOnline(pin, board, boardToken, {
+    tabletPassword,
+    status: 'online',
+  });
+}
+
+/**
+ * Herní tablet: explicitní odpojení terče (offline + lastSeen).
+ * @param {{ pin: string, board: string|number, boardToken?: string, tabletPassword?: string }} presence
+ */
+export async function releaseTabletBoardPresence(presence) {
+  const pin = String(presence?.pin ?? '').trim();
+  const board = String(presence?.board ?? '').trim();
+  const boardToken = String(presence?.boardToken ?? '').trim();
+  const tabletPassword = String(presence?.tabletPassword ?? '').trim().slice(0, 5);
+  if (!/^\d{4}$/.test(pin) || !board) return;
+  await registerTabletBoardOnline(pin, board, boardToken, {
+    tabletPassword,
+    status: 'offline',
+  });
+}
+
+/**
+ * Herní tablet: best-effort release v beforeunload (fetch keepalive).
+ * @param {{ pin: string, board: string|number, boardToken?: string, tabletPassword?: string }} presence
+ */
+export function releaseTabletBoardPresenceOnUnload(presence) {
+  const pin = String(presence?.pin ?? '').trim();
+  const board = String(presence?.board ?? '').replace(/\D/g, '').slice(0, 2);
+  const boardToken = String(presence?.boardToken ?? '').trim();
+  const tabletPassword = String(presence?.tabletPassword ?? '').trim().slice(0, 5);
+  if (!/^\d{4}$/.test(pin) || !board || (!boardToken && !tabletPassword)) return;
+  const url = buildRegisterTabletBoardOnlineUrl();
+  const body = JSON.stringify({
+    data: {
+      pin,
+      board,
+      token: boardToken || undefined,
+      tabletPassword: tabletPassword || undefined,
+      status: 'offline',
+    },
+  });
+  try {
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      keepalive: true,
+      credentials: 'omit',
+    }).catch(() => {});
+  } catch {
+    /* ignore unload errors */
   }
 }
 

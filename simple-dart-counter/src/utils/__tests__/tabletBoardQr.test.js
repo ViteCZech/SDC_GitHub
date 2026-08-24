@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  TABLET_LAST_SEEN_OFFLINE_MS,
   buildTabletBoardQrUrl,
   ensureBoardAuthTokens,
   isBoardOnline,
@@ -30,7 +31,22 @@ describe('tabletBoardQr', () => {
   });
 
   it('isBoardOnline jen při status online', () => {
-    expect(isBoardOnline({ 1: { status: 'online' } }, 1)).toBe(true);
+    const now = Date.now();
+    expect(
+      isBoardOnline(
+        { 1: { status: 'online', lastSeen: { seconds: Math.floor(now / 1000) } } },
+        1,
+        now
+      )
+    ).toBe(true);
     expect(isBoardOnline({ 1: { status: 'offline' } }, 1)).toBe(false);
+  });
+
+  it('isBoardOnline vrací false při zastaralém lastSeen', () => {
+    const now = Date.now();
+    const staleSeconds = Math.floor((now - TABLET_LAST_SEEN_OFFLINE_MS - 1_000) / 1000);
+    expect(isBoardOnline({ 2: { status: 'online', lastSeen: { seconds: staleSeconds } } }, 2, now)).toBe(
+      false
+    );
   });
 });

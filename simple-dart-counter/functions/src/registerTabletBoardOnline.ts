@@ -14,6 +14,8 @@ type RegisterPayload = {
   pin?: string;
   board?: string | number;
   token?: string;
+  tabletPassword?: string;
+  status?: 'online' | 'offline';
 };
 
 function validateBoardAuth(
@@ -23,16 +25,18 @@ function validateBoardAuth(
   tabletPassword?: string
 ): boolean {
   const boardToken = String(token ?? '').trim();
+  const providedPassword = String(tabletPassword ?? '').trim().slice(0, 5);
+  const expectedPassword =
+    td && td.tabletPassword != null ? String(td.tabletPassword).trim().slice(0, 5) : '';
   const tokens = td?.boardAuthTokens;
   if (tokens && typeof tokens === 'object' && tokens[board] != null) {
-    return String(tokens[board]).trim() === boardToken;
+    if (String(tokens[board]).trim() === boardToken) return true;
+    if (expectedPassword && providedPassword && providedPassword === expectedPassword) return true;
+    return false;
   }
 
-  const expected =
-    td && td.tabletPassword != null ? String(td.tabletPassword).trim().slice(0, 5) : '';
-  if (expected === '') return true;
-  const provided = String(tabletPassword ?? '').trim().slice(0, 5);
-  return provided !== '' && provided === expected;
+  if (expectedPassword === '') return true;
+  return providedPassword !== '' && providedPassword === expectedPassword;
 }
 
 /**
@@ -49,6 +53,8 @@ export const registerTabletBoardOnline = onCall(
     const pin = String(data.pin ?? '').trim();
     const boardRaw = String(data.board ?? '').replace(/\D/g, '').slice(0, 2);
     const token = String(data.token ?? '').trim();
+    const tabletPassword = String(data.tabletPassword ?? '').trim().slice(0, 5);
+    const status = data.status === 'offline' ? 'offline' : 'online';
 
     if (!/^\d{4}$/.test(pin)) {
       throw new HttpsError('invalid-argument', 'Neplatný PIN turnaje.');
@@ -57,10 +63,6 @@ export const registerTabletBoardOnline = onCall(
     if (!Number.isFinite(boardNum) || boardNum < 1 || boardNum > 99) {
       throw new HttpsError('invalid-argument', 'Neplatné číslo terče.');
     }
-    if (!token) {
-      throw new HttpsError('invalid-argument', 'Chybí autorizační token.');
-    }
-
     const board = String(boardNum);
     const ref = db.collection(COLLECTION).doc(pin);
     const snap = await ref.get();
@@ -76,7 +78,7 @@ export const registerTabletBoardOnline = onCall(
       numBoards?: number;
     } | null;
 
-    if (!validateBoardAuth(td, board, token)) {
+    if (!validateBoardAuth(td, board, token, tabletPassword)) {
       throw new HttpsError('permission-denied', 'Neplatný token pro tento terč.');
     }
 
@@ -86,11 +88,11 @@ export const registerTabletBoardOnline = onCall(
     }
 
     await ref.update({
-      [`boardStatuses.${board}.status`]: 'online',
+      [`boardStatuses.${board}.status`]: status,
       [`boardStatuses.${board}.lastSeen`]: FieldValue.serverTimestamp(),
     });
 
-    logger.info('registerTabletBoardOnline ok', { pin, board });
+    logger.info('registerTabletBoardOnline ok', { pin, board, status });
     return { success: true };
   }
 );
