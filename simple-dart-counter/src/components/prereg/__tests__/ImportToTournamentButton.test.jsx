@@ -15,7 +15,7 @@ function registration(id, name) {
 }
 
 describe('ImportToTournamentButton', () => {
-  it('blokuje import u turnaje se startem v budoucnu', () => {
+  it('povolí import i u turnaje se startem v budoucnu', () => {
     const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
     render(
       <ImportToTournamentButton
@@ -32,8 +32,7 @@ describe('ImportToTournamentButton', () => {
     );
 
     const button = screen.getByRole('button', { name: /import players/i });
-    expect(button).toBeDisabled();
-    expect(screen.getByText(/can be imported to live mode no earlier than/i)).toBeTruthy();
+    expect(button).not.toBeDisabled();
   });
 
   it('povolí import pokud je start turnaje aktuální nebo v minulosti', () => {

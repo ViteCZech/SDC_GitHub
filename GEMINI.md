@@ -2,7 +2,7 @@
 
 Kontextový dokument pro AI (Gemini / Cursor). Čti tento soubor před jakoukoli změnou kódu.
 
-Aplikace: **Simple Dart Counter** (npm název `darts-cloud-pro`), verze UI `v1.10.1` v `simple-dart-counter/src/App.jsx`.
+Aplikace: **Simple Dart Counter** (npm název `darts-cloud-pro`), verze UI `v1.10.2` v `simple-dart-counter/src/App.jsx`.
 Produkt: PWA počítadlo šipek + správa klubových turnajů (Česko, ČŠO žebříčky). Jazyky UI: **cs / en / pl**.
 
 Kód a komentáře jsou převážně česky. Překlady žijí v `simple-dart-counter/src/translations.js` (jeden velký objekt `translations`).

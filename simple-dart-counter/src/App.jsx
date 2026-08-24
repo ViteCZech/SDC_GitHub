@@ -108,7 +108,7 @@ import {
 } from './utils/doublesThrowOrder';
 import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
 
-const APP_VERSION = "v1.10.1";
+const APP_VERSION = "v1.10.2";
 const ACTIVE_PREREG_STATUSES = new Set(['CONFIRMED', 'WAITLIST', 'PENDING_PAYMENT']);
 
 function generatePin() {
@@ -178,7 +178,7 @@ function formatPreRegStartsAt(ms, lang) {
 function buildPreRegFutureStartMessage(lang, startsAtMs) {
   const template =
     translations[lang]?.preregImportFutureStart ||
-    'Turnaj lze importovat do živého režimu nejdříve v termínu startu ({date}).';
+    'Živý turnaj lze vygenerovat nejdříve v termínu startu ({date}).';
   return template.replace('{date}', formatPreRegStartsAt(startsAtMs, lang));
 }
 
@@ -3394,13 +3394,7 @@ function AppMain({ lang, setLang }) {
     tournamentName,
     importMode = 'fresh',
     competitionType,
-    tournamentStartsAt = null,
   }) => {
-    const startsAtMs = resolvePreRegStartsAtMs(tournamentStartsAt);
-    if (startsAtMs != null && startsAtMs > Date.now()) {
-      showNotification(buildPreRegFutureStartMessage(lang, startsAtMs), 'error');
-      return;
-    }
     setUserRole('admin');
     if (activePreRegTournamentId) {
       setPreRegImportSourceId(activePreRegTournamentId);
