@@ -1800,9 +1800,7 @@ function AppMain({ lang, setLang }) {
       () => {
         skipUiResumePersist = true;
         safeStorage.clear();
-        const url = new URL(window.location.href);
-        url.hash = '';
-        window.location.replace(`${url.pathname || '/'}${url.search}`);
+        window.location.replace('/');
       },
       { confirmLabel: t('resetApp') || 'Resetovat', cancelLabel: t('cancel') || 'Zrušit' }
     );

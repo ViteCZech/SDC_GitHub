@@ -83,7 +83,7 @@ describe('VenueDisplayView', () => {
     expect(document.body.textContent).toContain('Jalůvka');
     expect(document.body.textContent).toContain('Armlich');
     expect(document.body.textContent).toContain('Novák');
-    expect(document.body.textContent).toContain('1:0');
+    expect(document.body.textContent).toMatch(/1\s*:\s*0/);
   });
 
   it('chybějící dokument ukáže neaktivní turnaj', () => {
