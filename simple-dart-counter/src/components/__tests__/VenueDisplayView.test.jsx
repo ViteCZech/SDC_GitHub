@@ -167,4 +167,36 @@ describe('VenueDisplayView', () => {
     expect(document.body.textContent).toContain('Novák');
     vi.useRealTimers();
   });
+
+  it('bez pavouka neschovává hluchý blok a nemá posuvník', () => {
+    listenMock.mockImplementation((_pin, cb) => {
+      cb(liveDoc());
+      return () => {};
+    });
+    render(<VenueDisplayView pin="1234" lang="cs" />);
+    const root = screen.getByTestId('venue-display');
+    expect(root.className).toContain('overflow-hidden');
+    expect(root.style.overflow).toBe('hidden');
+    expect(root.style.height).toBe('100vh');
+    expect(screen.queryByText('Pavouk čeká na vygenerování')).toBeNull();
+    expect(document.body.textContent).toContain('Jalůvka');
+  });
+
+  it('po přepnutí na živé terče ukáže celé jméno a skóre legů', () => {
+    vi.useFakeTimers();
+    listenMock.mockImplementation((_pin, cb) => {
+      cb(liveDoc());
+      return () => {};
+    });
+    render(<VenueDisplayView pin="1234" lang="cs" />);
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(document.body.textContent).toContain('Jalůvka');
+    expect(document.body.textContent).toContain('Armlich');
+    expect(document.body.textContent).toMatch(/TERČ\s*1/);
+    expect(document.body.textContent).toMatch(/1\s*:\s*0/);
+    expect(screen.queryByText('Pavouk čeká na vygenerování')).toBeNull();
+    vi.useRealTimers();
+  });
 });

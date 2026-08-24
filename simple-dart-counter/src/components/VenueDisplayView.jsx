@@ -3,12 +3,18 @@ import { AlertTriangle } from 'lucide-react';
 import { translations } from '../translations';
 import { listenToCloudTournament } from '../services/tournamentSync';
 import {
+  VENUE_BOARDS_PER_PAGE,
+  VENUE_BOARDS_PER_PAGE_WITH_BRACKET,
   VENUE_CALL_MS,
   VENUE_CAROUSEL_MS,
+  VENUE_GROUPS_PER_PAGE,
   VENUE_LISTEN_TIMEOUT_MS,
   boardsOccupancySignature,
   buildVenueDisplayModel,
+  chunkVenuePages,
   detectVenueMatchCalls,
+  resolveVenueBoardColumns,
+  venueBestOfFromWinLegs,
 } from '../utils/venueDisplay';
 import { calculateGroupStandings } from '../utils/tournamentLogic';
 
@@ -89,10 +95,6 @@ function resolveAverages(raw) {
   };
 }
 
-function avgText(val) {
-  return Number.isFinite(val) ? Number(val).toFixed(2) : '—';
-}
-
 function resolveMissingPresence(raw, names, lang) {
   if (!raw || raw.tabletStatus !== 'timeout_warning') return [];
   const present = raw.tabletCheckInPresent;
@@ -124,50 +126,12 @@ function matchStatusPriority(match) {
   return 3;
 }
 
-function matchStatusLabel(match, lang) {
-  const status = String(match?.status ?? '').toLowerCase();
-  if (status === 'playing' || status === 'in_progress') return tv(lang, 'statusPlaying');
-  if (status === 'completed' || status === 'walkover') return tv(lang, 'statusDone');
-  if (String(match?.tabletStatus ?? '') === 'checked_in') return tv(lang, 'statusReady');
-  return tv(lang, 'statusPending');
-}
-
-function renderSetBreakdown(setScores) {
-  if (!Array.isArray(setScores) || setScores.length === 0) return null;
-  return setScores
-    .map((setScore) => {
-      const p1 = toFiniteNumber(setScore?.p1);
-      const p2 = toFiniteNumber(setScore?.p2);
-      if (p1 == null || p2 == null) return null;
-      return `${p1}:${p2}`;
-    })
-    .filter(Boolean)
-    .join(' · ');
-}
-
 function resolveGroupsColumns(count) {
-  if (count <= 1) return 1;
-  if (count <= 4) return 2;
-  if (count <= 6) return 3;
-  return 4;
-}
-
-function resolveGroupsPageSize(groupsData) {
-  const total = Array.isArray(groupsData) ? groupsData.length : 0;
-  if (total <= 0) return 0;
-  const maxRows = (groupsData || []).reduce((max, g) => Math.max(max, g?.rows?.length || 0), 0);
-  if (maxRows >= 8) return 4;
-  if (maxRows >= 6) return 6;
-  return 8;
+  return count <= 1 ? 1 : 2;
 }
 
 function chunkGroups(groups, size) {
-  if (!Array.isArray(groups) || size <= 0) return [];
-  const out = [];
-  for (let i = 0; i < groups.length; i += size) {
-    out.push(groups.slice(i, i + size));
-  }
-  return out;
+  return chunkVenuePages(groups, size);
 }
 
 function buildVenueDevMockDoc() {
@@ -328,10 +292,11 @@ function shouldUseVenueDevMock(pin, invalidPin) {
   }
 }
 
-function TwoLineName({ text, className = '' }) {
+function PlayerName({ text, className = '' }) {
   return (
     <span
       className={className}
+      title={text}
       style={{
         display: '-webkit-box',
         WebkitLineClamp: 2,
@@ -349,70 +314,76 @@ function LiveMatchCard({ board, lang }) {
   const match = board.current || board.next;
   if (!match) return null;
   const isNow = !!board.current;
-  const scoreMain = match.hasSets
-    ? `${match.p1Sets} : ${match.p2Sets}`
-    : `${match.legsP1} : ${match.legsP2}`;
-  const scoreSub = match.hasSets ? `${tv(lang, 'legs')}: ${match.legsP1}:${match.legsP2}` : null;
-  const setBreakdown = renderSetBreakdown(match.setScores);
+  const scoreMain = `${match.legsP1} : ${match.legsP2}`;
   return (
     <article
-      className={`rounded-xl border px-3 py-3 ${
+      className={`h-full min-h-0 overflow-hidden rounded-xl border flex flex-col px-3 py-3 ${
         match.playing
           ? 'border-amber-400/70 bg-slate-900'
           : isNow
-            ? 'border-emerald-500/60 bg-slate-900'
+            ? 'border-emerald-500/50 bg-slate-900'
             : 'border-slate-800 bg-slate-900/95'
       }`}
     >
-      <header className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-            {tv(lang, 'board')} {board.board} · {isNow ? tv(lang, 'nowPlaying') : tv(lang, 'upNext')}
-          </p>
-          <p className="mt-1 text-xs font-bold uppercase tracking-wider text-emerald-400">
-            {matchStatusLabel(match, lang)}
-          </p>
-        </div>
-        <div className="shrink-0 rounded-lg border border-slate-700 bg-slate-950 px-3 py-1 text-right">
-          <p className="font-mono text-2xl font-black leading-tight tabular-nums text-white">{scoreMain}</p>
-          {scoreSub ? <p className="font-mono text-[10px] font-bold tabular-nums text-slate-400">{scoreSub}</p> : null}
-        </div>
+      <header className="flex items-center justify-between gap-3 shrink-0">
+        <p className="text-sm xl:text-lg font-black uppercase tracking-[0.18em] text-yellow-300">
+          {tv(lang, 'callBoard').replace('{n}', String(board.board))}
+        </p>
+        <p className="font-mono text-2xl xl:text-3xl font-black tabular-nums text-white leading-none">
+          {scoreMain}
+        </p>
       </header>
 
-      <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <TwoLineName text={match.player1Name} className="text-sm xl:text-base font-black text-slate-100 leading-tight min-h-[2.5rem]" />
-        <span className="text-[10px] xl:text-xs font-black uppercase tracking-widest text-slate-500">{tv(lang, 'vs')}</span>
-        <TwoLineName text={match.player2Name} className="text-sm xl:text-base font-black text-slate-100 leading-tight text-right min-h-[2.5rem]" />
-      </div>
-
-      <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-800 pt-2 text-xs xl:text-sm">
-        <p className="text-slate-400">
-          <span className="font-black uppercase tracking-wider text-slate-500">{tv(lang, 'referee')}:</span>{' '}
-          <span className="font-semibold text-slate-200">{match.refereeName || '—'}</span>
-        </p>
-        <p className="font-mono tabular-nums text-slate-300">
-          {tv(lang, 'avg')}: {avgText(match.p1Avg)} / {avgText(match.p2Avg)}
-        </p>
-      </div>
-
-      {setBreakdown ? (
-        <p className="mt-2 text-[11px] font-mono text-slate-400">
-          {tv(lang, 'sets')}: {setBreakdown}
-        </p>
-      ) : null}
-
-      {match.missingPresence.length > 0 ? (
-        <div className="mt-2 rounded-lg border border-amber-500/50 bg-amber-900/30 px-2.5 py-2 text-[11px] text-amber-100">
-          <p className="flex items-center gap-1 font-black uppercase tracking-wider">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            {tv(lang, 'presenceWarning')}
-          </p>
-          <p className="mt-1 leading-snug">
-            {match.missingPresence.join(', ')}
-          </p>
+      <div className="flex-1 min-h-0 flex items-center justify-center py-2">
+        <div className="w-full grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 xl:gap-3">
+          <PlayerName
+            text={match.player1Name}
+            className="text-base xl:text-2xl font-black text-slate-50 leading-tight text-left"
+          />
+          <span className="text-xs xl:text-sm font-black uppercase tracking-widest text-slate-500 shrink-0">
+            {tv(lang, 'vs')}
+          </span>
+          <PlayerName
+            text={match.player2Name}
+            className="text-base xl:text-2xl font-black text-slate-50 leading-tight text-right"
+          />
         </div>
-      ) : null}
+      </div>
+
+      <footer className="shrink-0 pt-2 border-t border-slate-800">
+        <p className="text-xs xl:text-sm text-slate-400 truncate">
+          {tv(lang, 'referee')}:{' '}
+          <span className="font-semibold text-slate-300">{match.refereeName || '—'}</span>
+        </p>
+        {match.missingPresence.length > 0 ? (
+          <p className="mt-1 flex items-center gap-1 text-[11px] text-amber-200 truncate">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            {tv(lang, 'presenceWarning')}: {match.missingPresence.join(', ')}
+          </p>
+        ) : null}
+      </footer>
     </article>
+  );
+}
+
+function BoardsGrid({ boards, lang }) {
+  if (!boards.length) {
+    return (
+      <p className="m-auto text-2xl font-black text-slate-600 uppercase tracking-widest text-center px-4">
+        {tv(lang, 'preparing')}
+      </p>
+    );
+  }
+  const cols = resolveVenueBoardColumns(boards.length);
+  return (
+    <div
+      className="grid gap-3 xl:gap-4 h-full min-h-0 overflow-hidden auto-rows-fr"
+      style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+    >
+      {boards.map((board) => (
+        <LiveMatchCard key={board.board} board={board} lang={lang} />
+      ))}
+    </div>
   );
 }
 
@@ -427,7 +398,7 @@ function GroupsSlide({ groups, lang, blockIndex = 0, blockCount = 1 }) {
 
   const groupColumns = resolveGroupsColumns(groups.length);
   return (
-    <div className="w-full h-full min-h-0 flex flex-col">
+    <div className="w-full h-full min-h-0 overflow-hidden flex flex-col">
       {blockCount > 1 ? (
         <div className="shrink-0 mb-2 text-right">
           <span className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
@@ -436,50 +407,49 @@ function GroupsSlide({ groups, lang, blockIndex = 0, blockCount = 1 }) {
         </div>
       ) : null}
       <div
-        className="grid gap-4 min-h-0 h-full auto-rows-fr"
+        className="grid gap-3 xl:gap-4 min-h-0 h-full overflow-hidden auto-rows-fr"
         style={{ gridTemplateColumns: `repeat(${groupColumns}, minmax(0, 1fr))` }}
       >
         {groups.map((g) => (
-          <section key={g.groupId} className="h-full min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/95 px-3 py-3">
-            <h2 className="text-base xl:text-lg font-black uppercase tracking-wider text-emerald-400 mb-2">
+          <section key={g.groupId} className="h-full min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/95 px-3 py-3 flex flex-col">
+            <h2 className="shrink-0 text-sm xl:text-base font-black uppercase tracking-wider text-emerald-400 mb-2">
               {g.name}
             </h2>
-            <div className="w-full min-w-0 overflow-hidden rounded-lg border border-slate-800">
+            <div className="min-h-0 flex-1 overflow-hidden">
               <table className="w-full table-fixed border-collapse text-left">
                 <colgroup>
-                  <col className="w-9" />
-                  <col />
-                  <col className="w-12 xl:w-14" />
-                  <col className="w-[4.25rem]" />
-                  <col className="w-[4.75rem]" />
+                  <col className="w-8" />
+                  <col style={{ width: '52%' }} />
+                  <col className="w-12" />
+                  <col className="w-16" />
+                  <col className="w-16" />
                 </colgroup>
                 <thead>
                   <tr className="border-b border-slate-700 text-slate-500 text-[10px] uppercase tracking-wider">
-                    <th className="py-1.5 px-2 font-black">#</th>
-                    <th className="py-1.5 px-2 font-black">{tv(lang, 'player')}</th>
-                    <th className="py-1.5 px-2 font-black text-right">{tv(lang, 'pts')}</th>
-                    <th className="py-1.5 px-2 font-black text-right">{tv(lang, 'legs')}</th>
-                    <th className="py-1.5 px-2 font-black text-right">{tv(lang, 'avg')}</th>
+                    <th className="py-1 px-1 font-black w-8">#</th>
+                    <th className="py-1 px-2 font-black">{tv(lang, 'player')}</th>
+                    <th className="py-1 px-1 font-black w-12 text-center">{tv(lang, 'pts')}</th>
+                    <th className="py-1 px-1 font-black w-16 text-center">{tv(lang, 'legs')}</th>
+                    <th className="py-1 px-1 font-black w-16 text-right">{tv(lang, 'avg')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {g.rows.map((row, idx) => (
                     <tr key={row.id ?? row.name} className="border-t border-slate-800 text-xs xl:text-sm">
-                      <td className="py-1.5 px-2 text-slate-300 font-mono tabular-nums align-top">{idx + 1}</td>
-                      <td className="py-1.5 px-2 min-w-0">
-                        <TwoLineName
-                          text={row.name}
-                          className="text-slate-100 font-semibold leading-tight min-h-[2.15rem]"
-                        />
+                      <td className="py-1 px-1 w-8 text-slate-400 font-mono tabular-nums">{idx + 1}</td>
+                      <td className="py-1 px-2 min-w-0">
+                        <span className="block truncate text-slate-100 font-semibold" title={row.name}>
+                          {row.name}
+                        </span>
                       </td>
-                      <td className="py-1.5 px-2 text-right text-amber-400 font-mono font-bold tabular-nums align-top">
+                      <td className="py-1 px-1 w-12 text-center text-amber-300 font-mono tabular-nums">
                         {row.points ?? row.matchesWon}
                       </td>
-                      <td className="py-1.5 px-2 text-right text-slate-200 font-mono tabular-nums align-top">
+                      <td className="py-1 px-1 w-16 text-center text-slate-200 font-mono tabular-nums">
                         {row.legsWon}:{row.legsLost}
                       </td>
-                      <td className="py-1.5 px-2 text-right text-slate-300 font-mono tabular-nums align-top">
-                        {Number(row.average ?? 0).toFixed(2)}
+                      <td className="py-1 px-1 w-16 text-right text-slate-300 font-mono tabular-nums">
+                        {Number(row.average ?? 0).toFixed(1)}
                       </td>
                     </tr>
                   ))}
@@ -548,6 +518,41 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
       unsub?.();
     };
   }, [pin, invalidPin]);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const root = document.getElementById('root');
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      htmlHeight: html.style.height,
+      bodyOverflow: body.style.overflow,
+      bodyHeight: body.style.height,
+      rootOverflow: root?.style.overflow,
+      rootHeight: root?.style.height,
+      rootMinHeight: root?.style.minHeight,
+    };
+    html.style.overflow = 'hidden';
+    html.style.height = '100vh';
+    body.style.overflow = 'hidden';
+    body.style.height = '100vh';
+    if (root) {
+      root.style.overflow = 'hidden';
+      root.style.height = '100vh';
+      root.style.minHeight = '100vh';
+    }
+    return () => {
+      html.style.overflow = prev.htmlOverflow;
+      html.style.height = prev.htmlHeight;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.height = prev.bodyHeight;
+      if (root) {
+        root.style.overflow = prev.rootOverflow;
+        root.style.height = prev.rootHeight;
+        root.style.minHeight = prev.rootMinHeight;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let wakeLock = null;
@@ -694,7 +699,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
       })
       .filter((g) => g.groupId && g.rows.length > 0);
   }, [model, lang]);
-  const groupsPageSize = useMemo(() => resolveGroupsPageSize(groupsData), [groupsData]);
+  const groupsPageSize = VENUE_GROUPS_PER_PAGE;
   const groupSlides = useMemo(() => {
     const pageSize = groupsPageSize;
     if (!pageSize) return [];
@@ -714,6 +719,8 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
       return {
         hasBracket: false,
         phaseName: '',
+        formatLabel: '',
+        bestOfLegs: 0,
         roundIndex: 0,
         roundCount: 0,
         completedMatches: 0,
@@ -773,7 +780,13 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
       .slice(0, 8);
 
     const totalRounds = normalizedRounds.length;
-    const prelimLegs = unpacked?.tournamentData?.prelimLegs;
+    const td = unpacked?.tournamentData;
+    const prelimLegs = td?.prelimLegs;
+    const bracketWinLegs = td?.bracketKoLegs ?? td?.bracketLegs ?? td?.groupsLegs ?? 3;
+    const activeWinLegs =
+      activeRoundIndex === 0 && prelimLegs != null && Number(prelimLegs) > 0
+        ? prelimLegs
+        : bracketWinLegs;
     const phaseName = (() => {
       if (activeRoundIndex === 0 && prelimLegs != null && Number(prelimLegs) > 0) {
         return tt(lang, 'tournPrelimLabel', 'Předkolo');
@@ -785,10 +798,13 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
       const key = tt(lang, 'tournRoundLastN', 'Top {n}');
       return String(key).replace('{n}', String(Math.pow(2, diff)));
     })();
+    const bestOfLegs = venueBestOfFromWinLegs(activeWinLegs);
 
     return {
       hasBracket: true,
       phaseName,
+      bestOfLegs,
+      formatLabel: tv(lang, 'bestOfLegs').replace('{n}', String(bestOfLegs)),
       roundIndex: activeRoundIndex,
       roundCount: totalRounds,
       completedMatches,
@@ -826,9 +842,24 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
   const slides = useMemo(() => {
     const out = [];
     if (groupSlides.length > 0) out.push(...groupSlides);
-    out.push({ type: 'live' });
+    const boardPageSize = bracketOverview.hasBracket
+      ? VENUE_BOARDS_PER_PAGE_WITH_BRACKET
+      : VENUE_BOARDS_PER_PAGE;
+    const boardPages = chunkVenuePages(liveMatches, boardPageSize);
+    if (boardPages.length === 0) {
+      out.push({ type: 'live', boards: [], pageIndex: 0, pageCount: 1 });
+    } else {
+      for (let i = 0; i < boardPages.length; i += 1) {
+        out.push({
+          type: 'live',
+          boards: boardPages[i],
+          pageIndex: i,
+          pageCount: boardPages.length,
+        });
+      }
+    }
     return out;
-  }, [groupSlides]);
+  }, [groupSlides, liveMatches, bracketOverview.hasBracket]);
 
   const activeSlide = slides[screenIdx % slides.length];
 
@@ -861,7 +892,8 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
   return (
     <div
       data-testid="venue-display"
-      className="flex flex-col w-full h-[100dvh] bg-black text-white overflow-hidden select-none"
+      className="flex flex-col w-full h-screen bg-black text-white overflow-hidden select-none"
+      style={{ height: '100vh', overflow: 'hidden' }}
     >
       <header className="shrink-0 flex items-center justify-between gap-4 px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 border-b border-slate-900">
         <div className="min-w-0">
@@ -874,7 +906,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
       </header>
 
       <main
-        className="flex-1 min-h-0 p-4 xl:p-6 flex flex-col"
+        className="flex-1 min-h-0 overflow-hidden p-4 xl:p-6 flex flex-col"
         data-testid="venue-display-status"
         data-state={viewState}
       >
@@ -887,7 +919,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
         ) : null}
 
         {model && activeSlide?.type === 'groups' ? (
-          <section className="w-full h-full min-h-0 rounded-2xl border border-slate-800 bg-slate-950/85 p-3 xl:p-4 flex flex-col">
+          <section className="w-full h-full min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/85 p-3 xl:p-4 flex flex-col">
             <div className="mb-3 flex items-start justify-between gap-3 shrink-0">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
@@ -899,7 +931,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
                 {tv(lang, 'groupsPerScreen').replace('{n}', String(groupsPageSize || 0))}
               </span>
             </div>
-            <div className="min-h-0 flex-1">
+            <div className="min-h-0 flex-1 overflow-hidden">
               <GroupsSlide
                 groups={activeSlide.groups}
                 lang={lang}
@@ -911,122 +943,94 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
         ) : null}
 
         {model && activeSlide?.type === 'live' ? (
-          <div className="w-full h-full min-h-0 grid grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-4 xl:gap-6">
-            <section className="min-h-0 rounded-2xl border border-slate-800 bg-slate-950/85 p-3 xl:p-4 flex flex-col">
-              <div className="mb-3 shrink-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
-                  {tv(lang, 'liveMatches')}
-                </p>
-                <h2 className="text-lg xl:text-2xl font-black text-white">{tv(lang, 'currentBoards')}</h2>
-              </div>
-              <div className="min-h-0 flex-1 overflow-auto space-y-3 pr-1">
-                {liveMatches.length > 0 ? (
-                  liveMatches.map((board) => (
-                    <LiveMatchCard key={board.board} board={board} lang={lang} />
-                  ))
-                ) : (
-                  <p className="m-auto text-center text-xl font-black text-slate-600 uppercase tracking-widest">
-                    {tv(lang, 'preparing')}
+          <div
+            className={`w-full h-full min-h-0 overflow-hidden grid gap-4 xl:gap-6 ${
+              bracketOverview.hasBracket
+                ? 'grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]'
+                : 'grid-cols-1'
+            }`}
+          >
+            <section className="min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/85 p-3 xl:p-4 flex flex-col">
+              <div className="mb-3 shrink-0 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                    {tv(lang, 'liveMatches')}
                   </p>
-                )}
+                  <h2 className="text-lg xl:text-2xl font-black text-white">{tv(lang, 'currentBoards')}</h2>
+                </div>
+                {activeSlide.pageCount > 1 ? (
+                  <span className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    {tv(lang, 'boardsPage')
+                      .replace('{page}', String(activeSlide.pageIndex + 1))
+                      .replace('{total}', String(activeSlide.pageCount))}
+                  </span>
+                ) : null}
+              </div>
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <BoardsGrid boards={activeSlide.boards || []} lang={lang} />
               </div>
             </section>
 
-            <section className="min-h-0 rounded-2xl border border-slate-800 bg-slate-950/85 p-3 xl:p-4 flex flex-col">
-              <div className="mb-3 shrink-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
-                  {tv(lang, 'bracket')}
-                </p>
-                <h2 className="text-lg xl:text-2xl font-black text-white">
-                  {bracketOverview.hasBracket ? bracketOverview.phaseName : tv(lang, 'waitingForBracket')}
-                </h2>
-                {bracketOverview.hasBracket ? (
-                  <p className="mt-1 text-xs text-slate-400 font-semibold">
+            {bracketOverview.hasBracket ? (
+              <section className="min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/85 p-3 xl:p-4 flex flex-col">
+                <div className="mb-3 shrink-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                    {tv(lang, 'bracket')}
+                  </p>
+                  <h2 className="text-lg xl:text-2xl font-black text-white">
+                    {bracketOverview.phaseName}
+                  </h2>
+                  <p className="mt-1 text-xs xl:text-sm text-slate-300 font-semibold">
+                    {bracketOverview.formatLabel}
+                    {' · '}
                     {tv(lang, 'phaseRound')
                       .replace('{round}', String(bracketOverview.roundIndex + 1))
                       .replace('{total}', String(bracketOverview.roundCount))}
-                    {' · '}
-                    {tv(lang, 'phaseProgress')
-                      .replace('{done}', String(bracketOverview.completedMatches))
-                      .replace('{all}', String(bracketOverview.totalMatches))}
                   </p>
-                ) : null}
-              </div>
+                </div>
 
-              <div className="min-h-0 flex-1 overflow-auto space-y-3 pr-1">
-                {!bracketOverview.hasBracket ? (
-                  <p className="m-auto text-center text-xl font-black text-slate-600 uppercase tracking-widest">
-                    {tv(lang, 'waitingForBracket')}
-                  </p>
-                ) : bracketOverview.matches.length === 0 ? (
-                  <p className="m-auto text-center text-lg font-black text-slate-500 uppercase tracking-wider">
-                    {tv(lang, 'noActiveBracketMatches')}
-                  </p>
-                ) : (
-                  bracketOverview.matches.map((match, idx) => {
-                    const scoreMain = match.hasSets
-                      ? `${match.p1Sets} : ${match.p2Sets}`
-                      : `${match.legsP1} : ${match.legsP2}`;
-                    const scoreSub = match.hasSets ? `${tv(lang, 'legs')}: ${match.legsP1}:${match.legsP2}` : null;
-                    const setBreakdown = renderSetBreakdown(match.setScores);
-                    return (
-                      <article key={match.id ?? match.matchId ?? `${idx}-${match.player1Name}-${match.player2Name}`} className="rounded-xl border border-slate-800 bg-slate-900/90 px-3 py-3">
-                        <header className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                              {tv(lang, 'board')} {match.board ?? '—'}
+                <div className="min-h-0 flex-1 overflow-hidden grid gap-2 auto-rows-fr content-start">
+                  {bracketOverview.matches.length === 0 ? (
+                    <p className="m-auto text-center text-lg font-black text-slate-500 uppercase tracking-wider">
+                      {tv(lang, 'noActiveBracketMatches')}
+                    </p>
+                  ) : (
+                    bracketOverview.matches.slice(0, 6).map((match, idx) => {
+                      const scoreMain = `${match.legsP1} : ${match.legsP2}`;
+                      return (
+                        <article
+                          key={match.id ?? match.matchId ?? `${idx}-${match.player1Name}-${match.player2Name}`}
+                          className="min-h-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/90 px-3 py-2 flex flex-col"
+                        >
+                          <header className="flex items-center justify-between gap-2 shrink-0">
+                            <p className="text-xs font-black uppercase tracking-wider text-yellow-300">
+                              {tv(lang, 'callBoard').replace('{n}', String(match.board ?? '—'))}
                             </p>
-                            <p className="mt-1 text-xs font-bold uppercase tracking-wider text-emerald-400">
-                              {matchStatusLabel(match, lang)}
-                            </p>
+                            <p className="font-mono text-lg font-black tabular-nums text-white">{scoreMain}</p>
+                          </header>
+                          <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 min-h-0">
+                            <PlayerName
+                              text={match.player1Name}
+                              className="text-sm xl:text-base font-black text-slate-100 leading-tight"
+                            />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                              {tv(lang, 'vs')}
+                            </span>
+                            <PlayerName
+                              text={match.player2Name}
+                              className="text-sm xl:text-base font-black text-slate-100 leading-tight text-right"
+                            />
                           </div>
-                          <div className="shrink-0 rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1 text-right">
-                            <p className="font-mono text-xl font-black leading-tight tabular-nums text-white">
-                              {scoreMain}
-                            </p>
-                            {scoreSub ? (
-                              <p className="font-mono text-[10px] font-bold tabular-nums text-slate-400">
-                                {scoreSub}
-                              </p>
-                            ) : null}
-                          </div>
-                        </header>
-                        <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                          <TwoLineName text={match.player1Name} className="text-sm font-black text-slate-100 min-h-[2.2rem]" />
-                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{tv(lang, 'vs')}</span>
-                          <TwoLineName text={match.player2Name} className="text-sm font-black text-slate-100 text-right min-h-[2.2rem]" />
-                        </div>
-                        <div className="mt-2 border-t border-slate-800 pt-2 text-xs text-slate-300 flex items-center justify-between gap-3">
-                          <p>
-                            <span className="font-black uppercase tracking-wider text-slate-500">{tv(lang, 'referee')}:</span>{' '}
-                            <span className="font-semibold text-slate-200">{match.refereeName || '—'}</span>
+                          <p className="mt-1 text-[11px] text-slate-400 truncate">
+                            {tv(lang, 'referee')}: {match.refereeName || '—'}
                           </p>
-                          <p className="font-mono tabular-nums">
-                            {tv(lang, 'avg')}: {avgText(match.p1Avg)} / {avgText(match.p2Avg)}
-                          </p>
-                        </div>
-                        {setBreakdown ? (
-                          <p className="mt-2 text-[11px] font-mono text-slate-400">
-                            {tv(lang, 'sets')}: {setBreakdown}
-                          </p>
-                        ) : null}
-                        {match.missingPresence.length > 0 ? (
-                          <div className="mt-2 rounded-lg border border-amber-500/50 bg-amber-900/30 px-2.5 py-2 text-[11px] text-amber-100">
-                            <p className="flex items-center gap-1 font-black uppercase tracking-wider">
-                              <AlertTriangle className="h-3.5 w-3.5" />
-                              {tv(lang, 'presenceWarning')}
-                            </p>
-                            <p className="mt-1 leading-snug">
-                              {match.missingPresence.join(', ')}
-                            </p>
-                          </div>
-                        ) : null}
-                      </article>
-                    );
-                  })
-                )}
-              </div>
-            </section>
+                        </article>
+                      );
+                    })
+                  )}
+                </div>
+              </section>
+            ) : null}
           </div>
         ) : null}
       </main>

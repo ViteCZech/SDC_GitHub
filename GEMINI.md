@@ -112,7 +112,7 @@ URL deep-linky (bez React Routeru, parsují se z `window.location`):
 
 - `/t/:tournamentId` — veřejná předregistrace (`?invite=` pro spolupořadatele)
 - `/tournaments` — katalog
-- `/tv/:pin` — veřejná TV obrazovka haly (`VenueDisplayView.jsx`), mimo tok `App.jsx` (jen čte `active_tournaments/{pin}`)
+- `/tv/:pin` — veřejná TV obrazovka haly (`VenueDisplayView.jsx`), mimo tok `App.jsx` (jen čte `active_tournaments/{pin}`). Kiosk: `100vh` + `overflow: hidden`, bez posuvníků. Pavouk se kreslí jen když už existuje; jinak 100 % plochy mají terče / skupiny. Terče max 6 / stránka, skupiny max 4 (mřížka 2×2), rotace 10 s.
 - tablet QR: PIN + číslo terče + token (`tabletBoardQr.js`)
 
 ---

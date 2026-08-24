@@ -4,11 +4,16 @@ import {
   buildVenueBoardSnapshots,
   buildVenueCarouselSlides,
   buildVenueDisplayUrl,
+  chunkVenuePages,
   detectVenueMatchCalls,
   parseVenueDisplayRouteFromUrl,
   playVenueGong,
+  resolveVenueBoardColumns,
   resolveVenueLang,
   unpackCloudTournament,
+  venueBestOfFromWinLegs,
+  VENUE_BOARDS_PER_PAGE,
+  VENUE_GROUPS_PER_PAGE,
 } from '../venueDisplay';
 
 function cloudDoc(overrides = {}) {
@@ -221,5 +226,27 @@ describe('venueDisplay snapshot', () => {
     playVenueGong(ctx);
     expect(ctx.createOscillator).toHaveBeenCalled();
     expect(ctx.createGain).toHaveBeenCalled();
+  });
+
+  it('chunkuje stránky po 4 skupinách a 6 terčích', () => {
+    expect(VENUE_GROUPS_PER_PAGE).toBe(4);
+    expect(VENUE_BOARDS_PER_PAGE).toBe(6);
+    expect(chunkVenuePages(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], 4)).toEqual([
+      ['A', 'B', 'C', 'D'],
+      ['E', 'F', 'G', 'H'],
+    ]);
+    expect(chunkVenuePages([1, 2, 3, 4, 5, 6, 7], 6)).toEqual([
+      [1, 2, 3, 4, 5, 6],
+      [7],
+    ]);
+    expect(chunkVenuePages([], 4)).toEqual([]);
+  });
+
+  it('mřížka terčů je 2–3 sloupce a Best of = 2n−1', () => {
+    expect(resolveVenueBoardColumns(1)).toBe(1);
+    expect(resolveVenueBoardColumns(4)).toBe(2);
+    expect(resolveVenueBoardColumns(6)).toBe(3);
+    expect(venueBestOfFromWinLegs(3)).toBe(5);
+    expect(venueBestOfFromWinLegs(2)).toBe(3);
   });
 });

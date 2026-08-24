@@ -9,10 +9,42 @@ import { formatRefereeNames, resolveRefereePerson } from './doublesReferee.js';
 import { isTeamPlayer } from './doublesSeeding.js';
 import { calculateGroupStandings, calculateTournamentStats } from './tournamentLogic.js';
 
-export const VENUE_CAROUSEL_MS = 15_000;
+export const VENUE_CAROUSEL_MS = 10_000;
 export const VENUE_CALL_MS = 8_000;
 /** Když Firestore v CI / offline neodpoví, nenechat TV viset na načítání. */
 export const VENUE_LISTEN_TIMEOUT_MS = 8_000;
+export const VENUE_GROUPS_PER_PAGE = 4;
+export const VENUE_BOARDS_PER_PAGE = 6;
+export const VENUE_BOARDS_PER_PAGE_WITH_BRACKET = 4;
+
+/**
+ * @template T
+ * @param {T[]} items
+ * @param {number} size
+ * @returns {T[][]}
+ */
+export function chunkVenuePages(items, size) {
+  const list = Array.isArray(items) ? items : [];
+  const n = Math.max(1, Number(size) || 1);
+  if (list.length === 0) return [];
+  const out = [];
+  for (let i = 0; i < list.length; i += n) out.push(list.slice(i, i + n));
+  return out;
+}
+
+/** 1 terč = 1 sloupec, 2–4 = 2 sloupce, 5–6 = 3 sloupce (2×3). */
+export function resolveVenueBoardColumns(count) {
+  const n = Number(count) || 0;
+  if (n <= 1) return 1;
+  if (n <= 4) return 2;
+  return 3;
+}
+
+/** First-to X → Best of (2X − 1). */
+export function venueBestOfFromWinLegs(winLegs) {
+  const w = Math.max(1, Number(winLegs) || 1);
+  return 2 * w - 1;
+}
 
 /**
  * @param {Pick<Location, 'pathname'>|null|undefined} loc
