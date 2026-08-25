@@ -3887,6 +3887,86 @@ function AppMain({ lang, setLang }) {
     setAppState('playing');
   };
 
+  const getBracketMatchLegSnapshot = (match) => {
+    if (!match) return null;
+    const readLegValue = (...candidates) => {
+      for (const c of candidates) {
+        const n = Number(c);
+        if (Number.isFinite(n) && n >= 0) return Math.max(0, Math.floor(n));
+      }
+      return null;
+    };
+    const p1Legs = readLegValue(
+      match?.score?.p1,
+      match?.result?.p1Legs,
+      match?.legsP1,
+      match?.score1
+    );
+    const p2Legs = readLegValue(
+      match?.score?.p2,
+      match?.result?.p2Legs,
+      match?.legsP2,
+      match?.score2
+    );
+    if (p1Legs == null || p2Legs == null) return null;
+    return { p1Legs, p2Legs };
+  };
+
+  const resolveBracketWinnerByLegTimeline = (match, legTarget) => {
+    const target = Math.max(1, Math.floor(Number(legTarget) || 1));
+    const sources = [
+      Array.isArray(match?.completedLegs) ? match.completedLegs : null,
+      Array.isArray(match?.result?.completedLegs) ? match.result.completedLegs : null,
+      Array.isArray(match?.legDetails) ? match.legDetails : null,
+      Array.isArray(match?.result?.legDetails) ? match.result.legDetails : null,
+    ];
+    const legs = sources.find((arr) => Array.isArray(arr) && arr.length > 0) || [];
+    if (!legs.length) return null;
+
+    let p1 = 0;
+    let p2 = 0;
+    for (const leg of legs) {
+      const wk = String(leg?.winnerKey ?? leg?.winner ?? '').trim().toLowerCase();
+      if (wk === 'p1') p1 += 1;
+      else if (wk === 'p2') p2 += 1;
+      else {
+        const wid = leg?.winnerId != null ? String(leg.winnerId) : '';
+        if (wid && match?.player1Id != null && wid === String(match.player1Id)) p1 += 1;
+        else if (wid && match?.player2Id != null && wid === String(match.player2Id)) p2 += 1;
+      }
+      if (p1 >= target || p2 >= target) {
+        return p1 >= target ? 'p1' : 'p2';
+      }
+    }
+    return null;
+  };
+
+  const resolveImmediateBracketWinnerForTarget = (match, legTarget) => {
+    const snap = getBracketMatchLegSnapshot(match);
+    if (!snap) return null;
+    const target = Math.max(1, Math.floor(Number(legTarget) || 1));
+    const { p1Legs, p2Legs } = snap;
+    const p1Reached = p1Legs >= target;
+    const p2Reached = p2Legs >= target;
+    if (!p1Reached && !p2Reached) return null;
+
+    if (p1Reached && !p2Reached) {
+      return { winnerKey: 'p1', winnerId: match?.player1Id ?? null, p1Legs, p2Legs };
+    }
+    if (p2Reached && !p1Reached) {
+      return { winnerKey: 'p2', winnerId: match?.player2Id ?? null, p1Legs, p2Legs };
+    }
+
+    const fromTimeline = resolveBracketWinnerByLegTimeline(match, target);
+    if (fromTimeline === 'p1' && match?.player1Id != null) {
+      return { winnerKey: 'p1', winnerId: match.player1Id, p1Legs, p2Legs };
+    }
+    if (fromTimeline === 'p2' && match?.player2Id != null) {
+      return { winnerKey: 'p2', winnerId: match.player2Id, p1Legs, p2Legs };
+    }
+    return null;
+  };
+
   const handleTabletCheckInComplete = async () => {
     const am = tabletAssignedMatchRef.current;
     const pin = String(activePin ?? '').trim();
@@ -4150,10 +4230,7 @@ function AppMain({ lang, setLang }) {
     setAppState('playing');
   };
 
-  const handleUpdateRoundSettings = (roundIndex, newLegs, newBoards) => {
-    const legs = Math.max(1, Math.floor(Number(newLegs)));
-    const boards = Math.max(1, Math.floor(Number(newBoards)) || 1);
-
+  const applyRoundSettingsChange = (roundIndex, legs, boards) => {
     // Treat "boards in this round" as the active boards cap for the bracket screen.
     // This prevents ghost boards (T5+) in cloud mode and stabilizes referee assignment.
     setTournamentData((prev) => {
@@ -4172,11 +4249,40 @@ function AppMain({ lang, setLang }) {
 
     setTournamentBracket((prev) => {
       if (!Array.isArray(prev) || !prev[roundIndex]?.matches) return prev;
-      return prev.map((round, ri) => {
+      const updated = prev.map((round, ri) => {
         if (ri !== roundIndex) return round;
         const withLegs = round.matches.map((m) => {
           if (!m) return m;
-          const next = m.status === 'pending' ? { ...m, winLegs: legs } : m;
+          const editableStatus =
+            m.status === 'pending' || m.status === 'playing' || m.status === 'in_progress';
+          let next = editableStatus ? { ...m, winLegs: legs } : m;
+          const isRunningLike =
+            m.status === 'playing' ||
+            m.status === 'in_progress' ||
+            m.tabletStatus === 'checked_in' ||
+            m.tabletStatus === 'ready_to_play';
+          if (isRunningLike) {
+            const resolved = resolveImmediateBracketWinnerForTarget(next, legs);
+            if (resolved?.winnerId) {
+              next = {
+                ...next,
+                status: 'completed',
+                winnerId: resolved.winnerId,
+                score: { p1: resolved.p1Legs, p2: resolved.p2Legs },
+                score1: resolved.p1Legs,
+                score2: resolved.p2Legs,
+                legsP1: resolved.p1Legs,
+                legsP2: resolved.p2Legs,
+                result: {
+                  ...(next.result || {}),
+                  p1Legs: resolved.p1Legs,
+                  p2Legs: resolved.p2Legs,
+                },
+                completedAt: next.completedAt ?? Date.now(),
+                tabletStatus: 'completed',
+              };
+            }
+          }
           // Pokud admin sníží počet terčů pro kolo, zneplatníme staré T5+,
           // aby se přiřazení stabilizovalo a šlo znovu dosadit počtáře.
           const b = Number(next.board);
@@ -4192,8 +4298,118 @@ function AppMain({ lang, setLang }) {
           matches: autoAssignSequentialBoardsToRound(roundWithMeta.matches, boards),
         };
       });
+      return applyBracketMaintenance(propagateBracketWinners(updated));
     });
   };
+
+  const handleUpdateRoundSettings = (roundIndex, newLegs, newBoards) => {
+    const legs = Math.max(1, Math.floor(Number(newLegs)));
+    const boards = Math.max(1, Math.floor(Number(newBoards)) || 1);
+    const round = Array.isArray(tournamentBracket) ? tournamentBracket[roundIndex] : null;
+    const matches = Array.isArray(round?.matches) ? round.matches : [];
+    const baseLegs =
+      tournamentData?.bracketKoLegs ?? tournamentData?.bracketLegs ?? tournamentData?.groupsLegs ?? 3;
+    const defaultRoundLegs = getBracketWinLegsForRound(
+      roundIndex,
+      baseLegs,
+      tournamentData?.prelimLegs
+    );
+    const started = matches
+      .map((m) => {
+        if (!m) return null;
+        const status = m.status;
+        const isRunningLike =
+          status === 'playing' ||
+          status === 'in_progress' ||
+          m.tabletStatus === 'checked_in' ||
+          m.tabletStatus === 'ready_to_play';
+        if (!isRunningLike) return null;
+        const currentTarget =
+          m.winLegs != null && Number.isFinite(Number(m.winLegs))
+            ? Math.max(1, Math.floor(Number(m.winLegs)))
+            : defaultRoundLegs;
+        if (currentTarget <= legs) return null;
+        const boardNum = Number(m.board);
+        const boardLabel =
+          m.board != null && m.board !== '' && Number.isFinite(boardNum)
+            ? `T${Math.max(1, Math.floor(boardNum))}`
+            : (t('tournNoBoardAssigned') || 'bez přiřazeného terče');
+        const p1 = m.player1Name ?? m.player1Id ?? 'P1';
+        const p2 = m.player2Name ?? m.player2Id ?? 'P2';
+        const snap = getBracketMatchLegSnapshot(m);
+        const scoreText = snap ? `${snap.p1Legs}:${snap.p2Legs}` : '?:?';
+        return {
+          boardLabel,
+          line: `• ${boardLabel}: ${p1} vs ${p2} (${scoreText}, ${currentTarget}→${legs})`,
+          canAutoResolveNow: !!resolveImmediateBracketWinnerForTarget(m, legs)?.winnerId,
+        };
+      })
+      .filter(Boolean);
+
+    if (started.length > 0) {
+      const boardSummary = [...new Set(started.map((x) => x.boardLabel))].join(', ');
+      const autoResolvable = started.filter((x) => x.canAutoResolveNow).length;
+      const warningLines = [
+        (t('tournBracketLiveLegsWarningIntro') ||
+          'Snižujete počet vítězných legů u již rozehraných zápasů.')
+          .replace(/\{legs\}/g, String(legs)),
+        (t('tournBracketLiveLegsWarningBoards') || 'Rizikové terče: {boards}')
+          .replace(/\{boards\}/g, boardSummary || (t('tournNone') || '—')),
+        autoResolvable > 0
+          ? (t('tournBracketLiveLegsWarningAutoResolve') ||
+              'Zápasy s dostupným skóre se po potvrzení uzavřou automaticky: {count}.')
+              .replace(/\{count\}/g, String(autoResolvable))
+          : (t('tournBracketLiveLegsWarningNoAutoResolve') ||
+              'U některých běžících zápasů nemusí být průběžné skóre dostupné pro okamžité uzavření.'),
+        '',
+        ...started.map((x) => x.line),
+        '',
+        t('tournBracketLiveLegsWarningQuestion') ||
+          'Opravdu chcete změnu použít i na rozehrané zápasy?',
+      ];
+      requestConfirm(
+        warningLines.join('\n'),
+        () => applyRoundSettingsChange(roundIndex, legs, boards),
+        {
+          title: t('tournBracketLiveLegsWarningTitle') || 'Potvrzení změny během rozehrané hry',
+          confirmLabel: t('tournBracketLiveLegsWarningConfirm') || 'Použít změnu',
+          cancelLabel: t('tournBracketLiveLegsWarningCancel') || 'Beze změny',
+        }
+      );
+      return;
+    }
+
+    applyRoundSettingsChange(roundIndex, legs, boards);
+  };
+
+  useEffect(() => {
+    if (appState !== 'playing' || !tournamentMatchContext || !Array.isArray(tournamentBracket)) return;
+    const ctx = tournamentMatchContext;
+    const isBracketCtx =
+      ctx.type === 'bracket' || (ctx.type === 'tablet' && (ctx.tabletMatchType ?? 'group') === 'bracket');
+    if (!isBracketCtx) return;
+    const roundIndex =
+      ctx.type === 'bracket'
+        ? ctx.roundIndex
+        : (ctx.roundIndex ?? ctx.match?.bracketRoundIndex ?? null);
+    const matchId = ctx.match?.id ?? ctx.match?.matchId;
+    if (roundIndex == null || matchId == null) return;
+    const round = tournamentBracket[roundIndex];
+    if (!round?.matches) return;
+    const activeMatch = round.matches.find((m) => String(m?.id ?? m?.matchId ?? '') === String(matchId));
+    if (!activeMatch) return;
+    const baseLegs =
+      tournamentData?.bracketKoLegs ?? tournamentData?.bracketLegs ?? tournamentData?.groupsLegs ?? 3;
+    const nextTarget =
+      activeMatch.winLegs != null && Number.isFinite(Number(activeMatch.winLegs))
+        ? Math.max(1, Math.floor(Number(activeMatch.winLegs)))
+        : getBracketWinLegsForRound(roundIndex, baseLegs, tournamentData?.prelimLegs);
+    setSettings((prev) => {
+      const current = Math.max(1, Math.floor(Number(prev.matchTarget) || 1));
+      if (current === nextTarget) return prev;
+      return { ...prev, matchTarget: nextTarget };
+    });
+  }, [appState, tournamentMatchContext, tournamentBracket, tournamentData]);
 
   const handleUpdateMatchBoard = (roundIndex, matchId, newBoard) => {
     const n = Math.max(1, Math.floor(Number(newBoard)) || 1);

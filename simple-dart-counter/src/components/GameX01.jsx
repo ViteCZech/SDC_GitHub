@@ -54,6 +54,20 @@ function buildOnlineLegTransition(mergedLeg) {
   return { awaitingAckFrom: loser, checkoutScore, checkoutDarts, winnerLegDarts, currentScore };
 }
 
+function resolveWinnerReachedLegTarget(completedLegs, legTarget) {
+  const target = Math.max(1, Math.floor(Number(legTarget) || 1));
+  if (!Array.isArray(completedLegs) || completedLegs.length === 0) return null;
+  let p1 = 0;
+  let p2 = 0;
+  for (const leg of completedLegs) {
+    const winner = String(leg?.winnerKey ?? leg?.winner ?? '').trim().toLowerCase();
+    if (winner === 'p1') p1 += 1;
+    else if (winner === 'p2') p2 += 1;
+    if (p1 >= target || p2 >= target) return p1 >= target ? 'p1' : 'p2';
+  }
+  return null;
+}
+
 function fillI18nTemplate(str, vars) {
   let out = String(str || '');
   Object.entries(vars).forEach(([k, v]) => {
@@ -328,6 +342,7 @@ export default function GameX01({
   const lastDocStartPlayerRef = useRef(null);
   const onlineStarterPressRef = useRef({ timer: null, armed: false });
   const blockStarterScoreClickRef = useRef(false);
+  const forcedTargetFinishRef = useRef(false);
 
   const [quickButtons, setQuickButtons] = useState(settings.quickButtons || [41, 45, 60, 100, 140, 180]);
   const tabletPresenceRef = useRef(tabletPresence);
@@ -409,12 +424,119 @@ export default function GameX01({
   }, [setScores]);
 
   useEffect(() => {
+    forcedTargetFinishRef.current = false;
+  }, [onlineGameId, settings.matchTarget]);
+
+  useEffect(() => {
     onlineLegTransitionRef.current = onlineLegTransition;
   }, [onlineLegTransition]);
 
   useEffect(() => {
     onlineMatchTransitionRef.current = onlineMatchTransition;
   }, [onlineMatchTransition]);
+
+  useEffect(() => {
+    if (forcedTargetFinishRef.current) return;
+    if (gameState.winner || gameState.matchWinner) return;
+    if (postMatchStatsActiveRef.current) return;
+
+    const legTarget =
+      settings.matchMode === 'first_to'
+        ? Math.max(1, Math.floor(Number(settings.matchTarget) || 1))
+        : Math.max(1, Math.ceil((Number(settings.matchTarget) || 1) / 2));
+    const p1Legs = Math.max(0, Math.floor(Number(gameState.p1Legs) || 0));
+    const p2Legs = Math.max(0, Math.floor(Number(gameState.p2Legs) || 0));
+    const p1Reached = p1Legs >= legTarget;
+    const p2Reached = p2Legs >= legTarget;
+    if (!p1Reached && !p2Reached) return;
+
+    let winnerKey = null;
+    if (p1Reached && !p2Reached) winnerKey = 'p1';
+    else if (p2Reached && !p1Reached) winnerKey = 'p2';
+    else winnerKey = resolveWinnerReachedLegTarget(gameState.completedLegs, legTarget);
+    if (!winnerKey) return;
+
+    forcedTargetFinishRef.current = true;
+    const stableId = onlineGameId ? String(onlineGameId) : Date.now();
+    const resultForStore = { p1Legs, p2Legs };
+    const record = {
+      id: stableId,
+      onlineSessionGameId: onlineGameId ? String(onlineGameId) : null,
+      date: new Date().toLocaleString(),
+      gameType: 'x01',
+      p1Name: settings.p1Name,
+      p1Id: settings.p1Id || null,
+      p2Name: settings.p2Name,
+      p2Id: settings.p2Id || null,
+      p1Legs: resultForStore.p1Legs,
+      p2Legs: resultForStore.p2Legs,
+      finalResult: {
+        player1: { legsWon: resultForStore.p1Legs },
+        player2: { legsWon: resultForStore.p2Legs },
+      },
+      p1Sets: winnerKey === 'p1' ? 1 : 0,
+      p2Sets: winnerKey === 'p2' ? 1 : 0,
+      matchSets: settings.matchSets || 1,
+      setScores: [...setScoresRef.current, { p1: resultForStore.p1Legs, p2: resultForStore.p2Legs }],
+      matchWinner: winnerKey,
+      completedLegs: [...gameState.completedLegs],
+      isBot: settings.isBot,
+      botLevel: settings.botLevel,
+      botAvg: settings.botAvg,
+      ...attachDoublesRecordFields(gameState.completedLegs, settings),
+    };
+
+    if (onlineGameId && settings.gameType === 'x01') {
+      const loser = winnerKey === 'p1' ? 'p2' : 'p1';
+      const matchT = {
+        winner: winnerKey,
+        awaitingAckFrom: loser,
+        finalScore: { p1: resultForStore.p1Legs, p2: resultForStore.p2Legs },
+      };
+      const mergedMatch = {
+        ...gameState,
+        winner: winnerKey,
+        matchWinner: winnerKey,
+      };
+      onlineLegTransitionRef.current = null;
+      onlineMatchTransitionRef.current = matchT;
+      pendingOnlineMatchRecordRef.current = record;
+      setOnlineLegTransition(null);
+      setOnlineMatchTransition(matchT);
+      setPendingOnlineMatchRecord(record);
+      setGameState(mergedMatch);
+      void pushOnlineX01LiveRef.current(mergedMatch, setScoresRef.current, {
+        legTransition: null,
+        matchTransition: matchT,
+        pendingMatchRecord: record,
+      });
+      return;
+    }
+
+    setOnlineLegTransition(null);
+    onMatchComplete(record, null);
+  }, [
+    gameState.winner,
+    gameState.matchWinner,
+    gameState.p1Legs,
+    gameState.p2Legs,
+    gameState.completedLegs,
+    onlineGameId,
+    settings.matchMode,
+    settings.matchTarget,
+    settings.matchSets,
+    settings.gameType,
+    settings.p1Name,
+    settings.p1Id,
+    settings.p2Name,
+    settings.p2Id,
+    settings.isBot,
+    settings.botLevel,
+    settings.botAvg,
+    settings,
+    gameState,
+    onMatchComplete,
+  ]);
 
   useEffect(() => {
     pendingOnlineMatchRecordRef.current = pendingOnlineMatchRecord;
