@@ -533,8 +533,6 @@ export default function GameX01({
     settings.isBot,
     settings.botLevel,
     settings.botAvg,
-    settings,
-    gameState,
     onMatchComplete,
   ]);
 
