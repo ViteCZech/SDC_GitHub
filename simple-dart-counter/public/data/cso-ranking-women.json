@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-08-26T04:03:00.000Z",
-    "effectiveDate": "2026-08-26",
-    "generatedAt": "2026-08-26 04:03",
-    "fetchedAt": "2026-08-26T05:40:35.142Z",
+    "updatedAt": "2026-08-27T04:03:00.000Z",
+    "effectiveDate": "2026-08-27",
+    "generatedAt": "2026-08-27 04:03",
+    "fetchedAt": "2026-08-27T16:20:25.663Z",
     "totalPlayers": 134
   },
   "players": [
@@ -332,66 +332,66 @@
     },
     {
       "rank": 58,
-      "name": "Jiřina Zahradníková",
-      "club": "Vostrý koně Pardubice",
-      "regNumber": "3182"
-    },
-    {
-      "rank": 58,
       "name": "Ludmila  Klaubová",
       "club": "Plaská Zvěř",
       "regNumber": "4572"
     },
     {
-      "rank": 60,
+      "rank": 59,
       "name": "Nela Svobodová",
       "regNumber": "6213"
     },
     {
-      "rank": 61,
+      "rank": 60,
       "name": "Tereza Šlichtová",
       "club": "Brněnská šipková z.s.",
       "regNumber": "5680"
     },
     {
-      "rank": 62,
+      "rank": 61,
       "name": "Lenka Domaniková",
       "regNumber": "6853"
     },
     {
-      "rank": 63,
+      "rank": 62,
       "name": "Hana Konvalinková",
       "regNumber": "7271"
     },
     {
-      "rank": 64,
+      "rank": 63,
       "name": "Lucie Reinišová",
       "club": "OKO Plzeň",
       "regNumber": "3726"
     },
     {
-      "rank": 64,
+      "rank": 63,
       "name": "Adriana Brhelová",
       "regNumber": "5926"
     },
     {
-      "rank": 66,
+      "rank": 65,
       "name": "Monika Doležalová",
       "club": "Pitbull Bažiny",
       "regNumber": "3423"
     },
     {
-      "rank": 67,
+      "rank": 66,
       "name": "Lenka Křivková",
       "regNumber": "5624"
     },
     {
-      "rank": 68,
+      "rank": 67,
+      "name": "Jiřina Zahradníková",
+      "club": "Vostrý koně Pardubice",
+      "regNumber": "3182"
+    },
+    {
+      "rank": 67,
       "name": "Kateřina Kupsová",
       "regNumber": "6800"
     },
     {
-      "rank": 68,
+      "rank": 67,
       "name": "Adéla Hipíková",
       "regNumber": "4914"
     },
