@@ -31,16 +31,40 @@ const SEEDING_TEMPLATES = {
   ],
 };
 
-function getBracketSeedingTemplate(bracketSize) {
-  if (SEEDING_TEMPLATES[bracketSize]) return SEEDING_TEMPLATES[bracketSize];
-  if (bracketSize === 128) {
-    const a = SEEDING_TEMPLATES[64];
-    return [...a, ...a.map((s) => s + 64)];
+/**
+ * Zdvojnásobí šablonu listů: každý seed s dostane soupeře (n+1−s).
+ * Stejný krok, kterým je 64 odvozené z 32 (1 vs 64, 32 vs 33, 2 vs 63, …).
+ */
+function expandSeedingTemplate(template) {
+  const n = template.length * 2;
+  const next = [];
+  for (const s of template) {
+    next.push(s);
+    next.push(n + 1 - s);
   }
-  const asc = [4, 8, 16, 32, 64].filter((k) => SEEDING_TEMPLATES[k]);
-  const ge = asc.find((k) => k >= bracketSize);
-  if (ge != null) return SEEDING_TEMPLATES[ge];
-  return SEEDING_TEMPLATES[32];
+  return next;
+}
+
+/**
+ * Šablona nasazení pro kapacitu 2^k. Nad 64 se skládá expanzí (128: 1 vs 128, ne 1 vs 64).
+ * @param {number} bracketSize
+ * @returns {number[]}
+ */
+export function getBracketSeedingTemplate(bracketSize) {
+  const size = Math.max(2, Math.floor(Number(bracketSize)) || 2);
+  if (SEEDING_TEMPLATES[size]) return SEEDING_TEMPLATES[size];
+  let t = null;
+  for (const k of [64, 32, 16, 8, 4]) {
+    if (SEEDING_TEMPLATES[k] && size > k && size % k === 0) {
+      t = SEEDING_TEMPLATES[k];
+      break;
+    }
+  }
+  if (!t) return SEEDING_TEMPLATES[32];
+  while (t.length < size) {
+    t = expandSeedingTemplate(t);
+  }
+  return t.length === size ? t : SEEDING_TEMPLATES[32];
 }
 
 const DEFAULT_MATCH_DURATION_MS = 15 * 60 * 1000; // 15 minut
@@ -1223,6 +1247,12 @@ function tryAutoCompleteBracketBye(m) {
   const bye2 = m.player2Id == null && isBracketByeName(m.player2Name);
   const real1 = m.player1Id != null;
   const real2 = m.player2Id != null;
+  if (bye1 && bye2) {
+    m.status = 'completed';
+    m.winnerId = null;
+    m.score = m.score && typeof m.score === 'object' ? { ...m.score } : { p1: 0, p2: 0 };
+    return true;
+  }
   if (bye1 && real2) {
     m.status = 'completed';
     m.winnerId = m.player2Id;
@@ -1233,6 +1263,40 @@ function tryAutoCompleteBracketBye(m) {
     m.status = 'completed';
     m.winnerId = m.player1Id;
     m.score = m.score && typeof m.score === 'object' ? { ...m.score } : { p1: 0, p2: 0 };
+    return true;
+  }
+  return false;
+}
+
+function applyCompletedFeederToDest(feeder, dest, side) {
+  if (!feeder || feeder.status !== 'completed' || !dest) return false;
+  const w = winnerFromBracketMatch(feeder);
+  if (w) {
+    if (side === 1) {
+      if (dest.player1Id !== w.id || dest.player1Name !== w.name) {
+        dest.player1Id = w.id;
+        dest.player1Name = w.name;
+        return true;
+      }
+    } else if (dest.player2Id !== w.id || dest.player2Name !== w.name) {
+      dest.player2Id = w.id;
+      dest.player2Name = w.name;
+      return true;
+    }
+    return false;
+  }
+  const bye1 = feeder.player1Id == null && isBracketByeName(feeder.player1Name);
+  const bye2 = feeder.player2Id == null && isBracketByeName(feeder.player2Name);
+  if (!(bye1 && bye2)) return false;
+  if (side === 1) {
+    if (dest.player1Id != null || !isBracketByeName(dest.player1Name)) {
+      dest.player1Id = null;
+      dest.player1Name = BRACKET_BYE_LABEL;
+      return true;
+    }
+  } else if (dest.player2Id != null || !isBracketByeName(dest.player2Name)) {
+    dest.player2Id = null;
+    dest.player2Name = BRACKET_BYE_LABEL;
     return true;
   }
   return false;
@@ -1254,22 +1318,8 @@ export function propagateBracketWinnersInPlace(rounds) {
         const dest = next[i];
         const L = curr[i * 2];
         const Rgt = curr[i * 2 + 1];
-        if (L?.status === 'completed' && L.winnerId != null) {
-          const w = winnerFromBracketMatch(L);
-          if (w && dest.player1Id !== w.id) {
-            dest.player1Id = w.id;
-            dest.player1Name = w.name;
-            changed = true;
-          }
-        }
-        if (Rgt?.status === 'completed' && Rgt.winnerId != null) {
-          const w = winnerFromBracketMatch(Rgt);
-          if (w && dest.player2Id !== w.id) {
-            dest.player2Id = w.id;
-            dest.player2Name = w.name;
-            changed = true;
-          }
-        }
+        if (applyCompletedFeederToDest(L, dest, 1)) changed = true;
+        if (applyCompletedFeederToDest(Rgt, dest, 2)) changed = true;
       }
     }
     for (const round of rounds) {
@@ -1532,7 +1582,10 @@ export function generateBracketStructure(groups, promotersCount, baseLegs = 3, m
     let player2Name = null;
 
     if (p1IsBye && p2IsBye) {
-      status = 'pending';
+      // Oba listy prázdné (nemělo by nastat u standardního nasazení) — řetězový volný los, ne TBA slot.
+      status = 'completed';
+      player1Name = BRACKET_BYE_LABEL;
+      player2Name = BRACKET_BYE_LABEL;
     } else if (p1IsBye) {
       status = 'completed';
       winnerId = s2.playerId;
@@ -2392,7 +2445,8 @@ export function resolveBracketRefereePlaceholder(match) {
  * (proherci zápasů předkola, které počítal někdo, kdo sám prohrál jiný zápas předkola); dokud takové výsledky nejsou, fallback
  * na všechny proherce kola 0. Pak proherci z tohoto kola; pak BYE kandidáti (bez opakování předkolových počtářů u BYE).
  * Bez předkola: první kolo jako dřív (nepostupující + BYE, druhá vlna proherci z kola). Pozdější kola = proherci z předchozího kola.
- * Přímý KO bez skupin: automat nepřiřazuje (admin). Limit terčů: max tolik přiřazení jako `availableBoards` mínus už hrající.
+ * Přímý KO bez skupin: 1. kolo z hráčů s volným losem, další vlna z proherců téhož kola;
+ * pozdější kola z proherců feederů, fallback volní registrovaní. Limit terčů: max tolik přiřazení jako `availableBoards` mínus už hrající.
  */
 export const updateBracketReferees = (
   bracket,
@@ -2561,6 +2615,18 @@ export const updateBracketReferees = (
       }
     });
   });
+
+  const collectIdleDirectKoIds = () => {
+    const s = new Set();
+    if (!Array.isArray(registeredPlayersForDirectKo)) return s;
+    for (const p of registeredPlayersForDirectKo) {
+      const id = p?.id ?? p?.name;
+      if (id == null || id === '') continue;
+      if (withdrawnIds.has(id)) continue;
+      s.add(id);
+    }
+    return s;
+  };
 
   const collectByeRoundCandidateIds = (roundIndex) => {
     const out = new Set();
@@ -2751,34 +2817,50 @@ export const updateBracketReferees = (
 
     roundMatches.forEach((match, matchIndex) => {
       if (roundIndex === 0 && isRoundZeroNonPhysicalBracketMatch(match)) {
-        match.referee = null;
-        delete match.refereePickTier;
+        if (!match.refereeLocked) {
+          match.referee = null;
+          delete match.refereePickTier;
+        }
         match.board = null;
         return;
       }
 
-      // STRIKTNÍ JIT PRAVIDLO: bez fyzicky přiděleného terče nesmí mít zápas počtáře.
-      // (Zápasy ve frontě zůstávají čisté a nevyčerpávají usedReferees; BYE zápasy jsou řešené výše.)
-      if (match?.status === 'pending' && (!match.board || match.board === null)) {
-        match.referee = null;
-        delete match.refereePickTier;
-        return;
-      }
+      const keepLockedReferee =
+        match?.refereeLocked &&
+        match.referee &&
+        !isBracketRefereePlaceholder(match.referee, match.refereeId);
 
-      // Striktní fronta: pokud zápas nemá terč, nesmí mít ani počtáře.
-      if (match?.status === 'pending' && (match.board == null || match.board === '')) {
-        match.referee = null;
-        delete match.refereePickTier;
+      // STRIKTNÍ JIT PRAVIDLO: bez fyzicky přiděleného terče nesmí mít zápas počtáře.
+      // Ručně zamčený počtář se ponechá (admin), ale neblokuje usedReferees, dokud zápas nemá terč.
+      if (match?.status === 'pending' && (!match.board || match.board === null || match.board === '')) {
+        if (!keepLockedReferee) {
+          match.referee = null;
+          delete match.refereePickTier;
+        }
         return;
       }
 
       if (!isPlayablePending(match)) return;
 
-      if (isBracketRefereePlaceholder(match?.referee, match?.refereeId)) {
+      if (isBracketRefereePlaceholder(match?.referee, match?.refereeId) && !match.refereeLocked) {
         match.referee = null;
         delete match.refereePickTier;
         delete match.refereeId;
         delete match.refereeName;
+      }
+
+      // Ruční zamčení: engine nepřepisuje.
+      if (keepLockedReferee) {
+        const refId = match.referee.id ?? match.referee.name;
+        if (refId != null) {
+          assignedRefsInThisRun.add(refId);
+          registerPickedReferee({
+            id: match.referee.id ?? refId,
+            name: match.referee.name ?? refId,
+          });
+        }
+        if (isPlayablePending(match)) activeBoardsUsed += 1;
+        return;
       }
 
       // Pokud je počtář předvyplněný (např. JIT), ale guard neprojde, uvolni a vyber fallback.
@@ -2787,7 +2869,8 @@ export const updateBracketReferees = (
         const skipHistoricForPreserve =
           isLaterKoRound ||
           (hasPrelimBracketRound && isFirstMainRound) ||
-          (isPrelimRound && Number(match.refereePickTier) === 2);
+          (isPrelimRound && Number(match.refereePickTier) === 2) ||
+          (!hasGroups && isFirstMainRound);
         if (
           !refereePassesRoundGuard(refId, match, roundBusyIds, withdrawnIds, usedReferees, {
             skipHistoricRefereeUsage: skipHistoricForPreserve,
@@ -2829,9 +2912,12 @@ export const updateBracketReferees = (
       let pickTier = 0;
 
       if (isPrelimRound) {
-        // Přímý KO bez skupin: v 1. kole/předkole automat nepřiřazuje (není k dispozici „nepostupující“ pool).
-        if (!hasGroups) return;
         const poolIds = new Set(nonAdvEntries.map((e) => e.id));
+        const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
+        for (const c of byeRefCandidates || []) {
+          if (c?.id != null) poolIds.add(c.id);
+        }
+        for (const id of byeRoundIds) poolIds.add(id);
         chosenRef = selectFromPool({
           poolIds,
           poolPriorityRank: nonAdvPriority,
@@ -2851,11 +2937,14 @@ export const updateBracketReferees = (
           });
           if (chosenRef) pickTier = 2;
         }
+        if (!chosenRef) {
+          chosenRef = selectFromPool({
+            poolIds: collectIdleDirectKoIds(),
+            skipHistoricRefereeUsage: true,
+          });
+          if (chosenRef) pickTier = 3;
+        }
       } else if (isFirstMainRound) {
-        // Přímý KO bez skupin: v prvním hlavním kole automat nepřiřazuje.
-        // Pravidlo „poražený z předchozího kola píše“ se aplikuje až od kol > 0 (viz later rounds níže).
-        if (!hasGroups && !hasPrelimBracketRound) return;
-        if (!hasGroups && hasPrelimBracketRound) return;
         if (hasPrelimBracketRound) {
           const prelimRefIds = collectRefereeIdsInBracketRound(newBracket, 0);
           const r0AllLosers = collectLosersFromBracketRoundIndex(0);
@@ -2918,12 +3007,15 @@ export const updateBracketReferees = (
           const poolPriority = new Map(nonAdvPriority);
           let nextRank = nonAdvEntries.length;
           const byeRefCandidates = collectRound0ByeWalkoverRefCandidates(newBracket, seedRankById);
-          for (const c of byeRefCandidates || []) {
+          const byeSorted = [...(byeRefCandidates || [])].sort(
+            (a, b) => (b.seedIdx ?? 0) - (a.seedIdx ?? 0)
+          );
+          for (const c of byeSorted) {
             if (c?.id == null) continue;
-            poolPriority.set(c.id, nextRank++);
+            if (!poolPriority.has(c.id)) poolPriority.set(c.id, nextRank++);
           }
           for (const id of byeRoundIds) {
-            poolPriority.set(id, nextRank++);
+            if (!poolPriority.has(id)) poolPriority.set(id, nextRank++);
           }
           const poolTier1 = new Set(wave1Base);
           for (const c of byeRefCandidates || []) {
@@ -2990,6 +3082,14 @@ export const updateBracketReferees = (
           skipHistoricRefereeUsage: true,
         });
         if (chosenRef) pickTier = 1;
+      }
+
+      if (!chosenRef) {
+        chosenRef = selectFromPool({
+          poolIds: collectIdleDirectKoIds(),
+          skipHistoricRefereeUsage: true,
+        });
+        if (chosenRef) pickTier = pickTier || 4;
       }
 
       if (chosenRef) {

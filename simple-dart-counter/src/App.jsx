@@ -4587,6 +4587,7 @@ function AppMain({ lang, setLang }) {
             return {
               ...rest,
               referee: { id: refId, name: newReferee?.name ?? refId },
+              refereeLocked: true,
             };
           }),
         };
