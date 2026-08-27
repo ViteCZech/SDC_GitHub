@@ -80,6 +80,8 @@ function publicResultIdFromPin(pin) {
 }
 
 function inferEventStartAt(tournamentData) {
+  const fromStartedAt = tournamentData?.startedAt ?? tournamentData?.meta?.startedAt;
+  if (fromStartedAt) return fromStartedAt;
   const fromMeta = tournamentData?.meta?.startsAt;
   if (fromMeta) return fromMeta;
   const fromDate = tournamentData?.date;

@@ -38,74 +38,119 @@ function renderScore(match) {
   return `${p1}:${p2}`;
 }
 
+function buildPlayerNameMap(record) {
+  const map = new Map();
+
+  for (const g of record?.groups || []) {
+    for (const p of g?.players || []) {
+      const id = p?.id ?? p?.playerId;
+      const name = String(p?.name ?? '').trim();
+      if (id != null && name) map.set(String(id), name);
+    }
+  }
+
+  for (const p of record?.tournamentData?.players || []) {
+    const id = p?.id ?? p?.playerId;
+    const name = String(p?.name ?? '').trim();
+    if (id != null && name) map.set(String(id), name);
+  }
+
+  return map;
+}
+
 function MatchesTab({ record, lang }) {
   const groupMatches = Array.isArray(record?.groupMatches) ? record.groupMatches : [];
   const bracket = Array.isArray(record?.tournamentBracket) ? record.tournamentBracket : [];
   const groupById = new Map((record?.groups || []).map((g) => [String(g.groupId ?? g.id), g]));
+  const nameById = buildPlayerNameMap(record);
   const tournamentName = record?.name || '';
+  const bracketFinalFirst = [...bracket].reverse();
+
+  const resolveName = (id, explicitName) => {
+    const explicit = String(explicitName ?? '').trim();
+    if (explicit) return explicit;
+    const key = id != null ? String(id) : '';
+    if (key && nameById.has(key)) return nameById.get(key);
+    return key || '—';
+  };
+
+  const groupedGroupMatches = groupMatches.reduce((acc, m) => {
+    const groupId = String(m.groupId ?? m.group ?? '—');
+    if (!acc[groupId]) acc[groupId] = [];
+    acc[groupId].push(m);
+    return acc;
+  }, {});
+  const groupIds = Object.keys(groupedGroupMatches).sort((a, b) =>
+    a.localeCompare(b, 'cs', { numeric: true, sensitivity: 'base' })
+  );
 
   return (
     <div className="space-y-4">
       <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-        <h3 className="text-xs uppercase tracking-widest font-black text-emerald-400 mb-3">
-          {lang === 'cs' ? 'Skupinové zápasy' : lang === 'pl' ? 'Mecze grupowe' : 'Group matches'}
-        </h3>
-        {groupMatches.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            {lang === 'cs' ? 'Žádné skupinové zápasy.' : lang === 'pl' ? 'Brak meczów grupowych.' : 'No group matches.'}
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {groupMatches.map((m, idx) => {
-              const groupId = String(m.groupId ?? m.group ?? '');
-              const g = groupById.get(groupId);
-              const p1 = m.player1Name || m.player1Id || '—';
-              const p2 = m.player2Name || m.player2Id || '—';
-              return (
-                <li key={m.matchId ?? m.id ?? `${groupId}-${idx}`} className="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] text-slate-500 uppercase tracking-wider">
-                        {(lang === 'cs' ? 'Skupina' : lang === 'pl' ? 'Grupa' : 'Group')} {(g?.groupId ?? groupId) || '—'}
-                      </div>
-                      <div className="text-sm font-semibold text-slate-200">{p1} vs {p2}</div>
-                    </div>
-                    <span className="font-mono text-lg font-black text-emerald-300">{renderScore(m)}</span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
-      <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
         <h3 className="text-xs uppercase tracking-widest font-black text-purple-300 mb-3">
           {lang === 'cs' ? 'Vyřazovací část' : lang === 'pl' ? 'Drabinka' : 'Knockout'}
         </h3>
-        {bracket.length === 0 ? (
+        {bracketFinalFirst.length === 0 ? (
           <p className="text-sm text-slate-500">
             {lang === 'cs' ? 'Pavouk zatím není dostupný.' : lang === 'pl' ? 'Drabinka nie jest jeszcze dostępna.' : 'Bracket is not available yet.'}
           </p>
         ) : (
           <div className="space-y-3">
-            {bracket.map((round, ri) => (
-              <div key={round.round ?? ri} className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+            {bracketFinalFirst.map((round, idx) => {
+              const originalRoundIndex = Math.max(0, bracket.length - 1 - idx);
+              return (
+              <div key={round.round ?? `round-${originalRoundIndex}`} className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
                 <div className="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-2">
-                  {getRoundLabel(ri, bracket.length, lang)}
+                  {getRoundLabel(originalRoundIndex, bracket.length, lang)}
                 </div>
                 <ul className="space-y-2">
                   {(round.matches || []).map((m, mi) => (
-                    <li key={m.id ?? m.matchId ?? `${ri}-${mi}`} className="flex items-center justify-between gap-3 text-sm">
+                    <li key={m.id ?? m.matchId ?? `${originalRoundIndex}-${mi}`} className="flex items-center justify-between gap-3 text-sm">
                       <span className="text-slate-200 truncate">
-                        {(m.player1Name || m.player1Id || '?')} vs {(m.player2Name || m.player2Id || '?')}
+                        {resolveName(m.player1Id, m.player1Name)} vs {resolveName(m.player2Id, m.player2Name)}
                       </span>
                       <span className="font-mono font-black text-amber-300">{renderScore(m)}</span>
                     </li>
                   ))}
                 </ul>
               </div>
-            ))}
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+        <h3 className="text-xs uppercase tracking-widest font-black text-emerald-400 mb-3">
+          {lang === 'cs' ? 'Skupiny (zápasy)' : lang === 'pl' ? 'Grupy (mecze)' : 'Groups (matches)'}
+        </h3>
+        {groupMatches.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            {lang === 'cs' ? 'Žádné skupinové zápasy.' : lang === 'pl' ? 'Brak meczów grupowych.' : 'No group matches.'}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {groupIds.map((groupId) => {
+              const g = groupById.get(groupId);
+              const matches = groupedGroupMatches[groupId] || [];
+              return (
+                <div key={groupId} className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+                  <div className="text-[11px] text-slate-500 uppercase tracking-wider font-bold mb-2">
+                    {(lang === 'cs' ? 'Skupina' : lang === 'pl' ? 'Grupa' : 'Group')} {g?.groupId ?? groupId}
+                  </div>
+                  <ul className="space-y-2">
+                    {matches.map((m, idx) => (
+                      <li key={m.matchId ?? m.id ?? `${groupId}-${idx}`} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-slate-200 truncate">
+                          {resolveName(m.player1Id, m.player1Name)} vs {resolveName(m.player2Id, m.player2Name)}
+                        </span>
+                        <span className="font-mono font-black text-emerald-300">{renderScore(m)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

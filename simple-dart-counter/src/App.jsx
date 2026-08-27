@@ -6122,6 +6122,7 @@ function AppMain({ lang, setLang }) {
               (typeof crypto !== 'undefined' && crypto.randomUUID
                 ? crypto.randomUUID()
                 : `t-${Date.now()}`);
+            const startedAtIso = new Date().toISOString();
 
             if (isTournamentBracketOnlyFormat(data.tournamentFormat)) {
               playersWithIds = sortPlayersForBracketSeeding(playersWithIds);
@@ -6150,6 +6151,11 @@ function AppMain({ lang, setLang }) {
                 players: playersWithIds,
                 pin: generatedPin,
                 tournamentId,
+                startedAt: startedAtIso,
+                meta: {
+                  ...(data.meta || {}),
+                  startedAt: startedAtIso,
+                },
                 tournamentFormat: 'bracket_only',
                 groups: [],
                 groupsLegs: null,
@@ -6178,6 +6184,11 @@ function AppMain({ lang, setLang }) {
               players: playersWithIds,
               pin: generatedPin,
               tournamentId,
+              startedAt: startedAtIso,
+              meta: {
+                ...(data.meta || {}),
+                startedAt: startedAtIso,
+              },
             });
             setActivePin(generatedPin);
             setTournamentData(withId);

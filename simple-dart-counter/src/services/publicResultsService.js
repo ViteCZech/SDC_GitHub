@@ -65,7 +65,12 @@ function normalizePublicDoc(id, raw) {
       : [];
   const status = String(docData.status ?? 'finished');
   const pin = String(docData.pin ?? tournamentData.pin ?? '').trim();
-  const eventStartAt = docData.eventStartAt ?? tournamentData?.meta?.startsAt ?? null;
+  const eventStartAt =
+    docData.eventStartAt ??
+    tournamentData?.startedAt ??
+    tournamentData?.meta?.startedAt ??
+    tournamentData?.meta?.startsAt ??
+    null;
   const updatedAt = docData.updatedAt ?? null;
 
   return {
@@ -102,7 +107,11 @@ function normalizeActiveDoc(pin, raw) {
     source: 'active-fallback',
     name: normalizeName(tournamentData?.name ?? tournamentData?.tournamentName),
     location: String(tournamentData?.venueName ?? '').trim(),
-    eventStartAt: tournamentData?.meta?.startsAt ?? null,
+    eventStartAt:
+      tournamentData?.startedAt ??
+      tournamentData?.meta?.startedAt ??
+      tournamentData?.meta?.startsAt ??
+      null,
     updatedAt: raw?.lastUpdated ?? null,
     playersCount: getPlayersCount({ groups, tournamentData }),
     matchesCount: getMatchesCount({ groupMatches, tournamentBracket }),

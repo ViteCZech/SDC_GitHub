@@ -75,6 +75,7 @@ export default function PublicResultsHome({
     setLoading(true);
     const unsub = listenPublicResultsFeed(
       (next) => {
+        setError(null);
         setFeed(next);
         setLoading(false);
       },
