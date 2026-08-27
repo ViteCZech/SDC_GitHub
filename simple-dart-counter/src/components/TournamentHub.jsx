@@ -231,7 +231,7 @@ export default function TournamentHub({
         {th('hubIntro')}
       </p>
 
-      <div className="grid w-full grid-cols-1 gap-3 sm:gap-4">
+      <div className="grid w-full grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
         <button
           type="button"
           onClick={() => onOpenPreReg?.()}

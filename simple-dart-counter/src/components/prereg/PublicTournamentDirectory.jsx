@@ -473,13 +473,13 @@ export default function PublicTournamentDirectory({
               />
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {SCOPES.map((id) => (
                 <button
                   key={id}
                   type="button"
                   onClick={() => setScope(id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide border transition-colors ${
+                  className={`w-full px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide border transition-colors ${
                     scope === id
                       ? 'bg-sky-600 border-sky-500 text-white'
                       : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
@@ -492,13 +492,13 @@ export default function PublicTournamentDirectory({
             </div>
 
             {scope !== 'MINE' && (
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {TABS.map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide border transition-colors ${
+                    className={`w-full px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide border transition-colors ${
                       activeTab === tab.id
                         ? 'bg-emerald-600 border-emerald-500 text-white'
                         : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
@@ -510,24 +510,26 @@ export default function PublicTournamentDirectory({
               </div>
             )}
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="space-y-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
                 {t('preregCatalogSortLabel')}
               </span>
-              {SORTS.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setSortMode(id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide border transition-colors ${
-                    sortMode === id
-                      ? 'bg-slate-100 border-slate-100 text-slate-900'
-                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {t(`preregCatalogSort${id}`)}
-                </button>
-              ))}
+              <div className="grid grid-cols-2 sm:max-w-md gap-2">
+                {SORTS.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setSortMode(id)}
+                    className={`w-full px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide border transition-colors ${
+                      sortMode === id
+                        ? 'bg-slate-100 border-slate-100 text-slate-900'
+                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {t(`preregCatalogSort${id}`)}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {sortMode === 'CITY' && (

@@ -5900,7 +5900,7 @@ function AppMain({ lang, setLang }) {
           className={`mx-auto flex w-full flex-1 p-4 sm:p-6 lg:max-w-6xl xl:max-w-7xl ${
             homeSubmenu === 'online'
               ? 'min-h-0 max-w-2xl flex-col items-stretch justify-start overflow-hidden md:max-w-3xl'
-              : 'max-w-md flex-col items-center justify-center gap-6 overflow-y-auto md:max-w-4xl md:grid md:grid-cols-2 md:gap-10 lg:gap-12'
+              : 'max-w-md flex-col items-center justify-center gap-6 overflow-y-auto md:max-w-5xl md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:gap-8 lg:max-w-6xl lg:grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)] lg:gap-10'
           }`}
         >
             {homeSubmenu === 'online' ? (
@@ -5962,7 +5962,7 @@ function AppMain({ lang, setLang }) {
                     )}
                 </div>
                 {/* Pravý sloupec: doplňková tlačítka */}
-                <div className="grid grid-cols-2 gap-3 w-full">
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 w-full">
                     <button onClick={() => setAppState('tutorial')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><FileText className="w-7 h-7 text-emerald-400" /><span className="text-sm font-bold text-white">{t('tutorial')}</span></button>
                     <button onClick={() => setAppState('history')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><History className="text-blue-400 w-7 h-7" /><span className="text-sm font-bold text-white">{t('matchHistory')}</span></button>
                     <button onClick={handleOpenTournamentEntry} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><Swords className="w-7 h-7 text-amber-400" /><span className="text-sm font-bold text-white">{t('tournament')}</span></button>
