@@ -28,6 +28,21 @@ describe('appNavigation', () => {
     });
   });
 
+  it('veřejné výsledky mají správné zpět cíle', () => {
+    expect(resolveAppNav({ appState: 'public_results_home' }).backTarget).toEqual({
+      type: 'state',
+      state: 'home',
+    });
+    expect(resolveAppNav({ appState: 'public_top_performances' }).backTarget).toEqual({
+      type: 'state',
+      state: 'public_results_home',
+    });
+    expect(resolveAppNav({ appState: 'public_results_detail' }).backTarget).toEqual({
+      type: 'state',
+      state: 'public_results_home',
+    });
+  });
+
   it('viewer ve skupinách odchází, admin se vrací k terčům', () => {
     expect(resolveAppNav({ appState: 'tournament_groups', userRole: 'viewer' }).backTarget).toEqual({
       type: 'leaveViewer',

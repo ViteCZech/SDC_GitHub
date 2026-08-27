@@ -164,6 +164,15 @@ service cloud.firestore {
     }
 
     /**
+     * Veřejný feed výsledků turnajů (list + detail + top výkony).
+     * Čtení veřejné, zápis jen autentizovaný klient/Cloud Function.
+     */
+    match /public_tournaments/{docId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null;
+    }
+
+    /**
      * Předregistrace turnajů (Fáze 1).
      * Veřejné read jen pro non-DRAFT turnaje; registrace pouze přes Cloud Function.
      * Citlivá data registrací (e-mail, telefon) — read jen pro ownera.

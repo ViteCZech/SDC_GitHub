@@ -13,6 +13,7 @@ import { app, db } from '../firebase';
 
 const COLLECTION = 'active_tournaments';
 const PAST_COLLECTION = 'past_tournaments';
+const PUBLIC_COLLECTION = 'public_tournaments';
 const FUNCTIONS_REGION = 'europe-west1';
 
 function resolveFunctionsProjectId() {
@@ -70,6 +71,113 @@ function stripUndefinedDeep(val) {
     if (nv !== undefined) out[k] = nv;
   }
   return out;
+}
+
+function publicResultIdFromPin(pin) {
+  const p = String(pin ?? '').trim();
+  if (!/^\d{4}$/.test(p)) return '';
+  return `live-${p}`;
+}
+
+function inferEventStartAt(tournamentData) {
+  const fromMeta = tournamentData?.meta?.startsAt;
+  if (fromMeta) return fromMeta;
+  const fromDate = tournamentData?.date;
+  return fromDate || null;
+}
+
+function sanitizePublicTournamentData(tournamentData, pin) {
+  const td = tournamentData && typeof tournamentData === 'object' ? tournamentData : {};
+  const startScore = Number(td.startScore ?? 501) || 501;
+  const outMode = String(td.outMode ?? 'double');
+  const format = String(td.tournamentFormat ?? td.format ?? 'groups_bracket');
+  const groupsLegs = Number(td.groupsLegs ?? td.groupLegs ?? td.legsGroup ?? 2) || 2;
+  const bracketLegs = Number(td.bracketKoLegs ?? td.bracketLegs ?? td.legsKo ?? 3) || 3;
+  const prelimLegs = td.prelimLegs == null ? null : Number(td.prelimLegs) || 0;
+  const numBoards =
+    Number(td.boardsCount ?? td.totalBoards ?? td.numBoards ?? 1) || 1;
+
+  return {
+    name: String(td.name ?? td.tournamentName ?? '').trim() || '(bez názvu)',
+    pin: String(pin ?? td.pin ?? '').trim(),
+    startScore,
+    outMode,
+    tournamentFormat: format,
+    groupsLegs,
+    bracketLegs,
+    bracketKoLegs: bracketLegs,
+    prelimLegs,
+    numBoards,
+    promotersCount: td.promotersCount ?? td.promotersPerGroup ?? td.advancePerGroup ?? 2,
+    venueName: td.venueName ?? '',
+    meta: {
+      startsAt: inferEventStartAt(td),
+      competitionType: td?.meta?.competitionType ?? td.competitionType ?? 'singles',
+    },
+  };
+}
+
+function computePublicCounts(groups, groupMatches, tournamentBracket) {
+  const playersCount = Array.isArray(groups)
+    ? groups.reduce((sum, g) => sum + (Array.isArray(g?.players) ? g.players.length : 0), 0)
+    : 0;
+  const groupMatchesCount = Array.isArray(groupMatches) ? groupMatches.length : 0;
+  const bracketMatchesCount = Array.isArray(tournamentBracket)
+    ? tournamentBracket.reduce(
+        (sum, r) => sum + (Array.isArray(r?.matches) ? r.matches.length : 0),
+        0
+      )
+    : 0;
+  return {
+    playersCount,
+    matchesCount: groupMatchesCount + bracketMatchesCount,
+  };
+}
+
+function buildPublicTournamentPayload({
+  pin,
+  status,
+  source = 'active',
+  tournamentData,
+  groups,
+  groupMatches,
+  tournamentBracket,
+}) {
+  const safeTd = sanitizePublicTournamentData(tournamentData, pin);
+  const safeGroups = cloneJsonSafe(groups, []);
+  const safeGroupMatches = cloneJsonSafe(groupMatches, []);
+  const safeBracket = cloneJsonSafe(tournamentBracket, []);
+  const counts = computePublicCounts(safeGroups, safeGroupMatches, safeBracket);
+
+  return stripUndefinedDeep({
+    pin: String(pin ?? '').trim(),
+    source,
+    status: status === 'finished' ? 'finished' : 'live',
+    name: safeTd.name,
+    location: safeTd.venueName || '',
+    eventStartAt: safeTd?.meta?.startsAt ?? null,
+    updatedAt: Timestamp.now(),
+    playersCount: counts.playersCount,
+    matchesCount: counts.matchesCount,
+    tournamentData: safeTd,
+    groups: safeGroups,
+    groupMatches: safeGroupMatches,
+    tournamentBracket: safeBracket,
+  });
+}
+
+async function upsertPublicTournamentByPin(pin, payload, merge = true) {
+  if (!db) return;
+  const id = publicResultIdFromPin(pin);
+  if (!id || !payload) return;
+  await setDoc(doc(db, PUBLIC_COLLECTION, id), payload, { merge });
+}
+
+async function deletePublicLiveTournamentByPin(pin) {
+  if (!db) return;
+  const id = publicResultIdFromPin(pin);
+  if (!id) return;
+  await deleteDoc(doc(db, PUBLIC_COLLECTION, id));
 }
 
 function groupMatchKey(m) {
@@ -198,6 +306,21 @@ export async function syncTournamentToCloud(pin, tournamentState) {
   if (payload == null) return;
 
   await setDoc(ref, payload, { merge: true });
+
+  try {
+    const publicPayload = buildPublicTournamentPayload({
+      pin: id,
+      status,
+      source: 'active',
+      tournamentData: tournamentDataSynced,
+      groups,
+      groupMatches,
+      tournamentBracket,
+    });
+    await upsertPublicTournamentByPin(id, publicPayload, true);
+  } catch (err) {
+    console.warn('syncTournamentToCloud public mirror failed:', err);
+  }
 }
 
 /**
@@ -209,6 +332,11 @@ export async function deleteCloudTournament(pin) {
   if (!/^\d{4}$/.test(id)) return;
   const ref = doc(db, COLLECTION, id);
   await deleteDoc(ref);
+  try {
+    await deletePublicLiveTournamentByPin(id);
+  } catch (err) {
+    console.warn('deleteCloudTournament public mirror delete failed:', err);
+  }
 }
 
 /**
@@ -240,6 +368,21 @@ export async function archivePastTournamentAndDeleteActive(userId, pin, name, fu
 
   await addDoc(collection(db, PAST_COLLECTION), payload);
   await deleteDoc(doc(db, COLLECTION, id));
+  try {
+    const publicPayload = buildPublicTournamentPayload({
+      pin: id,
+      status: 'finished',
+      source: 'archive',
+      tournamentData: safeData.tournamentData ?? null,
+      groups: safeData.groups ?? [],
+      groupMatches: safeData.groupMatches ?? [],
+      tournamentBracket: safeData.tournamentBracket ?? [],
+    });
+    await addDoc(collection(db, PUBLIC_COLLECTION), publicPayload);
+    await deletePublicLiveTournamentByPin(id);
+  } catch (err) {
+    console.warn('archivePastTournamentAndDeleteActive public mirror failed:', err);
+  }
 }
 
 /**

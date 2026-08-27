@@ -54,6 +54,26 @@ export function resolveAppNav(ctx) {
     return { showBack: true, showHome: true, backTarget: { type: 'state', state: 'home' } };
   }
 
+  if (appState === 'public_results_home') {
+    return { showBack: true, showHome: true, backTarget: { type: 'state', state: 'home' } };
+  }
+
+  if (appState === 'public_top_performances') {
+    return {
+      showBack: true,
+      showHome: true,
+      backTarget: { type: 'state', state: 'public_results_home' },
+    };
+  }
+
+  if (appState === 'public_results_detail') {
+    return {
+      showBack: true,
+      showHome: true,
+      backTarget: { type: 'state', state: 'public_results_home' },
+    };
+  }
+
   if (appState === 'tournament_hub') {
     return { showBack: true, showHome: true, backTarget: { type: 'state', state: 'home' } };
   }

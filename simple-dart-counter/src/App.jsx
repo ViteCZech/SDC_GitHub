@@ -46,6 +46,9 @@ import TournamentStatisticsView from './components/TournamentStatisticsView';
 import TabletWaitingRoom from './components/TabletWaitingRoom';
 import TabletBoardQrPanel from './components/TabletBoardQrPanel';
 import VenueDisplayView from './components/VenueDisplayView';
+import PublicResultsHome from './components/public/PublicResultsHome';
+import PublicTournamentResultsView from './components/public/PublicTournamentResultsView';
+import PublicTopPerformancesView from './components/public/PublicTopPerformancesView';
 import TournamentHistory from './components/TournamentHistory';
 import PublicTournamentPage from './components/prereg/PublicTournamentPage';
 import PublicTournamentDirectory from './components/prereg/PublicTournamentDirectory';
@@ -60,6 +63,7 @@ import { loadUiResume, saveUiResume } from './utils/uiResumeStorage';
 import { parsePreregRouteFromUrl, isPublicTournamentCatalogPath } from './utils/preregAdmin';
 import { parseTabletRouteFromUrl, ensureBoardAuthTokens } from './utils/tabletBoardQr';
 import { buildVenueDisplayUrl, parseVenueDisplayRouteFromUrl, resolveVenueLang } from './utils/venueDisplay';
+import { parsePublicResultsRouteFromUrl } from './utils/publicResultsRoutes';
 import { loadAdminInviteSession, saveAdminInviteSession } from './utils/preregStorage';
 import {
   adminConfirmPair,
@@ -1216,12 +1220,19 @@ function AppMain({ lang, setLang }) {
   const [user, setUser] = useState(null);
   const [offlineMode, setOfflineMode] = useState(false);
   const [appState, setAppState] = useState(() => {
+    const publicRoute = parsePublicResultsRouteFromUrl();
+    if (publicRoute?.view === 'home') return 'public_results_home';
+    if (publicRoute?.view === 'top') return 'public_top_performances';
+    if (publicRoute?.view === 'detail') return 'public_results_detail';
     if (isPublicTournamentCatalogPath()) return 'prereg_catalog';
     const route = parsePreregRouteFromUrl();
     if (route?.inviteToken) return 'prereg_admin';
     if (route?.tournamentId) return 'prereg_public';
     const resume = getBootUiResumeOnce();
-    if (resume?.appState && resume.appState !== 'home') return resume.appState;
+    if (resume?.appState && resume.appState !== 'home') {
+      if (String(resume.appState).startsWith('public_')) return 'home';
+      return resume.appState;
+    }
     return 'home';
   });
   const [preregTournamentId, setPreregTournamentId] = useState(() => {
@@ -1234,6 +1245,15 @@ function AppMain({ lang, setLang }) {
     }
     return null;
   });
+  const [publicResultId, setPublicResultId] = useState(() => {
+    const route = parsePublicResultsRouteFromUrl();
+    if (route?.view === 'detail') return route.resultId ?? null;
+    return null;
+  });
+  const appStateRef = useRef(appState);
+  useEffect(() => {
+    appStateRef.current = appState;
+  }, [appState]);
   /** Po otevření turnaje z katalogu — zpět vede na /tournaments místo domů. */
   const [preregReturnToCatalog, setPreregReturnToCatalog] = useState(() => {
     const r = getBootUiResumeOnce();
@@ -1601,6 +1621,23 @@ function AppMain({ lang, setLang }) {
         return;
       }
 
+      const publicRoute = parsePublicResultsRouteFromUrl();
+      if (publicRoute?.view === 'home') {
+        setPublicResultId(null);
+        setAppState('public_results_home');
+        return;
+      }
+      if (publicRoute?.view === 'top') {
+        setPublicResultId(null);
+        setAppState('public_top_performances');
+        return;
+      }
+      if (publicRoute?.view === 'detail') {
+        setPublicResultId(publicRoute.resultId ?? null);
+        setAppState('public_results_detail');
+        return;
+      }
+
       if (isPublicTournamentCatalogPath()) {
         setAppState('prereg_catalog');
         setPreregTournamentId(null);
@@ -1609,7 +1646,14 @@ function AppMain({ lang, setLang }) {
       }
 
       const route = parsePreregRouteFromUrl();
-      if (!route) return;
+      if (!route) {
+        const current = String(appStateRef.current || '');
+        if (current.startsWith('public_')) {
+          setPublicResultId(null);
+          setAppState('home');
+        }
+        return;
+      }
 
       setPreregTournamentId(route.tournamentId);
 
@@ -3199,6 +3243,11 @@ function AppMain({ lang, setLang }) {
       return;
     }
 
+    if (String(appState).startsWith('public_')) {
+      setPublicResultId(null);
+      window.history.replaceState(null, '', '/');
+    }
+
     setAppState('home');
   }, [
     appState,
@@ -3221,6 +3270,12 @@ function AppMain({ lang, setLang }) {
       if (backTarget.type === 'state') {
         if (backTarget.state === 'home') {
           goHomeFromNav();
+          return;
+        }
+        if (backTarget.state === 'public_results_home') {
+          setPublicResultId(null);
+          setAppState('public_results_home');
+          window.history.replaceState(null, '', '/results');
           return;
         }
         setAppState(backTarget.state);
@@ -3337,6 +3392,26 @@ function AppMain({ lang, setLang }) {
     setPreregReturnToCatalog(false);
     setAppState('prereg_catalog');
     window.history.pushState(null, '', '/tournaments');
+  };
+
+  const handleOpenPublicResultsHome = () => {
+    setPublicResultId(null);
+    setAppState('public_results_home');
+    window.history.pushState(null, '', '/results');
+  };
+
+  const handleOpenPublicTopPerformances = () => {
+    setPublicResultId(null);
+    setAppState('public_top_performances');
+    window.history.pushState(null, '', '/results/top');
+  };
+
+  const handleOpenPublicResultDetail = (resultId) => {
+    const id = String(resultId ?? '').trim();
+    if (!id) return;
+    setPublicResultId(id);
+    setAppState('public_results_detail');
+    window.history.pushState(null, '', `/results/${encodeURIComponent(id)}`);
   };
 
   const handleOpenCatalogTournament = (tournamentId) => {
@@ -5892,12 +5967,37 @@ function AppMain({ lang, setLang }) {
                     <button onClick={() => setAppState('history')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><History className="text-blue-400 w-7 h-7" /><span className="text-sm font-bold text-white">{t('matchHistory')}</span></button>
                     <button onClick={handleOpenTournamentEntry} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><Swords className="w-7 h-7 text-amber-400" /><span className="text-sm font-bold text-white">{t('tournament')}</span></button>
                     <button onClick={() => setAppState('profile')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><BarChart2 className="text-purple-400 w-7 h-7" /><span className="text-sm">{t('statsPersonal')}</span></button>
+                    <button onClick={handleOpenPublicResultsHome} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><ClipboardList className="text-emerald-300 w-7 h-7" /><span className="text-sm font-bold text-white">{t('publicResultsMenu')}</span></button>
                     <HomeOnlineMenuTile t={t} onOpen={() => setHomeSubmenu('online')} />
                     <button onClick={() => setAppState('about')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><Info className="text-yellow-400 w-7 h-7" /><span className="text-sm font-bold text-white">{t('aboutApp')}</span></button>
                 </div>
               </>
             )}
         </main>
+      )}
+
+      {appState === 'public_results_home' && (
+        <PublicResultsHome
+          lang={lang}
+          onOpenTournament={handleOpenPublicResultDetail}
+          onOpenTopPerformances={handleOpenPublicTopPerformances}
+        />
+      )}
+
+      {appState === 'public_top_performances' && (
+        <PublicTopPerformancesView
+          lang={lang}
+          onBack={handleOpenPublicResultsHome}
+          onOpenTournament={handleOpenPublicResultDetail}
+        />
+      )}
+
+      {appState === 'public_results_detail' && (
+        <PublicTournamentResultsView
+          lang={lang}
+          resultId={publicResultId}
+          onBack={handleOpenPublicResultsHome}
+        />
       )}
 
       {/* --- TOURNAMENT SETUP --- */}
