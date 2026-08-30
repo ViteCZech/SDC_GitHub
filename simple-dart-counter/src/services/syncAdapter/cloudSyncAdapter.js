@@ -3,6 +3,8 @@ import {
   deleteCloudTournament,
   heartbeatTabletBoardPresence,
   listenToCloudTournament,
+  mergeAdminBracketFromTabletCloud,
+  mergeAdminGroupMatchesFromTabletCloud,
   registerTabletBoardOnline,
   releaseTabletBoardPresence,
   releaseTabletBoardPresenceOnUnload,
@@ -41,6 +43,12 @@ export function createCloudSyncAdapter() {
     },
     updateMatchFromTablet(pin, matchType, matchId, matchUpdates, opts = {}) {
       return updateCloudMatchFromTablet(pin, matchType, matchId, matchUpdates, opts);
+    },
+    mergeGroupMatchesFromCloud(prevLocal, cloudList) {
+      return mergeAdminGroupMatchesFromTabletCloud(prevLocal, cloudList);
+    },
+    mergeBracketFromCloud(prevLocal, cloudBracket) {
+      return mergeAdminBracketFromTabletCloud(prevLocal, cloudBracket);
     },
     heartbeatTabletPresence(presence) {
       return heartbeatTabletBoardPresence(presence);

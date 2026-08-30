@@ -5,6 +5,8 @@ const mocked = vi.hoisted(() => ({
   deleteCloudTournament: vi.fn(),
   heartbeatTabletBoardPresence: vi.fn(),
   listenToCloudTournament: vi.fn(),
+  mergeAdminBracketFromTabletCloud: vi.fn(),
+  mergeAdminGroupMatchesFromTabletCloud: vi.fn(),
   registerTabletBoardOnline: vi.fn(),
   releaseTabletBoardPresence: vi.fn(),
   releaseTabletBoardPresenceOnUnload: vi.fn(),
@@ -21,6 +23,8 @@ vi.mock('../../tournamentSync', () => ({
   deleteCloudTournament: mocked.deleteCloudTournament,
   heartbeatTabletBoardPresence: mocked.heartbeatTabletBoardPresence,
   listenToCloudTournament: mocked.listenToCloudTournament,
+  mergeAdminBracketFromTabletCloud: mocked.mergeAdminBracketFromTabletCloud,
+  mergeAdminGroupMatchesFromTabletCloud: mocked.mergeAdminGroupMatchesFromTabletCloud,
   registerTabletBoardOnline: mocked.registerTabletBoardOnline,
   releaseTabletBoardPresence: mocked.releaseTabletBoardPresence,
   releaseTabletBoardPresenceOnUnload: mocked.releaseTabletBoardPresenceOnUnload,
@@ -64,6 +68,8 @@ describe('createCloudSyncAdapter', () => {
     await adapter.verifyTabletAccess('1234', 'abc', { board: '1' });
     await adapter.registerTabletPresence('1234', '1', 'token', { status: 'online' });
     await adapter.updateMatchFromTablet('1234', 'group', 'm-1', { status: 'done' }, { boardToken: 'bt' });
+    adapter.mergeGroupMatchesFromCloud([{ id: 'local-group' }], [{ id: 'cloud-group' }]);
+    adapter.mergeBracketFromCloud([{ round: 1 }], [{ round: 1 }]);
     await adapter.heartbeatTabletPresence(releasePayload);
     await adapter.releaseTabletPresence(releasePayload);
     adapter.releaseTabletPresenceOnUnload(releasePayload);
@@ -84,6 +90,11 @@ describe('createCloudSyncAdapter', () => {
       { status: 'done' },
       { boardToken: 'bt' }
     );
+    expect(mocked.mergeAdminGroupMatchesFromTabletCloud).toHaveBeenCalledWith(
+      [{ id: 'local-group' }],
+      [{ id: 'cloud-group' }]
+    );
+    expect(mocked.mergeAdminBracketFromTabletCloud).toHaveBeenCalledWith([{ round: 1 }], [{ round: 1 }]);
     expect(mocked.heartbeatTabletBoardPresence).toHaveBeenCalledWith(releasePayload);
     expect(mocked.releaseTabletBoardPresence).toHaveBeenCalledWith(releasePayload);
     expect(mocked.releaseTabletBoardPresenceOnUnload).toHaveBeenCalledWith(releasePayload);

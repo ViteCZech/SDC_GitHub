@@ -2,10 +2,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { signInAnonymously, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, deleteUser } from 'firebase/auth';
 import { collection, addDoc, deleteDoc, doc, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import {
-  mergeAdminGroupMatchesFromTabletCloud,
-  mergeAdminBracketFromTabletCloud,
-} from './services/tournamentSync';
 import { SyncAdapterProvider, useSyncAdapter } from './context/SyncAdapterContext';
 import { createCloudSyncAdapter } from './services/syncAdapter/cloudSyncAdapter';
 import { cancelOnlineGame, getOnlineGameById, abandonOnlineGameSession } from './services/onlineGamesService';
@@ -2230,7 +2226,7 @@ function AppMain({ lang, setLang }) {
         isIncomingCloudUpdate.current = true;
 
         setTournamentMatches((prev) => {
-          const next = mergeAdminGroupMatchesFromTabletCloud(
+          const next = syncAdapter.mergeGroupMatchesFromCloud(
             prev,
             Array.isArray(d.groupMatches) ? d.groupMatches : []
           );
@@ -2238,7 +2234,7 @@ function AppMain({ lang, setLang }) {
         });
         setTournamentBracket((prev) => {
           const cloudBr = Array.isArray(d.tournamentBracket) ? d.tournamentBracket : [];
-          const merged = mergeAdminBracketFromTabletCloud(prev, cloudBr);
+          const merged = syncAdapter.mergeBracketFromCloud(prev, cloudBr);
           if (merged === prev) return prev;
           return propagateBracketWinners(merged);
         });
@@ -2253,7 +2249,7 @@ function AppMain({ lang, setLang }) {
       (err) => console.warn('Admin tournament listener:', err)
     );
     return () => unsub();
-  }, [userRole, activePin, tournamentData?.cloudEnabled, user]);
+  }, [userRole, activePin, tournamentData?.cloudEnabled, user, syncAdapter]);
 
   /** Pravidelná synchronizace turnaje do Firestore (admin + platný PIN), debounce kvůli šetření zápisů. */
   useEffect(() => {

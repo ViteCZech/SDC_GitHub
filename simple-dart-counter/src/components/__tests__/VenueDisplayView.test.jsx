@@ -1,14 +1,18 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
+import { SyncAdapterProvider } from '../../context/SyncAdapterContext';
 
 const listenMock = vi.fn();
 
-vi.mock('../../services/tournamentSync', () => ({
-  listenToCloudTournament: (pin, cb) => listenMock(pin, cb),
-}));
-
 import VenueDisplayView from '../VenueDisplayView';
+
+function renderWithAdapter(ui) {
+  const adapter = {
+    listenTournament: (pin, cb) => listenMock(pin, cb),
+  };
+  return render(<SyncAdapterProvider adapter={adapter}>{ui}</SyncAdapterProvider>);
+}
 
 function liveDoc() {
   return {
@@ -60,7 +64,7 @@ function liveDoc() {
 describe('VenueDisplayView', () => {
   beforeEach(() => {
     listenMock.mockReset();
-    listenMock.mockImplementation((_pin, _cb) => () => {});
+    listenMock.mockImplementation(() => () => {});
   });
 
   afterEach(() => {
@@ -68,7 +72,7 @@ describe('VenueDisplayView', () => {
   });
 
   it('neplatný PIN nic neposlouchá a ukáže chybu', () => {
-    render(<VenueDisplayView pin={null} invalidPin lang="cs" />);
+    renderWithAdapter(<VenueDisplayView pin={null} invalidPin lang="cs" />);
     expect(screen.getByTestId('venue-display')).toBeTruthy();
     expect(screen.getByTestId('venue-display-status').getAttribute('data-state')).toBe('empty');
     expect(screen.getAllByText('Neplatný PIN').length).toBeGreaterThan(0);
@@ -81,7 +85,7 @@ describe('VenueDisplayView', () => {
       cb(liveDoc());
       return () => {};
     });
-    render(<VenueDisplayView pin="1234" lang="cs" />);
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
     act(() => {
       vi.advanceTimersByTime(16_000);
     });
@@ -99,7 +103,7 @@ describe('VenueDisplayView', () => {
       cb(null);
       return () => {};
     });
-    render(<VenueDisplayView pin="0000" lang="cs" />);
+    renderWithAdapter(<VenueDisplayView pin="0000" lang="cs" />);
     expect(screen.getAllByText('Turnaj není aktivní').length).toBeGreaterThan(0);
   });
 
@@ -110,7 +114,7 @@ describe('VenueDisplayView', () => {
       cb(liveDoc());
       return () => {};
     });
-    render(<VenueDisplayView pin="1234" lang="cs" />);
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
     expect(screen.queryByRole('alert')).toBeNull();
     act(() => push({
       ...liveDoc(),
@@ -158,7 +162,7 @@ describe('VenueDisplayView', () => {
       });
       return () => {};
     });
-    render(<VenueDisplayView pin="1234" lang="cs" />);
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
     act(() => {
       vi.advanceTimersByTime(16_000);
     });
@@ -173,7 +177,7 @@ describe('VenueDisplayView', () => {
       cb(liveDoc());
       return () => {};
     });
-    render(<VenueDisplayView pin="1234" lang="cs" />);
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
     const root = screen.getByTestId('venue-display');
     expect(root.className).toContain('overflow-hidden');
     expect(root.style.overflow).toBe('hidden');
@@ -188,7 +192,7 @@ describe('VenueDisplayView', () => {
       cb(liveDoc());
       return () => {};
     });
-    render(<VenueDisplayView pin="1234" lang="cs" />);
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
     act(() => {
       vi.advanceTimersByTime(10_000);
     });
