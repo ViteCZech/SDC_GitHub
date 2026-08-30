@@ -12,7 +12,7 @@ export function HomeOnlineMenuTile({ t, onOpen }) {
   return (
     <button type="button" onClick={onOpen} className={tileBtnClass}>
       <Globe className="w-7 h-7 text-cyan-400" />
-      <span className="text-sm font-bold text-white">{t('menuOnline')}</span>
+      <span className="text-sm font-bold text-slate-900 dark:text-white">{t('menuOnline')}</span>
     </button>
   );
 }
