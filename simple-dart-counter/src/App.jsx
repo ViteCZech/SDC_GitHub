@@ -99,6 +99,7 @@ import {
   findTournamentSlot,
 } from './utils/doublesThrowOrder';
 import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
+import { ThemeProvider } from './context/ThemeContext';
 
 const APP_VERSION = "v1.10.2";
 const ACTIVE_PREREG_STATUSES = new Set(['CONFIRMED', 'WAITLIST', 'PENDING_PAYMENT']);
@@ -4909,7 +4910,7 @@ function AppMain({ lang, setLang }) {
   if (appState === 'match_finished' || selectedMatchDetail) {
       const isTournament = !!tournamentMatchContext;
       return (
-          <div className="flex flex-col bg-slate-950 text-slate-100 font-sans relative overflow-hidden w-full h-[100dvh]">
+          <div className="flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans relative overflow-hidden w-full h-[100dvh]">
               <MatchStatsView
                 data={selectedMatchDetail}
                 title={t('matchStats')}
@@ -5269,7 +5270,7 @@ function AppMain({ lang, setLang }) {
       const isTournamentPlaying = !!tournamentMatchContext;
       matchSurfaceNode = (
           <div
-            className={`bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden ${
+            className={`bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden ${
               showPlayingVisible ? '' : 'hidden'
             }`}
             aria-hidden={!showPlayingVisible}
@@ -5525,7 +5526,7 @@ function AppMain({ lang, setLang }) {
   }
 
   return (
-    <div className="bg-slate-950 text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden">
+    <div className="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden">
       {matchSurfaceNode}
       {showTournamentPinBar && (
         <div className="shrink-0 w-full z-[5000] bg-slate-950 border-b border-slate-800 text-slate-300 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] flex flex-wrap justify-between items-center text-sm gap-x-2 gap-y-1">
@@ -6954,9 +6955,11 @@ export default function App() {
   }
   return (
     <SyncAdapterProvider adapter={syncAdapter}>
-      <AdminVirtualKeyboardProvider lang={lang}>
-        <AppMain lang={lang} setLang={setLang} />
-      </AdminVirtualKeyboardProvider>
+      <ThemeProvider>
+        <AdminVirtualKeyboardProvider lang={lang}>
+          <AppMain lang={lang} setLang={setLang} />
+        </AdminVirtualKeyboardProvider>
+      </ThemeProvider>
     </SyncAdapterProvider>
   );
 }

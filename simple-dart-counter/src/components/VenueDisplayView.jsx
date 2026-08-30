@@ -499,6 +499,19 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
   const skipFirstCallRef = useRef(true);
 
   useEffect(() => {
+    const html = document.documentElement;
+    const hadDark = html.classList.contains('dark');
+    const hadLight = html.classList.contains('light');
+    html.classList.remove('light');
+    html.classList.add('dark');
+    return () => {
+      html.classList.remove('dark', 'light');
+      if (hadDark) html.classList.add('dark');
+      if (hadLight) html.classList.add('light');
+    };
+  }, []);
+
+  useEffect(() => {
     if (shouldUseVenueDevMock(pin, invalidPin)) {
       setDoc(buildVenueDevMockDoc());
       return undefined;

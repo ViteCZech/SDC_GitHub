@@ -2,12 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Zabrání vzniku bílých pruhů a roztáhne aplikaci na celou obrazovku */
+/* Zakladni reset + podklad cele aplikace */
 :root {
-  background-color: #030712;
-  color: white;
   margin: 0;
   padding: 0;
+}
+
+html.dark,
+html.dark body {
+  background-color: #030712;
+  color: #f8fafc;
+}
+
+html.light,
+html.light body {
+  background-color: #f8fafc;
+  color: #0f172a;
 }
 
 body {
@@ -26,6 +36,73 @@ body {
   flex-direction: column;
 }
 
+html.light .bg-slate-950 {
+  background-color: #f8fafc !important;
+}
+
+html.light .bg-slate-900,
+html.light .bg-slate-800,
+html.light [class~="bg-slate-900/95"],
+html.light [class~="bg-slate-900/90"],
+html.light [class~="bg-slate-900/85"],
+html.light [class~="bg-slate-900/80"],
+html.light [class~="bg-slate-950/95"],
+html.light [class~="bg-slate-950/90"],
+html.light [class~="bg-slate-950/85"],
+html.light [class~="bg-slate-950/80"] {
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+html.light .bg-slate-700,
+html.light [class~="bg-slate-700/80"] {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .text-slate-100,
+html.light .text-slate-200,
+html.light .text-slate-300 {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-400 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-500,
+html.light .text-slate-600,
+html.light .text-slate-700 {
+  color: #475569 !important;
+}
+
+html.light .border-slate-900,
+html.light .border-slate-800,
+html.light .border-slate-700,
+html.light .border-slate-600,
+html.light [class~="border-slate-900/50"],
+html.light [class~="border-slate-800/60"],
+html.light [class~="border-slate-700/60"] {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .text-cyan-400,
+html.light .text-cyan-500,
+html.light .text-cyan-600 {
+  color: #0891b2 !important;
+}
+
+html.light .bg-cyan-400,
+html.light .bg-cyan-500,
+html.light .bg-cyan-600 {
+  background-color: #0891b2 !important;
+}
+
+html.light .border-cyan-400,
+html.light .border-cyan-500,
+html.light .border-cyan-600 {
+  border-color: #0891b2 !important;
+}
+
 /* Skrytí ošklivého bočního posuvníku (scrollbaru) */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
@@ -38,6 +115,18 @@ body {
 /* Globální zjemnění nápověd ve všech formulářových polích */
 input::placeholder,
 textarea::placeholder {
+  color: rgba(255, 255, 255, 0.35) !important;
+  font-style: italic;
+  opacity: 1 !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: rgba(71, 85, 105, 0.6) !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
   color: rgba(255, 255, 255, 0.35) !important;
   font-style: italic;
   opacity: 1 !important;

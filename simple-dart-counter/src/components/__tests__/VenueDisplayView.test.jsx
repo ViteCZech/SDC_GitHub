@@ -203,4 +203,13 @@ describe('VenueDisplayView', () => {
     expect(screen.queryByText('Pavouk čeká na vygenerování')).toBeNull();
     vi.useRealTimers();
   });
+
+  it('vzdy vynucuje dark rezim na html elementu', () => {
+    document.documentElement.classList.add('light');
+    const { unmount } = render(<VenueDisplayView pin="1234" lang="cs" />);
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+    expect(document.documentElement.classList.contains('light')).toBe(false);
+    unmount();
+    expect(document.documentElement.classList.contains('light')).toBe(true);
+  });
 });
