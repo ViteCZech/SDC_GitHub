@@ -6041,7 +6041,7 @@ function AppMain({ lang, setLang }) {
                         <div className="flex items-center justify-center w-20 h-20 mb-3 rounded-full shadow-lg bg-emerald-600 shadow-emerald-900/50">
                             <Target className="w-10 h-10 text-slate-900" />
                         </div>
-                        <h1 className="text-3xl font-black leading-none tracking-widest text-white">SIMPLE DART</h1>
+                        <h1 className="text-3xl font-black leading-none tracking-widest text-slate-900 dark:text-white">SIMPLE DART</h1>
                         <h2 className="mt-1 text-sm font-bold tracking-widest text-emerald-500">COUNTER</h2>
                     </div>
 
