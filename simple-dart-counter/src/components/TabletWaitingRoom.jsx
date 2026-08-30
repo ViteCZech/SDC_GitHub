@@ -4,6 +4,7 @@ import { translations } from '../translations';
 import TournamentStatisticsView from './TournamentStatisticsView';
 import { TABLET_CHECKIN_DEFAULT_SECONDS } from '../utils/tabletCheckInTimeout';
 import { useSyncAdapter } from '../context/SyncAdapterContext';
+import ContextHelpButton from './ContextHelpButton';
 
 const CHECKIN_SECONDS = TABLET_CHECKIN_DEFAULT_SECONDS;
 
@@ -36,6 +37,7 @@ export default function TabletWaitingRoom({
   tournamentMatches = [],
   tournamentBracket = [],
   tabletPresence = null,
+  onOpenContextHelp,
 }) {
   const syncAdapter = useSyncAdapter();
   const tt = (k) => translations[lang]?.tablet?.[k] ?? k;
@@ -412,6 +414,13 @@ export default function TabletWaitingRoom({
   return tournamentFinished && tournamentData ? (
         <main className="flex flex-1 flex-col min-h-0 h-full max-h-[calc(100dvh-2.5rem-3.5rem)] w-full max-w-6xl mx-auto overflow-hidden bg-slate-950">
           <div className="shrink-0 px-3 pt-3 pb-2 md:px-6 text-center border-b border-slate-800/80">
+            <div className="mb-2 flex justify-end">
+              <ContextHelpButton
+                topicId="tablet-room"
+                lang={lang}
+                onOpenContextHelp={onOpenContextHelp}
+              />
+            </div>
             <p className="text-[10px] md:text-xs font-black uppercase tracking-widest text-emerald-500">
               {tt('tournamentFinishedHeadline')}
             </p>
@@ -429,9 +438,16 @@ export default function TabletWaitingRoom({
         </main>
       ) : phase === 2 && match ? (
         <main className="flex flex-1 flex-col min-h-0 h-full max-h-[calc(100dvh-2.5rem-3.5rem)] w-full max-w-6xl mx-auto overflow-hidden bg-slate-950 px-3 pt-1 pb-2 md:px-6 md:pb-3">
-          <h1 className="shrink-0 text-center text-sm md:text-xl font-black uppercase tracking-wide text-white py-1">
-            {tt('matchCheckIn')}
-          </h1>
+          <div className="shrink-0 flex items-center justify-between gap-2 py-1">
+            <h1 className="text-center text-sm md:text-xl font-black uppercase tracking-wide text-white">
+              {tt('matchCheckIn')}
+            </h1>
+            <ContextHelpButton
+              topicId="tablet-room"
+              lang={lang}
+              onOpenContextHelp={onOpenContextHelp}
+            />
+          </div>
 
           <div
             className={`shrink-0 rounded-xl border-2 px-2 py-1.5 md:py-2 text-center max-w-md mx-auto w-full ${
@@ -564,6 +580,16 @@ export default function TabletWaitingRoom({
         </main>
       ) : (
         <main className="flex flex-col flex-1 min-h-0 h-full max-h-[calc(100dvh-2.5rem-3.5rem)] w-full max-w-2xl lg:max-w-7xl mx-auto overflow-hidden bg-slate-950 px-3 lg:px-6 pt-2 pb-3">
+          <div className="shrink-0 mb-2 flex items-center justify-between">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+              {tt('waitingForMatch')}
+            </p>
+            <ContextHelpButton
+              topicId="tablet-room"
+              lang={lang}
+              onOpenContextHelp={onOpenContextHelp}
+            />
+          </div>
           <div className="flex flex-col flex-1 min-h-0 gap-2 lg:gap-4">
             {dualIdlePanel && (
               <div className="lg:hidden shrink-0 flex rounded-xl border border-slate-700 overflow-hidden">

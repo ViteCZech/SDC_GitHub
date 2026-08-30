@@ -53,6 +53,13 @@ import { parsePreregRouteFromUrl, isPublicTournamentCatalogPath } from './utils/
 import { parseTabletRouteFromUrl, ensureBoardAuthTokens } from './utils/tabletBoardQr';
 import { buildVenueDisplayUrl, parseVenueDisplayRouteFromUrl, resolveVenueLang } from './utils/venueDisplay';
 import { parsePublicResultsRouteFromUrl } from './utils/publicResultsRoutes';
+import {
+  buildHelpReturnState,
+  getCurrentRoute,
+  normalizeHelpTopic,
+  resolveHelpBackSectionKey,
+  resolveHelpTab,
+} from './utils/contextHelp';
 import { loadAdminInviteSession, saveAdminInviteSession } from './utils/preregStorage';
 import {
   adminConfirmPair,
@@ -1602,6 +1609,86 @@ function AppMain({ lang, setLang }) {
     if (appState !== 'home') setHomeSubmenu(null);
   }, [appState]);
 
+  const openContextHelp = React.useCallback(
+    (topicId, opts = {}) => {
+      const normalizedTopic = normalizeHelpTopic(topicId);
+      const returnRoute =
+        typeof opts?.returnRoute === 'string' && opts.returnRoute.trim()
+          ? opts.returnRoute
+          : getCurrentRoute();
+      setHelpReturnState(
+        buildHelpReturnState({
+          appState,
+          returnRoute,
+          tutorialTab,
+          homeSubmenu,
+          tournamentSetupStep,
+          preregReturnToCatalog,
+          preregTournamentId,
+          activePreRegTournamentId,
+          publicResultId,
+          userRole,
+        })
+      );
+      if (appState === 'playing') {
+        const title =
+          settings?.p1Name && settings?.p2Name
+            ? `${settings.p1Name} vs ${settings.p2Name}`
+            : t('navResumeMatch') || 'Pokračovat v zápase';
+        setParkedSession({
+          kind: 'match',
+          mountKept: true,
+          title,
+          isTournament: !!tournamentMatchContextRef.current,
+          isOnline: !!onlineGameId,
+        });
+      }
+      setActiveHelpTopicId(normalizedTopic);
+      setTutorialTab(resolveHelpTab(normalizedTopic));
+      setAppState('tutorial');
+    },
+    [
+      appState,
+      tutorialTab,
+      homeSubmenu,
+      tournamentSetupStep,
+      preregReturnToCatalog,
+      preregTournamentId,
+      activePreRegTournamentId,
+      publicResultId,
+      userRole,
+      settings?.p1Name,
+      settings?.p2Name,
+      onlineGameId,
+      t,
+    ]
+  );
+
+  const returnFromContextHelp = React.useCallback(() => {
+    const snapshot = helpReturnStateRef.current;
+    if (!snapshot) {
+      setAppState('home');
+      setActiveHelpTopicId(null);
+      return;
+    }
+    setTutorialTab(String(snapshot.tutorialTab || 'x01'));
+    setHomeSubmenu(snapshot.homeSubmenu ?? null);
+    setTournamentSetupStep(snapshot.tournamentSetupStep ?? 1);
+    setPreregReturnToCatalog(!!snapshot.preregReturnToCatalog);
+    setPreregTournamentId(snapshot.preregTournamentId ?? null);
+    setActivePreRegTournamentId(snapshot.activePreRegTournamentId ?? null);
+    setPublicResultId(snapshot.publicResultId ?? null);
+    setAppState(snapshot.appState || 'home');
+    if (snapshot.appState === 'playing') {
+      setParkedSession(null);
+    }
+    if (snapshot.returnRoute) {
+      window.history.replaceState(null, '', snapshot.returnRoute);
+    }
+    setHelpReturnState(null);
+    setActiveHelpTopicId(null);
+  }, []);
+
   // Deep-link: #about nebo /t/:tournamentId (?invite= pro admin panel)
   useEffect(() => {
     const applyRoutes = async () => {
@@ -1714,6 +1801,12 @@ function AppMain({ lang, setLang }) {
   const [isLandscape, setIsLandscape] = useState(false);
   const [isPC, setIsPC] = useState(false);
   const [tutorialTab, setTutorialTab] = useState('x01');
+  const [activeHelpTopicId, setActiveHelpTopicId] = useState(null);
+  const [helpReturnState, setHelpReturnState] = useState(null);
+  const helpReturnStateRef = useRef(helpReturnState);
+  useEffect(() => {
+    helpReturnStateRef.current = helpReturnState;
+  }, [helpReturnState]);
   const [showSyncPrompt, setShowSyncPrompt] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   const [showCustomFormat, setShowCustomFormat] = useState(false);
@@ -3273,6 +3366,10 @@ function AppMain({ lang, setLang }) {
         setAppState(backTarget.state);
         return;
       }
+      if (backTarget.type === 'contextHelpReturn') {
+        returnFromContextHelp();
+        return;
+      }
       if (backTarget.type === 'setupStep') {
         setTournamentSetupStep(backTarget.step);
         return;
@@ -3308,7 +3405,16 @@ function AppMain({ lang, setLang }) {
         window.history.replaceState(null, '', '/tournaments');
       }
     },
-    [goHomeFromNav, handleSpectatorDisconnect, resetDrawToLiveRanking, isTournamentLive, tournamentData, tournamentMatches, tournamentBracket]
+    [
+      goHomeFromNav,
+      handleSpectatorDisconnect,
+      resetDrawToLiveRanking,
+      isTournamentLive,
+      tournamentData,
+      tournamentMatches,
+      tournamentBracket,
+      returnFromContextHelp,
+    ]
   );
 
   const leavePlayingToTournamentBoard = React.useCallback(() => {
@@ -3350,9 +3456,28 @@ function AppMain({ lang, setLang }) {
         userRole,
         hasTournamentData: !!tournamentData,
         canGoToBoardAssignment: canNavigateToStep(4),
+        hasContextHelpReturn: !!helpReturnState,
       }),
-    [appState, tournamentSetupStep, homeSubmenu, preregReturnToCatalog, userRole, tournamentData, canNavigateToStep]
+    [
+      appState,
+      tournamentSetupStep,
+      homeSubmenu,
+      preregReturnToCatalog,
+      userRole,
+      tournamentData,
+      canNavigateToStep,
+      helpReturnState,
+    ]
   );
+
+  const helpCenter = translations?.[lang]?.helpCenter ?? translations?.cs?.helpCenter ?? {};
+  const helpTopics = Array.isArray(helpCenter.topics) ? helpCenter.topics : [];
+  const visibleHelpTopics = helpTopics.filter(
+    (topic) => String(topic?.tab || 'tournaments') === tutorialTab
+  );
+  const helpSectionLabel = t(resolveHelpBackSectionKey(helpReturnState?.appState));
+  const helpBackLabel = (t('helpBackToSection') || '← Back to {section}')
+    .replace('{section}', helpSectionLabel || t('helpSectionHome'));
 
   /** Guard: turnajové obrazovky bez dat → hub + toast */
   useEffect(() => {
@@ -5392,6 +5517,7 @@ function AppMain({ lang, setLang }) {
                     skipOnlineInitialSeedGameId={skipOnlineInitialSeedGameId || undefined}
                     requestConfirm={requestConfirm}
                     onOnlineDocStartPlayer={syncOnlineDocStartPlayer}
+                    onOpenContextHelp={openContextHelp}
                     onAbort={
                       isTournamentPlaying
                         ? () => {
@@ -5954,7 +6080,7 @@ function AppMain({ lang, setLang }) {
                 </div>
                 {/* Pravý sloupec: doplňková tlačítka */}
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 w-full">
-                    <button onClick={() => setAppState('tutorial')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><FileText className="w-7 h-7 text-emerald-400" /><span className="text-sm font-bold text-slate-900 dark:text-white">{t('tutorial')}</span></button>
+                    <button onClick={() => openContextHelp('x01-mode')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><FileText className="w-7 h-7 text-emerald-400" /><span className="text-sm font-bold text-slate-900 dark:text-white">{t('tutorial')}</span></button>
                     <button onClick={() => setAppState('history')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><History className="text-blue-400 w-7 h-7" /><span className="text-sm font-bold text-slate-900 dark:text-white">{t('matchHistory')}</span></button>
                     <button onClick={handleOpenTournamentEntry} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><Swords className="w-7 h-7 text-amber-400" /><span className="text-sm font-bold text-slate-900 dark:text-white">{t('tournament')}</span></button>
                     <button onClick={() => setAppState('profile')} className="flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95"><BarChart2 className="text-purple-400 w-7 h-7" /><span className="text-sm">{t('statsPersonal')}</span></button>
@@ -5972,6 +6098,7 @@ function AppMain({ lang, setLang }) {
           lang={lang}
           onOpenTournament={handleOpenPublicResultDetail}
           onOpenTopPerformances={handleOpenPublicTopPerformances}
+          onOpenContextHelp={openContextHelp}
         />
       )}
 
@@ -5980,6 +6107,7 @@ function AppMain({ lang, setLang }) {
           lang={lang}
           onBack={handleOpenPublicResultsHome}
           onOpenTournament={handleOpenPublicResultDetail}
+          onOpenContextHelp={openContextHelp}
         />
       )}
 
@@ -5988,6 +6116,7 @@ function AppMain({ lang, setLang }) {
           lang={lang}
           resultId={publicResultId}
           onBack={handleOpenPublicResultsHome}
+          onOpenContextHelp={openContextHelp}
         />
       )}
 
@@ -6005,6 +6134,7 @@ function AppMain({ lang, setLang }) {
           onOpenPreReg={handleTournamentHubPreReg}
           onOpenCatalog={handleTournamentHubCatalog}
           onBack={() => setAppState('home')}
+          onOpenContextHelp={openContextHelp}
         />
       )}
 
@@ -6027,6 +6157,7 @@ function AppMain({ lang, setLang }) {
           onTabletTimeoutWarning={handleTabletTimeoutWarning}
           onStartGame={handleTabletStartGame}
           onBack={handleSpectatorDisconnect}
+          onOpenContextHelp={openContextHelp}
         />
         </div>
       )}
@@ -6201,6 +6332,7 @@ function AppMain({ lang, setLang }) {
             setUserRole(null);
             setAppState('tournament_hub');
           }}
+          onOpenContextHelp={openContextHelp}
         />
       )}
 
@@ -6321,6 +6453,7 @@ function AppMain({ lang, setLang }) {
           onStartMatch={handleStartTournamentMatch}
           onResetMatch={handleResetMatch}
           onWithdrawPlayer={handleWithdrawPlayer}
+          onOpenContextHelp={openContextHelp}
         />
       )}
 
@@ -6341,6 +6474,7 @@ function AppMain({ lang, setLang }) {
             onBracketWithdrawPlayer={handleBracketWithdrawPlayer}
             onBracketDataCommit={handleBracketDataCommit}
             lang={lang}
+            onOpenContextHelp={openContextHelp}
           />
         </main>
       )}
@@ -6678,12 +6812,58 @@ function AppMain({ lang, setLang }) {
       {appState === 'tutorial' && (
         <main className="relative z-10 flex flex-col items-center flex-1 w-full max-w-6xl xl:max-w-7xl mx-auto p-4 pb-20 overflow-y-auto sm:p-6">
             <h2 className="flex items-center gap-2 mb-6 text-2xl font-black tracking-widest text-white uppercase w-full"><FileText className="w-6 h-6 text-emerald-500"/> {t('tutorial')}</h2>
+            <button
+              type="button"
+              onClick={returnFromContextHelp}
+              className="w-full max-w-4xl mb-4 px-4 py-3 rounded-xl border border-emerald-500/40 bg-emerald-950/30 text-emerald-200 font-black tracking-wide text-sm hover:bg-emerald-950/50 transition-colors text-left"
+            >
+              {helpBackLabel}
+            </button>
             
             <div className="flex w-full max-w-md md:max-w-xl lg:max-w-2xl p-1 mb-6 border shadow-md bg-slate-800 rounded-xl border-slate-700">
                 <button onClick={() => setTutorialTab('x01')} className={`flex-1 py-3 text-xs font-black rounded-lg uppercase tracking-widest transition-colors ${tutorialTab === 'x01' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{t('tutTabX01')}</button>
                 <button onClick={() => setTutorialTab('cricket')} className={`flex-1 py-3 text-xs font-black rounded-lg uppercase tracking-widest transition-colors ${tutorialTab === 'cricket' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{t('tutTabCricket')}</button>
                 <button onClick={() => setTutorialTab('tournaments')} className={`flex-1 py-3 text-xs font-black rounded-lg uppercase tracking-widest transition-colors ${tutorialTab === 'tournaments' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{t('tutTabTournaments')}</button>
             </div>
+
+            {visibleHelpTopics.length > 0 && (
+              <section className="w-full max-w-4xl mb-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 md:p-5">
+                <h3 className="text-xs font-black uppercase tracking-widest text-amber-300 mb-3">
+                  {helpCenter.sectionTitle || 'Kontextová nápověda'}
+                </h3>
+                <div className="space-y-3">
+                  {visibleHelpTopics.map((topic) => (
+                    <article
+                      key={topic.id}
+                      className={`rounded-xl border p-3 md:p-4 ${
+                        activeHelpTopicId === topic.id
+                          ? 'border-amber-500/60 bg-amber-950/20'
+                          : 'border-slate-700 bg-slate-900'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="text-sm font-black tracking-wide text-white uppercase">
+                          {topic.title}
+                        </h4>
+                        {activeHelpTopicId === topic.id ? (
+                          <span className="text-[10px] font-black uppercase tracking-widest text-amber-300">
+                            {helpCenter.activeTopicLabel || 'Kontext'}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-2 text-sm text-slate-300 leading-relaxed">{topic.summary}</p>
+                      {Array.isArray(topic.points) && topic.points.length > 0 ? (
+                        <ul className="mt-3 space-y-1 text-sm text-slate-400 list-disc pl-5">
+                          {topic.points.map((point, idx) => (
+                            <li key={`${topic.id}-${idx}`}>{point}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
 
             <div className="grid w-full max-w-4xl grid-cols-1 gap-4 md:grid-cols-2">
                 {tutorialTab === 'x01' && (

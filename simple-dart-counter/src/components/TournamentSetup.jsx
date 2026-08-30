@@ -44,6 +44,7 @@ import {
 } from '../utils/drawRandomPairs';
 import RandomPairDrawPanel from './RandomPairDrawPanel';
 import VenueTvLinkCard from './VenueTvLinkCard';
+import ContextHelpButton from './ContextHelpButton';
 
 /** Ranking z inputu: prázdné nebo 0 → null */
 function parseRankingFromInput(val) {
@@ -78,6 +79,7 @@ export default function TournamentSetup({
   onNotify,
   preRegTournamentId,
   onBackToPreRegAdmin,
+  onOpenContextHelp,
 }) {
   const t = (k) => translations[lang]?.[k] || k;
   const th = (k) => translations[lang]?.tournamentHub?.[k] ?? k;
@@ -1046,9 +1048,16 @@ export default function TournamentSetup({
               </div>
               <div className="space-y-4 min-w-0">
               <div className="rounded-xl border border-slate-700/80 bg-slate-950/60 p-4 space-y-3">
-                <p className="text-xs font-black uppercase tracking-widest text-slate-400">
-                  {th('modeSectionTitle') || 'Režim turnaje'}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                    {th('modeSectionTitle') || 'Režim turnaje'}
+                  </p>
+                  <ContextHelpButton
+                    topicId="offline-mode"
+                    lang={lang}
+                    onOpenContextHelp={onOpenContextHelp}
+                  />
+                </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
                   <button
@@ -1134,12 +1143,24 @@ export default function TournamentSetup({
                     )}
                   </div>
                 )}
-                <VenueTvLinkCard
-                  lang={lang}
-                  pin={setupPinDisplay}
-                  isLoggedIn={!!isLoggedIn}
-                  cloudEnabled={!!tournamentDraft.cloudEnabled}
-                />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                      {t('venueTvOpen')}
+                    </span>
+                    <ContextHelpButton
+                      topicId="tv-screen"
+                      lang={lang}
+                      onOpenContextHelp={onOpenContextHelp}
+                    />
+                  </div>
+                  <VenueTvLinkCard
+                    lang={lang}
+                    pin={setupPinDisplay}
+                    isLoggedIn={!!isLoggedIn}
+                    cloudEnabled={!!tournamentDraft.cloudEnabled}
+                  />
+                </div>
                 {tournamentDraft.cloudEnabled && isLoggedIn && (
                   <div className="rounded-lg border border-slate-600/80 bg-slate-900/80 px-3 py-3 space-y-2">
                     <label

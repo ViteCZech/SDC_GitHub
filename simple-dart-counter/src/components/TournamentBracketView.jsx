@@ -4,6 +4,7 @@ import { translations } from '../translations';
 import { getBracketWinLegsForRound, getRoundBusyPlayerIds, isBracketRefereePlaceholder, suggestRefereeIdsForBracketMatch, resolveBracketRefereePlaceholder, countBracketJitStats } from '../utils/tournamentLogic';
 import { AdminTapTextField } from './AdminTapField';
 import NumericStepper from './NumericStepper';
+import ContextHelpButton from './ContextHelpButton';
 
 const BYE_MARKER = 'Volný los';
 
@@ -152,6 +153,7 @@ export default function TournamentBracketView({
   onBracketWithdrawPlayer,
   onBracketDataCommit,
   lang = 'cs',
+  onOpenContextHelp,
 }) {
   const isAdmin = userRole === 'admin';
   const t = (k) => translations[lang]?.[k] ?? k;
@@ -968,9 +970,16 @@ export default function TournamentBracketView({
         </div>
       )}
 
-      <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400">
-        {t('tournBracketTitle') || 'Vyřazovací pavouk'}
-      </h2>
+      <div className="flex items-center gap-2">
+        <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400">
+          {t('tournBracketTitle') || 'Vyřazovací pavouk'}
+        </h2>
+        <ContextHelpButton
+          topicId="tournament-management"
+          lang={lang}
+          onOpenContextHelp={onOpenContextHelp}
+        />
+      </div>
 
       <div className="flex overflow-x-auto whitespace-nowrap gap-2 p-4 bg-slate-900 border-b border-slate-800 rounded-xl">
         {(bracketData ?? []).map((round, index) => {

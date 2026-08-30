@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, CalendarDays, ChevronRight, Crown, Users } from 'lucide-react';
 import { translations } from '../../translations';
 import { useSyncAdapter } from '../../context/SyncAdapterContext';
+import ContextHelpButton from '../ContextHelpButton';
 
 function toLocaleDate(value, lang) {
   if (!value) return '—';
@@ -65,6 +66,7 @@ export default function PublicResultsHome({
   lang = 'cs',
   onOpenTournament,
   onOpenTopPerformances,
+  onOpenContextHelp,
 }) {
   const syncAdapter = useSyncAdapter();
   const dict = translations?.[lang]?.publicResults ?? translations?.cs?.publicResults ?? {};
@@ -101,9 +103,16 @@ export default function PublicResultsHome({
     <main className="flex flex-col flex-1 w-full overflow-y-auto bg-slate-950 p-4 pb-24">
       <div className="w-full max-w-5xl mx-auto space-y-4">
         <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            {dict.title || 'Veřejné turnajové statistiky'}
-          </h1>
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              {dict.title || 'Veřejné turnajové statistiky'}
+            </h1>
+            <ContextHelpButton
+              topicId="public-results"
+              lang={lang}
+              onOpenContextHelp={onOpenContextHelp}
+            />
+          </div>
           <p className="text-sm sm:text-base text-slate-400 mt-2">
             {dict.subtitle ||
               'Živé i odehrané turnaje na jednom místě. Otevřete detail turnaje pro zápasy, skupiny, pavouka a výsledky.'}

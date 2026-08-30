@@ -21,6 +21,7 @@ export const TOURNAMENT_PARKABLE_STATES = [
  *   userRole?: string|null,
  *   hasTournamentData?: boolean,
  *   canGoToBoardAssignment?: boolean,
+ *   hasContextHelpReturn?: boolean,
  * }} ctx
  * @returns {{ showBack: boolean, showHome: boolean, backTarget: object|null }}
  */
@@ -32,6 +33,7 @@ export function resolveAppNav(ctx) {
     preregReturnToCatalog = false,
     userRole = null,
     canGoToBoardAssignment = true,
+    hasContextHelpReturn = false,
   } = ctx;
 
   if (appState === 'home') {
@@ -50,7 +52,14 @@ export function resolveAppNav(ctx) {
     return { showBack: true, showHome: true, backTarget: { type: 'state', state: 'home' } };
   }
 
-  if (appState === 'history' || appState === 'profile' || appState === 'tutorial' || appState === 'about') {
+  if (appState === 'history' || appState === 'profile' || appState === 'about') {
+    return { showBack: true, showHome: true, backTarget: { type: 'state', state: 'home' } };
+  }
+
+  if (appState === 'tutorial') {
+    if (hasContextHelpReturn) {
+      return { showBack: true, showHome: true, backTarget: { type: 'contextHelpReturn' } };
+    }
     return { showBack: true, showHome: true, backTarget: { type: 'state', state: 'home' } };
   }
 

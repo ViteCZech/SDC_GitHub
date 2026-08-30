@@ -175,6 +175,106 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     tutCommonTitle3: 'Krok Zpět', tutCommonDesc3: 'Tlačítko zatočené šipky (vlevo dole) vrací hru o krok zpět. Funguje i po chybném ukončení zápasu.',
     tutCommonTitle4: 'Lokální vs Cloud záloha', tutCommonDesc4: 'Bez přihlášení zůstávají zápasy jen v mobilu. Po přihlášení přes Google získáte Cloud zálohu statistik!',
     tutSetsLegs: 'Zápas se hraje na vítězné sety a legy. Běžně se hraje na 1 vítězný set. Hráč, který první získá cílový počet legů, vyhrává set a legy se nulují.',
+    contextHelpOpen: 'Otevřít kontextovou nápovědu',
+    helpBackToSection: '← Zpět na {section}',
+    helpSectionHome: 'hlavní menu',
+    helpSectionGame: 'počitadlo zápasu',
+    helpSectionTournament: 'turnaj',
+    helpSectionTablet: 'tablet u terče',
+    helpSectionPublicResults: 'veřejné výsledky',
+    helpSectionRegistration: 'předregistrace',
+    helpCenter: {
+      sectionTitle: 'Kontextová nápověda',
+      activeTopicLabel: 'Aktivní kontext',
+      topics: [
+        {
+          id: 'offline-mode',
+          tab: 'tournaments',
+          title: 'Cloud vs. Offline (LAN) režim',
+          summary:
+            'Offline režim běží jen na tomto zařízení. Cloud režim synchronizuje turnaj, tablety i diváky přes Firebase.',
+          points: [
+            'Offline: nevyžaduje přihlášení ani internet; data zůstávají lokálně.',
+            'Cloud: vyžaduje Google účet pořadatele, stabilní internet a otevřený přístup zařízení k webu/Firebase.',
+            'Pro tablety v hale připojte zařízení na stejnou síť a zkontrolujte router/firewall (bez blokace HTTPS/WebRTC).',
+            'Po výpadku sítě nejdřív dohrajte lokálně; po obnovení připojení pokračuje cloud synchronizace podle aktuálního stavu.',
+          ],
+        },
+        {
+          id: 'public-results',
+          tab: 'tournaments',
+          title: 'Veřejné výsledky a statistiky (/results, /results/top)',
+          summary:
+            'Veřejný portál ukazuje živé i dokončené turnaje, detail zápasů, tabulky skupin, pavouka a top rekordy.',
+          points: [
+            '/results zobrazuje feed veřejně dostupných turnajů (live + history).',
+            '/results/top agreguje rekordy jako 180, nejvyšší checkout a turnajové průměry.',
+            'Žebříčky se počítají z uložených statistik turnaje; průběžně se aktualizují i během živého turnaje.',
+          ],
+        },
+        {
+          id: 'tv-screen',
+          tab: 'tournaments',
+          title: 'TV obrazovka (VenueDisplayView)',
+          summary:
+            'TV kiosk běží na adrese /tv/PIN a slouží jen pro zobrazení — bez přihlášení na televizi.',
+          points: [
+            'TV feed aktivujete v cloud turnaji; admin vygeneruje odkaz a otevře ho na TV/projektoru.',
+            'Obrazovka je bez posuvníků, fixovaná na celou výšku a optimalizovaná pro kiosk.',
+            'Skupiny se střídají automaticky po blocích; systém průběžně rotuje stránky a živé terče.',
+            'Po vygenerování pavouka TV přidá i aktivní KO zápasy včetně skóre a počtářů.',
+          ],
+        },
+        {
+          id: 'group-stage',
+          tab: 'tournaments',
+          title: 'Skupiny a pavouk',
+          summary:
+            'Ve skupinách se hrají round-robin zápasy, z nichž postupující přechází do vyřazovací části.',
+          points: [
+            'Admin řídí terče, sleduje tabulky a může spouštět nebo opravovat zápasy.',
+            'Po dokončení skupin se vygeneruje pavouk podle nastaveného počtu postupujících.',
+            'U pavouka lze ručně upravit terč, počtáře i kontumaci konkrétního zápasu.',
+          ],
+        },
+        {
+          id: 'tournament-management',
+          tab: 'tournaments',
+          title: 'Správa turnaje (admin/tablet/rozhodčí)',
+          summary:
+            'Turnaj má tři role: admin připravuje běh, tablet obsluhuje terč a divák sleduje průběh.',
+          points: [
+            'Admin nastaví formát, hráče, terče a přepíná mezi skupinami, pavoukem a statistikami.',
+            'Tablety u terčů dělají check-in hráčů/počtáře a odesílají výsledky zápasu.',
+            'Počtář (rozhodčí) je přiřazován automaticky, ale lze ho v adminu změnit ručně.',
+          ],
+        },
+        {
+          id: 'tablet-room',
+          tab: 'tournaments',
+          title: 'Tablet waiting room a check-in',
+          summary:
+            'Tablet čeká na přidělení zápasu, pak spustí check-in hráčů a potvrzení začínajícího.',
+          points: [
+            'Před startem zápasu se potvrzuje přítomnost hráčů i počtáře v časovém limitu.',
+            'Po vypršení limitu jde adminovi varování a může check-in obnovit.',
+            'Po check-inu tablet odešle stav a otevře vstup do X01 počítadla.',
+          ],
+        },
+        {
+          id: 'x01-mode',
+          tab: 'x01',
+          title: 'Herní režim X01',
+          summary:
+            'X01 hraje na přesné zavření (301/501), s legy/sety, validací nemožných stavů a opravou hodů.',
+          points: [
+            'Podporované out režimy: Single Out a Double Out; zavření musí být validní.',
+            'Legy a sety se počítají podle formátu First To / Best Of.',
+            'Undo vrací poslední tah a v historii lze editovat chybný hod bez restartu zápasu.',
+          ],
+        },
+      ],
+    },
 
     loginWithGoogle: 'Přihlásit přes Google (Cloud záloha)', logout: 'ODHLÁSIT SE',
     loginRequired: 'Pro tuto funkci je vyžadováno přihlášení',
@@ -1203,6 +1303,106 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     tutCommonTitle3: 'Undo Button', tutCommonDesc3: 'Bottom left curved arrow takes back a throw.',
     tutCommonTitle4: 'Cloud Backup', tutCommonDesc4: 'Sign in with Google to backup all stats to the cloud!',
     tutSetsLegs: 'The match is played for winning sets and legs. Usually it is played as first to 1 set. A player who reaches the target number of legs wins the set and legs reset to zero.',
+    contextHelpOpen: 'Open contextual help',
+    helpBackToSection: '← Back to {section}',
+    helpSectionHome: 'main menu',
+    helpSectionGame: 'match counter',
+    helpSectionTournament: 'tournament',
+    helpSectionTablet: 'board tablet',
+    helpSectionPublicResults: 'public results',
+    helpSectionRegistration: 'pre-registration',
+    helpCenter: {
+      sectionTitle: 'Context help',
+      activeTopicLabel: 'Current context',
+      topics: [
+        {
+          id: 'offline-mode',
+          tab: 'tournaments',
+          title: 'Cloud vs Offline (LAN) mode',
+          summary:
+            'Offline mode runs only on this device. Cloud mode keeps tournament, tablets, and spectators synchronized through Firebase.',
+          points: [
+            'Offline mode needs no login and can run without internet; data stays local.',
+            'Cloud mode needs the organiser signed in with Google and stable internet access.',
+            'For hall tablets, keep devices on the same network and avoid router/firewall blocks for HTTPS/WebRTC.',
+            'If internet drops, continue safely on-site and resume cloud sync once connectivity is back.',
+          ],
+        },
+        {
+          id: 'public-results',
+          tab: 'tournaments',
+          title: 'Public results & statistics (/results, /results/top)',
+          summary:
+            'The public portal shows live and finished tournaments, detailed match data, group tables, bracket, and top records.',
+          points: [
+            '/results lists public tournaments from live feed and archive.',
+            '/results/top aggregates records like most 180s, highest checkout, and best averages.',
+            'Rankings are computed from stored tournament stats and refresh during running events.',
+          ],
+        },
+        {
+          id: 'tv-screen',
+          tab: 'tournaments',
+          title: 'TV screen (VenueDisplayView)',
+          summary:
+            'The TV kiosk runs at /tv/PIN and is display-only; no login is required on the TV device.',
+          points: [
+            'Enable cloud mode, copy/open the TV link, and run it on a TV or projector.',
+            'The layout is full-height, kiosk-safe, and intentionally without scroll bars.',
+            'Group blocks rotate automatically and pages cycle through active boards.',
+            'When the bracket exists, KO matches appear with live scores and scorer names.',
+          ],
+        },
+        {
+          id: 'group-stage',
+          tab: 'tournaments',
+          title: 'Group stage and bracket',
+          summary:
+            'Group matches are played round-robin; advancing players are then promoted into the knockout bracket.',
+          points: [
+            'Admin controls boards, standings, and match start/reset actions.',
+            'After groups finish, the bracket is generated from configured promotion rules.',
+            'Bracket matches support manual board/scorer changes and walkovers.',
+          ],
+        },
+        {
+          id: 'tournament-management',
+          tab: 'tournaments',
+          title: 'Tournament management (admin/tablet/scorer)',
+          summary:
+            'There are three roles: admin runs the event, tablet handles board operations, and spectators follow live progress.',
+          points: [
+            'Admin configures format, roster, boards, and progresses through group/bracket/stat views.',
+            'Board tablets handle check-in and submit match outcomes from the board side.',
+            'Scorers are auto-assigned but can be manually overridden when needed.',
+          ],
+        },
+        {
+          id: 'tablet-room',
+          tab: 'tournaments',
+          title: 'Tablet waiting room & check-in',
+          summary:
+            'The tablet waits for assignment, runs presence check-in, then launches match entry.',
+          points: [
+            'Players and scorer confirm presence before the match starts.',
+            'On timeout, admin receives a warning and can restart check-in.',
+            'After check-in, the tablet opens the X01 match flow for that board.',
+          ],
+        },
+        {
+          id: 'x01-mode',
+          tab: 'x01',
+          title: 'X01 game mode',
+          summary:
+            'X01 enforces exact checkout (301/501), tracks legs/sets, validates impossible states, and supports throw correction.',
+          points: [
+            'Supported out rules: Single Out and Double Out with checkout validation.',
+            'Leg and set progression follows First To / Best Of match format.',
+            'Undo reverts the latest turn and history edit lets you correct mis-entered throws.',
+          ],
+        },
+      ],
+    },
 
     kbdDone: 'CLOSE', kbdSpace: 'SPACE', loginWithGoogle: 'Sign in with Google', logout: 'LOGOUT',
     confirmModalTitle: 'Confirmation', confirmAction: 'Confirm',
@@ -2223,6 +2423,106 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
     tutCommonTitle3: 'Cofnij', tutCommonDesc3: 'Strzałka w lewo cofa rzut.',
     tutCommonTitle4: 'Chmura', tutCommonDesc4: 'Zaloguj się przez Google by zapisać dane.',
     tutSetsLegs: 'Mecz jest rozgrywany na wygrane sety i legi. Zwykle gra się do 1 wygranego seta. Gracz, który pierwszy zdobędzie docelową liczbę legów, wygrywa set, a legi zerują się.',
+    contextHelpOpen: 'Otwórz pomoc kontekstową',
+    helpBackToSection: '← Wróć do: {section}',
+    helpSectionHome: 'menu główne',
+    helpSectionGame: 'licznik meczu',
+    helpSectionTournament: 'turniej',
+    helpSectionTablet: 'tablet przy tarczy',
+    helpSectionPublicResults: 'wyniki publiczne',
+    helpSectionRegistration: 'przedrejestracja',
+    helpCenter: {
+      sectionTitle: 'Pomoc kontekstowa',
+      activeTopicLabel: 'Aktualny kontekst',
+      topics: [
+        {
+          id: 'offline-mode',
+          tab: 'tournaments',
+          title: 'Tryb Cloud vs Offline (LAN)',
+          summary:
+            'Tryb offline działa tylko na tym urządzeniu. Tryb cloud synchronizuje turniej, tablety i widzów przez Firebase.',
+          points: [
+            'Offline nie wymaga logowania ani internetu; dane zostają lokalnie.',
+            'Cloud wymaga zalogowania organizatora przez Google i stabilnego internetu.',
+            'Dla tabletów w hali trzymaj urządzenia w tej samej sieci i nie blokuj HTTPS/WebRTC na routerze.',
+            'Po utracie internetu możesz grać dalej lokalnie, a synchronizacja cloud wróci po odzyskaniu połączenia.',
+          ],
+        },
+        {
+          id: 'public-results',
+          tab: 'tournaments',
+          title: 'Wyniki publiczne i statystyki (/results, /results/top)',
+          summary:
+            'Portal publiczny pokazuje turnieje live i zakończone, szczegóły meczów, tabele grup, drabinkę i rekordy.',
+          points: [
+            '/results wyświetla listę turniejów publicznych z feedu live i archiwum.',
+            '/results/top agreguje rekordy: najwięcej 180, najwyższy checkout i najlepsze średnie.',
+            'Rankingi liczone są ze statystyk zapisanych w turnieju i odświeżają się także podczas gry.',
+          ],
+        },
+        {
+          id: 'tv-screen',
+          tab: 'tournaments',
+          title: 'Ekran TV (VenueDisplayView)',
+          summary:
+            'Kiosk TV działa pod adresem /tv/PIN i służy tylko do wyświetlania; na telewizorze nie trzeba się logować.',
+          points: [
+            'Włącz cloud, otwórz link TV i uruchom go na telewizorze/projektorze.',
+            'Widok jest pełnoekranowy, kioskowy i bez pasków przewijania.',
+            'Grupy i plansze rotują automatycznie, aby prezentować bieżący stan.',
+            'Po wygenerowaniu drabinki pojawiają się także aktywne mecze KO z wynikiem i zapisującym.',
+          ],
+        },
+        {
+          id: 'group-stage',
+          tab: 'tournaments',
+          title: 'Grupy i drabinka',
+          summary:
+            'W grupach rozgrywany jest round-robin, a awansujący przechodzą do drabinki pucharowej.',
+          points: [
+            'Admin zarządza tarczami, tabelami i uruchamianiem/resetowaniem meczów.',
+            'Po zakończeniu grup drabinka generuje się zgodnie z zasadami awansu.',
+            'W drabince można ręcznie zmienić tarczę, zapisującego lub ustawić walkower.',
+          ],
+        },
+        {
+          id: 'tournament-management',
+          tab: 'tournaments',
+          title: 'Zarządzanie turniejem (admin/tablet/zapisujący)',
+          summary:
+            'Są trzy role: admin prowadzi turniej, tablet obsługuje tarczę, a widzowie śledzą przebieg na żywo.',
+          points: [
+            'Admin ustawia format, listę graczy, tarcze i przełącza grupy/drabinkę/statystyki.',
+            'Tablet przy tarczy obsługuje check-in i wysyła wynik meczu.',
+            'Zapisujący przydzielany jest automatycznie, ale można go nadpisać ręcznie.',
+          ],
+        },
+        {
+          id: 'tablet-room',
+          tab: 'tournaments',
+          title: 'Tablet waiting room i check-in',
+          summary:
+            'Tablet czeka na przydział meczu, potem uruchamia check-in obecności i start gry.',
+          points: [
+            'Przed meczem potwierdzana jest obecność graczy i zapisującego.',
+            'Po przekroczeniu limitu czasu admin dostaje alert i może wznowić check-in.',
+            'Po check-inie tablet otwiera przepływ X01 dla tej tarczy.',
+          ],
+        },
+        {
+          id: 'x01-mode',
+          tab: 'x01',
+          title: 'Tryb gry X01',
+          summary:
+            'X01 pilnuje dokładnego zamknięcia (301/501), liczy legi/sety, waliduje niemożliwe stany i wspiera korekty rzutów.',
+          points: [
+            'Obsługiwane zasady out: Single Out i Double Out z kontrolą poprawnego checkoutu.',
+            'Postęp legów i setów zależy od formatu First To / Best Of.',
+            'Undo cofa ostatnią kolejkę, a edycja historii poprawia błędnie wpisane rzuty.',
+          ],
+        },
+      ],
+    },
 
     kbdDone: 'ZAMKNIJ', kbdSpace: 'SPACJA', loginWithGoogle: 'Zaloguj przez Google', logout: 'WYLOGUJ',
     confirmModalTitle: 'Potwierdzenie', confirmAction: 'Potwierdź',

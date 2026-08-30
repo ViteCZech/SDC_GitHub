@@ -5,6 +5,7 @@ import TournamentBracketView from '../TournamentBracketView';
 import TournamentStatisticsView from '../TournamentStatisticsView';
 import { translations } from '../../translations';
 import { useSyncAdapter } from '../../context/SyncAdapterContext';
+import ContextHelpButton from '../ContextHelpButton';
 
 const EMPTY_PUBLIC_RESULTS_DICT = Object.freeze({});
 
@@ -172,6 +173,7 @@ export default function PublicTournamentResultsView({
   resultId,
   lang = 'cs',
   onBack,
+  onOpenContextHelp,
 }) {
   const syncAdapter = useSyncAdapter();
   const dict = useMemo(
@@ -266,7 +268,14 @@ export default function PublicTournamentResultsView({
         </button>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">{record.name}</h1>
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">{record.name}</h1>
+            <ContextHelpButton
+              topicId="public-results"
+              lang={lang}
+              onOpenContextHelp={onOpenContextHelp}
+            />
+          </div>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
             <div className="rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-2 text-slate-300 flex items-center gap-2">
               <CalendarDays className="w-4 h-4 text-slate-500" />

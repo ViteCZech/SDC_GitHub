@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AlertTriangle, Cloud, Eye, HardDrive, Tablet, Trophy, Users } from 'lucide-react';
 import { translations } from '../translations';
+import ContextHelpButton from './ContextHelpButton';
 
 /**
  * Rozcestník turnaje — 3 role:
@@ -17,6 +18,7 @@ export default function TournamentHub({
   onQuickStart,
   onGoogleLogin,
   isLoggedIn = false,
+  onOpenContextHelp,
 }) {
   const th = (k) => translations[lang]?.tournamentHub?.[k] ?? k;
   const [panel, setPanel] = useState(null); // null | 'join' | 'tablet' | 'viewer'
@@ -233,9 +235,16 @@ export default function TournamentHub({
 
       <div className="space-y-4">
         <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
-          <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">
-            {th('modeSectionTitle') || 'Režim turnaje'}
-          </h3>
+          <div className="mb-3 flex items-center gap-2">
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">
+              {th('modeSectionTitle') || 'Režim turnaje'}
+            </h3>
+            <ContextHelpButton
+              topicId="offline-mode"
+              lang={lang}
+              onOpenContextHelp={onOpenContextHelp}
+            />
+          </div>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
             <article className="rounded-xl border border-slate-700 bg-slate-950/70 p-4 space-y-3">
               <div className="flex items-start gap-3">

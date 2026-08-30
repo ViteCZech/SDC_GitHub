@@ -14,6 +14,7 @@ import { useSyncAdapter } from '../context/SyncAdapterContext';
 import OnlineVideoContainer from './online/OnlineVideoContainer';
 import PostMatchView from './online/PostMatchView';
 import DoublesThrowerPicker from './DoublesThrowerPicker';
+import ContextHelpButton from './ContextHelpButton';
 import {
   attachDoublesRecordFields,
   deriveThrowerFromHistory,
@@ -262,6 +263,7 @@ export default function GameX01({
   requestConfirm = null,
   /** Synchronizace `onlineGames.startPlayer` do lokálních nastavení. */
   onOnlineDocStartPlayer = null,
+  onOpenContextHelp,
 }) {
   const syncAdapter = useSyncAdapter();
     // 1. Zde máte překladovou funkci (pokud ne, přidejte ji)
@@ -1744,10 +1746,11 @@ export default function GameX01({
             }`}
           >
         <div
-          className={`relative z-30 flex w-full items-center justify-center rounded-lg border border-slate-800 py-1 px-2 ${isLandscape ? 'col-span-3 row-start-1' : ''} ${
+          className={`relative z-30 flex w-full items-center justify-between rounded-lg border border-slate-800 py-1 px-2 ${isLandscape ? 'col-span-3 row-start-1' : ''} ${
             onlineOpponentVideoBackdrop ? 'bg-slate-950/80 backdrop-blur-sm' : 'bg-slate-900/70'
           }`}
         >
+            <div className="w-8 shrink-0" />
             {(settings.matchSets || 1) === 1 ? (
                 <div className="text-sm sm:text-base font-black text-yellow-400 tracking-wider">LEGS {gameState.p1Legs} - {gameState.p2Legs}</div>
             ) : (
@@ -1757,6 +1760,12 @@ export default function GameX01({
                     <span className="text-yellow-400">LEGS {gameState.p1Legs} - {gameState.p2Legs}</span>
                 </div>
             )}
+            <ContextHelpButton
+              topicId="x01-mode"
+              lang={lang}
+              onOpenContextHelp={onOpenContextHelp}
+              className="h-7 w-7 shrink-0"
+            />
         </div>
         
         {/* Score Cards */}

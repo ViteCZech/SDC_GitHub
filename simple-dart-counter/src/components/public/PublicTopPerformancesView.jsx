@@ -3,6 +3,7 @@ import { ChevronLeft, Crown, Flame, Gauge, Target } from 'lucide-react';
 import { translations } from '../../translations';
 import { useSyncAdapter } from '../../context/SyncAdapterContext';
 import { calculateTournamentStats } from '../../utils/tournamentLogic';
+import ContextHelpButton from '../ContextHelpButton';
 
 function PerformanceCard({ title, subtitle, value, by, tournamentName, onOpenTournament, tournamentId, accent }) {
   return (
@@ -30,6 +31,7 @@ export default function PublicTopPerformancesView({
   lang = 'cs',
   onBack,
   onOpenTournament,
+  onOpenContextHelp,
 }) {
   const syncAdapter = useSyncAdapter();
   const dict = translations?.[lang]?.publicResults ?? translations?.cs?.publicResults ?? {};
@@ -98,10 +100,17 @@ export default function PublicTopPerformancesView({
         </button>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
-            <Crown className="w-7 h-7 text-purple-300" />
-            {dict.topTitle || 'Top výkony'}
-          </h1>
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
+              <Crown className="w-7 h-7 text-purple-300" />
+              {dict.topTitle || 'Top výkony'}
+            </h1>
+            <ContextHelpButton
+              topicId="public-results"
+              lang={lang}
+              onOpenContextHelp={onOpenContextHelp}
+            />
+          </div>
           <p className="text-sm text-slate-400 mt-2">
             {dict.topSubtitle ||
               'Nejlepší výkony napříč veřejně dostupnými turnaji. Výpočty vycházejí z uložených zápasových statistik.'}

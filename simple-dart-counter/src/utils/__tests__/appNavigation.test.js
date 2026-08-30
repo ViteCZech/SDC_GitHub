@@ -12,6 +12,16 @@ describe('appNavigation', () => {
     expect(resolveAppNav({ appState: 'match_finished' }).showHome).toBe(false);
   });
 
+  it('tutorial s kontextovým návratem vrací na původní obrazovku', () => {
+    expect(resolveAppNav({ appState: 'tutorial', hasContextHelpReturn: true }).backTarget).toEqual({
+      type: 'contextHelpReturn',
+    });
+    expect(resolveAppNav({ appState: 'tutorial', hasContextHelpReturn: false }).backTarget).toEqual({
+      type: 'state',
+      state: 'home',
+    });
+  });
+
   it('krok setupu 2 se vrací na krok 1, krok 1 opouští setup', () => {
     expect(resolveAppNav({ appState: 'tournament_setup', tournamentSetupStep: 2 }).backTarget).toEqual({
       type: 'setupStep',

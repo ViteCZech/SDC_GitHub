@@ -10,6 +10,7 @@ import {
 import { translations } from '../translations';
 import { formatRefereeNames } from '../utils/doublesReferee';
 import { pickParallelGroupMatches } from '../utils/groupParallelPlay';
+import ContextHelpButton from './ContextHelpButton';
 
 /** Rozdělení zobrazeného jména (mezera nebo podtržítko) pro zalamování řádků */
 function splitStandingNameParts(name) {
@@ -424,6 +425,7 @@ export default function TournamentGroupsView({
   onGenerateBracket,
   onFinishGroups,
   onResumeBracket,
+  onOpenContextHelp,
 }) {
   const isAdmin = userRole === 'admin';
   const th = (k) => translations[lang]?.tournamentHub?.[k] ?? k;
@@ -777,9 +779,16 @@ export default function TournamentGroupsView({
         )}
 
         <div className={`${isReviewMode ? 'mt-6' : 'mt-8'} mb-4`}>
-          <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400 mb-2">
-            {t('tournGroupsTitle')}
-          </h2>
+          <div className="mb-2 flex items-center gap-2">
+            <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400">
+              {t('tournGroupsTitle')}
+            </h2>
+            <ContextHelpButton
+              topicId="group-stage"
+              lang={lang}
+              onOpenContextHelp={onOpenContextHelp}
+            />
+          </div>
           {isReviewMode && (
             <h3 className="text-lg md:text-xl font-black tracking-wide uppercase text-amber-300">
               {t('tournReviewGroupsHeadline')}
