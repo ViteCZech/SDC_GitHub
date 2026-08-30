@@ -106,7 +106,6 @@ function sortByNearestStart(a, b) {
 export default function MyPreRegTournamentsList({
   lang,
   user,
-  onBack,
   onManage,
   onCreateNew,
   onGoogleLogin,

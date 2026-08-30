@@ -182,13 +182,6 @@ async function deletePublicLiveTournamentByPin(pin) {
   await deleteDoc(doc(db, PUBLIC_COLLECTION, id));
 }
 
-function groupMatchKey(m) {
-  if (!m) return '';
-  if (m.matchId != null && String(m.matchId) !== '') return `mid:${m.matchId}`;
-  if (m.id != null && String(m.id) !== '') return `mid:${m.id}`;
-  return `g:${m.groupId ?? m.group}-${m.player1Id}-${m.player2Id}-${m.round ?? 'x'}`;
-}
-
 /** Všechny možné klíče zápasu — kvůli matchId vs id mezi adminem a tabletem. */
 function groupMatchKeys(m) {
   if (!m) return [];
@@ -212,32 +205,6 @@ function findCloudGroupMatch(cloudByKey, local) {
   for (const k of groupMatchKeys(local)) {
     const hit = cloudByKey.get(k);
     if (hit) return hit;
-  }
-  return null;
-}
-
-function findGroupMatchIndex(matches, matchId) {
-  if (!Array.isArray(matches)) return -1;
-  const want = String(matchId ?? '').trim();
-  if (!want) return -1;
-  return matches.findIndex((m) => {
-    const mid = m.matchId ?? m.id;
-    return mid != null && String(mid) === want;
-  });
-}
-
-function findBracketMatchLoc(bracket, matchId) {
-  if (!Array.isArray(bracket)) return null;
-  const want = String(matchId ?? '').trim();
-  if (!want) return null;
-  for (let ri = 0; ri < bracket.length; ri++) {
-    const list = bracket[ri]?.matches;
-    if (!Array.isArray(list)) continue;
-    const mi = list.findIndex((m) => {
-      const id = m.id ?? m.matchId;
-      return id != null && String(id) === want;
-    });
-    if (mi >= 0) return { roundIndex: ri, matchIndex: mi };
   }
   return null;
 }

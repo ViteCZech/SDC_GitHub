@@ -73,7 +73,6 @@ export default function TournamentBoardAssignment({
   onUpdateGroupBoard,
   lang = 'cs',
   onComplete,
-  onBack,
 }) {
   const t = (k) => translations[lang]?.[k] ?? k;
   const vkOpt = useAdminVirtualKeyboardOptional();

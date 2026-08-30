@@ -50,7 +50,7 @@ function formatWhen(entry) {
 /**
  * Historie dokončených turnajů: Firestore `past_tournaments` (přihlášený účet) + localStorage.
  */
-export default function TournamentHistory({ lang = 'cs', user, onBack }) {
+export default function TournamentHistory({ lang = 'cs', user }) {
   const t = (k) => translations[lang]?.[k] ?? k;
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);

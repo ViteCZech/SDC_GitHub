@@ -35,7 +35,7 @@ import { allowsPairing, usesTeamCapacity } from '../../utils/preregCompetition';
  *   onGoogleLogin?: () => void,
  * }} props
  */
-export default function TournamentPreRegSetup({ lang, user, onBack, onCreated, onGoogleLogin }) {
+export default function TournamentPreRegSetup({ lang, user, onCreated, onGoogleLogin }) {
   const t = (k) => translations[lang]?.[k] || k;
   const isLoggedIn = user && !user.isAnonymous;
 

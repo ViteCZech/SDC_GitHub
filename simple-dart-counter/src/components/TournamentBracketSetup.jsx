@@ -14,7 +14,6 @@ export default function TournamentBracketSetup({
   tournamentData,
   tournamentGroups = [],
   onComplete,
-  onBack,
 }) {
   const t = (k) => translations[lang]?.[k] ?? k;
 

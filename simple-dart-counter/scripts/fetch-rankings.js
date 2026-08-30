@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import { mkdirSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
+import process from 'node:process';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

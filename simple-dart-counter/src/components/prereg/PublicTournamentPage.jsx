@@ -26,7 +26,7 @@ import { allowsPairing, normalizeCompetitionType } from '../../utils/preregCompe
  *   onBack?: () => void,
  * }} props
  */
-export default function PublicTournamentPage({ tournamentId, lang, user = null, onBack }) {
+export default function PublicTournamentPage({ tournamentId, lang, user = null }) {
   const t = (k) => translations[lang]?.[k] || k;
 
   const [loading, setLoading] = useState(true);
@@ -75,7 +75,6 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null, 
           amount: fresh.amount ?? stored.amount,
           isPaid: fresh.isPaid ?? stored.isPaid,
           refundDue: fresh.refundDue ?? stored.refundDue,
-          amount: fresh.amount ?? stored.amount,
           gender: fresh.gender ?? stored.gender,
           pair: fresh.pair ?? stored.pair,
         };

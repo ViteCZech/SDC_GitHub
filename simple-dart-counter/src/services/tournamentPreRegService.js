@@ -34,7 +34,7 @@ function requireApp() {
 function sanitizePublicTournament(data) {
   const copy = { ...data };
   if (copy.admin && typeof copy.admin === 'object') {
-    const { adminPinHash, inviteTokens, ...safeAdmin } = copy.admin;
+    const { adminPinHash: _adminPinHash, inviteTokens: _inviteTokens, ...safeAdmin } = copy.admin;
     copy.admin = safeAdmin;
   }
   return copy;
@@ -672,9 +672,8 @@ function createdAtMs(data) {
 /**
  * @param {string} tournamentId
  * @param {string} regId
- * @param {'CONFIRMED'|'WAITLIST'|'PENDING_PAYMENT'} [_previousStatus]
  */
-export async function cancelRegistration(tournamentId, regId, _previousStatus) {
+export async function cancelRegistration(tournamentId, regId) {
   await requireAdminAccess(tournamentId);
   const dbInst = requireDb();
   const regsSnap = await getDocs(collection(dbInst, 'tournaments', tournamentId, 'registrations'));
@@ -833,15 +832,6 @@ export async function restoreCancelledRegistration(tournamentId, regId, targetSt
     }
     return { status: next };
   });
-}
-
-function buildVariableSymbol(prefix, registrationId) {
-  const digitsFromId = registrationId.replace(/\D/g, '');
-  const suffix =
-    digitsFromId.length >= 6
-      ? digitsFromId.slice(-6)
-      : String(Date.now() % 1_000_000).padStart(6, '0');
-  return `${prefix ?? ''}${suffix}`.replace(/\s/g, '').slice(0, 10);
 }
 
 /**

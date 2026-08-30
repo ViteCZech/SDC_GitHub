@@ -128,10 +128,6 @@ function isPending(m) {
   return !!(m && !m.isBye && !isTerminal(m) && m.status === 'pending' && m.tabletStatus !== 'checked_in');
 }
 
-function isPickup(m) {
-  return isLive(m) || isPending(m);
-}
-
 function findPlayerSlot(id, tournamentData, groups) {
   if (id == null || id === '') return null;
   const sid = String(id);

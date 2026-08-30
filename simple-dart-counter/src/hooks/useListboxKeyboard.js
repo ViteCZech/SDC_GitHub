@@ -25,9 +25,11 @@ export function useListboxKeyboard({
   const onSelectRef = useRef(onSelect);
   const onCloseRef = useRef(onClose);
 
-  itemsRef.current = items;
-  onSelectRef.current = onSelect;
-  onCloseRef.current = onClose;
+  useEffect(() => {
+    itemsRef.current = items;
+    onSelectRef.current = onSelect;
+    onCloseRef.current = onClose;
+  }, [items, onSelect, onClose]);
 
   useEffect(() => {
     if (!isOpen || !items.length) {

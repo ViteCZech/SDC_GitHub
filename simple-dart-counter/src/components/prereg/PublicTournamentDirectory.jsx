@@ -192,7 +192,6 @@ export default function PublicTournamentDirectory({
   lang,
   user = null,
   onGoogleLogin,
-  onBack,
   onOpenTournament,
 }) {
   const t = (k) => translations[lang]?.[k] || k;

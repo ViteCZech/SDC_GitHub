@@ -416,7 +416,6 @@ export default function TournamentGroupsView({
   lang = 'cs',
   userRole = null,
   hasBracket = false,
-  onBack,
   onStartMatch,
   onResetMatch,
   onWithdrawPlayer,
@@ -578,7 +577,7 @@ export default function TournamentGroupsView({
         const scoreP2 = p1Wins ? Math.floor(Math.random() * winLegs) : winLegs;
         const mockP1Avg = parseFloat((Math.random() * 20 + 50).toFixed(2));
         const mockP2Avg = parseFloat((Math.random() * 20 + 50).toFixed(2));
-        const { tabletStatus, tabletBoard, tabletCheckedInAt, ...rest } = m;
+        const { ...rest } = m;
         return {
           ...rest,
           status: 'completed',
