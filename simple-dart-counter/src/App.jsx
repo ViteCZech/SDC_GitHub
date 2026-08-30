@@ -1609,6 +1609,39 @@ function AppMain({ lang, setLang }) {
     if (appState !== 'home') setHomeSubmenu(null);
   }, [appState]);
 
+  const [userRole, setUserRole] = useState(() => {
+    const r = getBootUiResumeOnce();
+    if (!r?.appState || r.appState === 'home') return null;
+    if (r.appState === 'tournament_setup' || r.appState === 'tournament_board_assignment') {
+      return r.userRole || 'admin';
+    }
+    return r.userRole ?? null;
+  });
+
+  const [tournamentSetupStep, setTournamentSetupStep] = useState(() => {
+    const s = Number(getBootUiResumeOnce()?.tournamentSetupStep);
+    return Number.isFinite(s) && s >= 1 && s <= 7 ? s : 1;
+  });
+
+  const [tutorialTab, setTutorialTab] = useState('x01');
+  const [activeHelpTopicId, setActiveHelpTopicId] = useState(null);
+  const [helpReturnState, setHelpReturnState] = useState(null);
+  const helpReturnStateRef = useRef(helpReturnState);
+  useEffect(() => {
+    helpReturnStateRef.current = helpReturnState;
+  }, [helpReturnState]);
+
+  const [settings, setSettings] = useState({
+    gameType: 'x01',
+    startScore: 501, outMode: 'double',
+    p1Name: translations[lang]?.p1Default || 'Domácí', p1Id: null,
+    p2Name: translations[lang]?.p2Default || 'Hosté', p2Id: null,
+    quickButtons: [41, 45, 60, 100, 140, 180],
+    matchMode: 'first_to', matchTarget: 3, matchSets: 1,
+    isBot: false, botLevel: 'pro', botAvg: 65,
+    startPlayer: 'p1'
+  });
+
   const openContextHelp = React.useCallback(
     (topicId, opts = {}) => {
       const normalizedTopic = normalizeHelpTopic(topicId);
@@ -1785,28 +1818,11 @@ function AppMain({ lang, setLang }) {
     });
   }, [user?.uid, user?.isAnonymous, activePreRegTournamentId, activePreRegInviteToken]);
 
-  const [settings, setSettings] = useState({
-    gameType: 'x01',
-    startScore: 501, outMode: 'double',
-    p1Name: translations[lang]?.p1Default || 'Domácí', p1Id: null,
-    p2Name: translations[lang]?.p2Default || 'Hosté', p2Id: null,
-    quickButtons: [41, 45, 60, 100, 140, 180],
-    matchMode: 'first_to', matchTarget: 3, matchSets: 1,
-    isBot: false, botLevel: 'pro', botAvg: 65,
-    startPlayer: 'p1'
-  });
 
   const [matchHistory, setMatchHistory] = useState(() => loadSafeMatchHistory());
   const [selectedMatchDetail, setSelectedMatchDetail] = useState(null); 
   const [isLandscape, setIsLandscape] = useState(false);
   const [isPC, setIsPC] = useState(false);
-  const [tutorialTab, setTutorialTab] = useState('x01');
-  const [activeHelpTopicId, setActiveHelpTopicId] = useState(null);
-  const [helpReturnState, setHelpReturnState] = useState(null);
-  const helpReturnStateRef = useRef(helpReturnState);
-  useEffect(() => {
-    helpReturnStateRef.current = helpReturnState;
-  }, [helpReturnState]);
   const [showSyncPrompt, setShowSyncPrompt] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   const [showCustomFormat, setShowCustomFormat] = useState(false);
@@ -1874,23 +1890,11 @@ function AppMain({ lang, setLang }) {
   const [tournamentDraft, setTournamentDraft] = useState(() =>
     mergeDraftFromResume(getBootUiResumeOnce()?.tournamentDraft)
   );
-  const [tournamentSetupStep, setTournamentSetupStep] = useState(() => {
-    const s = Number(getBootUiResumeOnce()?.tournamentSetupStep);
-    return Number.isFinite(s) && s >= 1 && s <= 7 ? s : 1;
-  });
   const [tournamentBracket, setTournamentBracket] = useState(
     () => getInitialTournamentBootstrapOnce().bracket ?? []
   );
   const hasBracketGenerated = Array.isArray(tournamentBracket) && (tournamentBracket?.length ?? 0) > 0;
   /** Režim přístupu k turnaji (cloud rozcestník); null = zatím nevybráno v hubu */
-  const [userRole, setUserRole] = useState(() => {
-    const r = getBootUiResumeOnce();
-    if (!r?.appState || r.appState === 'home') return null;
-    if (r.appState === 'tournament_setup' || r.appState === 'tournament_board_assignment') {
-      return r.userRole || 'admin';
-    }
-    return r.userRole ?? null;
-  });
   /** PIN zadaný při připojení tabletu / diváka (Firebase později) */
   const [activePin, setActivePin] = useState(() => {
     const r = getBootUiResumeOnce();
@@ -5638,7 +5642,7 @@ function AppMain({ lang, setLang }) {
     }
 
     return (
-      <>
+      <div className="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden">
         {matchSurfaceNode}
         <PauseMenuOverlay
           open={pauseMenuOpen}
@@ -5646,7 +5650,7 @@ function AppMain({ lang, setLang }) {
           title={t('navPause') || 'Pauza'}
           actions={pauseActions}
         />
-      </>
+      </div>
     );
   }
 
