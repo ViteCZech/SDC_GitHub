@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { translations } from '../../translations';
 import {
@@ -53,7 +53,7 @@ export default function CsoPlayerNameField({
   onNotify,
   rankingKind = 'singles',
 }) {
-  const t = (k) => translations[lang]?.[k] || k;
+  const t = useCallback((k) => translations[lang]?.[k] || k, [lang]);
 
   const [useCsoRanking, setUseCsoRanking] = useState(true);
   const [csoGender, setCsoGender] = useState('men');
@@ -121,7 +121,7 @@ export default function CsoPlayerNameField({
     return () => {
       cancelled = true;
     };
-  }, [useCsoRanking, csoListKey, lang, csoReloadKey]);
+  }, [useCsoRanking, csoListKey, csoReloadKey, t]);
 
   useEffect(() => {
     if (!onGenderChange) return;

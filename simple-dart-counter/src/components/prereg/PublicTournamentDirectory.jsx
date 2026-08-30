@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
   Calendar,
@@ -194,7 +194,7 @@ export default function PublicTournamentDirectory({
   onGoogleLogin,
   onOpenTournament,
 }) {
-  const t = (k) => translations[lang]?.[k] || k;
+  const t = useCallback((k) => translations[lang]?.[k] || k, [lang]);
 
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -244,7 +244,7 @@ export default function PublicTournamentDirectory({
       cancelled = true;
       isFetchingRef.current = false;
     };
-  }, [lang]);
+  }, [t]);
 
   // Lokální + serverové „mé přihlášky“
   useEffect(() => {
@@ -342,7 +342,7 @@ export default function PublicTournamentDirectory({
     return () => {
       cancelled = true;
     };
-  }, [isGoogleUser, user?.uid, tournaments, lang]);
+  }, [isGoogleUser, user?.uid, tournaments, t]);
 
   const catalogCities = useMemo(() => {
     const set = new Set();

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { translations } from '../translations';
 import { useSyncAdapter } from '../context/SyncAdapterContext';
@@ -635,7 +635,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
     return byId;
   }, [model]);
 
-  const hydrateDisplayMatch = (summary) => {
+  const hydrateDisplayMatch = useCallback((summary) => {
     if (!summary) return null;
     const raw = rawMatchById.get(summary.matchId) || null;
     const names = {
@@ -666,7 +666,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
         raw?.status === 'in_progress' ||
         raw?.tabletStatus === 'checked_in',
     };
-  };
+  }, [rawMatchById, playerNameById, lang]);
 
   const enrichedBoards = useMemo(() => {
     if (!model?.boards?.length) return [];
@@ -675,7 +675,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
       current: hydrateDisplayMatch(board.current),
       next: hydrateDisplayMatch(board.next),
     }));
-  }, [model, rawMatchById, playerNameById, lang]);
+  }, [model, hydrateDisplayMatch]);
 
   const liveMatches = useMemo(() => {
     return enrichedBoards

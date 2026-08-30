@@ -25,6 +25,8 @@ export default function OnlineVideo({ gameId, myRole, currentPlayer, localStream
 
     const gid = String(gameId).trim();
     if (!gid) return undefined;
+    const localVideoEl = localVideoRef.current;
+    const remoteVideoEl = remoteVideoRef.current;
 
     const signalRef = doc(db, ONLINE_GAMES_COLLECTION, gid, 'webrtc', 'signal');
     const iceCol = collection(db, ONLINE_GAMES_COLLECTION, gid, 'webrtc', 'signal', 'iceCandidates');
@@ -74,16 +76,14 @@ export default function OnlineVideo({ gameId, myRole, currentPlayer, localStream
     };
 
     const attachLocalVideo = (stream) => {
-      const el = localVideoRef.current;
-      if (el && stream) {
-        el.srcObject = stream;
+      if (localVideoEl && stream) {
+        localVideoEl.srcObject = stream;
       }
     };
 
     const attachRemoteVideo = (stream) => {
-      const el = remoteVideoRef.current;
-      if (el) {
-        el.srcObject = stream;
+      if (remoteVideoEl) {
+        remoteVideoEl.srcObject = stream;
       }
     };
 
@@ -221,10 +221,8 @@ export default function OnlineVideo({ gameId, myRole, currentPlayer, localStream
           internalStreamRef.current = null;
         }
       }
-      const elL = localVideoRef.current;
-      const elR = remoteVideoRef.current;
-      if (elL) elL.srcObject = null;
-      if (elR) elR.srcObject = null;
+      if (localVideoEl) localVideoEl.srcObject = null;
+      if (remoteVideoEl) remoteVideoEl.srcObject = null;
     };
   }, [gameId, myRole, localStreamProp]);
 

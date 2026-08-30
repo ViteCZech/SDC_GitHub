@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Trophy, Undo2 } from 'lucide-react';
 import { subscribeOnlineGame } from '../services/onlineGamesService';
 
@@ -71,6 +71,8 @@ export default function GameCricket({
   const peerAbandonCricketRef = useRef(false);
   const onlineGameIdRef = useRef(onlineGameId);
   const gameStateRef = useRef(gameState);
+  const handleThrowRef = useRef(null);
+  const playBotDartRef = useRef(null);
 
   const getDisplayName = (name, isP1, isBot) => {
     if (!name) return '';
@@ -117,7 +119,7 @@ export default function GameCricket({
     };
   }, [onlineGameId, myOnlineRole, onOnlinePeerAbandoned]);
 
-  const recalculateGame = (baseHistory, baseState) => {
+  const recalculateGame = useCallback((baseHistory, baseState) => {
     const moves = [...baseHistory].reverse();
     let st = {
       p1Score: 0, p2Score: 0,
@@ -180,9 +182,9 @@ export default function GameCricket({
       history: baseHistory,
       multiplier: 1 
     };
-  };
+  }, []);
 
-  const handleThrow = (target, overrideMultiplier = null) => {
+  const handleThrow = useCallback((target, overrideMultiplier = null) => {
     if (gameState.winner) return;
     if (
       onlineGameId &&
@@ -256,7 +258,11 @@ export default function GameCricket({
         return newState;
       }
     });
-  };
+  }, [gameState, myOnlineRole, onMatchComplete, onlineGameId, recalculateGame, setScores, settings]);
+
+  useEffect(() => {
+    handleThrowRef.current = handleThrow;
+  }, [handleThrow]);
 
   const handleUndoClick = () => {
     if (gameState.history.length === 0) return;
@@ -286,16 +292,16 @@ export default function GameCricket({
         return;
       }
       const key = e.key.toLowerCase();
-      if (key === 'm') handleThrow(0);
+      if (key === 'm') handleThrowRef.current?.(0);
       else if (key === 's') setGameState(prev => ({...prev, multiplier: 1}));
       else if (key === 'd') setGameState(prev => ({...prev, multiplier: 2}));
       else if (key === 't') setGameState(prev => ({...prev, multiplier: 3}));
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [isPC, gameState.winner, gameState.multiplier, gameState.currentPlayer, onlineGameId, myOnlineRole]);
+  }, [isPC, gameState.winner, gameState.currentPlayer, onlineGameId, myOnlineRole]);
 
-  const playBotDart = () => {
+  const playBotDart = useCallback(() => {
     const lvl = settings?.botLevel || 'amateur';
     let target = 0; let mult = 1;
 
@@ -328,11 +334,15 @@ export default function GameCricket({
     if (target === 25 && mult === 3) mult = 2;
     setGameState(prev => ({...prev, multiplier: mult}));
     setTimeout(() => handleThrow(target), 200);
-  };
+  }, [gameState, handleThrow, settings]);
+
+  useEffect(() => {
+    playBotDartRef.current = playBotDart;
+  }, [playBotDart]);
 
   useEffect(() => {
     if (settings?.isBot && gameState.currentPlayer === 'p2' && !gameState.winner) {
-      const timeout = setTimeout(() => playBotDart(), 800);
+      const timeout = setTimeout(() => playBotDartRef.current?.(), 800);
       return () => clearTimeout(timeout);
     }
   }, [gameState.currentPlayer, gameState.dartsThrown, gameState.winner, settings?.isBot]);

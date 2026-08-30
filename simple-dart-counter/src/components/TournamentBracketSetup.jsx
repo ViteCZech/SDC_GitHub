@@ -17,7 +17,10 @@ export default function TournamentBracketSetup({
 }) {
   const t = (k) => translations[lang]?.[k] ?? k;
 
-  const groups = tournamentGroups?.length ? tournamentGroups : [];
+  const groups = useMemo(
+    () => (tournamentGroups?.length ? tournamentGroups : []),
+    [tournamentGroups]
+  );
 
   const initialAdvance =
     tournamentData?.advancePerGroup != null

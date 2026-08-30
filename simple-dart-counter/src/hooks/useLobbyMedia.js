@@ -61,13 +61,14 @@ export function useLobbyMedia({ t, active }) {
   }, []);
 
   useEffect(() => {
+    const previewVideoEl = videoRef.current;
     if (!active || !navigator.mediaDevices?.getUserMedia) {
       stopStream(mediaStreamRef.current);
       mediaStreamRef.current = null;
       setMediaStream(null);
-      if (videoRef.current) {
+      if (previewVideoEl) {
         try {
-          videoRef.current.srcObject = null;
+          previewVideoEl.srcObject = null;
         } catch {
           /* ignore */
         }
@@ -87,8 +88,8 @@ export function useLobbyMedia({ t, active }) {
       }
       mediaStreamRef.current = stream;
       setMediaStream(stream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+      if (previewVideoEl) {
+        previewVideoEl.srcObject = stream;
       }
       const all = await navigator.mediaDevices.enumerateDevices();
       setVideoInputs(all.filter((d) => d.kind === 'videoinput'));
@@ -115,9 +116,9 @@ export function useLobbyMedia({ t, active }) {
       setPreviewReady(false);
       stopStream(mediaStreamRef.current);
       mediaStreamRef.current = null;
-      if (videoRef.current) {
+      if (previewVideoEl) {
         try {
-          videoRef.current.srcObject = null;
+          previewVideoEl.srcObject = null;
         } catch {
           /* ignore */
         }
@@ -174,9 +175,9 @@ export function useLobbyMedia({ t, active }) {
       stopStream(mediaStreamRef.current);
       mediaStreamRef.current = null;
       setMediaStream(null);
-      if (videoRef.current) {
+      if (previewVideoEl) {
         try {
-          videoRef.current.srcObject = null;
+          previewVideoEl.srcObject = null;
         } catch {
           /* ignore */
         }

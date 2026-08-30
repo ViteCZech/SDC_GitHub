@@ -124,6 +124,10 @@ export default function TabletBoardQrPanel({
   compact = false,
 }) {
   const t = (k) => translations[lang]?.[k] ?? k;
+  const tabletConnectedMsgTemplate = useMemo(
+    () => translations[lang]?.tabletQrConnectedSuccess || 'Terč {n} úspěšně připojen!',
+    [lang]
+  );
   const [panelOpen, setPanelOpen] = useState(false);
   const [boardStatuses, setBoardStatuses] = useState({});
   const [openBoard, setOpenBoard] = useState(null);
@@ -176,7 +180,7 @@ export default function TabletBoardQrPanel({
         if (!notifiedRef.current.has(notifyKey)) {
           notifiedRef.current.add(notifyKey);
           const boardNum = parseInt(boardKey, 10);
-          const msg = (t('tabletQrConnectedSuccess') || 'Terč {n} úspěšně připojen!').replace(
+          const msg = tabletConnectedMsgTemplate.replace(
             '{n}',
             String(boardNum)
           );
@@ -195,7 +199,7 @@ export default function TabletBoardQrPanel({
       }
     }
     prevStatusesRef.current = boardStatuses;
-  }, [boardStatuses, pin, openBoard, onNotify, t]);
+  }, [boardStatuses, pin, openBoard, onNotify, tabletConnectedMsgTemplate]);
 
   useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);

@@ -149,8 +149,19 @@ const EditScoreModal = ({ initialScore, initialDarts, scoreBefore, outMode, onSa
     const [isFirstEntry, setIsFirstEntry] = useState(true); 
     const t = (k) => translations[lang]?.[k] || k;
 
-    const handleNum = (n) => { if (isFirstEntry) { setScore(n); setIsFirstEntry(false); } else { if (score.length >= 3) return; setScore(score === '0' ? n : score + n); } };
-    const handleDel = () => { setIsFirstEntry(false); setScore(score.length > 1 ? score.slice(0, -1) : '0'); };
+    const handleNum = useCallback((n) => {
+      if (isFirstEntry) {
+        setScore(n);
+        setIsFirstEntry(false);
+      } else {
+        if (score.length >= 3) return;
+        setScore(score === '0' ? n : score + n);
+      }
+    }, [isFirstEntry, score]);
+    const handleDel = useCallback(() => {
+      setIsFirstEntry(false);
+      setScore(score.length > 1 ? score.slice(0, -1) : '0');
+    }, [score]);
 
     const currentScoreInt = parseInt(score) || 0;
     const isNewFinish = (scoreBefore - currentScoreInt) === 0;
@@ -168,7 +179,7 @@ const EditScoreModal = ({ initialScore, initialDarts, scoreBefore, outMode, onSa
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [score, isFirstEntry, darts, minDartsNeeded, currentScoreInt, isNewFinish]);
+    }, [score, isFirstEntry, darts, minDartsNeeded, currentScoreInt, isNewFinish, handleNum, handleDel, onSave, onCancel]);
 
     return (
         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center p-2 sm:p-4">
@@ -341,6 +352,7 @@ export default function GameX01({
   const onlineStarterPressRef = useRef({ timer: null, armed: false });
   const blockStarterScoreClickRef = useRef(false);
   const forcedTargetFinishRef = useRef(false);
+  const playBotTurnRef = useRef(null);
 
   const [quickButtons, setQuickButtons] = useState(settings.quickButtons || [41, 45, 60, 100, 140, 180]);
   const tabletPresenceRef = useRef(tabletPresence);
@@ -534,6 +546,8 @@ export default function GameX01({
     settings.botLevel,
     settings.botAvg,
     onMatchComplete,
+    gameState,
+    settings,
   ]);
 
   useEffect(() => {
@@ -828,7 +842,7 @@ export default function GameX01({
 
 
   // Bot logic
-  const playBotTurn = () => {
+  const playBotTurn = useCallback(() => {
       const cScore = gameState.p2Score; let pts = 0; const lvl = settings.botLevel;
       const canOut = cScore <= 170 && ![169, 168, 166, 165, 163, 162, 159].includes(cScore);
       const neighbors = { 20: [1, 5], 19: [7, 3], 18: [4, 1], 17: [2, 3] };
@@ -852,11 +866,15 @@ export default function GameX01({
       } else { pts = randNormal(50, 20); }
 
       processTurnRef.current(Math.min(180, Math.max(0, pts)), cScore === pts ? getMinDartsToCheckout(cScore, settings.outMode) : 3);
-  };
+  }, [gameState.p2Score, settings.botAvg, settings.botLevel, settings.outMode]);
+
+  useEffect(() => {
+    playBotTurnRef.current = playBotTurn;
+  }, [playBotTurn]);
 
   useEffect(() => {
       if (settings.isBot && gameState.currentPlayer === 'p2' && !gameState.winner) {
-          const timeout = setTimeout(() => playBotTurn(), 1500);
+          const timeout = setTimeout(() => playBotTurnRef.current?.(), 1500);
           return () => clearTimeout(timeout);
       }
   }, [gameState.currentPlayer, gameState.winner, settings.isBot]);

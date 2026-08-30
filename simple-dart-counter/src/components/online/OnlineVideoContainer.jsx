@@ -122,6 +122,8 @@ export default function OnlineVideoContainer({
 
     const gid = String(onlineGameId).trim();
     if (!gid) return undefined;
+    const localVideoEl = localVideoRef.current;
+    const remoteVideoEl = remoteVideoRef.current;
 
     const signalDocRef = doc(db, ONLINE_GAMES_COLLECTION, gid, 'signaling', 'signal');
     // Kolekce musí mít lichý počet segmentů: ICE pod dokumentem `signal`, ne vedle něj.
@@ -186,7 +188,7 @@ export default function OnlineVideoContainer({
       const local = await ensureLocal();
       if (cancelled || !local) return;
 
-      attachVideo(localVideoRef.current, local);
+      attachVideo(localVideoEl, local);
       applyLocalMicToStream(local, localMicMutedRef.current);
 
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
@@ -243,8 +245,8 @@ export default function OnlineVideoContainer({
         const [stream] = ev.streams || [];
         if (stream) {
           remoteStreamRef.current = stream;
-          attachVideo(remoteVideoRef.current, stream);
-          const rv = remoteVideoRef.current;
+          attachVideo(remoteVideoEl, stream);
+          const rv = remoteVideoEl;
           if (rv) {
             rv.muted = false;
             try {
@@ -378,10 +380,9 @@ export default function OnlineVideoContainer({
         internalStreamRef.current = null;
       }
 
-      attachVideo(localVideoRef.current, null);
-      attachVideo(remoteVideoRef.current, null);
+      attachVideo(localVideoEl, null);
+      attachVideo(remoteVideoEl, null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- pc lifecycle podle gameId/role/stream/dokončení
   }, [onlineGameId, myRole, localStreamProp, matchCompleted, webrtcSessionKey]);
 
   useEffect(() => {

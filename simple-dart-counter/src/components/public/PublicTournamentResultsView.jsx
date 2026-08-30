@@ -6,6 +6,8 @@ import TournamentStatisticsView from '../TournamentStatisticsView';
 import { translations } from '../../translations';
 import { useSyncAdapter } from '../../context/SyncAdapterContext';
 
+const EMPTY_PUBLIC_RESULTS_DICT = Object.freeze({});
+
 function toDateLabel(value, lang) {
   if (!value) return '—';
   const locale = lang === 'cs' ? 'cs-CZ' : lang === 'pl' ? 'pl-PL' : 'en-US';
@@ -172,7 +174,10 @@ export default function PublicTournamentResultsView({
   onBack,
 }) {
   const syncAdapter = useSyncAdapter();
-  const dict = translations?.[lang]?.publicResults ?? translations?.cs?.publicResults ?? {};
+  const dict = useMemo(
+    () => translations?.[lang]?.publicResults ?? translations?.cs?.publicResults ?? EMPTY_PUBLIC_RESULTS_DICT,
+    [lang]
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [record, setRecord] = useState(null);

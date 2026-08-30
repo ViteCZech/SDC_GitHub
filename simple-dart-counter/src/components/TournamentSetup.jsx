@@ -301,7 +301,7 @@ export default function TournamentSetup({
     ) {
       setTournamentDraft((prev) => ({ ...prev, bracketLegs: prev.groupLegs }));
     }
-  }, [tournamentDraft.format, tournamentDraft.groupLegs, setTournamentDraft]);
+  }, [tournamentDraft.format, tournamentDraft.groupLegs, tournamentDraft.bracketLegs, setTournamentDraft]);
 
   useEffect(() => {
     if (!user || user.isAnonymous) {

@@ -28,6 +28,7 @@ import { allowsPairing, normalizeCompetitionType } from '../../utils/preregCompe
  */
 export default function PublicTournamentPage({ tournamentId, lang, user = null }) {
   const t = (k) => translations[lang]?.[k] || k;
+  const isGoogleUser = !!user && !user.isAnonymous;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -88,7 +89,7 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null }
   }, [tournamentId]);
 
   useEffect(() => {
-    if (!user || user.isAnonymous) return undefined;
+    if (!isGoogleUser) return undefined;
     let cancelled = false;
     (async () => {
       try {
@@ -142,7 +143,7 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null }
     return () => {
       cancelled = true;
     };
-  }, [tournamentId, user?.uid, user?.isAnonymous]);
+  }, [tournamentId, user?.uid, isGoogleUser]);
 
   const handleRegistrationSuccess = (result, formSnapshot) => {
     const stored = {

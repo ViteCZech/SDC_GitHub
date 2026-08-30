@@ -1292,7 +1292,7 @@ function AppMain({ lang, setLang }) {
   }, [tournamentMatchContext]);
   /** Zabrání dvojímu zápisu historie při `status: completed` + lokálním dokončení. */
   const processedOnlineMatchHistoryRef = React.useRef(new Set());
-  const t = (k) => translations[lang]?.[k] || k;
+  const t = React.useCallback((k) => translations[lang]?.[k] || k, [lang]);
 
   const rosterIdentityFromPlayer = (rawPlayer) => {
     const name = String(rawPlayer?.name ?? '').trim();
@@ -1886,12 +1886,12 @@ function AppMain({ lang, setLang }) {
   }, [activePin, tournamentData?.tournamentId]);
 
   const [notification, setNotification] = useState(null); // { message: string, type: 'error'|'success' }
-  const showNotification = (message, type = 'error') => {
+  const showNotification = React.useCallback((message, type = 'error') => {
     setNotification({ message: String(message ?? ''), type });
     setTimeout(() => {
       setNotification(null);
     }, 4000);
-  };
+  }, []);
   const showNotificationRef = useRef(showNotification);
   showNotificationRef.current = showNotification;
   const tRef = useRef(t);
@@ -1944,7 +1944,7 @@ function AppMain({ lang, setLang }) {
     if (!startupStorageError) return;
     showNotification(startupStorageError, 'error');
     setStartupStorageError(null);
-  }, [startupStorageError]);
+  }, [startupStorageError, showNotification]);
 
   const handleEnsureBoardAuthTokens = React.useCallback((nextTd) => {
     if (!nextTd?.boardAuthTokens) return;
@@ -2029,7 +2029,7 @@ function AppMain({ lang, setLang }) {
     const playersWithIds = tournamentData.players.map((p, i) => ({ ...p, id: p.id ?? `p${i + 1}` }));
     const numGroups = tournamentData.numGroups ?? Math.max(1, Math.ceil(playersWithIds.length / 4));
     return distributePlayersToFixedGroups(playersWithIds, numGroups).map((g) => ({ ...g, boards: g.boards ?? [] }));
-  }, [tournamentData?.players, tournamentData?.groups, tournamentData?.numGroups, tournamentData?.tournamentFormat]);
+  }, [tournamentData]);
 
   const adminTabletTimeoutWarningEntries = React.useMemo(() => {
     const td = tournamentData;
@@ -2150,7 +2150,7 @@ function AppMain({ lang, setLang }) {
       });
     }
     return entries;
-  }, [tournamentData, tournamentMatches, tournamentBracket, tournamentGroups, lang]);
+  }, [tournamentData, tournamentMatches, tournamentBracket, tournamentGroups, t]);
 
   const adminTabletTimeoutPending = adminTabletTimeoutWarningEntries;
 
@@ -2558,6 +2558,7 @@ function AppMain({ lang, setLang }) {
     promotersForRefereeEngine,
     tournamentMatches,
     lang,
+    showNotification,
   ]);
 
   const tabletBoardStr = String(tournamentDraft?.hubTabletBoard ?? '').trim();
@@ -2768,7 +2769,7 @@ function AppMain({ lang, setLang }) {
       groupsLegs: Number(tournamentData.groupsLegs ?? tournamentData.legsGroup ?? 3) || 3,
       bracketLegs: Number(tournamentData.bracketKoLegs ?? tournamentData.bracketLegs ?? 3) || 3,
       totalBoards: Number(tournamentData.numBoards ?? tournamentData.totalBoards ?? 0) || 0,
-      now: Date.now(),
+      now: Date.now() + tournamentEndEstimateTick * 0,
       structuralBracketFallback:
         bracketEmpty && (tournamentData.players?.length ?? 0) >= 2
           ? {
@@ -2863,7 +2864,7 @@ function AppMain({ lang, setLang }) {
     : appState === 'tournament_bracket' ? 6
     : appState === 'tournament_stats' ? 7
     : 1;
-  const canNavigateToStep = (s) => {
+  const canNavigateToStep = React.useCallback((s) => {
     if (userRole === 'viewer') {
       if (![5, 6, 7].includes(s)) return false;
       return !!tournamentData;
@@ -2876,7 +2877,7 @@ function AppMain({ lang, setLang }) {
     if (s === 5 && hasBracketGenerated && tournamentData) return true; // Review skupin i s existujícím pavoukem
     if (s === 6 && hasBracketGenerated && tournamentData) return true; // Pavouk vždy dostupný po vygenerování
     return s <= currentStepperStep && !!tournamentData;
-  };
+  }, [currentStepperStep, hasBracketGenerated, isTournamentLive, tournamentData, userRole]);
   const handleStepperClick = (s) => {
     if (userRole === 'viewer') {
       if (!canNavigateToStep(s)) return;
@@ -3146,7 +3147,7 @@ function AppMain({ lang, setLang }) {
     setAppState('tournament_viewer_preparing');
   };
 
-  const handleSpectatorDisconnect = () => {
+  const handleSpectatorDisconnect = React.useCallback(() => {
     if (userRole === 'tablet') {
       const pin = String(activePin ?? '').trim();
       const board = String(tournamentDraft?.hubTabletBoard ?? loadStoredTabletBoard()).trim();
@@ -3169,7 +3170,7 @@ function AppMain({ lang, setLang }) {
     setTournamentMatchContext(null);
     setParkedSession(null);
     setAppState('tournament_hub');
-  };
+  }, [activePin, syncAdapter, tournamentDraft?.hubTabletBoard, userRole]);
 
   const dismissParkedSession = React.useCallback(() => {
     setParkedSession((prev) => {
@@ -3350,7 +3351,7 @@ function AppMain({ lang, setLang }) {
         hasTournamentData: !!tournamentData,
         canGoToBoardAssignment: canNavigateToStep(4),
       }),
-    [appState, tournamentSetupStep, homeSubmenu, preregReturnToCatalog, userRole, tournamentData, hasBracketGenerated, isTournamentLive]
+    [appState, tournamentSetupStep, homeSubmenu, preregReturnToCatalog, userRole, tournamentData, canNavigateToStep]
   );
 
   /** Guard: turnajové obrazovky bez dat → hub + toast */
@@ -3636,7 +3637,7 @@ function AppMain({ lang, setLang }) {
       const next = adaptGroupParallelPlay(prev, tournamentGroups);
       return parallelAssignSignature(prev) === parallelAssignSignature(next) ? prev : next;
     });
-  }, [tournamentGroups, groupMatchPhaseKey]);
+  }, [tournamentGroups, groupMatchPhaseKey, tournamentMatches?.length]);
 
   // Chytrá fronta terčů: při dokončení skupiny automaticky přiřaď terč první čekající
   useEffect(() => {
@@ -3715,7 +3716,7 @@ function AppMain({ lang, setLang }) {
           .replace('{Z}', waitingId);
       showNotification(msg, 'success');
     }
-  }, [userRole, tournamentData, tournamentMatches, tournamentBracket, activePin, user, lang, syncAdapter]);
+  }, [userRole, tournamentData, tournamentMatches, tournamentBracket, activePin, user, lang, syncAdapter, showNotification]);
 
   useEffect(() => {
     if (userRole !== 'admin') return;
@@ -4829,12 +4830,10 @@ function AppMain({ lang, setLang }) {
       } catch {}
   };
 
-  let legOptions = [];
-  if (settings.matchMode === 'first_to') {
-      legOptions = [1, 2, 3, 4, 5];
-  } else {
-      legOptions = [3, 5, 7, 9, 11];
-  }
+  const legOptions = React.useMemo(
+    () => (settings.matchMode === 'first_to' ? [1, 2, 3, 4, 5] : [3, 5, 7, 9, 11]),
+    [settings.matchMode]
+  );
 
   const p1Defaults = ['Domácí', 'Home', 'Gospodarze', translations?.cs?.p1Default, translations?.en?.p1Default, translations?.pl?.p1Default].filter(Boolean);
   const p2Defaults = ['Hosté', 'Away', 'Goście', translations?.cs?.p2Default, translations?.en?.p2Default, translations?.pl?.p2Default].filter(Boolean);
@@ -4905,7 +4904,7 @@ function AppMain({ lang, setLang }) {
       if (!legOptions.includes(settings.matchTarget)) {
           setSettings(prev => ({ ...prev, matchTarget: legOptions[0] }));
       }
-  }, [settings.matchMode]);
+  }, [legOptions, settings.matchMode, settings.matchTarget]);
 
   if (appState === 'match_finished' || selectedMatchDetail) {
       const isTournament = !!tournamentMatchContext;
