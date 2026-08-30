@@ -3,11 +3,15 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import PublicTournamentResultsView from '../PublicTournamentResultsView';
 
-vi.mock('../../../services/publicResultsService', () => ({
+const { getPublicResultById } = vi.hoisted(() => ({
   getPublicResultById: vi.fn(),
 }));
 
-import { getPublicResultById } from '../../../services/publicResultsService';
+vi.mock('../../../context/SyncAdapterContext', () => ({
+  useSyncAdapter: () => ({
+    getPublicResultById,
+  }),
+}));
 
 describe('PublicTournamentResultsView', () => {
   beforeEach(() => {

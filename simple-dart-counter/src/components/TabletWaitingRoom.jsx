@@ -3,10 +3,7 @@ import { Minus, Plus } from 'lucide-react';
 import { translations } from '../translations';
 import TournamentStatisticsView from './TournamentStatisticsView';
 import { TABLET_CHECKIN_DEFAULT_SECONDS } from '../utils/tabletCheckInTimeout';
-import {
-  heartbeatTabletBoardPresence,
-  releaseTabletBoardPresenceOnUnload,
-} from '../services/tournamentSync';
+import { useSyncAdapter } from '../context/SyncAdapterContext';
 
 const CHECKIN_SECONDS = TABLET_CHECKIN_DEFAULT_SECONDS;
 
@@ -40,7 +37,9 @@ export default function TabletWaitingRoom({
   tournamentBracket = [],
   tabletPresence = null,
 }) {
+  const syncAdapter = useSyncAdapter();
   const tt = (k) => translations[lang]?.tablet?.[k] ?? k;
+  void onBack;
   const match = activeMatch ?? assignedMatch;
 
   const [phase, setPhase] = useState(1);
@@ -116,7 +115,7 @@ export default function TabletWaitingRoom({
     const tabletPassword = String(tabletPresence?.tabletPassword ?? '').trim().slice(0, 5);
     if (!/^\d{4}$/.test(pin) || !board || (!boardToken && !tabletPassword)) return undefined;
     const tick = () => {
-      void heartbeatTabletBoardPresence({
+      void syncAdapter.heartbeatTabletPresence({
         pin,
         board,
         boardToken,
@@ -131,6 +130,7 @@ export default function TabletWaitingRoom({
     tabletPresence?.board,
     tabletPresence?.boardToken,
     tabletPresence?.tabletPassword,
+    syncAdapter,
   ]);
 
   useEffect(() => {
@@ -140,7 +140,7 @@ export default function TabletWaitingRoom({
     const tabletPassword = String(tabletPresence?.tabletPassword ?? '').trim().slice(0, 5);
     if (!/^\d{4}$/.test(pin) || !board || (!boardToken && !tabletPassword)) return undefined;
     const handleBeforeUnload = () => {
-      releaseTabletBoardPresenceOnUnload(tabletPresenceRef.current);
+      syncAdapter.releaseTabletPresenceOnUnload(tabletPresenceRef.current);
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -149,6 +149,7 @@ export default function TabletWaitingRoom({
     tabletPresence?.board,
     tabletPresence?.boardToken,
     tabletPresence?.tabletPassword,
+    syncAdapter,
   ]);
 
   useEffect(() => {

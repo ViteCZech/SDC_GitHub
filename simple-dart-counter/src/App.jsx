@@ -1,20 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { signInAnonymously, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, deleteUser } from 'firebase/auth';
 import { collection, addDoc, deleteDoc, doc, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import {
-  syncTournamentToCloud,
-  deleteCloudTournament,
-  archivePastTournamentAndDeleteActive,
-  listenToCloudTournament,
-  verifyTournamentPin,
-  verifyTabletBoardAccess,
-  updateCloudMatchFromTablet,
   mergeAdminGroupMatchesFromTabletCloud,
   mergeAdminBracketFromTabletCloud,
-  registerTabletBoardOnline,
-  releaseTabletBoardPresence,
 } from './services/tournamentSync';
+import { SyncAdapterProvider, useSyncAdapter } from './context/SyncAdapterContext';
+import { createCloudSyncAdapter } from './services/syncAdapter/cloudSyncAdapter';
 import { cancelOnlineGame, getOnlineGameById, abandonOnlineGameSession } from './services/onlineGamesService';
 import {
   readLastOnlineSession,
@@ -83,7 +76,6 @@ import {
   assignBracketJitBoardsAndReferees,
   getBracketFirstRoundChalkerShortage,
   propagateBracketWinners,
-  isRealPendingBracketMatch,
   calculateGroupStandings,
   isTournamentBracketOnlyFormat,
   sortPlayersForBracketSeeding,
@@ -1217,6 +1209,7 @@ const UserProfile = ({ user, matches, onLogout, onDeleteAccount, onLogin, lang, 
 // --- HLAVNÍ KOMPONENTA (ROUTER) ---
 function AppMain({ lang, setLang }) {
   const { openKeyboard, isKeyboardOpen, internalKeyboardEnabled } = useAdminVirtualKeyboard();
+  const syncAdapter = useSyncAdapter();
   const [user, setUser] = useState(null);
   const [offlineMode, setOfflineMode] = useState(false);
   const [appState, setAppState] = useState(() => {
@@ -1917,7 +1910,7 @@ function AppMain({ lang, setLang }) {
 
     const run = async () => {
       const { pin, board, token } = tabletRoute;
-      const access = await verifyTabletBoardAccess(pin, '', { board, boardToken: token });
+      const access = await syncAdapter.verifyTabletAccess(pin, '', { board, boardToken: token });
       if (!access.ok) {
         showNotificationRef.current(
           access.reason === 'bad_password'
@@ -1929,7 +1922,7 @@ function AppMain({ lang, setLang }) {
         return;
       }
       try {
-        await registerTabletBoardOnline(pin, board, token);
+        await syncAdapter.registerTabletPresence(pin, board, token);
       } catch (err) {
         console.warn('registerTabletBoardOnline:', err);
         showNotificationRef.current(
@@ -1949,7 +1942,7 @@ function AppMain({ lang, setLang }) {
       window.history.replaceState(null, '', '/');
     };
     void run();
-  }, []);
+  }, [syncAdapter]);
   useEffect(() => {
     if (!startupStorageError) return;
     showNotification(startupStorageError, 'error');
@@ -2281,7 +2274,7 @@ function AppMain({ lang, setLang }) {
         return;
       }
       const snap = tournamentSyncPayloadRef.current;
-      syncTournamentToCloud(pin, {
+      syncAdapter.syncTournament(pin, {
         tournamentData: snap.tournamentData,
         groups: snap.groups,
         groupMatches: snap.groupMatches,
@@ -2304,6 +2297,7 @@ function AppMain({ lang, setLang }) {
     tournamentGroups,
     tournamentMatches,
     tournamentBracket,
+    syncAdapter,
   ]);
 
   /** Přímý pavouk: uložit pavouk do stejného JSON jako turnaj (F5). */
@@ -2323,7 +2317,7 @@ function AppMain({ lang, setLang }) {
     const pin = String(activePin ?? '').trim();
     if (!/^\d{4}$/.test(pin)) return;
 
-    const unsub = listenToCloudTournament(pin, (cloudData) => {
+    const unsub = syncAdapter.listenTournament(pin, (cloudData) => {
       if (cloudData == null) {
         clearSpectatorSession();
         showNotificationRef.current(
@@ -2369,7 +2363,7 @@ function AppMain({ lang, setLang }) {
     });
 
     return () => unsub();
-  }, [userRole, activePin, tournamentData?.cloudEnabled, user]);
+  }, [userRole, activePin, tournamentData?.cloudEnabled, user, syncAdapter]);
 
   /**
    * Na kroku Pavouk průběžně:
@@ -2948,7 +2942,7 @@ function AppMain({ lang, setLang }) {
 
         if (isCloudArchive) {
           try {
-            await archivePastTournamentAndDeleteActive(user.uid, pinToDelete, name, fullSnapshot);
+            await syncAdapter.archiveTournament(user.uid, pinToDelete, name, fullSnapshot);
             showNotification(
               t('archiveSuccess') || 'Turnaj byl úspěšně uložen do historie.',
               'success'
@@ -2981,7 +2975,7 @@ function AppMain({ lang, setLang }) {
             console.warn('appendLocalTournamentHistory failed');
           }
           try {
-            await deleteCloudTournament(pinToDelete);
+            await syncAdapter.deleteTournament(pinToDelete);
           } catch {
             console.warn('deleteCloudTournament failed');
           }
@@ -3112,7 +3106,7 @@ function AppMain({ lang, setLang }) {
     const p = String(pin).replace(/\D/g, '').slice(0, 4);
     const b = String(board || '').replace(/\D/g, '').slice(0, 2);
     const tp = String(tabletPassword ?? '').trim();
-    const access = await verifyTabletBoardAccess(p, tp);
+    const access = await syncAdapter.verifyTabletAccess(p, tp);
     if (!access.ok) {
       showNotification(
         access.reason === 'bad_password'
@@ -3141,7 +3135,7 @@ function AppMain({ lang, setLang }) {
       return;
     }
     const p = String(pin).replace(/\D/g, '').slice(0, 4);
-    const ok = await verifyTournamentPin(p);
+    const ok = await syncAdapter.verifyTournamentPin(p);
     if (!ok) {
       showNotification(t('tournamentHub.invalidPin'), 'error');
       return;
@@ -3161,7 +3155,7 @@ function AppMain({ lang, setLang }) {
       const board = String(tournamentDraft?.hubTabletBoard ?? loadStoredTabletBoard()).trim();
       const auth = tabletCloudAuthOpts();
       if (/^\d{4}$/.test(pin) && board) {
-        void releaseTabletBoardPresence({
+        void syncAdapter.releaseTabletPresence({
           pin,
           board,
           boardToken: String(auth.boardToken ?? '').trim(),
@@ -3709,7 +3703,7 @@ function AppMain({ lang, setLang }) {
       const pin = String(activePin ?? '').trim();
       if (nextTd?.cloudEnabled && /^\d{4}$/.test(pin) && user && !user.isAnonymous) {
         const snap = tournamentSyncPayloadRef.current;
-        syncTournamentToCloud(pin, {
+        syncAdapter.syncTournament(pin, {
           tournamentData: nextTd,
           groups: nextGroups,
           groupMatches: snap?.groupMatches ?? tournamentMatches,
@@ -3724,7 +3718,7 @@ function AppMain({ lang, setLang }) {
           .replace('{Z}', waitingId);
       showNotification(msg, 'success');
     }
-  }, [userRole, tournamentData, tournamentMatches, tournamentBracket, activePin, user, lang]);
+  }, [userRole, tournamentData, tournamentMatches, tournamentBracket, activePin, user, lang, syncAdapter]);
 
   useEffect(() => {
     if (userRole !== 'admin') return;
@@ -4047,7 +4041,7 @@ function AppMain({ lang, setLang }) {
     const pin = String(activePin ?? '').trim();
     if (!am || !/^\d{4}$/.test(pin)) return;
     try {
-      await updateCloudMatchFromTablet(
+      await syncAdapter.updateMatchFromTablet(
         pin,
         am.matchType,
         am.matchId ?? am.id,
@@ -4079,7 +4073,7 @@ function AppMain({ lang, setLang }) {
     const nextCount = Math.min(TABLET_CHECKIN_MAX_WARNINGS, prevCount + 1);
     const roleCounts = bumpRoleWarningCounts(am?.tabletTimeoutRoleWarningCounts, present);
     try {
-      await updateCloudMatchFromTablet(
+      await syncAdapter.updateMatchFromTablet(
         pin,
         matchType,
         matchId,
@@ -4164,7 +4158,7 @@ function AppMain({ lang, setLang }) {
     const pin = String(activePin ?? '').trim();
     if (tournamentData?.cloudEnabled && /^\d{4}$/.test(pin) && user && !user.isAnonymous) {
       const snap = tournamentSyncPayloadRef.current;
-      syncTournamentToCloud(pin, {
+      syncAdapter.syncTournament(pin, {
         tournamentData: snap?.tournamentData ?? tournamentData,
         groups: snap?.groups ?? tournamentGroups,
         groupMatches: nextMatches,
@@ -4179,6 +4173,7 @@ function AppMain({ lang, setLang }) {
     tournamentGroups,
     activePin,
     user,
+    syncAdapter,
   ]);
 
   const handleTabletStartGame = async (matchId, startingPlayerId) => {
@@ -4194,7 +4189,7 @@ function AppMain({ lang, setLang }) {
     const mid = am.matchId ?? am.id;
     if (/^\d{4}$/.test(pin)) {
       try {
-        await updateCloudMatchFromTablet(
+        await syncAdapter.updateMatchFromTablet(
           pin,
           am.matchType,
           mid,
@@ -4981,7 +4976,7 @@ function AppMain({ lang, setLang }) {
                     }
 
                     try {
-                      await updateCloudMatchFromTablet(
+                      await syncAdapter.updateMatchFromTablet(
                         pin,
                         tmt === 'bracket' ? 'bracket' : 'group',
                         mid,
@@ -6005,6 +6000,9 @@ function AppMain({ lang, setLang }) {
         <TournamentHub
           lang={lang}
           onChooseAdmin={handleTournamentHubAdmin}
+          onQuickStart={handleTournamentQuickStart}
+          onGoogleLogin={handleLogin}
+          isLoggedIn={!!(user && !user.isAnonymous)}
           onTabletJoin={handleTournamentHubTabletJoin}
           onViewerJoin={handleTournamentHubViewerJoin}
           onOpenHistory={handleTournamentHubHistory}
@@ -6949,12 +6947,20 @@ function AppMain({ lang, setLang }) {
 export default function App() {
   const venueRoute = parseVenueDisplayRouteFromUrl();
   const [lang, setLang] = useState(() => (venueRoute ? resolveVenueLang() : 'cs'));
+  const syncAdapter = useMemo(() => createCloudSyncAdapter(), []);
+
   if (venueRoute) {
-    return <VenueDisplayView pin={venueRoute.pin} invalidPin={venueRoute.invalid} lang={lang} />;
+    return (
+      <SyncAdapterProvider adapter={syncAdapter}>
+        <VenueDisplayView pin={venueRoute.pin} invalidPin={venueRoute.invalid} lang={lang} />
+      </SyncAdapterProvider>
+    );
   }
   return (
-    <AdminVirtualKeyboardProvider lang={lang}>
-      <AppMain lang={lang} setLang={setLang} />
-    </AdminVirtualKeyboardProvider>
+    <SyncAdapterProvider adapter={syncAdapter}>
+      <AdminVirtualKeyboardProvider lang={lang}>
+        <AppMain lang={lang} setLang={setLang} />
+      </AdminVirtualKeyboardProvider>
+    </SyncAdapterProvider>
   );
 }

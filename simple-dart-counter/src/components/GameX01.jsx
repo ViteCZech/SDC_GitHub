@@ -10,10 +10,7 @@ import {
   updateHeartbeat,
   updateOnlineGameStartPlayer,
 } from '../services/onlineGamesService';
-import {
-  heartbeatTabletBoardPresence,
-  releaseTabletBoardPresenceOnUnload,
-} from '../services/tournamentSync';
+import { useSyncAdapter } from '../context/SyncAdapterContext';
 import OnlineVideoContainer from './online/OnlineVideoContainer';
 import PostMatchView from './online/PostMatchView';
 import DoublesThrowerPicker from './DoublesThrowerPicker';
@@ -255,6 +252,7 @@ export default function GameX01({
   /** Synchronizace `onlineGames.startPlayer` do lokálních nastavení. */
   onOnlineDocStartPlayer = null,
 }) {
+  const syncAdapter = useSyncAdapter();
     // 1. Zde máte překladovou funkci (pokud ne, přidejte ji)
   const t = (k) => translations[lang]?.[k] || k;
 
@@ -369,7 +367,7 @@ export default function GameX01({
     const tabletPassword = String(tabletPresence?.tabletPassword ?? '').trim().slice(0, 5);
     if (!/^\d{4}$/.test(pin) || !board || (!boardToken && !tabletPassword)) return undefined;
     const tick = () => {
-      void heartbeatTabletBoardPresence({
+      void syncAdapter.heartbeatTabletPresence({
         pin,
         board,
         boardToken,
@@ -384,6 +382,7 @@ export default function GameX01({
     tabletPresence?.board,
     tabletPresence?.boardToken,
     tabletPresence?.tabletPassword,
+    syncAdapter,
   ]);
 
   useEffect(() => {
@@ -393,7 +392,7 @@ export default function GameX01({
     const tabletPassword = String(tabletPresence?.tabletPassword ?? '').trim().slice(0, 5);
     if (!/^\d{4}$/.test(pin) || !board || (!boardToken && !tabletPassword)) return undefined;
     const handleBeforeUnload = () => {
-      releaseTabletBoardPresenceOnUnload(tabletPresenceRef.current);
+      syncAdapter.releaseTabletPresenceOnUnload(tabletPresenceRef.current);
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -402,6 +401,7 @@ export default function GameX01({
     tabletPresence?.board,
     tabletPresence?.boardToken,
     tabletPresence?.tabletPassword,
+    syncAdapter,
   ]);
 
     useEffect(() => {
@@ -647,10 +647,10 @@ export default function GameX01({
         }
       }
       if (doc.status === 'completed') {
-        setOnlineVideoSessionCompleted(true);
+        setOnlineFirestoreSessionCompleted(true);
       }
       if (doc.status === 'obsolete') {
-        setOnlineVideoSessionCompleted(true);
+        setOnlineFirestoreSessionCompleted(true);
         opponentHeartbeatMsRef.current = null;
         setIsOpponentOffline(false);
         if (!peerAbandonNotifyRef.current) {

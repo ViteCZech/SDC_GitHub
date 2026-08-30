@@ -876,6 +876,20 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
       hostTournaments: 'Pořádat turnaj',
       hostTournamentsHint:
         'Moje turnaje s registrací, rychlý start bez přihlášek a historie odehraných turnajů.',
+      modeSectionTitle: 'Režim turnaje',
+      offlineModeTitle: 'Offline / lokální turnaj',
+      offlineModeHint: 'Běh na tomto zařízení bez cloudu. Vhodné při výpadku internetu.',
+      offlineModeConditions:
+        'Podmínky: bez cloudových tabletů a bez cloud TV feedu. Data zůstávají lokálně na zařízení.',
+      offlineModeAction: 'Spustit offline turnaj',
+      cloudModeTitle: 'Cloud turnaj',
+      cloudModeHint:
+        'Online registrace, cloud synchronizace, tablety u terčů a TV obrazovka.',
+      cloudModeConditions:
+        'Podmínky: internet + Google přihlášení pořadatele. Diváci/tablety se připojují přes PIN.',
+      cloudModeLoginWarning:
+        'Nejste přihlášeni. Cloud turnaj vyžaduje Google účet pořadatele.',
+      cloudModeAction: 'Otevřít cloud turnaje',
       joinSection: 'Připojit se',
       joinSectionHint: 'Herní tablet u terče nebo sledování běžícího turnaje přes PIN.',
       browseTournaments: 'Procházet turnaje',
@@ -1889,6 +1903,20 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
       hostTournaments: 'Host a tournament',
       hostTournamentsHint:
         'My tournaments with registration, quick start without sign-ups, and finished-tournament history.',
+      modeSectionTitle: 'Tournament mode',
+      offlineModeTitle: 'Offline / local tournament',
+      offlineModeHint: 'Runs on this device without cloud services. Useful during internet outages.',
+      offlineModeConditions:
+        'Conditions: no cloud tablets and no cloud TV feed. Data stays local on this device.',
+      offlineModeAction: 'Start offline tournament',
+      cloudModeTitle: 'Cloud tournament',
+      cloudModeHint:
+        'Online registration, cloud synchronization, game tablets at boards, and venue TV display.',
+      cloudModeConditions:
+        'Conditions: internet + organizer signed in with Google. Spectators/tablets connect via PIN.',
+      cloudModeLoginWarning:
+        'You are not signed in. Cloud tournament requires an organizer Google account.',
+      cloudModeAction: 'Open cloud tournaments',
       joinSection: 'Join',
       joinSectionHint: 'Game tablet at a board, or spectate a running tournament with a PIN.',
       browseTournaments: 'Browse tournaments',
@@ -2872,6 +2900,21 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
       hostTournaments: 'Organizuj turniej',
       hostTournamentsHint:
         'Moje turnieje z rejestracją, szybki start bez zapisów oraz historia zakończonych turniejów.',
+      modeSectionTitle: 'Tryb turnieju',
+      offlineModeTitle: 'Turniej offline / lokalny',
+      offlineModeHint:
+        'Działa na tym urządzeniu bez chmury. Przydatne przy braku internetu.',
+      offlineModeConditions:
+        'Warunki: bez tabletów cloud i bez cloud TV feedu. Dane pozostają lokalnie na urządzeniu.',
+      offlineModeAction: 'Uruchom turniej offline',
+      cloudModeTitle: 'Turniej cloud',
+      cloudModeHint:
+        'Rejestracja online, synchronizacja w chmurze, tablety przy tarczach i ekran TV.',
+      cloudModeConditions:
+        'Warunki: internet + logowanie Google organizatora. Widzowie/tablety łączą się przez PIN.',
+      cloudModeLoginWarning:
+        'Nie jesteś zalogowany/a. Turniej cloud wymaga konta Google organizatora.',
+      cloudModeAction: 'Otwórz turnieje cloud',
       joinSection: 'Dołącz',
       joinSectionHint: 'Tablet przy tarczy lub oglądanie trwającego turnieju przez PIN.',
       browseTournaments: 'Przeglądaj turnieje',

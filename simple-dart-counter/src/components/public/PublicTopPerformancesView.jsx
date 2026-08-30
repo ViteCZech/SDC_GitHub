@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Crown, Flame, Gauge, Target } from 'lucide-react';
 import { translations } from '../../translations';
-import { listenPublicResultsFeed } from '../../services/publicResultsService';
+import { useSyncAdapter } from '../../context/SyncAdapterContext';
 import { calculateTournamentStats } from '../../utils/tournamentLogic';
 
 function PerformanceCard({ title, subtitle, value, by, tournamentName, onOpenTournament, tournamentId, accent }) {
@@ -31,17 +31,18 @@ export default function PublicTopPerformancesView({
   onBack,
   onOpenTournament,
 }) {
+  const syncAdapter = useSyncAdapter();
   const dict = translations?.[lang]?.publicResults ?? translations?.cs?.publicResults ?? {};
   const [feed, setFeed] = useState({ all: [], live: [], finished: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = listenPublicResultsFeed((next) => {
+    const unsub = syncAdapter.listenPublicFeed((next) => {
       setFeed(next);
       setLoading(false);
     });
     return () => unsub?.();
-  }, []);
+  }, [syncAdapter]);
 
   const best = useMemo(() => {
     const candidates = feed.finished.length ? feed.finished : feed.all;

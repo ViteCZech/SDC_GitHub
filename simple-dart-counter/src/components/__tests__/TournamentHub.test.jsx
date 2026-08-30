@@ -5,17 +5,28 @@ import userEvent from '@testing-library/user-event';
 import TournamentHub from '../TournamentHub';
 
 describe('TournamentHub', () => {
-  it('nabídne pořádat, připojit se a katalog', async () => {
+  it('jasně oddělí cloud a offline režim turnaje', async () => {
     const user = userEvent.setup();
     const onOpenPreReg = vi.fn();
     const onOpenCatalog = vi.fn();
+    const onQuickStart = vi.fn();
     render(
-      <TournamentHub lang="cs" onOpenPreReg={onOpenPreReg} onOpenCatalog={onOpenCatalog} />
+      <TournamentHub
+        lang="cs"
+        isLoggedIn={false}
+        onOpenPreReg={onOpenPreReg}
+        onOpenCatalog={onOpenCatalog}
+        onQuickStart={onQuickStart}
+      />
     );
-    expect(screen.getByText('Pořádat turnaj')).toBeTruthy();
+    expect(screen.getByText('Offline / lokální turnaj')).toBeTruthy();
+    expect(screen.getByText('Cloud turnaj')).toBeTruthy();
+    expect(screen.getByText(/Cloud turnaj vyžaduje Google účet pořadatele/)).toBeTruthy();
     await user.click(screen.getByRole('button', { name: /Procházet turnaje/ }));
     expect(onOpenCatalog).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: /Pořádat turnaj/ }));
+    await user.click(screen.getByRole('button', { name: /Spustit offline turnaj/ }));
+    expect(onQuickStart).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: /Otevřít cloud turnaje/ }));
     expect(onOpenPreReg).toHaveBeenCalledTimes(1);
   });
 

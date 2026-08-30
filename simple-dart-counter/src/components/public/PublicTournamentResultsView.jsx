@@ -4,7 +4,7 @@ import TournamentGroupsView from '../TournamentGroupsView';
 import TournamentBracketView from '../TournamentBracketView';
 import TournamentStatisticsView from '../TournamentStatisticsView';
 import { translations } from '../../translations';
-import { getPublicResultById } from '../../services/publicResultsService';
+import { useSyncAdapter } from '../../context/SyncAdapterContext';
 
 function toDateLabel(value, lang) {
   if (!value) return '—';
@@ -171,6 +171,7 @@ export default function PublicTournamentResultsView({
   lang = 'cs',
   onBack,
 }) {
+  const syncAdapter = useSyncAdapter();
   const dict = translations?.[lang]?.publicResults ?? translations?.cs?.publicResults ?? {};
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -183,7 +184,7 @@ export default function PublicTournamentResultsView({
     setError('');
     setRecord(null);
 
-    void getPublicResultById(resultId)
+    void syncAdapter.getPublicResultById(resultId)
       .then((row) => {
         if (cancelled) return;
         if (!row) {
@@ -203,7 +204,7 @@ export default function PublicTournamentResultsView({
     return () => {
       cancelled = true;
     };
-  }, [resultId, dict.notFound, dict.loadError]);
+  }, [resultId, dict.notFound, dict.loadError, syncAdapter]);
 
   const tabs = useMemo(
     () => [

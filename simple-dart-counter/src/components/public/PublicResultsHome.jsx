@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, CalendarDays, ChevronRight, Crown, Users } from 'lucide-react';
 import { translations } from '../../translations';
-import { listenPublicResultsFeed } from '../../services/publicResultsService';
+import { useSyncAdapter } from '../../context/SyncAdapterContext';
 
 function toLocaleDate(value, lang) {
   if (!value) return '—';
@@ -66,6 +66,7 @@ export default function PublicResultsHome({
   onOpenTournament,
   onOpenTopPerformances,
 }) {
+  const syncAdapter = useSyncAdapter();
   const dict = translations?.[lang]?.publicResults ?? translations?.cs?.publicResults ?? {};
   const [feed, setFeed] = useState({ all: [], live: [], finished: [] });
   const [loading, setLoading] = useState(true);
@@ -73,7 +74,7 @@ export default function PublicResultsHome({
 
   useEffect(() => {
     setLoading(true);
-    const unsub = listenPublicResultsFeed(
+    const unsub = syncAdapter.listenPublicFeed(
       (next) => {
         setError(null);
         setFeed(next);
@@ -85,7 +86,7 @@ export default function PublicResultsHome({
       }
     );
     return () => unsub?.();
-  }, [dict.loadError]);
+  }, [dict.loadError, syncAdapter]);
 
   const summary = useMemo(() => {
     const starts = feed.all.reduce((sum, x) => sum + (Number(x.playersCount) || 0), 0);

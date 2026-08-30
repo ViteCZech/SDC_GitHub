@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CalendarPlus, Eye, Tablet, Trophy, Users } from 'lucide-react';
+import { AlertTriangle, Cloud, Eye, HardDrive, Tablet, Trophy, Users } from 'lucide-react';
 import { translations } from '../translations';
 
 /**
@@ -14,9 +14,9 @@ export default function TournamentHub({
   onViewerJoin,
   onOpenPreReg,
   onOpenCatalog,
-  // Rychlý start + historie se volají z Moje turnaje (MyPreRegTournamentsList).
-  onChooseAdmin: _onChooseAdmin,
-  onOpenHistory: _onOpenHistory,
+  onQuickStart,
+  onGoogleLogin,
+  isLoggedIn = false,
 }) {
   const th = (k) => translations[lang]?.tournamentHub?.[k] ?? k;
   const [panel, setPanel] = useState(null); // null | 'join' | 'tablet' | 'viewer'
@@ -231,60 +231,130 @@ export default function TournamentHub({
         {th('hubIntro')}
       </p>
 
-      <div className="grid w-full grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-        <button
-          type="button"
-          onClick={() => onOpenPreReg?.()}
-          className={`${tileBtn} border-emerald-500/40 bg-emerald-950/30 hover:bg-emerald-950/50`}
-        >
-          <div className="flex items-start gap-4">
-            <div className={`${tileIconWrap} bg-emerald-500/20 text-emerald-400`}>
-              <CalendarPlus className={tileIcon} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-base sm:text-lg font-black text-white uppercase tracking-wide">
-                {th('hostTournaments')}
+      <div className="space-y-4">
+        <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
+          <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">
+            {th('modeSectionTitle') || 'Režim turnaje'}
+          </h3>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            <article className="rounded-xl border border-slate-700 bg-slate-950/70 p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className={`${tileIconWrap} bg-emerald-500/20 text-emerald-400`}>
+                  <HardDrive className={tileIcon} />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-black text-white uppercase tracking-wide">
+                    {th('offlineModeTitle') || 'Offline / lokální turnaj'}
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1 leading-snug">
+                    {th('offlineModeHint') ||
+                      'Běh na tomto zařízení bez cloudu. Vhodné při výpadku internetu.'}
+                  </div>
+                </div>
               </div>
-              <div className="text-sm text-slate-400 mt-1 leading-snug">{th('hostTournamentsHint')}</div>
-            </div>
-          </div>
-        </button>
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-950/25 px-3 py-2 text-[11px] text-emerald-200 leading-snug">
+                {th('offlineModeConditions') ||
+                  'Podmínky: bez cloudových tabletů a bez cloud TV feedu. Data zůstávají lokálně na zařízení.'}
+              </div>
+              <button
+                type="button"
+                onClick={() => onQuickStart?.()}
+                className="w-full py-3 rounded-xl font-black bg-emerald-600 text-white hover:bg-emerald-500 border border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={typeof onQuickStart !== 'function'}
+              >
+                {th('offlineModeAction') || 'Spustit offline turnaj'}
+              </button>
+            </article>
 
-        <button
-          type="button"
-          onClick={() => setPanel('join')}
-          className={`${tileBtn} border-slate-700 bg-slate-800/80 hover:bg-slate-800`}
-        >
-          <div className="flex items-start gap-4">
-            <div className={`${tileIconWrap} bg-cyan-500/20 text-cyan-400`}>
-              <Users className={tileIcon} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-base sm:text-lg font-black text-white uppercase tracking-wide">
-                {th('joinSection')}
+            <article className="rounded-xl border border-sky-500/35 bg-sky-950/20 p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className={`${tileIconWrap} bg-sky-500/20 text-sky-300`}>
+                  <Cloud className={tileIcon} />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-black text-white uppercase tracking-wide">
+                    {th('cloudModeTitle') || 'Cloud turnaj'}
+                  </div>
+                  <div className="text-xs text-slate-300 mt-1 leading-snug">
+                    {th('cloudModeHint') ||
+                      'Online registrace, cloud synchronizace, tablety u terčů a TV obrazovka.'}
+                  </div>
+                </div>
               </div>
-              <div className="text-sm text-slate-400 mt-1 leading-snug">{th('joinSectionHint')}</div>
-            </div>
+              <div className="rounded-lg border border-sky-400/35 bg-slate-900/70 px-3 py-2 text-[11px] text-sky-100 leading-snug">
+                {th('cloudModeConditions') ||
+                  'Podmínky: internet + Google přihlášení pořadatele. Diváci/tablety se připojují přes PIN.'}
+              </div>
+              {!isLoggedIn ? (
+                <div className="rounded-lg border border-amber-500/40 bg-amber-950/30 px-3 py-2 text-[11px] text-amber-100 leading-snug flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    {th('cloudModeLoginWarning') ||
+                      'Nejste přihlášeni. Cloud turnaj vyžaduje Google účet pořadatele.'}
+                  </span>
+                </div>
+              ) : null}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => onOpenPreReg?.()}
+                  className="w-full py-3 rounded-xl font-black bg-sky-600 text-white hover:bg-sky-500 border border-sky-500"
+                >
+                  {th('cloudModeAction') || 'Otevřít cloud turnaje'}
+                </button>
+                {!isLoggedIn && typeof onGoogleLogin === 'function' ? (
+                  <button
+                    type="button"
+                    onClick={() => onGoogleLogin()}
+                    className="w-full py-3 rounded-xl font-bold bg-white text-slate-900 hover:bg-slate-100 border border-slate-200"
+                  >
+                    {translations[lang]?.loginWithGoogle || 'Přihlásit přes Google'}
+                  </button>
+                ) : (
+                  <div className="hidden sm:block" />
+                )}
+              </div>
+            </article>
           </div>
-        </button>
+        </section>
 
-        <button
-          type="button"
-          onClick={() => onOpenCatalog?.()}
-          className={`${tileBtn} border-slate-700 bg-slate-800/80 hover:bg-slate-800`}
-        >
-          <div className="flex items-start gap-4">
-            <div className={`${tileIconWrap} bg-sky-500/20 text-sky-400`}>
-              <Trophy className={tileIcon} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-base sm:text-lg font-black text-white uppercase tracking-wide">
-                {th('browseTournaments')}
+        <div className="grid w-full grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+          <button
+            type="button"
+            onClick={() => setPanel('join')}
+            className={`${tileBtn} border-slate-700 bg-slate-800/80 hover:bg-slate-800`}
+          >
+            <div className="flex items-start gap-4">
+              <div className={`${tileIconWrap} bg-cyan-500/20 text-cyan-400`}>
+                <Users className={tileIcon} />
               </div>
-              <div className="text-sm text-slate-400 mt-1 leading-snug">{th('browseTournamentsHint')}</div>
+              <div className="min-w-0 flex-1">
+                <div className="text-base sm:text-lg font-black text-white uppercase tracking-wide">
+                  {th('joinSection')}
+                </div>
+                <div className="text-sm text-slate-400 mt-1 leading-snug">{th('joinSectionHint')}</div>
+              </div>
             </div>
-          </div>
-        </button>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onOpenCatalog?.()}
+            className={`${tileBtn} border-slate-700 bg-slate-800/80 hover:bg-slate-800`}
+          >
+            <div className="flex items-start gap-4">
+              <div className={`${tileIconWrap} bg-sky-500/20 text-sky-400`}>
+                <Trophy className={tileIcon} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-base sm:text-lg font-black text-white uppercase tracking-wide">
+                  {th('browseTournaments')}
+                </div>
+                <div className="text-sm text-slate-400 mt-1 leading-snug">{th('browseTournamentsHint')}</div>
+              </div>
+            </div>
+          </button>
+        </div>
       </div>
     </main>
   );

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { translations } from '../translations';
-import { listenToCloudTournament } from '../services/tournamentSync';
+import { useSyncAdapter } from '../context/SyncAdapterContext';
 import {
   VENUE_BOARDS_PER_PAGE,
   VENUE_BOARDS_PER_PAGE_WITH_BRACKET,
@@ -491,6 +491,7 @@ function CallOverlay({ call, lang }) {
  * Kiosk TV obrazovka — jen čte active_tournaments/{pin}.
  */
 export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false }) {
+  const syncAdapter = useSyncAdapter();
   const [doc, setDoc] = useState(undefined);
   const [screenIdx, setScreenIdx] = useState(0);
   const [callQueue, setCallQueue] = useState([]);
@@ -507,7 +508,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
       return undefined;
     }
     setDoc(undefined);
-    const unsub = listenToCloudTournament(pin, (data) => {
+    const unsub = syncAdapter.listenTournament(pin, (data) => {
       setDoc(data ?? null);
     });
     const timeoutId = window.setTimeout(() => {
@@ -517,7 +518,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
       window.clearTimeout(timeoutId);
       unsub?.();
     };
-  }, [pin, invalidPin]);
+  }, [pin, invalidPin, syncAdapter]);
 
   useEffect(() => {
     const html = document.documentElement;
