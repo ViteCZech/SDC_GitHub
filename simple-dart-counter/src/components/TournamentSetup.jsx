@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle, Cloud, Edit2, ExternalLink, Loader2, Target, Trash2, UserPlus } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle, Cloud, Edit2, ExternalLink, HardDrive, Loader2, Target, Trash2, UserPlus } from 'lucide-react';
 import { translations } from '../translations';
 import {
   applyAdvancementPhrase,
@@ -80,7 +80,9 @@ export default function TournamentSetup({
   onBackToPreRegAdmin,
 }) {
   const t = (k) => translations[lang]?.[k] || k;
+  const th = (k) => translations[lang]?.tournamentHub?.[k] ?? k;
   const vkOpt = useAdminVirtualKeyboardOptional();
+  void onBack;
 
   const step = controlledStep ?? 1;
   const setStep = (s) => { if (typeof onStepChange === 'function') onStepChange(s); };
@@ -1044,49 +1046,81 @@ export default function TournamentSetup({
               </div>
               <div className="space-y-4 min-w-0">
               <div className="rounded-xl border border-slate-700/80 bg-slate-950/60 p-4 space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-2">
-                      <Cloud className="w-4 h-4 text-emerald-500 shrink-0" />
-                      {t('tournamentHub.cloudModeToggle') || 'Síťová hra / Použít tablety'}
-                    </p>
-                    <p className="text-[11px] text-slate-500 leading-snug">
-                      {t('tournTabletPasswordHint') ||
-                        'Herní tablety zadají PIN i heslo; diváci pouze PIN.'}
-                    </p>
-                  </div>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                  {th('modeSectionTitle') || 'Režim turnaje'}
+                </p>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
                   <button
                     type="button"
-                    role="switch"
-                    aria-checked={!!tournamentDraft.cloudEnabled}
+                    role="radio"
+                    aria-checked={!tournamentDraft.cloudEnabled}
+                    onClick={() =>
+                      setTournamentDraft((prev) => ({
+                        ...prev,
+                        cloudEnabled: false,
+                        tabletPassword: '',
+                      }))
+                    }
+                    className={`text-left rounded-xl border p-3 transition-colors ${
+                      !tournamentDraft.cloudEnabled
+                        ? 'border-emerald-500/60 bg-emerald-950/30'
+                        : 'border-slate-700 bg-slate-900/70 hover:bg-slate-900'
+                    }`}
+                  >
+                    <p className="text-[11px] font-black uppercase tracking-widest text-emerald-300 flex items-center gap-2">
+                      <HardDrive className="w-4 h-4 shrink-0" />
+                      {th('offlineModeTitle') || 'Offline / lokální turnaj'}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-2 leading-snug">
+                      {th('offlineModeHint') ||
+                        'Běh na tomto zařízení bez cloudu. Vhodné při výpadku internetu.'}
+                    </p>
+                    <p className="text-[11px] text-emerald-200/90 mt-2 leading-snug">
+                      {th('offlineModeConditions') ||
+                        'Podmínky: bez cloudových tabletů a bez cloud TV feedu. Data zůstávají lokálně na zařízení.'}
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={!!tournamentDraft.cloudEnabled && !!isLoggedIn}
                     disabled={!isLoggedIn}
                     onClick={() => {
                       if (!isLoggedIn) return;
-                      setTournamentDraft((prev) => {
-                        const next = !prev.cloudEnabled;
-                        return {
-                          ...prev,
-                          cloudEnabled: next,
-                          tabletPassword: next ? prev.tabletPassword : '',
-                        };
-                      });
+                      setTournamentDraft((prev) => ({ ...prev, cloudEnabled: true }));
                     }}
-                    className={`relative h-8 w-14 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/50 ${
-                      tournamentDraft.cloudEnabled && isLoggedIn ? 'bg-emerald-600' : 'bg-slate-700'
-                    } ${!isLoggedIn ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    className={`text-left rounded-xl border p-3 transition-colors ${
+                      tournamentDraft.cloudEnabled && isLoggedIn
+                        ? 'border-sky-500/60 bg-sky-950/30'
+                        : 'border-slate-700 bg-slate-900/70 hover:bg-slate-900'
+                    } ${!isLoggedIn ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
-                    <span
-                      className={`absolute top-1 left-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${
-                        tournamentDraft.cloudEnabled && isLoggedIn ? 'translate-x-6' : 'translate-x-0'
-                      }`}
-                    />
+                    <p className="text-[11px] font-black uppercase tracking-widest text-sky-300 flex items-center gap-2">
+                      <Cloud className="w-4 h-4 shrink-0" />
+                      {th('cloudModeTitle') || 'Cloud turnaj'}
+                    </p>
+                    <p className="text-[11px] text-slate-300 mt-2 leading-snug">
+                      {th('cloudModeHint') ||
+                        'Online registrace, cloud synchronizace, tablety u terčů a TV obrazovka.'}
+                    </p>
+                    <p className="text-[11px] text-sky-100/90 mt-2 leading-snug">
+                      {th('cloudModeConditions') ||
+                        'Podmínky: internet + Google přihlášení pořadatele. Diváci/tablety se připojují přes PIN.'}
+                    </p>
                   </button>
                 </div>
+
                 {!isLoggedIn && (
                   <div className="rounded-lg border border-amber-500/40 bg-amber-950/25 px-3 py-3 space-y-3">
-                    <p className="text-sm font-medium text-amber-100/95 leading-snug">
-                      {t('tournamentHub.loginRequiredForCloud') ||
-                        'Pro tablety, cloudové diváky a TV obrazovku haly se musíte přihlásit přes Google.'}
+                    <p className="text-sm font-medium text-amber-100/95 leading-snug flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>
+                        {th('cloudModeLoginWarning') ||
+                          t('tournamentHub.loginRequiredForCloud') ||
+                          'Pro tablety, cloudové diváky a TV obrazovku haly se musíte přihlásit přes Google.'}
+                      </span>
                     </p>
                     {typeof onGoogleLogin === 'function' && (
                       <button
