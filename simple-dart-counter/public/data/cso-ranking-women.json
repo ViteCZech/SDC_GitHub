@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-08-31T04:03:00.000Z",
-    "effectiveDate": "2026-08-31",
-    "generatedAt": "2026-08-31 04:03",
-    "fetchedAt": "2026-08-31T11:31:23.740Z",
+    "updatedAt": "2026-09-01T04:03:00.000Z",
+    "effectiveDate": "2026-09-01",
+    "generatedAt": "2026-09-01 04:03",
+    "fetchedAt": "2026-09-01T09:54:34.578Z",
     "totalPlayers": 138
   },
   "players": [
@@ -191,7 +191,7 @@
       "regNumber": "6049"
     },
     {
-      "rank": 33,
+      "rank": 32,
       "name": "Markéta Fryštacká",
       "club": "Black Panthers",
       "regNumber": "3815"
@@ -494,41 +494,41 @@
     },
     {
       "rank": 89,
-      "name": "Helena Božiková",
-      "regNumber": "6250"
-    },
-    {
-      "rank": 90,
       "name": "Miroslava Komanová",
       "club": "DC Vikings Blatná",
       "regNumber": "1068"
     },
     {
-      "rank": 91,
+      "rank": 90,
       "name": "Marie Kropíková",
       "club": "Schovi Darts",
       "regNumber": "6466"
     },
     {
-      "rank": 91,
+      "rank": 90,
       "name": "Lenka Šimůnková",
       "club": "DC Vikings Blatná",
       "regNumber": "2173"
     },
     {
-      "rank": 91,
+      "rank": 90,
       "name": "Vanessa Pitelová",
       "regNumber": "7443"
     },
     {
-      "rank": 91,
+      "rank": 90,
       "name": "Ladislava Pitelová",
       "regNumber": "7441"
     },
     {
-      "rank": 91,
+      "rank": 90,
       "name": "Adéla Sklenovská",
       "regNumber": "6852"
+    },
+    {
+      "rank": 95,
+      "name": "Helena Božiková",
+      "regNumber": "6250"
     },
     {
       "rank": 96,
@@ -563,28 +563,34 @@
     },
     {
       "rank": 102,
-      "name": "Dita Schmied",
-      "regNumber": "6500"
-    },
-    {
-      "rank": 103,
       "name": "Lenka Chudobová",
       "regNumber": "6421"
     },
     {
-      "rank": 103,
+      "rank": 102,
       "name": "Karla Wetterová",
       "regNumber": "6425"
     },
     {
-      "rank": 105,
+      "rank": 104,
       "name": "Lucie Václavíková",
       "regNumber": "7282"
     },
     {
-      "rank": 105,
+      "rank": 104,
       "name": "Gabriela Divišová",
       "regNumber": "7204"
+    },
+    {
+      "rank": 104,
+      "name": "Dita Schmied",
+      "regNumber": "6500"
+    },
+    {
+      "rank": 107,
+      "name": "Renata Brandejsová",
+      "club": "Tělocvičná jednota Sokol Lukavice",
+      "regNumber": "3761"
     },
     {
       "rank": 107,
@@ -595,12 +601,6 @@
       "rank": 107,
       "name": "Nela Rychlíková",
       "regNumber": "5184"
-    },
-    {
-      "rank": 109,
-      "name": "Renata Brandejsová",
-      "club": "Tělocvičná jednota Sokol Lukavice",
-      "regNumber": "3761"
     },
     {
       "rank": 110,
