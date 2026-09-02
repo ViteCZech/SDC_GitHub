@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-09-01T04:03:00.000Z",
-    "effectiveDate": "2026-09-01",
-    "generatedAt": "2026-09-01 04:03",
-    "fetchedAt": "2026-09-01T09:54:34.578Z",
+    "updatedAt": "2026-09-02T04:03:00.000Z",
+    "effectiveDate": "2026-09-02",
+    "generatedAt": "2026-09-02 04:03",
+    "fetchedAt": "2026-09-02T09:26:16.357Z",
     "totalPlayers": 138
   },
   "players": [
@@ -242,7 +242,7 @@
       "regNumber": "3606"
     },
     {
-      "rank": 41,
+      "rank": 42,
       "name": "Hana Schmidtová",
       "regNumber": "6556"
     },
