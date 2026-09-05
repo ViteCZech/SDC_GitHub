@@ -13,7 +13,35 @@ export default defineConfig({
       manifest: false,
       workbox: {
         // TOTO JE KLÍČOVÉ: Říká PWA, aby ignorovalo Firebase Auth a .well-known složku
-        navigateFallbackDenylist: [/^\/__/, /^\/\.well-known\//]
+        navigateFallbackDenylist: [/^\/__/, /^\/\.well-known\//],
+        globIgnores: [
+          '**/TournamentSetup-*.js',
+          '**/TournamentHub-*.js',
+          '**/TournamentBoardAssignment-*.js',
+          '**/TournamentGroupsView-*.js',
+          '**/TournamentBracketView-*.js',
+          '**/TournamentStatisticsView-*.js',
+          '**/TournamentHistory-*.js',
+          '**/TournamentPreRegSetup-*.js',
+          '**/GameCricket-*.js',
+          '**/OnlineHub-*.js',
+          '**/OnlineVideoContainer-*.js',
+          '**/PostMatchView-*.js',
+          '**/PublicResultsHome-*.js',
+          '**/PublicTournamentResultsView-*.js',
+          '**/PublicTopPerformancesView-*.js',
+          '**/PublicTournamentPage-*.js',
+          '**/PublicTournamentDirectory-*.js',
+          '**/RegistrationAdminPanel-*.js',
+          '**/MyPreRegTournamentsList-*.js',
+          '**/TabletWaitingRoom-*.js',
+          '**/TabletBoardQrPanel-*.js',
+          '**/VenueDisplayView-*.js',
+          '**/MatchStatsView-*.js',
+          '**/UserProfile-*.js',
+          '**/en-*.js',
+          '**/pl-*.js',
+        ],
       }
     })
   ],

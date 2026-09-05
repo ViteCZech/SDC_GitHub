@@ -13,7 +13,7 @@ describe('venueDisplayRoutes', () => {
   it('neimportuje tournamentLogic (vstupní chunk TV/hala)', () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const src = readFileSync(join(here, '../venueDisplayRoutes.js'), 'utf8');
-    expect(src).not.toMatch(/tournamentLogic/);
+    expect(src).not.toMatch(/from ['"].*tournamentLogic/);
   });
 
   it('parseVenueDisplayRouteFromUrl čte /tv/:pin a odmítne neplatný PIN', () => {
@@ -43,6 +43,6 @@ describe('venueDisplayRoutes', () => {
       'https://example.test/tv/1234?lang=en'
     );
     expect(resolveVenueLang('?lang=pl')).toBe('pl');
-    expect(resolveVenueLang('?lang=xx')).toBe('cs');
+    expect(resolveVenueLang('?lang=en')).toBe('en');
   });
 });

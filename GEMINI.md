@@ -293,7 +293,7 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 6. **AppMain.jsx je velký.** Novou logiku extrahuj do `utils/` / `services/` / komponenty. Do AppMain jen wiring. Home/setup/X01 nech eager; ostatní obrazovky lazy.
 7. **Tablet = kiosk.** Žádný Google login na tabletu. Přístup PIN + board + heslo/token.
 8. **Cloud turnaje** vyžaduje Google účet. Offline turnaj musí dál fungovat bez cloudu.
-9. **PWA:** po změně chování ověř, že service worker neservíruje starý bundle; `registerSW({ immediate: true })`.
+9. **PWA:** po změně chování ověř, že service worker neservíruje starý bundle; `registerSW({ immediate: true })`. Lazy obrazovky (turnaj, cricket, online, prereg) se do precache nedávají — stáhnou se až po otevření.
 10. Neměň Firebase project ID, název DB `eur3`, ani region functions bez výslovného zadání.
 
 ---
