@@ -28,7 +28,41 @@ function createDraft(overrides = {}) {
 }
 
 describe('TournamentSetup - volba cloud/offline režimu', () => {
-  it('u odhlášeného uživatele nabídne login hint až po kliknutí na cloud režim', async () => {
+  it('ukáže jen zvolený režim, ne dvě rovnocenné karty', () => {
+    render(
+      <TournamentSetup
+        lang="cs"
+        step={1}
+        tournamentDraft={createDraft()}
+        setTournamentDraft={() => {}}
+        user={null}
+      />
+    );
+
+    expect(screen.getByRole('status', { name: /Zvolený režim/i })).toHaveTextContent('Offline / lokální turnaj');
+    expect(screen.queryByRole('radio')).toBeNull();
+    expect(screen.getByRole('button', { name: /Změnit na cloud turnaj/i })).toBeTruthy();
+    expect(screen.queryByText(/Online registrace, cloud synchronizace/)).toBeNull();
+  });
+
+  it('po vstupu do cloudu neukáže offline jako rovnocennou volbu', () => {
+    render(
+      <TournamentSetup
+        lang="cs"
+        step={1}
+        tournamentDraft={createDraft({ cloudEnabled: true })}
+        setTournamentDraft={() => {}}
+        user={{ uid: 'u1', isAnonymous: false }}
+      />
+    );
+
+    expect(screen.getByRole('status', { name: /Zvolený režim/i })).toHaveTextContent('Cloud turnaj');
+    expect(screen.queryByRole('radio')).toBeNull();
+    expect(screen.getByRole('button', { name: /Změnit na offline/i })).toBeTruthy();
+    expect(screen.queryByText(/Běh na lokální Wi-Fi bez internetu/)).toBeNull();
+  });
+
+  it('u odhlášeného uživatele nabídne login hint až po kliknutí na změnu do cloudu', async () => {
     const user = userEvent.setup();
     const setTournamentDraft = vi.fn();
     render(
@@ -42,12 +76,28 @@ describe('TournamentSetup - volba cloud/offline režimu', () => {
     );
 
     expect(screen.getByText('Offline / lokální turnaj')).toBeTruthy();
-    const cloudBtn = screen.getByRole('radio', { name: /Cloud turnaj/i });
     expect(screen.queryByText(/Cloud turnaj vyžaduje Google účet pořadatele/i)).toBeNull();
     setTournamentDraft.mockClear();
-    await user.click(cloudBtn);
+    await user.click(screen.getByRole('button', { name: /Změnit na cloud turnaj/i }));
     expect(setTournamentDraft).not.toHaveBeenCalled();
     expect(screen.getByText(/Cloud turnaj vyžaduje Google účet pořadatele/i)).toBeTruthy();
+  });
+
+  it('v cloudovém režimu bez přihlášení neshodí režim na offline', () => {
+    const setTournamentDraft = vi.fn();
+    render(
+      <TournamentSetup
+        lang="cs"
+        step={1}
+        tournamentDraft={createDraft({ cloudEnabled: true })}
+        setTournamentDraft={setTournamentDraft}
+        user={null}
+      />
+    );
+
+    expect(screen.getByRole('status', { name: /Zvolený režim/i })).toHaveTextContent('Cloud turnaj');
+    expect(screen.getByText(/Cloud turnaj vyžaduje Google účet pořadatele/i)).toBeTruthy();
+    expect(setTournamentDraft).not.toHaveBeenCalled();
   });
 
   it('při přepnutí na offline režim vypne cloud a smaže heslo tabletů', async () => {
@@ -65,7 +115,7 @@ describe('TournamentSetup - volba cloud/offline režimu', () => {
       />
     );
 
-    await user.click(screen.getByRole('radio', { name: /Offline \/ lokální turnaj/i }));
+    await user.click(screen.getByRole('button', { name: /Změnit na offline/i }));
     expect(setTournamentDraft).toHaveBeenCalledTimes(1);
     const updater = setTournamentDraft.mock.calls[0][0];
     expect(updater(current)).toMatchObject({ cloudEnabled: false, tabletPassword: '' });
@@ -86,9 +136,26 @@ describe('TournamentSetup - volba cloud/offline režimu', () => {
       />
     );
 
-    await user.click(screen.getByRole('radio', { name: /Cloud turnaj/i }));
+    await user.click(screen.getByRole('button', { name: /Změnit na cloud turnaj/i }));
     expect(setTournamentDraft).toHaveBeenCalledTimes(1);
     const updater = setTournamentDraft.mock.calls[0][0];
     expect(updater(current)).toMatchObject({ cloudEnabled: true });
+  });
+
+  it('z předregistrace zamkne cloud a nenechá přepnout na offline', () => {
+    render(
+      <TournamentSetup
+        lang="cs"
+        step={1}
+        tournamentDraft={createDraft({ cloudEnabled: true })}
+        setTournamentDraft={() => {}}
+        user={{ uid: 'u1', isAnonymous: false }}
+        preRegTournamentId="tourn-1"
+      />
+    );
+
+    expect(screen.getByRole('status', { name: /Zvolený režim/i })).toHaveTextContent('Cloud turnaj');
+    expect(screen.queryByRole('button', { name: /Změnit na offline/i })).toBeNull();
+    expect(screen.getByText(/Živý běh z předregistrace běží v cloudu/i)).toBeTruthy();
   });
 });

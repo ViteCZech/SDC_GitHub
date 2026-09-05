@@ -956,13 +956,23 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
         'Warunki: internet + logowanie Google organizatora. Widzowie/tablety łączą się przez PIN.',
       cloudModeLoginWarning:
         'Nie jesteś zalogowany/a. Turniej cloud wymaga konta Google organizatora.',
-      cloudModeAction: 'Otwórz turnieje cloud',
+      cloudModeAction: 'Turnieje z rejestracją',
+      cloudModeQuickStart: 'Szybki turniej cloud',
+      setupModeChosen: 'Wybrany tryb',
+      modeChosenHint:
+        'Tryb wybrano na rozdrożu. Tutaj go tylko potwierdzamy — w razie potrzeby zmiana jest linkiem poniżej.',
+      switchToOfflineMode: 'Zmień na turniej offline / lokalny',
+      switchToCloudMode: 'Zmień na turniej cloud',
+      modeLockedFromPrereg:
+        'Żywy przebieg z przedrejestracji działa w chmurze. Tryb offline nie jest tutaj dostępny.',
+      cloudQuickStartHint: 'Od razu kreator losowania w chmurze — bez publicznej przedrejestracji.',
       joinSection: 'Dołącz',
       joinSectionHint: 'Tablet przy tarczy lub oglądanie trwającego turnieju przez PIN.',
       browseTournaments: 'Przeglądaj turnieje',
       browseTournamentsHint:
         'Publiczny katalog, moje zgłoszenia i turnieje bez rejestracji — sortowanie według terminu lub miasta.',
-      hubIntro: 'Wybierz, czy organizujesz turniej, dołączasz do niego, czy tylko przeglądasz ofertę.',
+      hubIntro:
+        'Najpierw wybierz tryb organizacji: chmura albo offline. Dołączanie do cudzego turnieju i katalog są osobno.',
       tabletMode: 'Tablet do gry',
       tabletModeHint: 'PIN, numer tarczy i hasło od administratora.',
       viewerMode: 'Oglądaj turniej',

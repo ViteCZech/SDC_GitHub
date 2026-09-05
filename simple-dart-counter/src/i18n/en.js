@@ -983,13 +983,23 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
         'Conditions: internet + organizer signed in with Google. Spectators/tablets connect via PIN.',
       cloudModeLoginWarning:
         'You are not signed in. Cloud tournament requires an organizer Google account.',
-      cloudModeAction: 'Open cloud tournaments',
+      cloudModeAction: 'Tournaments with registration',
+      cloudModeQuickStart: 'Quick cloud tournament',
+      setupModeChosen: 'Selected mode',
+      modeChosenHint:
+        'You chose this mode on the hub. This screen only confirms it — switch below if you really need to.',
+      switchToOfflineMode: 'Switch to offline / local tournament',
+      switchToCloudMode: 'Switch to cloud tournament',
+      modeLockedFromPrereg:
+        'A live run imported from pre-registration stays in the cloud. Offline mode is not available here.',
+      cloudQuickStartHint: 'Go straight to the cloud draw wizard — no public pre-registration.',
       joinSection: 'Join',
       joinSectionHint: 'Game tablet at a board, or spectate a running tournament with a PIN.',
       browseTournaments: 'Browse tournaments',
       browseTournamentsHint:
         'Public catalog, my registrations, and tournaments you have not joined — sort by date or city.',
-      hubIntro: 'Choose whether you are hosting, joining, or browsing the public list.',
+      hubIntro:
+        'First choose how you will host: cloud or offline. Joining someone else’s tournament and the catalog are separate.',
       tabletMode: 'Game tablet',
       tabletModeHint: 'PIN, board number and password from the admin.',
       viewerMode: 'Spectate tournament',

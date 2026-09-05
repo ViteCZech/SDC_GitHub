@@ -315,21 +315,33 @@ export default function TournamentSetup({
     }
   }, [tournamentDraft.format, tournamentDraft.groupLegs, tournamentDraft.bracketLegs, setTournamentDraft]);
 
-  useEffect(() => {
-    if (!user || user.isAnonymous) {
-      setTournamentDraft((prev) => (prev.cloudEnabled ? { ...prev, cloudEnabled: false } : prev));
-    }
-  }, [user, setTournamentDraft]);
-
   const isLoggedIn = user && !user.isAnonymous;
+  const isCloudMode = fromPreReg || !!tournamentDraft.cloudEnabled;
+  const canSwitchMode = !fromPreReg;
   const cloudLoginWarning =
     th('cloudModeLoginWarning') ||
     t('tournamentHub.loginRequiredForCloud') ||
     'Pro tablety, cloudové diváky a TV obrazovku haly se musíte přihlásit přes Google.';
+  const showCloudLoginPrompt = !isLoggedIn && (showCloudLoginHint || isCloudMode);
+
+  useEffect(() => {
+    if (!fromPreReg) return;
+    setTournamentDraft((prev) => (prev.cloudEnabled ? prev : { ...prev, cloudEnabled: true }));
+  }, [fromPreReg, setTournamentDraft]);
 
   useEffect(() => {
     if (isLoggedIn) setShowCloudLoginHint(false);
   }, [isLoggedIn]);
+
+  const handleOfflineModeClick = () => {
+    setShowCloudLoginHint(false);
+    setTournamentDraft((prev) => ({
+      ...prev,
+      cloudEnabled: false,
+      tabletPassword: '',
+    }));
+    onTournamentModeChange?.('lan');
+  };
 
   const handleCloudModeClick = () => {
     if (!isLoggedIn) {
@@ -359,6 +371,11 @@ export default function TournamentSetup({
     const name = (tournamentDraft.name || '').trim();
     if (!name) {
       setValidationError(t('tournErrName') || 'Název turnaje nesmí být prázdný.');
+      return false;
+    }
+    if (tournamentDraft.cloudEnabled && !isLoggedIn) {
+      setShowCloudLoginHint(true);
+      setValidationError(cloudLoginWarning);
       return false;
     }
     if (tournamentDraft.cloudEnabled && isLoggedIn) {
@@ -1078,7 +1095,7 @@ export default function TournamentSetup({
                 <div className="rounded-xl border border-slate-700/80 bg-slate-950/60 p-4 space-y-3">
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-black uppercase tracking-widest text-slate-400">
-                      {th('modeSectionTitle') || 'Režim turnaje'}
+                      {th('setupModeChosen') || th('modeSectionTitle') || 'Zvolený režim'}
                     </p>
                     <ContextHelpButton
                       topicId="offline-mode"
@@ -1086,54 +1103,19 @@ export default function TournamentSetup({
                       onOpenContextHelp={onOpenContextHelp}
                     />
                   </div>
+                  <p className="text-[11px] text-slate-500 leading-snug">
+                    {fromPreReg
+                      ? (th('modeLockedFromPrereg') ||
+                        'Živý běh z předregistrace běží v cloudu. Offline režim tady není k dispozici.')
+                      : (th('modeChosenHint') ||
+                        'Režim jste zvolili na rozcestníku. Tady ho jen potvrzujeme.')}
+                  </p>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={!tournamentDraft.cloudEnabled}
-                      onClick={() =>
-                        {
-                          setShowCloudLoginHint(false);
-                          setTournamentDraft((prev) => ({
-                            ...prev,
-                            cloudEnabled: false,
-                            tabletPassword: '',
-                          }));
-                          onTournamentModeChange?.('lan');
-                        }
-                      }
-                      className={`text-left rounded-xl border p-3 transition-colors ${
-                        !tournamentDraft.cloudEnabled
-                          ? 'border-emerald-500/60 bg-emerald-950/30'
-                          : 'border-slate-700 bg-slate-900/70 hover:bg-slate-900'
-                      }`}
-                    >
-                      <p className="text-[11px] font-black uppercase tracking-widest text-emerald-300 flex items-center gap-2">
-                        <HardDrive className="w-4 h-4 shrink-0" />
-                        {th('offlineModeTitle') || 'Offline / lokální turnaj'}
-                      </p>
-                      <p className="text-[11px] text-slate-400 mt-2 leading-snug">
-                        {th('offlineModeHint') ||
-                          'Běh na tomto zařízení bez cloudu. Vhodné při výpadku internetu.'}
-                      </p>
-                      <p className="text-[11px] text-emerald-200/90 mt-2 leading-snug">
-                        {th('offlineModeConditions') ||
-                          'Podmínky: bez cloudových tabletů a bez cloud TV feedu. Data zůstávají lokálně na zařízení.'}
-                      </p>
-                    </button>
-
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={!!tournamentDraft.cloudEnabled && !!isLoggedIn}
-                      onClick={handleCloudModeClick}
-                      className={`text-left rounded-xl border p-3 transition-colors ${
-                        tournamentDraft.cloudEnabled && isLoggedIn
-                          ? 'border-sky-500/60 bg-sky-950/30'
-                          : 'border-slate-700 bg-slate-900/70 hover:bg-slate-900'
-                      } ${!isLoggedIn ? 'opacity-80' : ''}`}
-                      title={!isLoggedIn ? cloudLoginWarning : undefined}
+                  {isCloudMode ? (
+                    <div
+                      role="status"
+                      aria-label={th('setupModeChosen') || 'Zvolený režim'}
+                      className="text-left rounded-xl border border-sky-500/60 bg-sky-950/30 p-3"
                     >
                       <p className="text-[11px] font-black uppercase tracking-widest text-sky-300 flex items-center gap-2">
                         <Cloud className="w-4 h-4 shrink-0" />
@@ -1147,10 +1129,41 @@ export default function TournamentSetup({
                         {th('cloudModeConditions') ||
                           'Podmínky: internet + Google přihlášení pořadatele. Diváci/tablety se připojují přes PIN.'}
                       </p>
-                    </button>
-                  </div>
+                    </div>
+                  ) : (
+                    <div
+                      role="status"
+                      aria-label={th('setupModeChosen') || 'Zvolený režim'}
+                      className="text-left rounded-xl border border-emerald-500/60 bg-emerald-950/30 p-3"
+                    >
+                      <p className="text-[11px] font-black uppercase tracking-widest text-emerald-300 flex items-center gap-2">
+                        <HardDrive className="w-4 h-4 shrink-0" />
+                        {th('offlineModeTitle') || 'Offline / lokální turnaj'}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-2 leading-snug">
+                        {th('offlineModeHint') ||
+                          'Běh na tomto zařízení bez cloudu. Vhodné při výpadku internetu.'}
+                      </p>
+                      <p className="text-[11px] text-emerald-200/90 mt-2 leading-snug">
+                        {th('offlineModeConditions') ||
+                          'Podmínky: bez cloudových tabletů a bez cloud TV feedu. Data zůstávají lokálně na zařízení.'}
+                      </p>
+                    </div>
+                  )}
 
-                  {!isLoggedIn && showCloudLoginHint && (
+                  {canSwitchMode && (
+                    <button
+                      type="button"
+                      onClick={isCloudMode ? handleOfflineModeClick : handleCloudModeClick}
+                      className="w-full text-center text-[11px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-200 py-2"
+                    >
+                      {isCloudMode
+                        ? (th('switchToOfflineMode') || 'Změnit na offline / lokální turnaj')
+                        : (th('switchToCloudMode') || 'Změnit na cloud turnaj')}
+                    </button>
+                  )}
+
+                  {showCloudLoginPrompt && (
                     <div className="rounded-lg border border-amber-500/40 bg-amber-950/25 px-3 py-3 space-y-3">
                       <p className="text-sm font-medium text-amber-100/95 leading-snug flex items-start gap-2">
                         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -1170,7 +1183,7 @@ export default function TournamentSetup({
                       )}
                     </div>
                   )}
-                  {!tournamentDraft.cloudEnabled && (
+                  {!isCloudMode && (
                     <LanRelayStatusPanel
                       lang={lang}
                       pin={setupPinDisplay}
@@ -1193,16 +1206,16 @@ export default function TournamentSetup({
                       lang={lang}
                       pin={setupPinDisplay}
                       isLoggedIn={!!isLoggedIn}
-                      cloudEnabled={!!tournamentDraft.cloudEnabled}
-                      lanEnabled={!tournamentDraft.cloudEnabled}
+                      cloudEnabled={isCloudMode}
+                      lanEnabled={!isCloudMode}
                       origin={
-                        !tournamentDraft.cloudEnabled && lanHealth?.addresses?.[0]
+                        !isCloudMode && lanHealth?.addresses?.[0]
                           ? `http://${lanHealth.addresses[0]}:${lanHealth.port || lanCfg?.port || 8787}`
                           : undefined
                       }
                     />
                   </div>
-                  {tournamentDraft.cloudEnabled && isLoggedIn && (
+                  {isCloudMode && isLoggedIn && (
                     <div className="rounded-lg border border-slate-600/80 bg-slate-900/80 px-3 py-3 space-y-2">
                       <label
                         className="block text-[10px] font-bold uppercase tracking-widest text-slate-400"

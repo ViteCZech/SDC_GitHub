@@ -148,7 +148,7 @@ import {
 } from './utils/tabletBoardSchedule';
 import { doublesResultExtras, getTranslatedName, loserRefereePerson } from './utils/matchStats';
 
-const APP_VERSION = "v1.10.2";
+const APP_VERSION = "v1.10.3";
 const ACTIVE_PREREG_STATUSES = new Set(['CONFIRMED', 'WAITLIST', 'PENDING_PAYMENT']);
 
 // --- HLAVNÍ KOMPONENTA (ROUTER) ---
@@ -2207,8 +2207,11 @@ function AppMain({ lang, setLang }) {
     if (!tournamentDraft?.cloudEnabled) void enableLanAdapter();
   };
 
-  /** Rychlý start = vždy nový průvodce (ne pokračování v live). */
-  const handleTournamentQuickStart = () => {
+  /** Rychlý start = vždy nový průvodce (ne pokračování v live).
+   *  `cloud: true` = cloudový živý turnaj (z cloudové větve rozcestníku / předregistrace).
+   *  Bez flagu = offline / LAN (z offline karty na rozcestníku). */
+  const handleTournamentQuickStart = (options = {}) => {
+    const wantCloud = options?.cloud === true;
     const startFresh = () => {
       setParkedSession(null);
       setTournamentData(null);
@@ -2223,9 +2226,10 @@ function AppMain({ lang, setLang }) {
       setTournamentDraft({
         ...createDefaultTournamentDraft(),
         pin: pinToUse,
-        cloudEnabled: false,
+        cloudEnabled: wantCloud,
       });
-      void enableLanAdapter();
+      if (wantCloud) enableCloudAdapter();
+      else void enableLanAdapter();
       writeTournamentWip(pinToUse);
       setActivePin(pinToUse);
       setTournamentSetupStep(1);
@@ -2625,6 +2629,7 @@ function AppMain({ lang, setLang }) {
     competitionType,
   }) => {
     setUserRole('admin');
+    enableCloudAdapter();
     if (activePreRegTournamentId) {
       setPreRegImportSourceId(activePreRegTournamentId);
     }
@@ -2712,6 +2717,7 @@ function AppMain({ lang, setLang }) {
         setTournamentDraft((prev) => ({
           ...createDefaultTournamentDraft(),
           ...prev,
+          cloudEnabled: true,
           name: String(tournamentName || '').trim() || prev.name || tournamentData?.name || '',
           players: [
             ...existing,
@@ -2744,6 +2750,7 @@ function AppMain({ lang, setLang }) {
         ];
         return {
           ...prev,
+          cloudEnabled: true,
           name: String(tournamentName || '').trim() || prev.name || '',
           players: merged,
           useCsoRanking: true,
@@ -2766,6 +2773,7 @@ function AppMain({ lang, setLang }) {
         ...createDefaultTournamentDraft(),
         ...prev,
         pin: pinToUse,
+        cloudEnabled: true,
         name: String(tournamentName || '').trim(),
         players: importedPlayers.map((p, i) => ({
           ...p,
@@ -5200,7 +5208,8 @@ function AppMain({ lang, setLang }) {
         <TournamentHub
           lang={lang}
           onChooseAdmin={handleTournamentHubAdmin}
-          onQuickStart={handleTournamentQuickStart}
+          onQuickStart={() => handleTournamentQuickStart()}
+          onCloudQuickStart={() => handleTournamentQuickStart({ cloud: true })}
           onGoogleLogin={handleLogin}
           isLoggedIn={!!(user && !user.isAnonymous)}
           onTabletJoin={handleTournamentHubTabletJoin}
@@ -5620,7 +5629,7 @@ function AppMain({ lang, setLang }) {
           onManage={handlePreRegManage}
           onCreateNew={handlePreRegCreateNew}
           onGoogleLogin={handleLogin}
-          onQuickStart={handleTournamentQuickStart}
+          onQuickStart={() => handleTournamentQuickStart({ cloud: true })}
           onOpenHistory={handleTournamentHubHistory}
           onContinueLive={
             tournamentData || parkedSession?.kind === 'tournament'

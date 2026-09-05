@@ -16,6 +16,7 @@ export default function TournamentHub({
   onOpenPreReg,
   onOpenCatalog,
   onQuickStart,
+  onCloudQuickStart,
   onGoogleLogin,
   isLoggedIn = false,
   onOpenContextHelp,
@@ -306,23 +307,29 @@ export default function TournamentHub({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => onOpenPreReg?.()}
-                  className="w-full py-3 rounded-xl font-black bg-sky-600 text-white hover:bg-sky-500 border border-sky-500"
+                  onClick={() => onCloudQuickStart?.()}
+                  className="w-full py-3 rounded-xl font-black bg-sky-600 text-white hover:bg-sky-500 border border-sky-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                  disabled={typeof onCloudQuickStart !== 'function'}
                 >
-                  {th('cloudModeAction') || 'Otevřít cloud turnaje'}
+                  {th('cloudModeQuickStart') || 'Rychlý cloud turnaj'}
                 </button>
-                {!isLoggedIn && typeof onGoogleLogin === 'function' ? (
-                  <button
-                    type="button"
-                    onClick={() => onGoogleLogin()}
-                    className="w-full py-3 rounded-xl font-bold bg-white text-slate-900 hover:bg-slate-100 border border-slate-200"
-                  >
-                    {translations[lang]?.loginWithGoogle || 'Přihlásit přes Google'}
-                  </button>
-                ) : (
-                  <div className="hidden sm:block" />
-                )}
+                <button
+                  type="button"
+                  onClick={() => onOpenPreReg?.()}
+                  className="w-full py-3 rounded-xl font-black bg-sky-800/80 text-white hover:bg-sky-700 border border-sky-500/70"
+                >
+                  {th('cloudModeAction') || 'Turnaje s registrací'}
+                </button>
               </div>
+              {!isLoggedIn && typeof onGoogleLogin === 'function' ? (
+                <button
+                  type="button"
+                  onClick={() => onGoogleLogin()}
+                  className="w-full py-3 rounded-xl font-bold bg-white text-slate-900 hover:bg-slate-100 border border-slate-200"
+                >
+                  {translations[lang]?.loginWithGoogle || 'Přihlásit přes Google'}
+                </button>
+              ) : null}
             </article>
           </div>
         </section>

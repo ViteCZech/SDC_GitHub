@@ -254,7 +254,9 @@ export default function MyPreRegTournamentsList({
             </div>
             <div>
               <p className="text-sm font-black text-white uppercase tracking-wide">{th('quickStart')}</p>
-              <p className="text-xs text-slate-400 mt-1 leading-snug">{th('quickStartHint')}</p>
+              <p className="text-xs text-slate-400 mt-1 leading-snug">
+                {th('cloudQuickStartHint') || th('quickStartHint')}
+              </p>
             </div>
           </button>
         )}

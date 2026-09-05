@@ -26,7 +26,26 @@ describe('TournamentHub', () => {
     expect(onOpenCatalog).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: /Spustit offline turnaj/ }));
     expect(onQuickStart).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: /Otevřít cloud turnaje/ }));
+    await user.click(screen.getByRole('button', { name: /Turnaje s registrací/ }));
+    expect(onOpenPreReg).toHaveBeenCalledTimes(1);
+  });
+
+  it('cloudová karta má zvlášť rychlý start a předregistraci', async () => {
+    const user = userEvent.setup();
+    const onOpenPreReg = vi.fn();
+    const onCloudQuickStart = vi.fn();
+    render(
+      <TournamentHub
+        lang="cs"
+        isLoggedIn
+        onOpenPreReg={onOpenPreReg}
+        onCloudQuickStart={onCloudQuickStart}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: /Rychlý cloud turnaj/ }));
+    expect(onCloudQuickStart).toHaveBeenCalledTimes(1);
+    expect(onOpenPreReg).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: /Turnaje s registrací/ }));
     expect(onOpenPreReg).toHaveBeenCalledTimes(1);
   });
 

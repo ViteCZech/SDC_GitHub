@@ -998,13 +998,23 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
         'Podmínky: internet + Google přihlášení pořadatele. Diváci/tablety se připojují přes PIN.',
       cloudModeLoginWarning:
         'Nejste přihlášeni. Cloud turnaj vyžaduje Google účet pořadatele.',
-      cloudModeAction: 'Otevřít cloud turnaje',
+      cloudModeAction: 'Turnaje s registrací',
+      cloudModeQuickStart: 'Rychlý cloud turnaj',
+      setupModeChosen: 'Zvolený režim',
+      modeChosenHint:
+        'Režim jste zvolili na rozcestníku. Tady ho jen potvrzujeme — kdyby bylo potřeba, jde ještě změnit odkazem níže.',
+      switchToOfflineMode: 'Změnit na offline / lokální turnaj',
+      switchToCloudMode: 'Změnit na cloud turnaj',
+      modeLockedFromPrereg:
+        'Živý běh z předregistrace běží v cloudu. Offline režim tady není k dispozici.',
+      cloudQuickStartHint: 'Hned průvodce losem v cloudu — bez veřejné předregistrace.',
       joinSection: 'Připojit se',
       joinSectionHint: 'Herní tablet u terče nebo sledování běžícího turnaje přes PIN.',
       browseTournaments: 'Procházet turnaje',
       browseTournamentsHint:
         'Veřejný katalog, mé přihlášky a turnaje bez registrace — řazení podle termínu nebo města.',
-      hubIntro: 'Vyberte, jestli turnaj pořádáte, připojujete se k němu, nebo jen prohlížíte nabídku.',
+      hubIntro:
+        'Nejdřív zvolte režim pořádání: cloud, nebo offline. Připojení k cizímu turnaji a katalog jsou zvlášť.',
       tabletMode: 'Herní tablet',
       tabletModeHint: 'PIN, číslo terče a heslo od administrátora.',
       viewerMode: 'Sledovat turnaj',
