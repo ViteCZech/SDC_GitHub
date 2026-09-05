@@ -120,6 +120,7 @@ export default function TournamentSetup({
   const [highlightPlayerIndex, setHighlightPlayerIndex] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [pairDrawBusy, setPairDrawBusy] = useState(false);
+  const [showCloudLoginHint, setShowCloudLoginHint] = useState(false);
   const tournamentNameFieldRef = useRef(null);
   const playerNameFieldRef = useRef(null);
   const playerRankingFieldRef = useRef(null);
@@ -312,6 +313,23 @@ export default function TournamentSetup({
   }, [user, setTournamentDraft]);
 
   const isLoggedIn = user && !user.isAnonymous;
+  const cloudLoginWarning =
+    th('cloudModeLoginWarning') ||
+    t('tournamentHub.loginRequiredForCloud') ||
+    'Pro tablety, cloudové diváky a TV obrazovku haly se musíte přihlásit přes Google.';
+
+  useEffect(() => {
+    if (isLoggedIn) setShowCloudLoginHint(false);
+  }, [isLoggedIn]);
+
+  const handleCloudModeClick = () => {
+    if (!isLoggedIn) {
+      setShowCloudLoginHint(true);
+      return;
+    }
+    setShowCloudLoginHint(false);
+    setTournamentDraft((prev) => ({ ...prev, cloudEnabled: true }));
+  };
 
   const stepLabels = {
     tournStep1: fromPreReg
@@ -1065,11 +1083,14 @@ export default function TournamentSetup({
                       role="radio"
                       aria-checked={!tournamentDraft.cloudEnabled}
                       onClick={() =>
-                        setTournamentDraft((prev) => ({
-                          ...prev,
-                          cloudEnabled: false,
-                          tabletPassword: '',
-                        }))
+                        {
+                          setShowCloudLoginHint(false);
+                          setTournamentDraft((prev) => ({
+                            ...prev,
+                            cloudEnabled: false,
+                            tabletPassword: '',
+                          }));
+                        }
                       }
                       className={`text-left rounded-xl border p-3 transition-colors ${
                         !tournamentDraft.cloudEnabled
@@ -1095,16 +1116,13 @@ export default function TournamentSetup({
                       type="button"
                       role="radio"
                       aria-checked={!!tournamentDraft.cloudEnabled && !!isLoggedIn}
-                      disabled={!isLoggedIn}
-                      onClick={() => {
-                        if (!isLoggedIn) return;
-                        setTournamentDraft((prev) => ({ ...prev, cloudEnabled: true }));
-                      }}
+                      onClick={handleCloudModeClick}
                       className={`text-left rounded-xl border p-3 transition-colors ${
                         tournamentDraft.cloudEnabled && isLoggedIn
                           ? 'border-sky-500/60 bg-sky-950/30'
                           : 'border-slate-700 bg-slate-900/70 hover:bg-slate-900'
-                      } ${!isLoggedIn ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      } ${!isLoggedIn ? 'opacity-80' : ''}`}
+                      title={!isLoggedIn ? cloudLoginWarning : undefined}
                     >
                       <p className="text-[11px] font-black uppercase tracking-widest text-sky-300 flex items-center gap-2">
                         <Cloud className="w-4 h-4 shrink-0" />
@@ -1121,14 +1139,12 @@ export default function TournamentSetup({
                     </button>
                   </div>
 
-                  {!isLoggedIn && (
+                  {!isLoggedIn && showCloudLoginHint && (
                     <div className="rounded-lg border border-amber-500/40 bg-amber-950/25 px-3 py-3 space-y-3">
                       <p className="text-sm font-medium text-amber-100/95 leading-snug flex items-start gap-2">
                         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                         <span>
-                          {th('cloudModeLoginWarning') ||
-                            t('tournamentHub.loginRequiredForCloud') ||
-                            'Pro tablety, cloudové diváky a TV obrazovku haly se musíte přihlásit přes Google.'}
+                          {cloudLoginWarning}
                         </span>
                       </p>
                       {typeof onGoogleLogin === 'function' && (

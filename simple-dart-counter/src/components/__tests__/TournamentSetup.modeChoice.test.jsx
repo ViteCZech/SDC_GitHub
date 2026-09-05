@@ -28,20 +28,25 @@ function createDraft(overrides = {}) {
 }
 
 describe('TournamentSetup - volba cloud/offline režimu', () => {
-  it('u odhlášeného uživatele zobrazuje podmínky cloud režimu a cloud volbu blokuje', () => {
+  it('u odhlášeného uživatele nabídne login hint až po kliknutí na cloud režim', async () => {
+    const user = userEvent.setup();
+    const setTournamentDraft = vi.fn();
     render(
       <TournamentSetup
         lang="cs"
         step={1}
         tournamentDraft={createDraft()}
-        setTournamentDraft={vi.fn()}
+        setTournamentDraft={setTournamentDraft}
         user={null}
       />
     );
 
     expect(screen.getByText('Offline / lokální turnaj')).toBeTruthy();
     const cloudBtn = screen.getByRole('radio', { name: /Cloud turnaj/i });
-    expect(cloudBtn).toBeDisabled();
+    expect(screen.queryByText(/Cloud turnaj vyžaduje Google účet pořadatele/i)).toBeNull();
+    setTournamentDraft.mockClear();
+    await user.click(cloudBtn);
+    expect(setTournamentDraft).not.toHaveBeenCalled();
     expect(screen.getByText(/Cloud turnaj vyžaduje Google účet pořadatele/i)).toBeTruthy();
   });
 
