@@ -49,6 +49,7 @@ import PauseMenuOverlay from './components/PauseMenuOverlay';
 import ActiveSessionBanner from './components/ActiveSessionBanner';
 import { resolveAppNav, shouldParkTournamentSession } from './utils/appNavigation';
 import { shouldMountMatchSurface } from './utils/matchKeepAlive';
+import { deepEqual } from './utils/deepEqual';
 import { loadUiResume, saveUiResume } from './utils/uiResumeStorage';
 import { parsePreregRouteFromUrl, isPublicTournamentCatalogPath } from './utils/preregAdmin';
 import { parseTabletRouteFromUrl, ensureBoardAuthTokens } from './utils/tabletBoardQr';
@@ -2566,7 +2567,7 @@ function AppMain({ lang, setLang }) {
       regForDirectKo,
       tournamentData?.prelimLegs ?? null
     );
-    if (JSON.stringify(bracketWithRefs) !== JSON.stringify(tournamentBracket)) {
+    if (!deepEqual(bracketWithRefs, tournamentBracket)) {
       setTournamentBracket(bracketWithRefs);
     }
     }, 200);
@@ -2617,7 +2618,7 @@ function AppMain({ lang, setLang }) {
       prelimLegs: tournamentData?.prelimLegs ?? null,
     });
 
-    if (JSON.stringify(withRefs) !== JSON.stringify(tournamentBracket)) {
+    if (!deepEqual(withRefs, tournamentBracket)) {
       setTournamentBracket(withRefs);
     }
     }, 200);

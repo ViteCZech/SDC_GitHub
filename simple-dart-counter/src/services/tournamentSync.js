@@ -2,7 +2,6 @@ import {
   doc,
   getDoc,
   setDoc,
-  updateDoc,
   deleteDoc,
   deleteField,
   onSnapshot,
@@ -10,9 +9,13 @@ import {
   addDoc,
   Timestamp,
   serverTimestamp,
+  runTransaction,
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app, auth, db } from '../firebase';
+import { deepEqual } from '../utils/deepEqual';
+import { isMatchTerminal } from '../utils/matchTerminal';
+import { buildTournamentFieldPatch } from '../utils/tournamentCloudPatch';
 
 const COLLECTION = 'active_tournaments';
 const PAST_COLLECTION = 'past_tournaments';
@@ -30,11 +33,6 @@ function resolveFunctionsProjectId() {
 function buildRegisterTabletBoardOnlineUrl() {
   const projectId = resolveFunctionsProjectId();
   return `https://${FUNCTIONS_REGION}-${projectId}.cloudfunctions.net/registerTabletBoardOnline`;
-}
-
-function isMatchTerminal(m) {
-  const s = m?.status;
-  return s === 'completed' || s === 'walkover' || m?.walkover === true;
 }
 
 /**
@@ -249,6 +247,20 @@ function findCloudGroupMatch(cloudByKey, local) {
   return null;
 }
 
+function existingFieldsForPatch(cloud) {
+  return cloneJsonSafe(
+    {
+      tournamentData: cloud?.tournamentData ?? null,
+      groups: Array.isArray(cloud?.groups) ? cloud.groups : [],
+      groupMatches: Array.isArray(cloud?.groupMatches) ? cloud.groupMatches : [],
+      tournamentBracket: Array.isArray(cloud?.tournamentBracket) ? cloud.tournamentBracket : [],
+      status: cloud?.status ?? null,
+      ownerUid: cloud?.ownerUid ?? null,
+    },
+    {}
+  );
+}
+
 /**
  * @param {string} pin – ID dokumentu (4místný PIN)
  * @param {{ tournamentData?: object|null, groups?: array, groupMatches?: array, tournamentBracket?: array }} tournamentState
@@ -258,93 +270,119 @@ export async function syncTournamentToCloud(pin, tournamentState) {
   const id = String(pin).trim();
   if (!/^\d{4}$/.test(id)) return;
 
-  const safeState = cloneJsonSafe(tournamentState, {});
-  if (!safeState || typeof safeState !== 'object') return;
-
-  const tournamentData = safeState.tournamentData ?? null;
-  const groups = Array.isArray(safeState.groups) ? safeState.groups : [];
-  let groupMatches = Array.isArray(safeState.groupMatches) ? safeState.groupMatches : [];
-  let tournamentBracket = Array.isArray(safeState.tournamentBracket)
-    ? safeState.tournamentBracket
-    : [];
-
-  // Drž top-level `groups` a `tournamentData.groups` ve shodě (tablet bere obojí).
-  const tournamentDataSynced =
-    tournamentData && groups.length > 0
-      ? { ...tournamentData, groups }
-      : tournamentData;
-
-  const ref = doc(db, COLLECTION, id);
-
-  // Než admin přepíše dokument, slouč výsledky z tabletu z aktuálního cloudu
-  // (zabrání race: starý lokální stav přepíše právě uložený výsledek z tabletu).
-  try {
-    const existing = await getDoc(ref);
-    const exists = typeof existing.exists === 'function' ? existing.exists() : existing.exists;
-    if (exists) {
-      const cloud = existing.data() || {};
-      groupMatches = mergeAdminGroupMatchesFromTabletCloud(
-        groupMatches,
-        Array.isArray(cloud.groupMatches) ? cloud.groupMatches : []
-      );
-      tournamentBracket = mergeAdminBracketFromTabletCloud(
-        tournamentBracket,
-        Array.isArray(cloud.tournamentBracket) ? cloud.tournamentBracket : []
-      );
-    }
-  } catch (err) {
-    console.warn('syncTournamentToCloud: cloud merge before write failed', err);
-  }
-
   const ownerUid = requireGoogleUid();
   if (!ownerUid) return;
 
-  const { publicData, secrets } = splitTournamentSecrets(tournamentDataSynced);
-  const publicSynced =
-    publicData && groups.length > 0 && !publicData.groups
-      ? { ...publicData, groups }
-      : publicData;
+  const safeState = cloneJsonSafe(tournamentState, {});
+  if (!safeState || typeof safeState !== 'object') return;
 
-  const status = deriveTournamentStatus({
-    tournamentData: publicSynced,
-    groupMatches,
-    tournamentBracket,
-  });
+  const groups = Array.isArray(safeState.groups) ? safeState.groups : [];
+  const localGroupMatches = Array.isArray(safeState.groupMatches) ? safeState.groupMatches : [];
+  const localBracket = Array.isArray(safeState.tournamentBracket)
+    ? safeState.tournamentBracket
+    : [];
+  const tournamentData = safeState.tournamentData ?? null;
 
-  const withMeta = {
-    tournamentData: publicSynced,
+  const ref = doc(db, COLLECTION, id);
+  let writeMode = 'skip';
+  let wroteTournamentData = false;
+  let mirror = {
+    publicSynced: null,
     groups,
-    groupMatches,
-    tournamentBracket,
-    status,
-    lastUpdated: new Date().toISOString(),
-    ownerUid,
+    groupMatches: localGroupMatches,
+    tournamentBracket: localBracket,
+    status: 'running',
   };
 
-  const payload = cloneJsonSafe(withMeta, null);
-  if (payload == null) return;
-
-  await setDoc(ref, payload, { merge: true });
   try {
-    await updateDoc(ref, {
-      'tournamentData.tabletPassword': deleteField(),
-      'tournamentData.boardAuthTokens': deleteField(),
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(ref);
+      const exists = typeof snap.exists === 'function' ? snap.exists() : snap.exists;
+      const cloud = exists ? snap.data() || {} : {};
+
+      let groupMatches = localGroupMatches;
+      let tournamentBracket = localBracket;
+      if (exists) {
+        groupMatches = mergeAdminGroupMatchesFromTabletCloud(
+          groupMatches,
+          Array.isArray(cloud.groupMatches) ? cloud.groupMatches : []
+        );
+        tournamentBracket = mergeAdminBracketFromTabletCloud(
+          tournamentBracket,
+          Array.isArray(cloud.tournamentBracket) ? cloud.tournamentBracket : []
+        );
+      }
+
+      const tournamentDataSynced =
+        tournamentData && groups.length > 0 ? { ...tournamentData, groups } : tournamentData;
+      const { publicData } = splitTournamentSecrets(tournamentDataSynced);
+      const publicSynced =
+        publicData && groups.length > 0 && !publicData.groups
+          ? { ...publicData, groups }
+          : publicData;
+      const status = deriveTournamentStatus({
+        tournamentData: publicSynced,
+        groupMatches,
+        tournamentBracket,
+      });
+      const payload = cloneJsonSafe(
+        {
+          tournamentData: publicSynced,
+          groups,
+          groupMatches,
+          tournamentBracket,
+          status,
+          lastUpdated: new Date().toISOString(),
+          ownerUid,
+        },
+        null
+      );
+      if (payload == null) return;
+
+      mirror = { publicSynced, groups, groupMatches, tournamentBracket, status };
+
+      const plan = buildTournamentFieldPatch(
+        exists ? existingFieldsForPatch(cloud) : null,
+        payload
+      );
+      writeMode = plan.mode;
+      if (plan.mode === 'skip') return;
+      if (plan.mode === 'create') {
+        wroteTournamentData = true;
+        transaction.set(ref, plan.payload);
+        return;
+      }
+      wroteTournamentData = Object.prototype.hasOwnProperty.call(plan.patch, 'tournamentData');
+      const update = { ...plan.patch };
+      if (!wroteTournamentData) {
+        update['tournamentData.tabletPassword'] = deleteField();
+        update['tournamentData.boardAuthTokens'] = deleteField();
+      }
+      transaction.update(ref, update);
     });
   } catch (err) {
-    console.warn('syncTournamentToCloud: strip public secrets failed', err);
+    console.warn('syncTournamentToCloud: transaction failed', err);
+    return;
   }
 
-  try {
-    await setDoc(
-      doc(db, PINS_COLLECTION, id),
-      { ownerUid, updatedAt: serverTimestamp() },
-      { merge: true }
-    );
-  } catch (err) {
-    console.warn('syncTournamentToCloud: tournament_pins write failed', err);
+  if (writeMode === 'skip') return;
+
+  if (writeMode === 'create') {
+    try {
+      await setDoc(
+        doc(db, PINS_COLLECTION, id),
+        { ownerUid, updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+    } catch (err) {
+      console.warn('syncTournamentToCloud: tournament_pins write failed', err);
+    }
   }
 
-  if (secrets) {
+  const { secrets } = splitTournamentSecrets(
+    tournamentData && groups.length > 0 ? { ...tournamentData, groups } : tournamentData
+  );
+  if (secrets && (writeMode === 'create' || wroteTournamentData)) {
     try {
       await setDoc(
         doc(db, SECRETS_COLLECTION, id),
@@ -363,12 +401,12 @@ export async function syncTournamentToCloud(pin, tournamentState) {
   try {
     const publicPayload = buildPublicTournamentPayload({
       pin: id,
-      status,
+      status: mirror.status,
       source: 'active',
-      tournamentData: publicSynced,
-      groups,
-      groupMatches,
-      tournamentBracket,
+      tournamentData: mirror.publicSynced,
+      groups: mirror.groups,
+      groupMatches: mirror.groupMatches,
+      tournamentBracket: mirror.tournamentBracket,
       ownerUid,
     });
     await upsertPublicTournamentByPin(id, publicPayload, true);
@@ -610,11 +648,6 @@ export async function updateCloudMatchFromTablet(pin, matchType, matchId, matchU
   }
 }
 
-function isCloudMatchTerminal(m) {
-  const s = m?.status;
-  return s === 'completed' || s === 'walkover' || m?.walkover === true;
-}
-
 /** Porovnání polí, která tablet posílá u dokončeného zápasu (bez zbytečného přerenderu). */
 function groupCompletedMergeUnchanged(local, merged) {
   const keys = [
@@ -643,18 +676,17 @@ function groupCompletedMergeUnchanged(local, merged) {
   for (const k of keys) {
     if ((local?.[k] ?? null) !== (merged?.[k] ?? null)) return false;
   }
-  if (JSON.stringify(local?.result ?? null) !== JSON.stringify(merged?.result ?? null)) return false;
-  if (JSON.stringify(local?.score ?? null) !== JSON.stringify(merged?.score ?? null)) return false;
-  if (JSON.stringify(local?.legDetails ?? null) !== JSON.stringify(merged?.legDetails ?? null)) return false;
-  if (
-    JSON.stringify(local?.tabletCheckInPresent ?? null) !==
-    JSON.stringify(merged?.tabletCheckInPresent ?? null)
-  ) {
+  if (!deepEqual(local?.result ?? null, merged?.result ?? null)) return false;
+  if (!deepEqual(local?.score ?? null, merged?.score ?? null)) return false;
+  if (!deepEqual(local?.legDetails ?? null, merged?.legDetails ?? null)) return false;
+  if (!deepEqual(local?.tabletCheckInPresent ?? null, merged?.tabletCheckInPresent ?? null)) {
     return false;
   }
   if (
-    JSON.stringify(local?.tabletTimeoutRoleWarningCounts ?? null) !==
-    JSON.stringify(merged?.tabletTimeoutRoleWarningCounts ?? null)
+    !deepEqual(
+      local?.tabletTimeoutRoleWarningCounts ?? null,
+      merged?.tabletTimeoutRoleWarningCounts ?? null
+    )
   ) {
     return false;
   }
@@ -666,10 +698,7 @@ function groupCompletedMergeUnchanged(local, merged) {
   ) {
     return false;
   }
-  if (
-    JSON.stringify(local?.tabletCheckInResume ?? null) !==
-    JSON.stringify(merged?.tabletCheckInResume ?? null)
-  ) {
+  if (!deepEqual(local?.tabletCheckInResume ?? null, merged?.tabletCheckInResume ?? null)) {
     return false;
   }
   return true;
@@ -701,11 +730,13 @@ function applyTabletCheckInCloudPatch(local, cloud, patch) {
       p2: Math.max(Number(lr.p2) || 0, Number(cr.p2) || 0),
       referee: Math.max(Number(lr.referee) || 0, Number(cr.referee) || 0),
     };
-    if (JSON.stringify(mergedRoles) !== JSON.stringify({
-      p1: Number(lr.p1) || 0,
-      p2: Number(lr.p2) || 0,
-      referee: Number(lr.referee) || 0,
-    })) {
+    if (
+      !deepEqual(mergedRoles, {
+        p1: Number(lr.p1) || 0,
+        p2: Number(lr.p2) || 0,
+        referee: Number(lr.referee) || 0,
+      })
+    ) {
       patch.tabletTimeoutRoleWarningCounts = mergedRoles;
     }
   }
@@ -720,7 +751,7 @@ function applyTabletCheckInCloudPatch(local, cloud, patch) {
       if (effectiveWarn > localWarn) patch.tabletTimeoutWarningCount = effectiveWarn;
       if (
         cloud.tabletCheckInPresent != null &&
-        JSON.stringify(cloud.tabletCheckInPresent) !== JSON.stringify(local.tabletCheckInPresent ?? null)
+        !deepEqual(cloud.tabletCheckInPresent, local.tabletCheckInPresent ?? null)
       ) {
         patch.tabletCheckInPresent = cloud.tabletCheckInPresent;
       }
@@ -745,7 +776,7 @@ function applyTabletCheckInCloudPatch(local, cloud, patch) {
   if (
     cloud.tabletCheckInPresent != null &&
     cloud.tabletStatus !== 'timeout_warning' &&
-    JSON.stringify(cloud.tabletCheckInPresent) !== JSON.stringify(local.tabletCheckInPresent ?? null)
+    !deepEqual(cloud.tabletCheckInPresent, local.tabletCheckInPresent ?? null)
   ) {
     patch.tabletCheckInPresent = cloud.tabletCheckInPresent;
   }
@@ -767,9 +798,9 @@ export function mergeAdminGroupMatchesFromTabletCloud(prevLocal, cloudList) {
     const cloud = findCloudGroupMatch(cloudByKey, local);
     if (!cloud) return local;
 
-    if (isCloudMatchTerminal(cloud)) {
+    if (isMatchTerminal(cloud)) {
       // Preferuj novější dokončení, pokud jsou obě strany hotové
-      if (isCloudMatchTerminal(local)) {
+      if (isMatchTerminal(local)) {
         const lc = Number(local.completedAt) || 0;
         const cc = Number(cloud.completedAt) || 0;
         if (lc > cc) return local;
@@ -781,7 +812,7 @@ export function mergeAdminGroupMatchesFromTabletCloud(prevLocal, cloudList) {
     }
 
     // Cloud není hotový — lokální dokončený výsledek nesahej
-    if (isCloudMatchTerminal(local)) return local;
+    if (isMatchTerminal(local)) return local;
 
     const patch = {};
     applyTabletCheckInCloudPatch(local, cloud, patch);
@@ -822,8 +853,8 @@ export function mergeAdminBracketFromTabletCloud(prevLocal, cloudBracket) {
         : null;
       if (!cloud) return local;
 
-      if (isCloudMatchTerminal(cloud)) {
-        if (isCloudMatchTerminal(local)) {
+      if (isMatchTerminal(cloud)) {
+        if (isMatchTerminal(local)) {
           const lc = Number(local.completedAt) || 0;
           const cc = Number(cloud.completedAt) || 0;
           if (lc > cc) return local;
@@ -834,7 +865,7 @@ export function mergeAdminBracketFromTabletCloud(prevLocal, cloudBracket) {
         return merged;
       }
 
-      if (isCloudMatchTerminal(local)) return local;
+      if (isMatchTerminal(local)) return local;
 
       const patch = {};
       applyTabletCheckInCloudPatch(local, cloud, patch);

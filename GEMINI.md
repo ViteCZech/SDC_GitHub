@@ -174,7 +174,10 @@ Vstup: Domů → Turnaj (`TournamentHub`).
 - `active_tournaments/{pin}` — živý stav (čtení veřejné, zápis jen auth)
 - `past_tournaments` — archiv po skončení
 - `tournament_pins/{pin}` — vlastnictví PINu
-- Tablety posílají výsledky přes CF `submitTabletMatchUpdate` / `registerTabletBoardOnline`
+- Tablety posílají výsledky přes CF `submitTabletMatchUpdate` (transakce, jen `groupMatches` / `tournamentBracket`) a `registerTabletBoardOnline`
+- Admin sync (`syncTournamentToCloud`) je transakce + **field patch** (`tournamentCloudPatch.js`); prázdný diff se nezapisuje
+- Pavouk v UI se porovnává strukturovaně (`deepEqual`), ne `JSON.stringify`
+- Hotový výsledek zápasu se nenechá přepsat starším pending/completed (`matchTerminal.js`)
 - Check-in timeout + varování adminovi (`tabletCheckInTimeout.js`)
 - Po startu se **zamkne ranking/los** (`tournamentRanking.js`)
 

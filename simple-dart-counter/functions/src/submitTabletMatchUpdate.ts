@@ -5,6 +5,7 @@ import * as logger from 'firebase-functions/logger';
 import { CALLABLE_PUBLIC } from './authz';
 import { validateTabletAuth } from './tabletAuth';
 import { loadTabletAuthForPin } from './tournamentSecrets';
+import { buildTabletMatchDocPatch } from './tabletMatchPatch';
 
 if (getApps().length === 0) {
   initializeApp();
@@ -25,14 +26,6 @@ type SubmitPayload = {
   matchUpdates?: Record<string, unknown>;
 };
 
-function cloneJsonSafe<T>(value: T, fallback: T): T {
-  try {
-    return JSON.parse(JSON.stringify(value ?? fallback)) as T;
-  } catch {
-    return fallback;
-  }
-}
-
 function stripUndefinedDeep(val: unknown): unknown {
   if (val === undefined) return undefined;
   if (val === null || typeof val !== 'object') return val;
@@ -48,63 +41,10 @@ function stripUndefinedDeep(val: unknown): unknown {
   return out;
 }
 
-function isMatchTerminal(m: { status?: string; walkover?: boolean } | null | undefined): boolean {
-  const s = m?.status;
-  return s === 'completed' || s === 'walkover' || m?.walkover === true;
-}
-
-function deriveTournamentStatus(args: {
-  tournamentData: unknown;
-  groupMatches: unknown[];
-  tournamentBracket: unknown[];
-}): string {
-  if (!args.tournamentData) return 'preparing';
-  const gm = Array.isArray(args.groupMatches) ? args.groupMatches : [];
-  const bracketMatches = Array.isArray(args.tournamentBracket)
-    ? args.tournamentBracket.flatMap((r) => {
-        const matches = (r as { matches?: unknown[] })?.matches;
-        return Array.isArray(matches) ? matches : [];
-      })
-    : [];
-  const allMatches = [...gm, ...bracketMatches] as Array<{ status?: string; walkover?: boolean }>;
-  if (allMatches.length === 0) return 'running';
-  return allMatches.every(isMatchTerminal) ? 'finished' : 'running';
-}
-
-function findGroupMatchIndex(matches: unknown[], matchId: string): number {
-  if (!Array.isArray(matches)) return -1;
-  const want = String(matchId ?? '').trim();
-  if (!want) return -1;
-  return matches.findIndex((m) => {
-    const row = m as { matchId?: string; id?: string };
-    const mid = row.matchId ?? row.id;
-    return mid != null && String(mid) === want;
-  });
-}
-
-function findBracketMatchLoc(
-  bracket: unknown[],
-  matchId: string
-): { roundIndex: number; matchIndex: number } | null {
-  if (!Array.isArray(bracket)) return null;
-  const want = String(matchId ?? '').trim();
-  if (!want) return null;
-  for (let ri = 0; ri < bracket.length; ri++) {
-    const list = (bracket[ri] as { matches?: unknown[] })?.matches;
-    if (!Array.isArray(list)) continue;
-    const mi = list.findIndex((m) => {
-      const row = m as { id?: string; matchId?: string };
-      const id = row.id ?? row.matchId;
-      return id != null && String(id) === want;
-    });
-    if (mi >= 0) return { roundIndex: ri, matchIndex: mi };
-  }
-  return null;
-}
-
 /**
  * Herní tablet: zápis stavu/výsledku zápasu bez Google loginu.
  * Ověření: platný PIN + board token nebo neprázdné heslo (tajemství v tournament_secrets).
+ * Zápis je transakce jen na groupMatches / tournamentBracket — nesahe na zbytek dokumentu.
  */
 export const submitTabletMatchUpdate = onCall(
   CALLABLE_PUBLIC,
@@ -130,8 +70,6 @@ export const submitTabletMatchUpdate = onCall(
       throw new HttpsError('invalid-argument', 'Chybí data zápasu.');
     }
 
-    // Bezpečnost: tablet nesmí přes matchUpdates přepsat celý dokument turnaje.
-    // Pozn.: `status` u zápasu je povolené (completed / playing / …).
     const forbidden = ['tournamentData', 'groups', 'groupMatches', 'tournamentBracket'];
     for (const key of forbidden) {
       if (Object.prototype.hasOwnProperty.call(patches, key)) {
@@ -140,13 +78,13 @@ export const submitTabletMatchUpdate = onCall(
     }
 
     const ref = db.collection(COLLECTION).doc(pin);
-    const snap = await ref.get();
-    if (!snap.exists) {
+    const authSnap = await ref.get();
+    if (!authSnap.exists) {
       throw new HttpsError('not-found', 'Turnaj s tímto PINem nebyl nalezen.');
     }
 
-    const raw = snap.data() ?? {};
-    const td = (raw.tournamentData ?? null) as {
+    const authRaw = authSnap.data() ?? {};
+    const td = (authRaw.tournamentData ?? null) as {
       tabletPassword?: string;
       boardAuthTokens?: Record<string, string>;
     } | null;
@@ -158,61 +96,37 @@ export const submitTabletMatchUpdate = onCall(
       throw new HttpsError('permission-denied', 'Neplatné heslo pro herní tablet.');
     }
 
-    let groupMatches: unknown[] = Array.isArray(raw.groupMatches)
-      ? cloneJsonSafe(raw.groupMatches, [])
-      : [];
-    let tournamentBracket: unknown[] = Array.isArray(raw.tournamentBracket)
-      ? cloneJsonSafe(raw.tournamentBracket, [])
-      : [];
-
-    if (matchType === 'group') {
-      const idx = findGroupMatchIndex(groupMatches, matchId);
-      if (idx < 0) {
-        throw new HttpsError('not-found', 'Zápas ve skupinách nebyl nalezen.');
-      }
-      groupMatches = groupMatches.map((m, i) =>
-        i === idx ? { ...(m as object), ...patches } : m
-      );
-    } else {
-      const loc = findBracketMatchLoc(tournamentBracket, matchId);
-      if (!loc) {
-        throw new HttpsError('not-found', 'Zápas v pavouku nebyl nalezen.');
-      }
-      tournamentBracket = tournamentBracket.map((round, ri) => {
-        if (ri !== loc.roundIndex) return round;
-        const r = round as { matches?: unknown[] };
-        const matches = (r.matches || []).map((m, mi) =>
-          mi === loc.matchIndex ? { ...(m as object), ...patches } : m
-        );
-        return { ...r, matches };
+    try {
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) {
+          throw new HttpsError('not-found', 'Turnaj s tímto PINem nebyl nalezen.');
+        }
+        const raw = (snap.data() ?? {}) as Record<string, unknown>;
+        let docPatch: ReturnType<typeof buildTabletMatchDocPatch>;
+        try {
+          docPatch = buildTabletMatchDocPatch({
+            raw,
+            matchType,
+            matchId,
+            patches,
+          });
+        } catch (err) {
+          const code = err instanceof Error ? err.message : '';
+          if (code === 'not-found-group') {
+            throw new HttpsError('not-found', 'Zápas ve skupinách nebyl nalezen.');
+          }
+          if (code === 'not-found-bracket') {
+            throw new HttpsError('not-found', 'Zápas v pavouku nebyl nalezen.');
+          }
+          throw err;
+        }
+        tx.update(ref, docPatch);
       });
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      throw err;
     }
-
-    const tournamentData = raw.tournamentData ?? null;
-    const groups = Array.isArray(raw.groups) ? raw.groups : [];
-    const status = deriveTournamentStatus({
-      tournamentData,
-      groupMatches,
-      tournamentBracket,
-    });
-
-    const payload = cloneJsonSafe(
-      {
-        ...raw,
-        tournamentData,
-        groups,
-        groupMatches,
-        tournamentBracket,
-        status,
-        lastUpdated: new Date().toISOString(),
-      },
-      null
-    );
-    if (payload == null) {
-      throw new HttpsError('internal', 'Nepodařilo se připravit data pro uložení.');
-    }
-
-    await ref.set(payload);
 
     logger.info('submitTabletMatchUpdate ok', {
       pin,
