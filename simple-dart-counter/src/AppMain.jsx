@@ -1370,6 +1370,7 @@ function AppMain({ lang, setLang }) {
     if (!remoteSyncEnabled) return;
     const pin = String(activePin ?? '').trim();
     if (!/^\d{4}$/.test(pin)) return;
+    if (!tournamentData) return;
     if (tournamentData.boardAuthTokens && Object.keys(tournamentData.boardAuthTokens).length) return;
     if (typeof syncAdapter.loadTournamentSecrets !== 'function') return;
     let cancelled = false;
