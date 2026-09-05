@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { CheckCircle2, QrCode, Wifi, WifiOff, X } from 'lucide-react';
-import { doc, onSnapshot } from 'firebase/firestore';
 import { translations } from '../translations';
-import { db } from '../firebase';
+import { useSyncAdapter } from '../context/SyncAdapterContext';
 import {
   buildTabletBoardQrUrl,
   ensureBoardAuthTokens,
@@ -11,8 +10,6 @@ import {
   resolveTotalBoards,
 } from '../utils/tabletBoardQr';
 import VenueTvLinkCard from './VenueTvLinkCard';
-
-const ACTIVE_TOURNAMENTS_COLL = 'active_tournaments';
 
 function BoardQrModal({ lang, board, url, online, connected, onClose }) {
   const t = (k) => translations[lang]?.[k] ?? k;
@@ -121,9 +118,11 @@ export default function TabletBoardQrPanel({
   tournamentData,
   onNotify,
   onEnsureTokens,
+  origin,
   compact = false,
 }) {
   const t = (k) => translations[lang]?.[k] ?? k;
+  const syncAdapter = useSyncAdapter();
   const tabletConnectedMsgTemplate = useMemo(
     () => translations[lang]?.tabletQrConnectedSuccess || 'Terč {n} úspěšně připojen!',
     [lang]
@@ -151,24 +150,13 @@ export default function TabletBoardQrPanel({
 
   useEffect(() => {
     const id = String(pin ?? '').trim();
-    if (!db || !/^\d{4}$/.test(id)) return undefined;
-
-    const ref = doc(db, ACTIVE_TOURNAMENTS_COLL, id);
-    const unsub = onSnapshot(
-      ref,
-      (snap) => {
-        const exists = typeof snap.exists === 'function' ? snap.exists() : snap.exists;
-        if (!exists) {
-          setBoardStatuses({});
-          return;
-        }
-        const raw = snap.data()?.boardStatuses;
-        setBoardStatuses(raw && typeof raw === 'object' ? raw : {});
-      },
-      (err) => console.warn('TabletBoardQrPanel snapshot:', err)
-    );
-    return () => unsub();
-  }, [pin]);
+    if (!/^\d{4}$/.test(id) || typeof syncAdapter.listenTournament !== 'function') return undefined;
+    const unsub = syncAdapter.listenTournament(id, (data) => {
+      const raw = data?.boardStatuses;
+      setBoardStatuses(raw && typeof raw === 'object' ? raw : {});
+    });
+    return () => unsub?.();
+  }, [pin, syncAdapter]);
 
   useEffect(() => {
     const prev = prevStatusesRef.current;
@@ -225,6 +213,7 @@ export default function TabletBoardQrPanel({
           pin: String(pin),
           board: openBoard,
           token: tokens[String(openBoard)],
+          origin,
         })}
         online={isBoardOnline(boardStatuses, openBoard, nowMs)}
         connected={connectedBoard === openBoard}
@@ -282,7 +271,15 @@ export default function TabletBoardQrPanel({
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <VenueTvLinkCard lang={lang} pin={pin} isLoggedIn cloudEnabled compact />
+              <VenueTvLinkCard
+                lang={lang}
+                pin={pin}
+                isLoggedIn
+                cloudEnabled={!origin}
+                lanEnabled={!!origin}
+                origin={origin}
+                compact
+              />
               <BoardGrid
                 lang={lang}
                 boards={boards}
@@ -314,7 +311,15 @@ export default function TabletBoardQrPanel({
             'Zobrazte QR kód pro daný terč. Po naskenování tabletu uvidíte okamžité potvrzení připojení.'}
         </p>
         <div className="mb-4">
-          <VenueTvLinkCard lang={lang} pin={pin} isLoggedIn cloudEnabled compact />
+          <VenueTvLinkCard
+            lang={lang}
+            pin={pin}
+            isLoggedIn
+            cloudEnabled={!origin}
+            lanEnabled={!!origin}
+            origin={origin}
+            compact
+          />
         </div>
         <BoardGrid
           lang={lang}

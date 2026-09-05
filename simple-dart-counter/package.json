@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "preview": "vite preview",
+    "lan-server": "node server/lanRelay.js",
     "update-rankings": "node scripts/fetch-rankings.js"
   },
   "dependencies": {

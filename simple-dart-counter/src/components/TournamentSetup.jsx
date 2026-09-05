@@ -46,6 +46,7 @@ import {
 import RandomPairDrawPanel from './RandomPairDrawPanel';
 import VenueTvLinkCard from './VenueTvLinkCard';
 import ContextHelpButton from './ContextHelpButton';
+import LanRelayStatusPanel from './LanRelayStatusPanel';
 
 /** Ranking z inputu: prázdné nebo 0 → null */
 function parseRankingFromInput(val) {
@@ -81,6 +82,9 @@ export default function TournamentSetup({
   preRegTournamentId,
   onBackToPreRegAdmin,
   onOpenContextHelp,
+  lanHealth = null,
+  lanCfg = null,
+  onTournamentModeChange,
 }) {
   const t = (k) => translations[lang]?.[k] || k;
   const th = (k) => translations[lang]?.tournamentHub?.[k] ?? k;
@@ -334,6 +338,7 @@ export default function TournamentSetup({
     }
     setShowCloudLoginHint(false);
     setTournamentDraft((prev) => ({ ...prev, cloudEnabled: true }));
+    onTournamentModeChange?.('cloud');
   };
 
   const stepLabels = {
@@ -1095,6 +1100,7 @@ export default function TournamentSetup({
                             cloudEnabled: false,
                             tabletPassword: '',
                           }));
+                          onTournamentModeChange?.('lan');
                         }
                       }
                       className={`text-left rounded-xl border p-3 transition-colors ${
@@ -1164,6 +1170,14 @@ export default function TournamentSetup({
                       )}
                     </div>
                   )}
+                  {!tournamentDraft.cloudEnabled && (
+                    <LanRelayStatusPanel
+                      lang={lang}
+                      pin={setupPinDisplay}
+                      health={lanHealth}
+                      organizerCfg={lanCfg}
+                    />
+                  )}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
@@ -1180,6 +1194,12 @@ export default function TournamentSetup({
                       pin={setupPinDisplay}
                       isLoggedIn={!!isLoggedIn}
                       cloudEnabled={!!tournamentDraft.cloudEnabled}
+                      lanEnabled={!tournamentDraft.cloudEnabled}
+                      origin={
+                        !tournamentDraft.cloudEnabled && lanHealth?.addresses?.[0]
+                          ? `http://${lanHealth.addresses[0]}:${lanHealth.port || lanCfg?.port || 8787}`
+                          : undefined
+                      }
                     />
                   </div>
                   {tournamentDraft.cloudEnabled && isLoggedIn && (

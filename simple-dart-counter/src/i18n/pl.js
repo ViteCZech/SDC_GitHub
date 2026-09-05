@@ -314,6 +314,8 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
     venueTvHintNoPin: 'PIN turnieju zostanie nadany. Potem zobaczysz tu link /tv/PIN.',
     venueTvHintReady:
       'Otwórz ten link na TV lub projektorze. Telewizor się nie loguje — działa, bo jesteś zalogowany i turniej jest w chmurze.',
+    venueTvHintLan:
+      'Lokalna sieć LAN: otwórz ten link na TV w Wi-Fi organizatora. Internet i logowanie Google nie są potrzebne.',
     tournPinTapShowPassword: 'Dotknij, aby pokazać hasło dla tabletów gry',
     tournFormat: 'Format turnieju', tournFormatGroupsKo: 'Grupy + drabinka KO', tournFormatKoOnly: 'Tylko drabinka KO',
     tournGroupsLegs: 'Grupy: legi do wygranej', tournBracketLegs: 'Drabinka: legi do wygranej',
@@ -936,10 +938,17 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
       modeSectionTitle: 'Tryb turnieju',
       offlineModeTitle: 'Turniej offline / lokalny',
       offlineModeHint:
-        'Działa na tym urządzeniu bez chmury. Przydatne przy braku internetu.',
+        'Działa w lokalnym Wi-Fi bez internetu — admin, tablety i TV przez przekaźnik LAN.',
       offlineModeConditions:
-        'Warunki: bez tabletów cloud i bez cloud TV feedu. Dane pozostają lokalnie na urządzeniu.',
+        'Wymagania: komputer organizatora uruchamia lokalny serwer (npm run lan-server / npm run dev). Tablety i TV łączą się przez IP w sieci; dane zostają na dysku organizatora.',
       offlineModeAction: 'Uruchom turniej offline',
+      lanRelayTitle: 'Lokalny serwer LAN',
+      lanRelayRunning: 'Przekaźnik działa. Tablety i TV łączą się przez Wi-Fi bez internetu.',
+      lanRelayDown:
+        'Przekaźnik nie działa. Na komputerze organizatora uruchom npm run lan-server (lub npm run dev).',
+      lanRelayStartHint: 'Po starcie serwera pojawi się tu adres IP i link /tv/PIN dla telewizora.',
+      lanRelayIp: 'Adres IP',
+      lanRelayTablets: 'Podłączone tablety',
       cloudModeTitle: 'Turniej cloud',
       cloudModeHint:
         'Rejestracja online, synchronizacja w chmurze, tablety przy tarczach i ekran TV.',

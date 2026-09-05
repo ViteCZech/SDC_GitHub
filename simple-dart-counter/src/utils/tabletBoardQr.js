@@ -53,15 +53,32 @@ export function ensureBoardAuthTokens(tournamentData) {
  * @param {{ pin: string, board: number|string, token: string }} params
  * @returns {string}
  */
-export function buildTabletBoardQrUrl({ pin, board, token }) {
-  const origin =
-    typeof window !== 'undefined' && window.location?.origin
+export function buildTabletBoardQrUrl({ pin, board, token, origin }) {
+  const resolvedOrigin =
+    origin ||
+    (typeof window !== 'undefined' && window.location?.origin
       ? window.location.origin
-      : 'https://simple-dart-counter-12ff2.web.app';
-  const url = new URL('/tablet', origin);
+      : 'https://simple-dart-counter-12ff2.web.app');
+  const url = new URL('/tablet', resolvedOrigin);
   url.searchParams.set('t', String(pin ?? '').trim());
   url.searchParams.set('board', String(board ?? '').trim());
   url.searchParams.set('token', String(token ?? '').trim());
+  try {
+    const parsed = new URL(resolvedOrigin);
+    const isLanHost =
+      parsed.hostname === 'localhost' ||
+      parsed.hostname === '127.0.0.1' ||
+      parsed.port === '8787' ||
+      /^\d{1,3}(?:\.\d{1,3}){3}$/.test(parsed.hostname);
+    if (isLanHost) {
+      url.searchParams.set(
+        'lanHost',
+        parsed.port ? `${parsed.hostname}:${parsed.port}` : parsed.hostname
+      );
+    }
+  } catch {
+    /* ignore */
+  }
   return url.toString();
 }
 
@@ -78,7 +95,7 @@ export function parseTabletRouteFromUrl() {
   const board = String(params.get('board') ?? '').replace(/\D/g, '').slice(0, 2);
   const token = String(params.get('token') ?? '').trim();
   if (!/^\d{4}$/.test(pin) || !board || !token) return null;
-  return { pin, board, token };
+  return { pin, board, token, lanHost: params.get('lanHost') || params.get('lan') || '' };
 }
 
 function toMillis(ts) {

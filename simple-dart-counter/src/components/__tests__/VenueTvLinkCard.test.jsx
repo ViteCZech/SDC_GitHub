@@ -30,4 +30,19 @@ describe('VenueTvLinkCard', () => {
     expect(document.body.textContent).toContain('Televize se nepřihlašuje');
     expect(screen.getByRole('link', { name: /Otevřít TV/i }).getAttribute('href')).toContain('lang=cs');
   });
+
+  it('LAN režim aktivuje TV bez Google loginu a použije LAN origin', () => {
+    render(
+      <VenueTvLinkCard
+        lang="cs"
+        pin="1234"
+        lanEnabled
+        origin="http://192.168.1.10:8787"
+      />
+    );
+    expect(screen.queryByRole('button', { name: /Přihlásit se/ })).toBeNull();
+    expect(screen.getByRole('link', { name: /Otevřít TV/i }).getAttribute('href')).toContain(
+      'http://192.168.1.10:8787/tv/1234'
+    );
+  });
 });

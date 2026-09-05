@@ -1,6 +1,8 @@
 import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { SyncAdapterProvider } from './context/SyncAdapterContext';
 import { createCloudSyncAdapter } from './services/syncAdapter/cloudSyncAdapter';
+import { createLanSyncAdapter } from './services/syncAdapter/lanSyncAdapter';
+import { resolveLanRelayConfig } from './services/syncAdapter/lanRelayConfig';
 import { ensureLocale, prefetchOtherLocales } from './translations';
 import {
   parseVenueDisplayRouteFromUrl,
@@ -25,7 +27,11 @@ export default function App() {
   const venueRoute = entry.kind === 'venue' ? entry : null;
   const [lang, setLangState] = useState(() => (venueRoute ? resolveVenueLang() : 'cs'));
   const [localeReady, setLocaleReady] = useState(() => (venueRoute ? resolveVenueLang() : 'cs') === 'cs');
-  const syncAdapter = useMemo(() => createCloudSyncAdapter(), []);
+  const lanCfg = useMemo(() => resolveLanRelayConfig(), []);
+  const syncAdapter = useMemo(
+    () => (lanCfg ? createLanSyncAdapter(lanCfg) : createCloudSyncAdapter()),
+    [lanCfg]
+  );
 
   const setLang = React.useCallback((next) => {
     void ensureLocale(next).then(() => {

@@ -12,16 +12,20 @@ export default function VenueTvLinkCard({
   pin,
   isLoggedIn = false,
   cloudEnabled = false,
+  lanEnabled = false,
+  origin,
   onGoogleLogin,
   compact = false,
 }) {
   const t = (k) => translations[lang]?.[k] ?? translations.cs?.[k] ?? k;
   const [copied, setCopied] = useState(false);
   const pinOk = /^\d{4}$/.test(String(pin ?? '').trim());
-  const url = pinOk ? buildVenueDisplayUrl(pin, undefined, lang) : '';
-  const active = !!(isLoggedIn && cloudEnabled && pinOk);
+  const url = pinOk ? buildVenueDisplayUrl(pin, origin, lang) : '';
+  const active = !!pinOk && (!!lanEnabled || !!(isLoggedIn && cloudEnabled));
 
-  const hint = !isLoggedIn
+  const hint = lanEnabled
+    ? t('venueTvHintLan')
+    : !isLoggedIn
     ? t('venueTvHintLogin')
     : !cloudEnabled
       ? t('venueTvHintCloudOff')
@@ -85,7 +89,7 @@ export default function VenueTvLinkCard({
         </div>
       ) : null}
 
-      {!isLoggedIn && typeof onGoogleLogin === 'function' ? (
+      {!isLoggedIn && !lanEnabled && typeof onGoogleLogin === 'function' ? (
         <button
           type="button"
           onClick={() => onGoogleLogin()}

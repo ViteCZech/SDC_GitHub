@@ -354,6 +354,8 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     venueTvHintNoPin: 'PIN turnaje se teprve přidělí. Pak tady uvidíte odkaz /tv/PIN.',
     venueTvHintReady:
       'Na TV nebo projektoru otevřete tento odkaz. Televize se nepřihlašuje — aktivní je proto, že jste přihlášení a turnaj běží v cloudu.',
+    venueTvHintLan:
+      'Lokální LAN: na televizi otevřete tento odkaz v síti Wi-Fi pořadatele. Internet ani Google login nejsou potřeba.',
     tournPinTapShowPassword: 'Klepnutím zobrazíte heslo pro herní tablety',
     tournFormat: 'Formát turnaje', tournFormatGroupsKo: 'Skupiny + KO Pavouk', tournFormatKoOnly: 'Pouze KO Pavouk',
     formatGroupsBracket: 'Skupiny a Pavouk',
@@ -978,10 +980,17 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
         'Moje turnaje s registrací, rychlý start bez přihlášek a historie odehraných turnajů.',
       modeSectionTitle: 'Režim turnaje',
       offlineModeTitle: 'Offline / lokální turnaj',
-      offlineModeHint: 'Běh na tomto zařízení bez cloudu. Vhodné při výpadku internetu.',
+      offlineModeHint: 'Běh na lokální Wi-Fi bez internetu — admin, tablety i TV přes LAN relay.',
       offlineModeConditions:
-        'Podmínky: bez cloudových tabletů a bez cloud TV feedu. Data zůstávají lokálně na zařízení.',
+        'Podmínky: na počítači pořadatele běží lokální server (npm run lan-server / npm run dev). Tablety a TV se připojí přes IP v síti, data zůstávají na disku pořadatele.',
       offlineModeAction: 'Spustit offline turnaj',
+      lanRelayTitle: 'Lokální LAN server',
+      lanRelayRunning: 'Relay běží. Tablety a TV se připojují přes Wi-Fi bez internetu.',
+      lanRelayDown:
+        'Relay neběží. Na počítači pořadatele spusťte npm run lan-server (nebo npm run dev).',
+      lanRelayStartHint: 'Po startu serveru se tady objeví IP adresa a odkaz /tv/PIN pro televizi.',
+      lanRelayIp: 'IP adresa',
+      lanRelayTablets: 'Připojené tablety',
       cloudModeTitle: 'Cloud turnaj',
       cloudModeHint:
         'Online registrace, cloud synchronizace, tablety u terčů a TV obrazovka.',

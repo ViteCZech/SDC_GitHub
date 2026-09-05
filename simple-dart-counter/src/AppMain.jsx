@@ -1,7 +1,16 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { signInAnonymously, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, deleteUser } from 'firebase/auth';
 import { auth } from './firebase';
-import { useSyncAdapter } from './context/SyncAdapterContext';
+import { useSetSyncAdapter, useSyncAdapter } from './context/SyncAdapterContext';
+import { createCloudSyncAdapter } from './services/syncAdapter/cloudSyncAdapter';
+import { createLanSyncAdapter } from './services/syncAdapter/lanSyncAdapter';
+import {
+  clearLanRelayConfig,
+  fetchLanRelayHealth,
+  lanHttpBase,
+  localOrganizerLanConfig,
+  rememberLanRelayConfig,
+} from './services/syncAdapter/lanRelayConfig';
 import {
   readLastOnlineSession,
   clearLastOnlineSession,
@@ -101,7 +110,6 @@ import {
   adaptGroupParallelPlay,
   matchPhaseSignature,
   parallelAssignSignature,
-  pickParallelGroupMatches,
 } from './utils/groupParallelPlay';
 import {
   buildDoublesSettingsFromSlots,
@@ -109,6 +117,7 @@ import {
 } from './utils/doublesThrowOrder';
 import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { shouldRemoteSyncTournament } from './utils/tournamentRemoteSync';
 import {
   SESSION_BOARD_KEY,
   SESSION_PIN_KEY,
@@ -135,6 +144,7 @@ import {
   buildTabletBoardSchedule,
   enrichTabletMatchPlayerNames,
   pickTabletMatchForBoard,
+  resolveTournamentPlayerName,
 } from './utils/tabletBoardSchedule';
 import { doublesResultExtras, getTranslatedName, loserRefereePerson } from './utils/matchStats';
 
@@ -145,6 +155,8 @@ const ACTIVE_PREREG_STATUSES = new Set(['CONFIRMED', 'WAITLIST', 'PENDING_PAYMEN
 function AppMain({ lang, setLang }) {
   const { openKeyboard, isKeyboardOpen, internalKeyboardEnabled } = useAdminVirtualKeyboard();
   const syncAdapter = useSyncAdapter();
+  const setSyncAdapter = useSetSyncAdapter();
+  const [lanHealth, setLanHealth] = useState(null);
   const [user, setUser] = useState(null);
   const [offlineMode, setOfflineMode] = useState(false);
   const [appState, setAppState] = useState(() => {
@@ -847,6 +859,60 @@ function AppMain({ lang, setLang }) {
   const [tournamentDraft, setTournamentDraft] = useState(() =>
     mergeDraftFromResume(getBootUiResumeOnce()?.tournamentDraft)
   );
+  const enableLanAdapter = React.useCallback(async () => {
+    const cfg = localOrganizerLanConfig();
+    rememberLanRelayConfig(cfg);
+    setSyncAdapter(createLanSyncAdapter(cfg));
+    const health = await fetchLanRelayHealth(cfg);
+    setLanHealth(health);
+    return health;
+  }, [setSyncAdapter]);
+  const enableCloudAdapter = React.useCallback(() => {
+    clearLanRelayConfig();
+    setSyncAdapter(createCloudSyncAdapter());
+    setLanHealth(null);
+  }, [setSyncAdapter]);
+  const remoteSyncEnabled = shouldRemoteSyncTournament({
+    adapter: syncAdapter,
+    tournamentData,
+    user,
+  });
+  const lanPublicOrigin = React.useMemo(() => {
+    if (syncAdapter?.mode !== 'lan') return undefined;
+    const ip = Array.isArray(lanHealth?.addresses) ? lanHealth.addresses[0] : null;
+    const port = Number(lanHealth?.port) || Number(syncAdapter.config?.port) || 8787;
+    if (ip) return `http://${ip}:${port}`;
+    return lanHttpBase(syncAdapter.config) || undefined;
+  }, [syncAdapter, lanHealth]);
+
+  useEffect(() => {
+    const lanMode = !tournamentDraft?.cloudEnabled && !tournamentData?.cloudEnabled;
+    if (!lanMode) return undefined;
+    if (
+      appState !== 'tournament_setup' &&
+      appState !== 'tournament_hub' &&
+      appState !== 'tournament_groups' &&
+      appState !== 'tournament_bracket' &&
+      appState !== 'tournament_board_assignment'
+    ) {
+      return undefined;
+    }
+    let cancelled = false;
+    const tick = async () => {
+      const health = await fetchLanRelayHealth(localOrganizerLanConfig());
+      if (!cancelled) setLanHealth(health);
+    };
+    tick();
+    const id = window.setInterval(tick, 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [
+    appState,
+    tournamentDraft?.cloudEnabled,
+    tournamentData?.cloudEnabled,
+  ]);
   const [tournamentBracket, setTournamentBracket] = useState(
     () => getInitialTournamentBootstrapOnce().bracket ?? []
   );
@@ -1263,7 +1329,7 @@ function AppMain({ lang, setLang }) {
   /** Admin: poslech cloudu jen pro sloučení změn z tabletu (check-in, výsledek), bez přepsání celého turnaje. */
   useEffect(() => {
     if (userRole !== 'admin') return;
-    if (!tournamentData?.cloudEnabled || !user || user.isAnonymous) return;
+    if (!remoteSyncEnabled) return;
     if (!syncAdapter.isBackendReady()) return;
     const pin = String(activePin ?? '').trim();
     if (!/^\d{4}$/.test(pin)) return;
@@ -1296,12 +1362,12 @@ function AppMain({ lang, setLang }) {
       }, 2200);
     });
     return () => unsub();
-  }, [userRole, activePin, tournamentData?.cloudEnabled, user, syncAdapter]);
+  }, [userRole, activePin, remoteSyncEnabled, syncAdapter]);
 
   /** Admin na jiném zařízení: doplň QR tokeny / heslo tabletů z privátní kolekce. */
   useEffect(() => {
     if (userRole !== 'admin') return;
-    if (!tournamentData?.cloudEnabled || !user || user.isAnonymous) return;
+    if (!remoteSyncEnabled) return;
     const pin = String(activePin ?? '').trim();
     if (!/^\d{4}$/.test(pin)) return;
     if (tournamentData.boardAuthTokens && Object.keys(tournamentData.boardAuthTokens).length) return;
@@ -1328,16 +1394,15 @@ function AppMain({ lang, setLang }) {
   }, [
     userRole,
     activePin,
-    tournamentData?.cloudEnabled,
+    remoteSyncEnabled,
     tournamentData?.boardAuthTokens,
-    user,
     syncAdapter,
   ]);
 
   /** Pravidelná synchronizace turnaje do Firestore (admin + platný PIN), debounce kvůli šetření zápisů. */
   useEffect(() => {
     if (userRole !== 'admin') return;
-    if (!tournamentData?.cloudEnabled || !user || user.isAnonymous || !syncAdapter.isBackendReady()) return;
+    if (!remoteSyncEnabled || !syncAdapter.isBackendReady()) return;
     const pin = String(activePin ?? '').trim();
     if (!/^\d{4}$/.test(pin)) return;
 
@@ -1377,6 +1442,7 @@ function AppMain({ lang, setLang }) {
     tournamentMatches,
     tournamentBracket,
     syncAdapter,
+    remoteSyncEnabled,
   ]);
 
   /** Přímý pavouk: uložit pavouk do stejného JSON jako turnaj (F5). */
@@ -1442,7 +1508,7 @@ function AppMain({ lang, setLang }) {
     });
 
     return () => unsub();
-  }, [userRole, activePin, tournamentData?.cloudEnabled, user, syncAdapter]);
+  }, [userRole, activePin, remoteSyncEnabled, syncAdapter]);
 
   /**
    * Na kroku Pavouk průběžně:
@@ -1456,7 +1522,7 @@ function AppMain({ lang, setLang }) {
     if (userRole !== 'admin') return;
     if (appState !== 'tournament_bracket' || !tournamentData) return;
     if (!Array.isArray(tournamentBracket) || tournamentBracket?.length === 0) return;
-    if (tournamentData?.cloudEnabled && isIncomingCloudUpdate.current) return;
+    if (remoteSyncEnabled && isIncomingCloudUpdate.current) return;
 
     if (bracketAutoFixTimerRef.current) clearTimeout(bracketAutoFixTimerRef.current);
     bracketAutoFixTimerRef.current = window.setTimeout(() => {
@@ -1464,7 +1530,7 @@ function AppMain({ lang, setLang }) {
       if (userRoleRef.current !== 'admin') return;
       if (appState !== 'tournament_bracket' || !tournamentData) return;
       if (!Array.isArray(tournamentBracket) || tournamentBracket?.length === 0) return;
-      if (tournamentData?.cloudEnabled && isIncomingCloudUpdate.current) return;
+      if (remoteSyncEnabled && isIncomingCloudUpdate.current) return;
 
     const defBoards =
       Number(tournamentData.boardsCount ?? tournamentData.totalBoards ?? tournamentData.numBoards) || 1;
@@ -1521,6 +1587,7 @@ function AppMain({ lang, setLang }) {
     tournamentGroups,
     promotersForRefereeEngine,
     tournamentMatches,
+    remoteSyncEnabled,
   ]);
 
     /** JIT: průběžně zaplňuje volné terče kompletními pending zápasy napříč pavoukem (always-on). */
@@ -1528,7 +1595,7 @@ function AppMain({ lang, setLang }) {
     if (userRole !== 'admin') return;
     if (appState !== 'tournament_bracket' || !tournamentData) return;
     if (!Array.isArray(tournamentBracket) || tournamentBracket.length === 0) return;
-    if (tournamentData?.cloudEnabled && isIncomingCloudUpdate.current) return;
+    if (remoteSyncEnabled && isIncomingCloudUpdate.current) return;
 
     if (bracketJitTimerRef.current) clearTimeout(bracketJitTimerRef.current);
     bracketJitTimerRef.current = window.setTimeout(() => {
@@ -1536,7 +1603,7 @@ function AppMain({ lang, setLang }) {
       if (userRoleRef.current !== 'admin') return;
       if (appState !== 'tournament_bracket' || !tournamentData) return;
       if (!Array.isArray(tournamentBracket) || tournamentBracket.length === 0) return;
-      if (tournamentData?.cloudEnabled && isIncomingCloudUpdate.current) return;
+      if (remoteSyncEnabled && isIncomingCloudUpdate.current) return;
 
     const availableBoards =
       Number(tournamentData.boardsCount ?? tournamentData.totalBoards ?? tournamentData.numBoards) || 1;
@@ -1572,6 +1639,7 @@ function AppMain({ lang, setLang }) {
     tournamentGroups,
     promotersForRefereeEngine,
     tournamentMatches,
+    remoteSyncEnabled,
   ]);
 
   /** Upozornění adminovi: nedostatek nepostupujících oproti zápasům bez počtáře v 1. kole pavouku. */
@@ -1680,7 +1748,7 @@ function AppMain({ lang, setLang }) {
 
   const showTabletQrNav =
     userRole === 'admin' &&
-    !!tournamentData?.cloudEnabled &&
+    !!(tournamentData?.cloudEnabled || syncAdapter?.mode === 'lan') &&
     /^\d{4}$/.test(String(activePin ?? '').trim()) &&
     ['tournament_groups', 'tournament_bracket', 'tournament_stats'].includes(appState);
 
@@ -2136,6 +2204,7 @@ function AppMain({ lang, setLang }) {
     setActivePin(pinToUse);
     setTournamentSetupStep(1);
     setAppState('tournament_setup');
+    if (!tournamentDraft?.cloudEnabled) void enableLanAdapter();
   };
 
   /** Rychlý start = vždy nový průvodce (ne pokračování v live). */
@@ -2154,7 +2223,9 @@ function AppMain({ lang, setLang }) {
       setTournamentDraft({
         ...createDefaultTournamentDraft(),
         pin: pinToUse,
+        cloudEnabled: false,
       });
+      void enableLanAdapter();
       writeTournamentWip(pinToUse);
       setActivePin(pinToUse);
       setTournamentSetupStep(1);
@@ -2817,7 +2888,10 @@ function AppMain({ lang, setLang }) {
 
       // Okamžitý cloud sync — tablet jinak zůstane na dohrané skupině (debounce + inbound lock).
       const pin = String(activePin ?? '').trim();
-      if (nextTd?.cloudEnabled && /^\d{4}$/.test(pin) && user && !user.isAnonymous) {
+      if (
+        shouldRemoteSyncTournament({ adapter: syncAdapter, tournamentData: nextTd, user }) &&
+        /^\d{4}$/.test(pin)
+      ) {
         const snap = tournamentSyncPayloadRef.current;
         syncAdapter.syncTournament(pin, {
           tournamentData: nextTd,
@@ -3272,7 +3346,7 @@ function AppMain({ lang, setLang }) {
     }
 
     const pin = String(activePin ?? '').trim();
-    if (tournamentData?.cloudEnabled && /^\d{4}$/.test(pin) && user && !user.isAnonymous) {
+    if (remoteSyncEnabled && /^\d{4}$/.test(pin)) {
       const snap = tournamentSyncPayloadRef.current;
       syncAdapter.syncTournament(pin, {
         tournamentData: snap?.tournamentData ?? tournamentData,
@@ -3288,8 +3362,8 @@ function AppMain({ lang, setLang }) {
     tournamentData,
     tournamentGroups,
     activePin,
-    user,
     syncAdapter,
+    remoteSyncEnabled,
   ]);
 
   const handleTabletStartGame = async (matchId, startingPlayerId) => {
@@ -4733,7 +4807,7 @@ function AppMain({ lang, setLang }) {
             {showTabletQrNav ? (
               <>
                 <a
-                  href={buildVenueDisplayUrl(activePin, undefined, lang)}
+                  href={buildVenueDisplayUrl(activePin, lanPublicOrigin, lang)}
                   target="_blank"
                   rel="noreferrer"
                   className="p-2 rounded-lg bg-slate-800 border border-slate-700 text-amber-400 hover:text-amber-300 hover:bg-slate-700 transition-colors"
@@ -4748,6 +4822,7 @@ function AppMain({ lang, setLang }) {
                   tournamentData={tournamentData}
                   onNotify={showNotification}
                   onEnsureTokens={handleEnsureBoardAuthTokens}
+                  origin={lanPublicOrigin}
                   compact
                 />
               </>
@@ -5191,6 +5266,12 @@ function AppMain({ lang, setLang }) {
           user={user}
           onGoogleLogin={handleLogin}
           onNotify={showNotification}
+          lanHealth={lanHealth}
+          lanCfg={syncAdapter?.mode === 'lan' ? syncAdapter.config : localOrganizerLanConfig()}
+          onTournamentModeChange={(mode) => {
+            if (mode === 'lan') void enableLanAdapter();
+            else enableCloudAdapter();
+          }}
           preRegTournamentId={preRegImportSourceId}
           onBackToPreRegAdmin={
             preRegImportSourceId

@@ -30,6 +30,17 @@ describe('tabletBoardQr', () => {
     expect(url).toContain('token=tok');
   });
 
+  it('buildTabletBoardQrUrl použije LAN origin', () => {
+    const url = buildTabletBoardQrUrl({
+      pin: '1234',
+      board: 1,
+      token: 'abc',
+      origin: 'http://192.168.1.10:8787',
+    });
+    expect(url.startsWith('http://192.168.1.10:8787/tablet')).toBe(true);
+    expect(new URL(url).searchParams.get('lanHost')).toBe('192.168.1.10:8787');
+  });
+
   it('isBoardOnline jen při status online', () => {
     const now = Date.now();
     expect(
