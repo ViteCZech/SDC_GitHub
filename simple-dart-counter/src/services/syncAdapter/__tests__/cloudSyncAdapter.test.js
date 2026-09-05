@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocked = vi.hoisted(() => ({
@@ -20,7 +23,6 @@ const mocked = vi.hoisted(() => ({
   getOnlineGameById: vi.fn(),
   cancelOnlineGame: vi.fn(),
   abandonOnlineGameSession: vi.fn(),
-  isCloudDbReady: vi.fn(() => true),
   savePublicMatch: vi.fn(),
   deletePublicMatch: vi.fn(),
   deletePublicMatchesForUser: vi.fn(),
@@ -30,7 +32,13 @@ const mocked = vi.hoisted(() => ({
   adminConfirmPair: vi.fn(),
   verifyAdminInviteToken: vi.fn(),
   claimAdminInviteAccess: vi.fn(),
+  publicResultsLoaded: false,
+  onlineGamesLoaded: false,
+  matchHistoryLoaded: false,
+  preRegLoaded: false,
 }));
+
+vi.mock('../../../firebase', () => ({ db: { name: 'eur3' } }));
 
 vi.mock('../../tournamentSync', () => ({
   archivePastTournamentAndDeleteActive: mocked.archivePastTournamentAndDeleteActive,
@@ -49,54 +57,77 @@ vi.mock('../../tournamentSync', () => ({
   loadTournamentSecrets: mocked.loadTournamentSecrets,
 }));
 
-vi.mock('../../publicResultsService', () => ({
-  getPublicResultById: mocked.getPublicResultById,
-  listenPublicResultsFeed: mocked.listenPublicResultsFeed,
-}));
+vi.mock('../../publicResultsService', () => {
+  mocked.publicResultsLoaded = true;
+  return {
+    getPublicResultById: mocked.getPublicResultById,
+    listenPublicResultsFeed: mocked.listenPublicResultsFeed,
+  };
+});
 
-vi.mock('../../onlineGamesService', () => ({
-  getOnlineGameById: mocked.getOnlineGameById,
-  cancelOnlineGame: mocked.cancelOnlineGame,
-  abandonOnlineGameSession: mocked.abandonOnlineGameSession,
-}));
+vi.mock('../../onlineGamesService', () => {
+  mocked.onlineGamesLoaded = true;
+  return {
+    getOnlineGameById: mocked.getOnlineGameById,
+    cancelOnlineGame: mocked.cancelOnlineGame,
+    abandonOnlineGameSession: mocked.abandonOnlineGameSession,
+  };
+});
 
-vi.mock('../../matchHistoryCloud', () => ({
-  isCloudDbReady: mocked.isCloudDbReady,
-  savePublicMatch: mocked.savePublicMatch,
-  deletePublicMatch: mocked.deletePublicMatch,
-  deletePublicMatchesForUser: mocked.deletePublicMatchesForUser,
-}));
+vi.mock('../../matchHistoryCloud', () => {
+  mocked.matchHistoryLoaded = true;
+  return {
+    savePublicMatch: mocked.savePublicMatch,
+    deletePublicMatch: mocked.deletePublicMatch,
+    deletePublicMatchesForUser: mocked.deletePublicMatchesForUser,
+  };
+});
 
-vi.mock('../../tournamentPreRegService', () => ({
-  getOwnerTournamentData: mocked.getOwnerTournamentData,
-  listTournamentRegistrations: mocked.listTournamentRegistrations,
-  createManualRegistration: mocked.createManualRegistration,
-  adminConfirmPair: mocked.adminConfirmPair,
-  verifyAdminInviteToken: mocked.verifyAdminInviteToken,
-  claimAdminInviteAccess: mocked.claimAdminInviteAccess,
-}));
+vi.mock('../../tournamentPreRegService', () => {
+  mocked.preRegLoaded = true;
+  return {
+    getOwnerTournamentData: mocked.getOwnerTournamentData,
+    listTournamentRegistrations: mocked.listTournamentRegistrations,
+    createManualRegistration: mocked.createManualRegistration,
+    adminConfirmPair: mocked.adminConfirmPair,
+    verifyAdminInviteToken: mocked.verifyAdminInviteToken,
+    claimAdminInviteAccess: mocked.claimAdminInviteAccess,
+  };
+});
 
 import { createCloudSyncAdapter } from '../cloudSyncAdapter';
 
 describe('createCloudSyncAdapter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocked.isCloudDbReady.mockReturnValue(true);
   });
 
-  it('maps all tournament, tablet and public APIs 1:1', async () => {
+  it('keeps deferred services out of the static import graph', () => {
+    const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../cloudSyncAdapter.js'), 'utf8');
+    expect(src).not.toMatch(/from ['"]\.\.\/publicResultsService['"]/);
+    expect(src).not.toMatch(/from ['"]\.\.\/onlineGamesService['"]/);
+    expect(src).not.toMatch(/from ['"]\.\.\/matchHistoryCloud['"]/);
+    expect(src).not.toMatch(/from ['"]\.\.\/tournamentPreRegService['"]/);
+    expect(src).toMatch(/import\(['"]\.\.\/publicResultsService['"]\)/);
+    expect(src).toMatch(/import\(['"]\.\.\/onlineGamesService['"]\)/);
+    expect(src).toMatch(/import\(['"]\.\.\/matchHistoryCloud['"]\)/);
+    expect(src).toMatch(/import\(['"]\.\.\/tournamentPreRegService['"]\)/);
+  });
+
+  it('maps tournament and tablet APIs 1:1 without loading deferred services', async () => {
     const adapter = createCloudSyncAdapter();
     expect(adapter.mode).toBe('cloud');
     expect(adapter.isBackendReady()).toBe(true);
+    expect(mocked.publicResultsLoaded).toBe(false);
+    expect(mocked.onlineGamesLoaded).toBe(false);
+    expect(mocked.matchHistoryLoaded).toBe(false);
+    expect(mocked.preRegLoaded).toBe(false);
 
     const tournamentUnsub = vi.fn();
     mocked.listenToCloudTournament.mockReturnValue(tournamentUnsub);
-    const publicUnsub = vi.fn();
-    mocked.listenPublicResultsFeed.mockReturnValue(publicUnsub);
 
     const snap = { tournamentData: { name: 'Friday' }, groups: [], groupMatches: [], tournamentBracket: [] };
     const cb = vi.fn();
-    const errCb = vi.fn();
     const releasePayload = { pin: '1234', board: '1' };
 
     expect(adapter.listenTournament('1234', cb)).toBe(tournamentUnsub);
@@ -113,8 +144,6 @@ describe('createCloudSyncAdapter', () => {
     await adapter.heartbeatTabletPresence(releasePayload);
     await adapter.releaseTabletPresence(releasePayload);
     adapter.releaseTabletPresenceOnUnload(releasePayload);
-    expect(adapter.listenPublicFeed(cb, errCb)).toBe(publicUnsub);
-    await adapter.getPublicResultById('res-1');
 
     expect(mocked.listenToCloudTournament).toHaveBeenCalledWith('1234', cb);
     expect(mocked.syncTournamentToCloud).toHaveBeenCalledWith('1234', snap);
@@ -139,7 +168,39 @@ describe('createCloudSyncAdapter', () => {
     expect(mocked.heartbeatTabletBoardPresence).toHaveBeenCalledWith(releasePayload);
     expect(mocked.releaseTabletBoardPresence).toHaveBeenCalledWith(releasePayload);
     expect(mocked.releaseTabletBoardPresenceOnUnload).toHaveBeenCalledWith(releasePayload);
-    expect(mocked.listenPublicResultsFeed).toHaveBeenCalledWith(cb, errCb);
+    expect(mocked.publicResultsLoaded).toBe(false);
+    expect(mocked.onlineGamesLoaded).toBe(false);
+    expect(mocked.matchHistoryLoaded).toBe(false);
+    expect(mocked.preRegLoaded).toBe(false);
+  });
+
+  it('does not attach a public feed if unsubscribed before the module loads', async () => {
+    const adapter = createCloudSyncAdapter();
+    mocked.listenPublicResultsFeed.mockReturnValue(vi.fn());
+    const unsub = adapter.listenPublicFeed(vi.fn(), vi.fn());
+    unsub();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(mocked.listenPublicResultsFeed).not.toHaveBeenCalled();
+  });
+
+  it('lazy-loads public results and unsubscribes the inner listener', async () => {
+    const adapter = createCloudSyncAdapter();
+    const publicUnsub = vi.fn();
+    mocked.listenPublicResultsFeed.mockReturnValue(publicUnsub);
+    const cb = vi.fn();
+    const errCb = vi.fn();
+
+    const unsub = adapter.listenPublicFeed(cb, errCb);
+    expect(typeof unsub).toBe('function');
+    await vi.waitFor(() => {
+      expect(mocked.listenPublicResultsFeed).toHaveBeenCalledWith(cb, errCb);
+    });
+    expect(mocked.publicResultsLoaded).toBe(true);
+    unsub();
+    expect(publicUnsub).toHaveBeenCalledTimes(1);
+
+    await adapter.getPublicResultById('res-1');
     expect(mocked.getPublicResultById).toHaveBeenCalledWith('res-1');
   });
 
@@ -166,6 +227,9 @@ describe('createCloudSyncAdapter', () => {
     await adapter.verifyAdminInviteToken('t-1', 'tok');
     await adapter.claimAdminInviteAccess('t-1', 'tok');
 
+    expect(mocked.onlineGamesLoaded).toBe(true);
+    expect(mocked.matchHistoryLoaded).toBe(true);
+    expect(mocked.preRegLoaded).toBe(true);
     expect(mocked.getOnlineGameById).toHaveBeenCalledWith('g-1');
     expect(mocked.cancelOnlineGame).toHaveBeenCalledWith('g-1');
     expect(mocked.abandonOnlineGameSession).toHaveBeenCalledWith('g-1', 'p1');

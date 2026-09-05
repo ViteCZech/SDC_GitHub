@@ -41,6 +41,9 @@ export default defineConfig({
           '**/UserProfile-*.js',
           '**/en-*.js',
           '**/pl-*.js',
+          '**/tournamentPreRegService-*.js',
+          '**/publicResultsService-*.js',
+          '**/matchHistoryCloud-*.js',
         ],
       }
     })

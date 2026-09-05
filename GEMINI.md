@@ -20,7 +20,7 @@ SDC_GitHub/
     src/AppMain.jsx                  ← orchestrátor (stavy, auth, turnaj, online, wiring UI)
     src/lazyScreens.jsx              ← React.lazy obrazovky mimo home/setup/X01
     src/context/SyncAdapterContext.jsx
-    src/services/syncAdapter/        ← cloud I/O pro App (turnaj, online, historie, prereg)
+    src/services/syncAdapter/        ← cloud I/O: jádro turnaj/tablet eager; prereg/online/historie lazy
     src/utils/venueDisplayRoutes.js  ← /tv/:pin routing bez tournamentLogic
     src/utils/tabletBoardSchedule.js ← rozpis / pickup zápasu na tabletu
     src/utils/matchStats.js          ← průměry, překlad výchozích jmen
@@ -75,7 +75,7 @@ Lokální běh: `cd simple-dart-counter && npm run dev`. Functions: `cd function
 
 Obrazovky mimo home / setup / X01 jdou přes `lazyScreens.jsx` (turnaj, cricket, online lobby, prereg, veřejné výsledky, profil). `GameX01` zůstává v hlavním chunku kvůli parkování zápasu. Každá lazy obrazovka má vlastní `Suspense`, aby suspend cricket/turnaje neodpojil namountovaný X01.
 
-Cloudové I/O z AppMain jde přes `useSyncAdapter()` (`createCloudSyncAdapter`): turnaj/tablet, veřejné výsledky, online hry, záloha historie zápasů, prereg admin. Firebase SDK se v AppMain přímo nevolá (jen Auth).
+Cloudové I/O z AppMain jde přes `useSyncAdapter()` (`createCloudSyncAdapter`). Jádro (turnaj/tablet, `isBackendReady`) je v úvodním chunku kvůli TV `/tv/:pin`. Veřejné výsledky, online hry, záloha historie zápasů a prereg admin se dynamicky importují až při prvním volání. Firebase SDK se v AppMain přímo nevolá (jen Auth).
 
 Helpery mimo orchestrátor: `appSession.js`, `tabletBoardSchedule.js`, `matchStats.js`. Obrazovky statistik: `MatchStatsView.jsx`, `UserProfile.jsx`.
 
@@ -293,7 +293,7 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 6. **AppMain.jsx je velký.** Novou logiku extrahuj do `utils/` / `services/` / komponenty. Do AppMain jen wiring. Home/setup/X01 nech eager; ostatní obrazovky lazy.
 7. **Tablet = kiosk.** Žádný Google login na tabletu. Přístup PIN + board + heslo/token.
 8. **Cloud turnaje** vyžaduje Google účet. Offline turnaj musí dál fungovat bez cloudu.
-9. **PWA:** po změně chování ověř, že service worker neservíruje starý bundle; `registerSW({ immediate: true })`. Lazy obrazovky (turnaj, cricket, online, prereg) se do precache nedávají — stáhnou se až po otevření.
+9. **PWA:** po změně chování ověř, že service worker neservíruje starý bundle; `registerSW({ immediate: true })`. Lazy obrazovky (turnaj, cricket, online, prereg) a odložené servisy (prereg, veřejné výsledky, historie zápasů) se do precache nedávají — stáhnou se až po otevření.
 10. Neměň Firebase project ID, název DB `eur3`, ani region functions bez výslovného zadání.
 
 ---

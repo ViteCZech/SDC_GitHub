@@ -1,3 +1,4 @@
+import { db } from '../../firebase';
 import {
   archivePastTournamentAndDeleteActive,
   deleteCloudTournament,
@@ -14,32 +15,25 @@ import {
   verifyTournamentPin,
   loadTournamentSecrets,
 } from '../tournamentSync';
-import { getPublicResultById, listenPublicResultsFeed } from '../publicResultsService';
-import {
-  abandonOnlineGameSession as abandonOnlineGameSessionFn,
-  cancelOnlineGame as cancelOnlineGameFn,
-  getOnlineGameById as getOnlineGameByIdFn,
-} from '../onlineGamesService';
-import {
-  deletePublicMatch as deletePublicMatchFn,
-  deletePublicMatchesForUser as deletePublicMatchesForUserFn,
-  isCloudDbReady,
-  savePublicMatch as savePublicMatchFn,
-} from '../matchHistoryCloud';
-import {
-  adminConfirmPair as adminConfirmPairFn,
-  claimAdminInviteAccess as claimAdminInviteAccessFn,
-  createManualRegistration as createManualRegistrationFn,
-  getOwnerTournamentData as getOwnerTournamentDataFn,
-  listTournamentRegistrations as listTournamentRegistrationsFn,
-  verifyAdminInviteToken as verifyAdminInviteTokenFn,
-} from '../tournamentPreRegService';
+
+function cachedImport(loader) {
+  let pending;
+  return () => {
+    pending ??= loader();
+    return pending;
+  };
+}
+
+const loadPublicResults = cachedImport(() => import('../publicResultsService'));
+const loadOnlineGames = cachedImport(() => import('../onlineGamesService'));
+const loadMatchHistory = cachedImport(() => import('../matchHistoryCloud'));
+const loadPreReg = cachedImport(() => import('../tournamentPreRegService'));
 
 export function createCloudSyncAdapter() {
   return Object.freeze({
     mode: 'cloud',
     isBackendReady() {
-      return isCloudDbReady();
+      return !!db;
     },
 
     listenTournament(pin, callback) {
@@ -87,49 +81,80 @@ export function createCloudSyncAdapter() {
     },
 
     listenPublicFeed(callback, onError) {
-      return listenPublicResultsFeed(callback, onError);
+      let cancelled = false;
+      let innerUnsub = null;
+      loadPublicResults()
+        .then((mod) => {
+          if (cancelled) return;
+          innerUnsub = mod.listenPublicResultsFeed(callback, onError);
+          if (cancelled) {
+            innerUnsub?.();
+            innerUnsub = null;
+          }
+        })
+        .catch((err) => {
+          if (!cancelled && typeof onError === 'function') onError(err);
+        });
+      return () => {
+        cancelled = true;
+        innerUnsub?.();
+        innerUnsub = null;
+      };
     },
-    getPublicResultById(resultId) {
-      return getPublicResultById(resultId);
+    async getPublicResultById(resultId) {
+      const mod = await loadPublicResults();
+      return mod.getPublicResultById(resultId);
     },
 
-    getOnlineGameById(gameId) {
-      return getOnlineGameByIdFn(gameId);
+    async getOnlineGameById(gameId) {
+      const mod = await loadOnlineGames();
+      return mod.getOnlineGameById(gameId);
     },
-    cancelOnlineGame(gameId) {
-      return cancelOnlineGameFn(gameId);
+    async cancelOnlineGame(gameId) {
+      const mod = await loadOnlineGames();
+      return mod.cancelOnlineGame(gameId);
     },
-    abandonOnlineGameSession(gameId, myRole) {
-      return abandonOnlineGameSessionFn(gameId, myRole);
-    },
-
-    savePublicMatch(record) {
-      return savePublicMatchFn(record);
-    },
-    deletePublicMatch(docId) {
-      return deletePublicMatchFn(docId);
-    },
-    deletePublicMatchesForUser(uid) {
-      return deletePublicMatchesForUserFn(uid);
+    async abandonOnlineGameSession(gameId, myRole) {
+      const mod = await loadOnlineGames();
+      return mod.abandonOnlineGameSession(gameId, myRole);
     },
 
-    getOwnerTournamentData(tournamentId) {
-      return getOwnerTournamentDataFn(tournamentId);
+    async savePublicMatch(record) {
+      const mod = await loadMatchHistory();
+      return mod.savePublicMatch(record);
     },
-    listTournamentRegistrations(tournamentId) {
-      return listTournamentRegistrationsFn(tournamentId);
+    async deletePublicMatch(docId) {
+      const mod = await loadMatchHistory();
+      return mod.deletePublicMatch(docId);
     },
-    createManualRegistration(tournamentId, input) {
-      return createManualRegistrationFn(tournamentId, input);
+    async deletePublicMatchesForUser(uid) {
+      const mod = await loadMatchHistory();
+      return mod.deletePublicMatchesForUser(uid);
     },
-    adminConfirmPair(tournamentId, regAId, regBId) {
-      return adminConfirmPairFn(tournamentId, regAId, regBId);
+
+    async getOwnerTournamentData(tournamentId) {
+      const mod = await loadPreReg();
+      return mod.getOwnerTournamentData(tournamentId);
     },
-    verifyAdminInviteToken(tournamentId, token) {
-      return verifyAdminInviteTokenFn(tournamentId, token);
+    async listTournamentRegistrations(tournamentId) {
+      const mod = await loadPreReg();
+      return mod.listTournamentRegistrations(tournamentId);
     },
-    claimAdminInviteAccess(tournamentId, token) {
-      return claimAdminInviteAccessFn(tournamentId, token);
+    async createManualRegistration(tournamentId, input) {
+      const mod = await loadPreReg();
+      return mod.createManualRegistration(tournamentId, input);
+    },
+    async adminConfirmPair(tournamentId, regAId, regBId) {
+      const mod = await loadPreReg();
+      return mod.adminConfirmPair(tournamentId, regAId, regBId);
+    },
+    async verifyAdminInviteToken(tournamentId, token) {
+      const mod = await loadPreReg();
+      return mod.verifyAdminInviteToken(tournamentId, token);
+    },
+    async claimAdminInviteAccess(tournamentId, token) {
+      const mod = await loadPreReg();
+      return mod.claimAdminInviteAccess(tournamentId, token);
     },
   });
 }
