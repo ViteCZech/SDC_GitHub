@@ -6815,11 +6815,11 @@ function AppMain({ lang, setLang }) {
       {/* --- TUTORIAL --- */}
       {appState === 'tutorial' && (
         <main className="relative z-10 flex flex-col items-center flex-1 w-full max-w-6xl xl:max-w-7xl mx-auto p-4 pb-20 overflow-y-auto sm:p-6">
-            <h2 className="flex items-center gap-2 mb-6 text-2xl font-black tracking-widest text-white uppercase w-full"><FileText className="w-6 h-6 text-emerald-500"/> {t('tutorial')}</h2>
+            <h2 className="flex items-center gap-2 mb-6 text-2xl font-black tracking-widest text-slate-900 dark:text-white uppercase w-full"><FileText className="w-6 h-6 text-emerald-500"/> {t('tutorial')}</h2>
             <button
               type="button"
               onClick={returnFromContextHelp}
-              className="w-full max-w-4xl mb-4 px-4 py-3 rounded-xl border border-emerald-500/40 bg-emerald-950/30 text-emerald-200 font-black tracking-wide text-sm hover:bg-emerald-950/50 transition-colors text-left"
+              className="w-full max-w-4xl mb-4 px-4 py-3 rounded-xl border border-emerald-600/40 bg-emerald-50 text-emerald-800 font-black tracking-wide text-sm hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-200 dark:hover:bg-emerald-950/50 transition-colors text-left"
             >
               {helpBackLabel}
             </button>
@@ -6831,8 +6831,11 @@ function AppMain({ lang, setLang }) {
             </div>
 
             {visibleHelpTopics.length > 0 && (
-              <section className="w-full max-w-4xl mb-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 md:p-5">
-                <h3 className="text-xs font-black uppercase tracking-widest text-amber-300 mb-3">
+              <section
+                data-testid="context-help-section"
+                className="w-full max-w-4xl mb-6 rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/70 p-4 md:p-5"
+              >
+                <h3 className="text-xs font-black uppercase tracking-widest text-amber-700 dark:text-amber-300 mb-3">
                   {helpCenter.sectionTitle || 'Kontextová nápověda'}
                 </h3>
                 <div className="space-y-3">
@@ -6841,23 +6844,23 @@ function AppMain({ lang, setLang }) {
                       key={topic.id}
                       className={`rounded-xl border p-3 md:p-4 ${
                         activeHelpTopicId === topic.id
-                          ? 'border-amber-500/60 bg-amber-950/20'
-                          : 'border-slate-700 bg-slate-900'
+                          ? 'border-amber-500 bg-amber-50 dark:border-amber-500/60 dark:bg-amber-950/20'
+                          : 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <h4 className="text-sm font-black tracking-wide text-white uppercase">
+                        <h4 className="text-sm font-black tracking-wide text-slate-900 dark:text-white uppercase">
                           {topic.title}
                         </h4>
                         {activeHelpTopicId === topic.id ? (
-                          <span className="text-[10px] font-black uppercase tracking-widest text-amber-300">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">
                             {helpCenter.activeTopicLabel || 'Kontext'}
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-2 text-sm text-slate-300 leading-relaxed">{topic.summary}</p>
+                      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{topic.summary}</p>
                       {Array.isArray(topic.points) && topic.points.length > 0 ? (
-                        <ul className="mt-3 space-y-1 text-sm text-slate-400 list-disc pl-5">
+                        <ul className="mt-3 space-y-1 text-sm text-slate-600 dark:text-slate-400 list-disc pl-5">
                           {topic.points.map((point, idx) => (
                             <li key={`${topic.id}-${idx}`}>{point}</li>
                           ))}
