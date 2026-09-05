@@ -11,6 +11,7 @@ import {
   joinOnlineGame,
   getOnlineGameById,
   ONLINE_AUTH_FAILED,
+  ONLINE_CRICKET_UNSUPPORTED,
   ONLINE_JOIN_ERROR_GUEST_NAME,
   ONLINE_JOIN_ERROR_NOT_AVAILABLE,
   subscribePublicWaitingGames,
@@ -44,6 +45,7 @@ function mapJoinError(err, t) {
   if (code === ONLINE_JOIN_ERROR_GUEST_NAME) return t('onlineGuestNameRequired');
   if (code === 'no_db') return t('onlineErrorNoDb');
   if (code === ONLINE_AUTH_FAILED) return t('onlineErrorAuthFailed');
+  if (code === ONLINE_CRICKET_UNSUPPORTED) return t('onlineErrorCricketUnsupported');
   return t('onlineJoinGameUnavailable');
 }
 
@@ -261,6 +263,10 @@ export default function OnlineHub({
   const defaultHostName = settings?.p1Name || '';
 
   const openGuestJoinDraft = (row) => {
+    if (row?.gameType === 'cricket') {
+      setFormError(t('onlineErrorCricketUnsupported'));
+      return;
+    }
     setWaitingSession(null);
     setFormError(null);
     setGuestJoinDraft({
@@ -297,7 +303,9 @@ export default function OnlineHub({
           ? t('onlineErrorNoDb')
           : e?.message === ONLINE_AUTH_FAILED
             ? t('onlineErrorAuthFailed')
-            : String(e?.message || 'error')
+            : e?.message === ONLINE_CRICKET_UNSUPPORTED
+              ? t('onlineErrorCricketUnsupported')
+              : String(e?.message || 'error')
       );
     } finally {
       setHostBusy(false);

@@ -15,6 +15,9 @@ import {
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { signInAnonymously } from 'firebase/auth';
 import { app, auth, db } from '../firebase';
+import { ONLINE_CRICKET_UNSUPPORTED, assertOnlineX01Only } from '../utils/onlineGameType';
+
+export { ONLINE_CRICKET_UNSUPPORTED, assertOnlineX01Only };
 
 function requireAuthUid() {
   const uid = auth?.currentUser?.uid;
@@ -87,7 +90,7 @@ function randomFourDigitPin() {
  * Vytvoří záznam online hry ve Firestore.
  * @param {object} opts
  * @param {string} opts.hostName
- * @param {'x01'|'cricket'} opts.gameType
+ * @param {'x01'} opts.gameType online je jen X01 (cricket se odmítne)
  * @param {number} opts.legs 1–30
  * @param {boolean} opts.isPublic
  * @param {number} [opts.startScore] pro X01
@@ -97,20 +100,17 @@ function randomFourDigitPin() {
 export async function createOnlineGame(opts) {
   if (!db) throw new Error('no_db');
   await ensureAnonymousAuth();
+  assertOnlineX01Only(opts.gameType);
   const hostName = String(opts.hostName || '').trim() || 'Host';
-  const gameType = opts.gameType === 'cricket' ? 'cricket' : 'x01';
+  const gameType = 'x01';
   const legs = Math.min(30, Math.max(1, Math.floor(Number(opts.legs) || 1)));
   const isPublic = !!opts.isPublic;
   const startPlayer = opts.startPlayer === 'p2' ? 'p2' : 'p1';
-  const startScore = gameType === 'x01' ? Number(opts.startScore) || 501 : null;
-  const outMode =
-    gameType === 'x01' && ['double', 'single', 'master'].includes(opts.outMode)
-      ? opts.outMode
-      : 'double';
-  const gameFormat =
-    gameType === 'cricket'
-      ? 'Cricket'
-      : buildGameFormatLabel({ gameType: 'x01', startScore, outMode });
+  const startScore = Number(opts.startScore) || 501;
+  const outMode = ['double', 'single', 'master'].includes(opts.outMode)
+    ? opts.outMode
+    : 'double';
+  const gameFormat = buildGameFormatLabel({ gameType: 'x01', startScore, outMode });
   const pin = isPublic ? null : randomFourDigitPin();
   const pinHash = isPublic ? null : await hashOnlinePin(pin);
   const hostUid = requireAuthUid();
@@ -123,8 +123,8 @@ export async function createOnlineGame(opts) {
     gameFormat,
     legs,
     gameType,
-    startScore: gameType === 'x01' ? startScore : null,
-    outMode: gameType === 'x01' ? outMode : null,
+    startScore,
+    outMode,
     startPlayer,
     createdAt: serverTimestamp(),
     heartbeatHost: serverTimestamp(),
@@ -167,6 +167,7 @@ export function subscribePublicWaitingGames(onList, onError) {
       const list = snap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
         .filter((g) => {
+          if (g?.gameType === 'cricket') return false;
           // Lobby filter: nezobrazovat waiting hry, jejichž host se 30s neozval.
           const hb = g?.heartbeatHost?.toMillis?.();
           if (typeof hb !== 'number' || Number.isNaN(hb)) return false;
@@ -226,6 +227,7 @@ export async function joinOnlineGame(gameId, guestName, pinRaw = '') {
       const result = await fn({ gameId: id, guestName: guest, pin });
       const game = result?.data?.game;
       if (!game || !game.id) throw new Error(ONLINE_JOIN_ERROR_NOT_AVAILABLE);
+      assertOnlineX01Only(game.gameType);
       return game;
     } catch (err) {
       const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
@@ -248,6 +250,7 @@ export async function joinOnlineGame(gameId, guestName, pinRaw = '') {
     if (prev.status !== 'waiting' || prev.isPublic !== true) {
       throw new Error(ONLINE_JOIN_ERROR_NOT_AVAILABLE);
     }
+    assertOnlineX01Only(prev.gameType);
     if (prev.guestUid != null && String(prev.guestUid).length > 0) {
       throw new Error(ONLINE_JOIN_ERROR_NOT_AVAILABLE);
     }

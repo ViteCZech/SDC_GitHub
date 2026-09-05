@@ -69,6 +69,7 @@ Lokální běh: `cd simple-dart-counter && npm run dev`. Functions: `cd function
 Navigace Domů/Zpět: `src/utils/appNavigation.js` (`resolveAppNav`). Herní plocha (`playing`, `match_finished`) má vlastní Pause menu, ne AppNavBar.
 
 Při „Domů“ z běžícího turnaje se relace **parkne** (`ActiveSessionBanner`) — nesmí se tiše zahodit.
+Parknutý zápas (`parkedSession.kind === 'match'` + `mountKept`) musí zůstat namountovaný i přes historii / statistiky (`matchKeepAlive.js`); jinak `GameX01`/`GameCricket` ztratí skóre.
 
 ---
 
@@ -138,8 +139,8 @@ Domů → Online Hra.
 
 - Host založí lobby (veřejná / soukromá PIN)
 - Host: kamera povinná, guest se připojí jménem
-- X01 nebo Cricket, 1–30 legů, SO/DO/MO, kdo začíná
-- Live stav v `onlineGames/{id}.liveGameState`
+- **Jen X01** (1–30 legů, SO/DO/MO). Cricket online je zakázaný (`ONLINE_CRICKET_UNSUPPORTED`) — chybí live sync/ACK.
+- Live stav v `onlineGames/{id}.liveGameState` s `writeId` + monotonním `seq` (`onlineLiveSync.js`); pozdní snapshot nesmí přepsat novější hod
 - Heartbeat host/guest, reconnect (`onlineReconnectStorage.js`)
 - Po legu čeká **OK od poraženého** než začne další
 - Video: `OnlineVideo.jsx` / `OnlineVideoContainer.jsx`, `useLobbyMedia.js`

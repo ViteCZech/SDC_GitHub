@@ -23,6 +23,12 @@ import {
   memberName,
   snapshotCompletedLeg,
 } from '../utils/doublesThrowOrder';
+import {
+  createLiveWriteId,
+  nextLiveSeq,
+  seqAfterApplyingRemote,
+  shouldApplyRemoteLive,
+} from '../utils/onlineLiveSync';
 
 const IMPOSSIBLE_SCORES = [163, 166, 169, 172, 173, 175, 176, 178, 179];
 
@@ -341,8 +347,10 @@ export default function GameX01({
   const handleTurnCommitRef = useRef(null);
   const handleUndoClickRef = useRef(null);
   const handleNextLegRef = useRef(null);
-  const pushOnlineX01LiveRef = useRef(async () => {});
+  const pushOnlineX01LiveRef = useRef(async () => false);
   const lastPushedWriteIdRef = useRef('');
+  const lastPushedSeqRef = useRef(0);
+  const lastAppliedSeqRef = useRef(0);
   const didSeedOnlineRef = useRef(false);
   const setScoresRef = useRef(setScores);
   const opponentHeartbeatMsRef = useRef(null);
@@ -578,11 +586,14 @@ export default function GameX01({
     setShowObsoleteExit(false);
     onlineDocStatusRef.current = null;
     onlineDocStatusStateRef.current = null;
+    lastPushedWriteIdRef.current = '';
+    lastPushedSeqRef.current = 0;
+    lastAppliedSeqRef.current = 0;
   }, [onlineGameId]);
 
   useEffect(() => {
     pushOnlineX01LiveRef.current = async (gs, ss, syncExtra = null) => {
-      if (!onlineGameId || settings.gameType !== 'x01') return;
+      if (!onlineGameId || settings.gameType !== 'x01') return false;
       let legTransition = onlineLegTransitionRef.current;
       let matchTransition = onlineMatchTransitionRef.current;
       let pendingMatchRecord = pendingOnlineMatchRecordRef.current;
@@ -602,11 +613,16 @@ export default function GameX01({
       } else if (syncExtra != null) {
         legTransition = syncExtra;
       }
-      const writeId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+      const seq = nextLiveSeq(lastPushedSeqRef.current, lastAppliedSeqRef.current);
+      const writeId = createLiveWriteId();
+      const prevWriteId = lastPushedWriteIdRef.current;
+      const prevPushedSeq = lastPushedSeqRef.current;
       lastPushedWriteIdRef.current = writeId;
+      lastPushedSeqRef.current = seq;
       const payload = {
         kind: 'x01',
         writeId,
+        seq,
         gameState: gs,
         setScores: Array.isArray(ss) ? ss : [],
         legTransition,
@@ -618,15 +634,34 @@ export default function GameX01({
       }
       try {
         await updateGameState(onlineGameId, payload);
-      } catch {}
+        lastAppliedSeqRef.current = Math.max(lastAppliedSeqRef.current, seq);
+        return true;
+      } catch (err) {
+        console.warn('pushOnlineX01Live', err);
+        lastPushedWriteIdRef.current = prevWriteId;
+        lastPushedSeqRef.current = prevPushedSeq;
+        return false;
+      }
     };
   }, [onlineGameId, settings.gameType]);
 
   useEffect(() => {
     if (!onlineGameId || settings.gameType !== 'x01') return undefined;
     const unsub = subscribeToGameState(onlineGameId, (live) => {
-      if (!live || live.kind !== 'x01' || !live.gameState) return;
-      if (live.writeId && live.writeId === lastPushedWriteIdRef.current) return;
+      const decision = shouldApplyRemoteLive({
+        live,
+        lastPushedWriteId: lastPushedWriteIdRef.current,
+        lastPushedSeq: lastPushedSeqRef.current,
+        lastAppliedSeq: lastAppliedSeqRef.current,
+      });
+      if (!decision.apply) return;
+      const nextSeq = seqAfterApplyingRemote(
+        live.seq,
+        lastAppliedSeqRef.current,
+        lastPushedSeqRef.current
+      );
+      lastAppliedSeqRef.current = nextSeq;
+      if (nextSeq > lastPushedSeqRef.current) lastPushedSeqRef.current = nextSeq;
       setGameState(live.gameState);
       setSetScores(Array.isArray(live.setScores) ? live.setScores : []);
       setOnlineLegTransition(live.legTransition ?? null);
@@ -1423,20 +1458,12 @@ export default function GameX01({
     setPostMatchStatsActive(true);
     onlineMatchTransitionRef.current = null;
     setOnlineMatchTransition(null);
-    const writeId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-    lastPushedWriteIdRef.current = writeId;
-    try {
-      await updateGameState(onlineGameId, {
-        kind: 'x01',
-        writeId,
-        gameState: gs,
-        setScores: Array.isArray(ss) ? ss : [],
-        legTransition: null,
-        matchTransition: null,
-        pendingMatchRecord: rec,
-        postMatchStatsActive: true,
-      });
-    } catch {
+    const ok = await pushOnlineX01LiveRef.current(gs, ss, {
+      legTransition: null,
+      matchTransition: null,
+      pendingMatchRecord: rec,
+    });
+    if (!ok) {
       console.warn('beginOnlinePostMatchStats');
       postMatchStatsActiveRef.current = false;
       setPostMatchStatsActive(false);

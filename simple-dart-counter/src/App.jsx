@@ -48,6 +48,7 @@ import AppNavBar from './components/AppNavBar';
 import PauseMenuOverlay from './components/PauseMenuOverlay';
 import ActiveSessionBanner from './components/ActiveSessionBanner';
 import { resolveAppNav, shouldParkTournamentSession } from './utils/appNavigation';
+import { shouldMountMatchSurface } from './utils/matchKeepAlive';
 import { loadUiResume, saveUiResume } from './utils/uiResumeStorage';
 import { parsePreregRouteFromUrl, isPublicTournamentCatalogPath } from './utils/preregAdmin';
 import { parseTabletRouteFromUrl, ensureBoardAuthTokens } from './utils/tabletBoardQr';
@@ -1500,8 +1501,13 @@ function AppMain({ lang, setLang }) {
   }, []);
 
   const handleOnlineGameStart = React.useCallback((gameData, gameId, role, localStream = null) => {
+    if (gameData?.gameType === 'cricket') {
+      console.warn('online cricket is not supported');
+      clearLastOnlineSession();
+      return;
+    }
     const legs = Math.min(30, Math.max(1, Number(gameData?.legs) || 1));
-    const gt = gameData?.gameType === 'cricket' ? 'cricket' : 'x01';
+    const gt = 'x01';
     const r = role === 'p2' ? 'p2' : 'p1';
     setOnlineLocalStream(localStream || null);
     setSettings((prev) => ({
@@ -1561,6 +1567,10 @@ function AppMain({ lang, setLang }) {
 
       const st = data.status;
       if (st !== 'waiting' && st !== 'playing') {
+        clearLastOnlineSession();
+        return;
+      }
+      if (data.gameType === 'cricket') {
         clearLastOnlineSession();
         return;
       }
@@ -5071,9 +5081,207 @@ function AppMain({ lang, setLang }) {
       }
   }, [legOptions, settings.matchMode, settings.matchTarget]);
 
+  const showPlayingVisible = appState === 'playing';
+  const mountMatchSurface = shouldMountMatchSurface(appState, parkedSession);
+
+  let matchSurfaceNode = null;
+  if (mountMatchSurface) {
+      const isTournamentPlaying = !!tournamentMatchContext;
+      matchSurfaceNode = (
+          <div
+            className={`bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden ${
+              showPlayingVisible ? '' : 'hidden'
+            }`}
+            aria-hidden={!showPlayingVisible}
+          >
+              {showTournamentPinBar && (
+                  <div className="shrink-0 w-full z-[5000] bg-slate-950 border-b border-slate-800 text-slate-300 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] flex flex-wrap justify-between items-center text-sm gap-x-2 gap-y-1">
+                      <div className="min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 flex-1">
+                      {userRole === 'tablet' && tournamentMatchContext?.type === 'tablet' ? (
+                        <div className="min-w-0 flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-x-2 text-[11px] sm:text-sm leading-tight pr-1">
+                          <span className="truncate font-semibold text-slate-200">{pinBarTitle}</span>
+                          <span className="hidden sm:inline text-slate-600 shrink-0">|</span>
+                          <span className="truncate text-slate-400">
+                            {t('tournBoard') || 'Terč'} {String(tabletBoardStr || '—').trim() || '—'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="truncate pr-2 min-w-0">🏆 {pinBarTitle}</span>
+                      )}
+                      {tournamentPinEndEstimate}
+                      </div>
+                      <div className="shrink-0 flex items-center gap-2 flex-wrap justify-end">
+                        <span className="text-slate-500 hidden sm:inline">PIN:</span>
+                        {adminPinBarRevealable ? (
+                          <button
+                            type="button"
+                            onClick={() => setAdminPinBarShowTabletPassword((v) => !v)}
+                            className="text-2xl font-black text-yellow-400 tracking-widest font-mono tabular-nums rounded-lg px-1 -mx-1 hover:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                            title={t('tournPinTapShowPassword')}
+                            aria-expanded={adminPinBarShowTabletPassword}
+                          >
+                            {pinBarDisplayCode}
+                          </button>
+                        ) : (
+                          <span className="text-2xl font-black text-yellow-400 tracking-widest font-mono tabular-nums">
+                            {pinBarDisplayCode}
+                          </span>
+                        )}
+                        {adminPinBarRevealable && adminPinBarShowTabletPassword && (
+                          <span className="text-xs sm:text-sm font-mono font-bold text-amber-300 tracking-wide max-w-[min(100%,12rem)] break-all">
+                            {t('tournTabletPassword')}: {pinBarTabletPw}
+                          </span>
+                        )}
+                        {userRole === 'admin' && (
+                        <button
+                          type="button"
+                          onClick={handleEndTournament}
+                          className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-red-400 hover:text-red-300 px-2 py-1.5 rounded-lg border border-red-500/40 hover:bg-red-950/60 whitespace-nowrap"
+                        >
+                          {t('tournEndTournament') || 'Ukončit turnaj'}
+                        </button>
+                        )}
+                        {(userRole === 'viewer' || userRole === 'tablet') && (
+                          <button
+                            type="button"
+                            onClick={handleSpectatorDisconnect}
+                            title={t('tournamentHub.disconnect') || 'Odpojit'}
+                            className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white px-2 py-1.5 rounded-lg border border-slate-600 hover:bg-slate-800 whitespace-nowrap"
+                          >
+                            <Unplug className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                            <span className="hidden sm:inline">{t('tournamentHub.disconnect') || 'Odpojit'}</span>
+                          </button>
+                        )}
+                      </div>
+                  </div>
+              )}
+              <header className="relative z-20 flex items-center justify-between px-4 py-3 border-b bg-slate-900 border-slate-800 shrink-0">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPauseMenuOpen(true)}
+                      className="p-2 transition-colors rounded-lg hover:bg-slate-800 text-slate-400 hover:text-amber-300"
+                      aria-label={t('navPause') || 'Pauza'}
+                      title={t('navPause') || 'Pauza'}
+                    >
+                      <Pause className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="flex flex-col items-center">
+                      <div className="flex items-center gap-2 text-[10px] sm:text-xs font-black tracking-[0.3em] uppercase">
+                          <span className="text-slate-500">
+                              {settings.gameType === 'cricket' ? 'CRICKET' : `${settings.startScore} ${settings.outMode === 'double' ? 'DO' : 'SO'}`}
+                          </span>
+                          <span className="text-slate-700">/</span>
+                          <div className="flex items-center gap-1">
+                              <span className="text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.4)]">
+                                  {settings.matchMode === 'first_to' ? t('firstTo') : t('bestOf')}
+                              </span>
+                              <span className="text-white">{settings.matchTarget}</span>
+                          </div>
+                          <span className="text-slate-700">/</span>
+                          <div className="flex items-center gap-1">
+                              <span className="text-emerald-400">{settings.matchSets || 1}</span>
+                              <span className="text-slate-500">{(settings.matchSets || 1) === 1 ? (t('setSingular') || 'Set') : (t('setPlural') || 'Sety')}</span>
+                          </div>
+                      </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <button onClick={toggleFullscreen} className="p-2 transition-colors rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700">
+                          {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+                      </button>
+                      <div className="flex p-1 border rounded-lg bg-slate-800 border-slate-700">
+                          {['cs','en','pl'].map(l=><button key={l} onClick={()=>setLang(l)} className={`p-1 rounded transition-all ${lang===l?'bg-slate-600 opacity-100 shadow-sm':'opacity-40 grayscale'}`}><FlagIcon lang={l} /></button>)}
+                      </div>
+                  </div>
+              </header>
+              {settings.gameType === 'x01' || settings.doubles ? (
+                  <GameX01
+                    settings={settings}
+                    lang={lang}
+                    isLandscape={isLandscape}
+                    isPC={isPC}
+                    tabletPresence={
+                      userRole === 'tablet' && tournamentMatchContext?.type === 'tablet'
+                        ? tabletPresence
+                        : null
+                    }
+                    onlineGameId={onlineGameId || undefined}
+                    myOnlineRole={myOnlineRole || undefined}
+                    onlineLocalStream={onlineLocalStream || undefined}
+                    skipOnlineInitialSeedGameId={skipOnlineInitialSeedGameId || undefined}
+                    requestConfirm={requestConfirm}
+                    onOnlineDocStartPlayer={syncOnlineDocStartPlayer}
+                    onOpenContextHelp={openContextHelp}
+                    onAbort={
+                      isTournamentPlaying
+                        ? () => {
+                            const ctx = tournamentMatchContextRef.current;
+                            clearPlayingTournamentMatchWithoutResult();
+                            setTournamentMatchContext(null);
+                            setAppState(
+                              ctx?.type === 'bracket'
+                                ? 'tournament_bracket'
+                                : ctx?.type === 'tablet'
+                                  ? 'tournament_tablet'
+                                  : 'tournament_groups'
+                            );
+                          }
+                        : () => {
+                            if (onlineGameId) {
+                              handleOnlineSessionEnded();
+                              return;
+                            }
+                            setAppState('setup');
+                          }
+                    }
+                    onMatchComplete={handleMatchComplete}
+                    onOnlineSessionEnded={handleOnlineSessionEnded}
+                    onOnlinePeerAbandoned={handleOnlinePeerAbandonedMatch}
+                    restoredGameState={matchFinishRestoreState}
+                    onRestoredConsumed={() => setMatchFinishRestoreState(null)}
+                  />
+              ) : (
+                  <GameCricket
+                    settings={settings}
+                    lang={lang}
+                    isLandscape={isLandscape}
+                    isPC={isPC}
+                    onlineGameId={onlineGameId || undefined}
+                    onAbort={
+                      isTournamentPlaying
+                        ? () => {
+                            const ctx = tournamentMatchContextRef.current;
+                            clearPlayingTournamentMatchWithoutResult();
+                            setTournamentMatchContext(null);
+                            setAppState(
+                              ctx?.type === 'bracket'
+                                ? 'tournament_bracket'
+                                : ctx?.type === 'tablet'
+                                  ? 'tournament_tablet'
+                                  : 'tournament_groups'
+                            );
+                          }
+                        : () => {
+                            if (onlineGameId) {
+                              handleOnlineSessionEnded();
+                              return;
+                            }
+                            setAppState('setup');
+                          }
+                    }
+                    onMatchComplete={handleMatchComplete}
+                    myOnlineRole={myOnlineRole || undefined}
+                    onOnlinePeerAbandoned={handleOnlinePeerAbandonedMatch}
+                  />
+              )}
+          </div>
+      );
+  }
+
   if (appState === 'match_finished' || selectedMatchDetail) {
       const isTournament = !!tournamentMatchContext;
-      return (
+      const matchStatsScreen = (
           <div className="flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans relative overflow-hidden w-full h-[100dvh]">
               <MatchStatsView
                 data={selectedMatchDetail}
@@ -5422,206 +5630,15 @@ function AppMain({ lang, setLang }) {
               />
           </div>
       );
-  }
-
-  const matchParkedKept =
-    parkedSession?.kind === 'match' && parkedSession.mountKept === true;
-  const showPlayingVisible = appState === 'playing';
-  const mountMatchSurface = showPlayingVisible || matchParkedKept;
-
-  let matchSurfaceNode = null;
-  if (mountMatchSurface) {
-      const isTournamentPlaying = !!tournamentMatchContext;
-      matchSurfaceNode = (
-          <div
-            className={`bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans flex flex-col relative w-full h-[100dvh] overflow-hidden ${
-              showPlayingVisible ? '' : 'hidden'
-            }`}
-            aria-hidden={!showPlayingVisible}
-          >
-              {showTournamentPinBar && (
-                  <div className="shrink-0 w-full z-[5000] bg-slate-950 border-b border-slate-800 text-slate-300 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] flex flex-wrap justify-between items-center text-sm gap-x-2 gap-y-1">
-                      <div className="min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 flex-1">
-                      {userRole === 'tablet' && tournamentMatchContext?.type === 'tablet' ? (
-                        <div className="min-w-0 flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-x-2 text-[11px] sm:text-sm leading-tight pr-1">
-                          <span className="truncate font-semibold text-slate-200">{pinBarTitle}</span>
-                          <span className="hidden sm:inline text-slate-600 shrink-0">|</span>
-                          <span className="truncate text-slate-400">
-                            {t('tournBoard') || 'Terč'} {String(tabletBoardStr || '—').trim() || '—'}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="truncate pr-2 min-w-0">🏆 {pinBarTitle}</span>
-                      )}
-                      {tournamentPinEndEstimate}
-                      </div>
-                      <div className="shrink-0 flex items-center gap-2 flex-wrap justify-end">
-                        <span className="text-slate-500 hidden sm:inline">PIN:</span>
-                        {adminPinBarRevealable ? (
-                          <button
-                            type="button"
-                            onClick={() => setAdminPinBarShowTabletPassword((v) => !v)}
-                            className="text-2xl font-black text-yellow-400 tracking-widest font-mono tabular-nums rounded-lg px-1 -mx-1 hover:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
-                            title={t('tournPinTapShowPassword')}
-                            aria-expanded={adminPinBarShowTabletPassword}
-                          >
-                            {pinBarDisplayCode}
-                          </button>
-                        ) : (
-                          <span className="text-2xl font-black text-yellow-400 tracking-widest font-mono tabular-nums">
-                            {pinBarDisplayCode}
-                          </span>
-                        )}
-                        {adminPinBarRevealable && adminPinBarShowTabletPassword && (
-                          <span className="text-xs sm:text-sm font-mono font-bold text-amber-300 tracking-wide max-w-[min(100%,12rem)] break-all">
-                            {t('tournTabletPassword')}: {pinBarTabletPw}
-                          </span>
-                        )}
-                        {userRole === 'admin' && (
-                        <button
-                          type="button"
-                          onClick={handleEndTournament}
-                          className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-red-400 hover:text-red-300 px-2 py-1.5 rounded-lg border border-red-500/40 hover:bg-red-950/60 whitespace-nowrap"
-                        >
-                          {t('tournEndTournament') || 'Ukončit turnaj'}
-                        </button>
-                        )}
-                        {(userRole === 'viewer' || userRole === 'tablet') && (
-                          <button
-                            type="button"
-                            onClick={handleSpectatorDisconnect}
-                            title={t('tournamentHub.disconnect') || 'Odpojit'}
-                            className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white px-2 py-1.5 rounded-lg border border-slate-600 hover:bg-slate-800 whitespace-nowrap"
-                          >
-                            <Unplug className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                            <span className="hidden sm:inline">{t('tournamentHub.disconnect') || 'Odpojit'}</span>
-                          </button>
-                        )}
-                      </div>
-                  </div>
-              )}
-              <header className="relative z-20 flex items-center justify-between px-4 py-3 border-b bg-slate-900 border-slate-800 shrink-0">
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setPauseMenuOpen(true)}
-                      className="p-2 transition-colors rounded-lg hover:bg-slate-800 text-slate-400 hover:text-amber-300"
-                      aria-label={t('navPause') || 'Pauza'}
-                      title={t('navPause') || 'Pauza'}
-                    >
-                      <Pause className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <div className="flex flex-col items-center">
-                      <div className="flex items-center gap-2 text-[10px] sm:text-xs font-black tracking-[0.3em] uppercase">
-                          <span className="text-slate-500">
-                              {settings.gameType === 'cricket' ? 'CRICKET' : `${settings.startScore} ${settings.outMode === 'double' ? 'DO' : 'SO'}`}
-                          </span>
-                          <span className="text-slate-700">/</span>
-                          <div className="flex items-center gap-1">
-                              <span className="text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.4)]">
-                                  {settings.matchMode === 'first_to' ? t('firstTo') : t('bestOf')}
-                              </span>
-                              <span className="text-white">{settings.matchTarget}</span>
-                          </div>
-                          <span className="text-slate-700">/</span>
-                          <div className="flex items-center gap-1">
-                              <span className="text-emerald-400">{settings.matchSets || 1}</span>
-                              <span className="text-slate-500">{(settings.matchSets || 1) === 1 ? (t('setSingular') || 'Set') : (t('setPlural') || 'Sety')}</span>
-                          </div>
-                      </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                      <button onClick={toggleFullscreen} className="p-2 transition-colors rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700">
-                          {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-                      </button>
-                      <div className="flex p-1 border rounded-lg bg-slate-800 border-slate-700">
-                          {['cs','en','pl'].map(l=><button key={l} onClick={()=>setLang(l)} className={`p-1 rounded transition-all ${lang===l?'bg-slate-600 opacity-100 shadow-sm':'opacity-40 grayscale'}`}><FlagIcon lang={l} /></button>)}
-                      </div>
-                  </div>
-              </header>
-              {settings.gameType === 'x01' || settings.doubles ? (
-                  <GameX01
-                    settings={settings}
-                    lang={lang}
-                    isLandscape={isLandscape}
-                    isPC={isPC}
-                    tabletPresence={
-                      userRole === 'tablet' && tournamentMatchContext?.type === 'tablet'
-                        ? tabletPresence
-                        : null
-                    }
-                    onlineGameId={onlineGameId || undefined}
-                    myOnlineRole={myOnlineRole || undefined}
-                    onlineLocalStream={onlineLocalStream || undefined}
-                    skipOnlineInitialSeedGameId={skipOnlineInitialSeedGameId || undefined}
-                    requestConfirm={requestConfirm}
-                    onOnlineDocStartPlayer={syncOnlineDocStartPlayer}
-                    onOpenContextHelp={openContextHelp}
-                    onAbort={
-                      isTournamentPlaying
-                        ? () => {
-                            const ctx = tournamentMatchContextRef.current;
-                            clearPlayingTournamentMatchWithoutResult();
-                            setTournamentMatchContext(null);
-                            setAppState(
-                              ctx?.type === 'bracket'
-                                ? 'tournament_bracket'
-                                : ctx?.type === 'tablet'
-                                  ? 'tournament_tablet'
-                                  : 'tournament_groups'
-                            );
-                          }
-                        : () => {
-                            if (onlineGameId) {
-                              handleOnlineSessionEnded();
-                              return;
-                            }
-                            setAppState('setup');
-                          }
-                    }
-                    onMatchComplete={handleMatchComplete}
-                    onOnlineSessionEnded={handleOnlineSessionEnded}
-                    onOnlinePeerAbandoned={handleOnlinePeerAbandonedMatch}
-                    restoredGameState={matchFinishRestoreState}
-                    onRestoredConsumed={() => setMatchFinishRestoreState(null)}
-                  />
-              ) : (
-                  <GameCricket
-                    settings={settings}
-                    lang={lang}
-                    isLandscape={isLandscape}
-                    isPC={isPC}
-                    onlineGameId={onlineGameId || undefined}
-                    onAbort={
-                      isTournamentPlaying
-                        ? () => {
-                            const ctx = tournamentMatchContextRef.current;
-                            clearPlayingTournamentMatchWithoutResult();
-                            setTournamentMatchContext(null);
-                            setAppState(
-                              ctx?.type === 'bracket'
-                                ? 'tournament_bracket'
-                                : ctx?.type === 'tablet'
-                                  ? 'tournament_tablet'
-                                  : 'tournament_groups'
-                            );
-                          }
-                        : () => {
-                            if (onlineGameId) {
-                              handleOnlineSessionEnded();
-                              return;
-                            }
-                            setAppState('setup');
-                          }
-                    }
-                    onMatchComplete={handleMatchComplete}
-                    myOnlineRole={myOnlineRole || undefined}
-                    onOnlinePeerAbandoned={handleOnlinePeerAbandonedMatch}
-                  />
-              )}
-          </div>
-      );
+      if (mountMatchSurface) {
+          return (
+              <>
+                  {matchSurfaceNode}
+                  {matchStatsScreen}
+              </>
+          );
+      }
+      return matchStatsScreen;
   }
 
   if (showPlayingVisible) {
