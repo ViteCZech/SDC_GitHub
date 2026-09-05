@@ -879,9 +879,9 @@ export default function TournamentSetup({
         )}
         {/* STEP 1 */}
         {step === 1 && (
-          <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start animate-in fade-in duration-200">
+          <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-4 lg:items-start animate-in fade-in duration-200">
             <div className="lg:col-span-12 flex items-start justify-between gap-3 flex-wrap">
-              <div className="min-w-0">
+              <div className="min-w-0 lg:flex-1">
                 <div className="flex items-center gap-2">
                   <h2 className="text-xl font-black tracking-widest uppercase text-emerald-400">
                     {stepLabels.tournStep1}
@@ -989,220 +989,220 @@ export default function TournamentSetup({
               <button
                 type="button"
                 onClick={handleStep1Continue}
-                className={`${btnBase} bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 ml-auto`}
+                className={`${btnBase} hidden sm:flex bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 ml-auto`}
               >
                 {t('tournContinue') || 'Pokračovat'}
                 <ArrowRight className="w-5 h-5" />
               </button>
             </div>
-            <div className="lg:col-span-7">
-            <div className="p-4 border rounded-xl bg-slate-900 border-slate-800 space-y-4 md:grid md:grid-cols-2 md:gap-6 md:space-y-0">
-              <div className="space-y-4 min-w-0">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-                  {t('tournName') || 'Název turnaje'}
-                </label>
-                <AdminTapTextField
-                  fieldRef={tournamentNameFieldRef}
-                  id="tournament-setup-tournament-name"
-                  value={tournamentDraft.name}
-                  readOnly={fromPreReg}
-                  disabled={fromPreReg}
-                  onValueChange={(v) => {
-                    if (fromPreReg) return;
-                    setTournamentDraft((prev) => ({ ...prev, name: v }));
-                  }}
-                  onEnterPress={() => {
-                    if (fromPreReg) return;
-                    vkOpt?.closeKeyboard?.();
-                    handleStep1Continue();
-                  }}
-                  placeholder={t('tournNamePlaceholder') || 'např. Páteční turnaj'}
-                  className={`${inputBase}${fromPreReg ? ' opacity-80 cursor-not-allowed' : ''}`}
-                />
-                {fromPreReg && (
-                  <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
-                    {t('tournNameLockedHint')}
-                  </p>
-                )}
-              </div>
-              {showSetupPin && (
-                <div className="rounded-xl border border-amber-500/25 bg-slate-950/90 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-500/90 mb-0.5">
-                      {t('tournSetupPin') || 'PIN turnaje'}
-                    </p>
-                    <p className="text-xs text-slate-500 leading-snug">
-                      {t('tournSetupPinHint') ||
-                        'Diváci: jen PIN. Herní tablety v cloudu: PIN a heslo od administrátora.'}
-                    </p>
-                  </div>
-                  <p
-                    className="text-2xl sm:text-3xl font-black font-mono text-yellow-400 tabular-nums tracking-[0.15em] shrink-0 sm:text-right"
-                    aria-label={`PIN ${setupPinDisplay}`}
-                  >
-                    {setupPinDisplay}
-                  </p>
-                </div>
-              )}
-              </div>
-              <div className="space-y-4 min-w-0">
-              <div className="rounded-xl border border-slate-700/80 bg-slate-950/60 p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-400">
-                    {th('modeSectionTitle') || 'Režim turnaje'}
-                  </p>
-                  <ContextHelpButton
-                    topicId="offline-mode"
-                    lang={lang}
-                    onOpenContextHelp={onOpenContextHelp}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={!tournamentDraft.cloudEnabled}
-                    onClick={() =>
-                      setTournamentDraft((prev) => ({
-                        ...prev,
-                        cloudEnabled: false,
-                        tabletPassword: '',
-                      }))
-                    }
-                    className={`text-left rounded-xl border p-3 transition-colors ${
-                      !tournamentDraft.cloudEnabled
-                        ? 'border-emerald-500/60 bg-emerald-950/30'
-                        : 'border-slate-700 bg-slate-900/70 hover:bg-slate-900'
-                    }`}
-                  >
-                    <p className="text-[11px] font-black uppercase tracking-widest text-emerald-300 flex items-center gap-2">
-                      <HardDrive className="w-4 h-4 shrink-0" />
-                      {th('offlineModeTitle') || 'Offline / lokální turnaj'}
-                    </p>
-                    <p className="text-[11px] text-slate-400 mt-2 leading-snug">
-                      {th('offlineModeHint') ||
-                        'Běh na tomto zařízení bez cloudu. Vhodné při výpadku internetu.'}
-                    </p>
-                    <p className="text-[11px] text-emerald-200/90 mt-2 leading-snug">
-                      {th('offlineModeConditions') ||
-                        'Podmínky: bez cloudových tabletů a bez cloud TV feedu. Data zůstávají lokálně na zařízení.'}
-                    </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={!!tournamentDraft.cloudEnabled && !!isLoggedIn}
-                    disabled={!isLoggedIn}
-                    onClick={() => {
-                      if (!isLoggedIn) return;
-                      setTournamentDraft((prev) => ({ ...prev, cloudEnabled: true }));
+            <div className="lg:col-span-12 grid gap-4 lg:grid-cols-12 lg:items-start">
+              <div className="lg:col-span-5 p-4 border rounded-xl bg-slate-900 border-slate-800 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    {t('tournName') || 'Název turnaje'}
+                  </label>
+                  <AdminTapTextField
+                    fieldRef={tournamentNameFieldRef}
+                    id="tournament-setup-tournament-name"
+                    value={tournamentDraft.name}
+                    readOnly={fromPreReg}
+                    disabled={fromPreReg}
+                    onValueChange={(v) => {
+                      if (fromPreReg) return;
+                      setTournamentDraft((prev) => ({ ...prev, name: v }));
                     }}
-                    className={`text-left rounded-xl border p-3 transition-colors ${
-                      tournamentDraft.cloudEnabled && isLoggedIn
-                        ? 'border-sky-500/60 bg-sky-950/30'
-                        : 'border-slate-700 bg-slate-900/70 hover:bg-slate-900'
-                    } ${!isLoggedIn ? 'opacity-60 cursor-not-allowed' : ''}`}
-                  >
-                    <p className="text-[11px] font-black uppercase tracking-widest text-sky-300 flex items-center gap-2">
-                      <Cloud className="w-4 h-4 shrink-0" />
-                      {th('cloudModeTitle') || 'Cloud turnaj'}
+                    onEnterPress={() => {
+                      if (fromPreReg) return;
+                      vkOpt?.closeKeyboard?.();
+                      handleStep1Continue();
+                    }}
+                    placeholder={t('tournNamePlaceholder') || 'např. Páteční turnaj'}
+                    className={`${inputBase}${fromPreReg ? ' opacity-80 cursor-not-allowed' : ''}`}
+                  />
+                  {fromPreReg && (
+                    <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
+                      {t('tournNameLockedHint')}
                     </p>
-                    <p className="text-[11px] text-slate-300 mt-2 leading-snug">
-                      {th('cloudModeHint') ||
-                        'Online registrace, cloud synchronizace, tablety u terčů a TV obrazovka.'}
-                    </p>
-                    <p className="text-[11px] text-sky-100/90 mt-2 leading-snug">
-                      {th('cloudModeConditions') ||
-                        'Podmínky: internet + Google přihlášení pořadatele. Diváci/tablety se připojují přes PIN.'}
-                    </p>
-                  </button>
+                  )}
                 </div>
-
-                {!isLoggedIn && (
-                  <div className="rounded-lg border border-amber-500/40 bg-amber-950/25 px-3 py-3 space-y-3">
-                    <p className="text-sm font-medium text-amber-100/95 leading-snug flex items-start gap-2">
-                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>
-                        {th('cloudModeLoginWarning') ||
-                          t('tournamentHub.loginRequiredForCloud') ||
-                          'Pro tablety, cloudové diváky a TV obrazovku haly se musíte přihlásit přes Google.'}
-                      </span>
+                {showSetupPin && (
+                  <div className="rounded-xl border border-amber-500/25 bg-slate-950/90 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-amber-500/90 mb-0.5">
+                        {t('tournSetupPin') || 'PIN turnaje'}
+                      </p>
+                      <p className="text-xs text-slate-500 leading-snug">
+                        {t('tournSetupPinHint') ||
+                          'Diváci: jen PIN. Herní tablety v cloudu: PIN a heslo od administrátora.'}
+                      </p>
+                    </div>
+                    <p
+                      className="text-2xl sm:text-3xl font-black font-mono text-yellow-400 tabular-nums tracking-[0.15em] shrink-0 sm:text-right"
+                      aria-label={`PIN ${setupPinDisplay}`}
+                    >
+                      {setupPinDisplay}
                     </p>
-                    {typeof onGoogleLogin === 'function' && (
-                      <button
-                        type="button"
-                        onClick={() => onGoogleLogin()}
-                        className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-bold bg-white text-slate-900 hover:bg-slate-100 border border-slate-200 transition-colors"
-                      >
-                        <Cloud className="w-5 h-5 text-sky-600" />
-                        {t('loginWithGoogle') || 'Přihlásit se přes Google'}
-                      </button>
-                    )}
                   </div>
                 )}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                      {t('venueTvOpen')}
-                    </span>
+              </div>
+
+              <div className="lg:col-span-7 p-4 border rounded-xl bg-slate-900 border-slate-800 space-y-4 min-w-0">
+                <div className="rounded-xl border border-slate-700/80 bg-slate-950/60 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                      {th('modeSectionTitle') || 'Režim turnaje'}
+                    </p>
                     <ContextHelpButton
-                      topicId="tv-screen"
+                      topicId="offline-mode"
                       lang={lang}
                       onOpenContextHelp={onOpenContextHelp}
                     />
                   </div>
-                  <VenueTvLinkCard
-                    lang={lang}
-                    pin={setupPinDisplay}
-                    isLoggedIn={!!isLoggedIn}
-                    cloudEnabled={!!tournamentDraft.cloudEnabled}
-                  />
-                </div>
-                {tournamentDraft.cloudEnabled && isLoggedIn && (
-                  <div className="rounded-lg border border-slate-600/80 bg-slate-900/80 px-3 py-3 space-y-2">
-                    <label
-                      className="block text-[10px] font-bold uppercase tracking-widest text-slate-400"
-                      htmlFor="tournament-tablet-password"
-                    >
-                      {t('tournTabletPasswordLabel') || 'Heslo pro herní tablety'}
-                    </label>
-                    <p className="text-[11px] text-slate-500 leading-snug">
-                      {t('tournTabletPasswordHint') ||
-                        'Max. 5 znaků, musí se lišit od PINu. Divácké tablety zadávají pouze PIN.'}
-                    </p>
-                    <input
-                      id="tournament-tablet-password"
-                      type="text"
-                      inputMode="text"
-                      autoComplete="off"
-                      maxLength={5}
-                      value={String(tournamentDraft.tabletPassword ?? '')}
-                      onChange={(e) =>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={!tournamentDraft.cloudEnabled}
+                      onClick={() =>
                         setTournamentDraft((prev) => ({
                           ...prev,
-                          tabletPassword: e.target.value.slice(0, 5),
+                          cloudEnabled: false,
+                          tabletPassword: '',
                         }))
                       }
-                      placeholder={t('tournTabletPasswordPlaceholder') || 'např. ab12'}
-                      className={inputBase}
+                      className={`text-left rounded-xl border p-3 transition-colors ${
+                        !tournamentDraft.cloudEnabled
+                          ? 'border-emerald-500/60 bg-emerald-950/30'
+                          : 'border-slate-700 bg-slate-900/70 hover:bg-slate-900'
+                      }`}
+                    >
+                      <p className="text-[11px] font-black uppercase tracking-widest text-emerald-300 flex items-center gap-2">
+                        <HardDrive className="w-4 h-4 shrink-0" />
+                        {th('offlineModeTitle') || 'Offline / lokální turnaj'}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-2 leading-snug">
+                        {th('offlineModeHint') ||
+                          'Běh na tomto zařízení bez cloudu. Vhodné při výpadku internetu.'}
+                      </p>
+                      <p className="text-[11px] text-emerald-200/90 mt-2 leading-snug">
+                        {th('offlineModeConditions') ||
+                          'Podmínky: bez cloudových tabletů a bez cloud TV feedu. Data zůstávají lokálně na zařízení.'}
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={!!tournamentDraft.cloudEnabled && !!isLoggedIn}
+                      disabled={!isLoggedIn}
+                      onClick={() => {
+                        if (!isLoggedIn) return;
+                        setTournamentDraft((prev) => ({ ...prev, cloudEnabled: true }));
+                      }}
+                      className={`text-left rounded-xl border p-3 transition-colors ${
+                        tournamentDraft.cloudEnabled && isLoggedIn
+                          ? 'border-sky-500/60 bg-sky-950/30'
+                          : 'border-slate-700 bg-slate-900/70 hover:bg-slate-900'
+                      } ${!isLoggedIn ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      <p className="text-[11px] font-black uppercase tracking-widest text-sky-300 flex items-center gap-2">
+                        <Cloud className="w-4 h-4 shrink-0" />
+                        {th('cloudModeTitle') || 'Cloud turnaj'}
+                      </p>
+                      <p className="text-[11px] text-slate-300 mt-2 leading-snug">
+                        {th('cloudModeHint') ||
+                          'Online registrace, cloud synchronizace, tablety u terčů a TV obrazovka.'}
+                      </p>
+                      <p className="text-[11px] text-sky-100/90 mt-2 leading-snug">
+                        {th('cloudModeConditions') ||
+                          'Podmínky: internet + Google přihlášení pořadatele. Diváci/tablety se připojují přes PIN.'}
+                      </p>
+                    </button>
+                  </div>
+
+                  {!isLoggedIn && (
+                    <div className="rounded-lg border border-amber-500/40 bg-amber-950/25 px-3 py-3 space-y-3">
+                      <p className="text-sm font-medium text-amber-100/95 leading-snug flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>
+                          {th('cloudModeLoginWarning') ||
+                            t('tournamentHub.loginRequiredForCloud') ||
+                            'Pro tablety, cloudové diváky a TV obrazovku haly se musíte přihlásit přes Google.'}
+                        </span>
+                      </p>
+                      {typeof onGoogleLogin === 'function' && (
+                        <button
+                          type="button"
+                          onClick={() => onGoogleLogin()}
+                          className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-bold bg-white text-slate-900 hover:bg-slate-100 border border-slate-200 transition-colors"
+                        >
+                          <Cloud className="w-5 h-5 text-sky-600" />
+                          {t('loginWithGoogle') || 'Přihlásit se přes Google'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        {t('venueTvOpen')}
+                      </span>
+                      <ContextHelpButton
+                        topicId="tv-screen"
+                        lang={lang}
+                        onOpenContextHelp={onOpenContextHelp}
+                      />
+                    </div>
+                    <VenueTvLinkCard
+                      lang={lang}
+                      pin={setupPinDisplay}
+                      isLoggedIn={!!isLoggedIn}
+                      cloudEnabled={!!tournamentDraft.cloudEnabled}
                     />
                   </div>
-                )}
-              </div>
-              {validationError && (
-                <div
-                  className="p-3 rounded-lg bg-red-900/30 border border-red-500/50 text-red-400 text-sm font-bold"
-                  role="alert"
-                >
-                  {validationError}
+                  {tournamentDraft.cloudEnabled && isLoggedIn && (
+                    <div className="rounded-lg border border-slate-600/80 bg-slate-900/80 px-3 py-3 space-y-2">
+                      <label
+                        className="block text-[10px] font-bold uppercase tracking-widest text-slate-400"
+                        htmlFor="tournament-tablet-password"
+                      >
+                        {t('tournTabletPasswordLabel') || 'Heslo pro herní tablety'}
+                      </label>
+                      <p className="text-[11px] text-slate-500 leading-snug">
+                        {t('tournTabletPasswordHint') ||
+                          'Max. 5 znaků, musí se lišit od PINu. Divácké tablety zadávají pouze PIN.'}
+                      </p>
+                      <input
+                        id="tournament-tablet-password"
+                        type="text"
+                        inputMode="text"
+                        autoComplete="off"
+                        maxLength={5}
+                        value={String(tournamentDraft.tabletPassword ?? '')}
+                        onChange={(e) =>
+                          setTournamentDraft((prev) => ({
+                            ...prev,
+                            tabletPassword: e.target.value.slice(0, 5),
+                          }))
+                        }
+                        placeholder={t('tournTabletPasswordPlaceholder') || 'např. ab12'}
+                        className={inputBase}
+                      />
+                    </div>
+                  )}
                 </div>
-              )}
               </div>
             </div>
-            </div>
+
+            {validationError && (
+              <div
+                className="lg:col-span-12 p-3 rounded-lg bg-red-900/30 border border-red-500/50 text-red-400 text-sm font-bold"
+                role="alert"
+              >
+                {validationError}
+              </div>
+            )}
           </div>
         )}
 
