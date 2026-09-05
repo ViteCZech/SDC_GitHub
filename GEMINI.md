@@ -16,7 +16,12 @@ SDC_GitHub/
   GEMINI.md                          ← tento soubor
   .github/workflows/                 ← Firebase Hosting + Functions deploy, update žebříčků
   simple-dart-counter/               ← CELÁ APLIKACE (pracovní kořen)
-    src/App.jsx                      ← orchestrátor (stavy, auth, turnaj, online, UI)
+    src/App.jsx                      ← orchestrátor (stavy, auth, turnaj, online, wiring UI)
+    src/context/SyncAdapterContext.jsx
+    src/services/syncAdapter/        ← cloud I/O pro App (turnaj, online, historie, prereg)
+    src/utils/appSession.js          ← PIN, spectator session, resume, localStorage
+    src/utils/tabletBoardSchedule.js ← rozpis / pickup zápasu na tabletu
+    src/utils/matchStats.js          ← průměry, překlad výchozích jmen
     src/main.jsx                     ← React 19 + PWA service worker
     src/firebase.js                  ← Firebase Auth + Firestore DB `eur3`
     src/translations.js
@@ -57,12 +62,16 @@ Lokální běh: `cd simple-dart-counter && npm run dev`. Functions: `cd function
 
 ## Architektura (důležité)
 
-`App.jsx` (~6000 řádků) je **centrální orchestrátor**, ne „hloupý router“. Drží:
+`App.jsx` je **centrální orchestrátor**, ne „hloupý router“. Drží:
 
 - `appState` — která obrazovka se kreslí
 - `userRole` — `admin` | `viewer` | `tablet` | null
-- nastavení zápasu, historii, turnajová data, cloud sync, parked session
+- nastavení zápasu, historii, turnajová data, parked session
 - Google login, anonymous auth pro online
+
+Cloudové I/O z App jde přes `useSyncAdapter()` (`createCloudSyncAdapter`): turnaj/tablet, veřejné výsledky, online hry, záloha historie zápasů, prereg admin. Firebase SDK se v App.jsx přímo nevolá (jen Auth).
+
+Helpery mimo orchestrátor: `appSession.js`, `tabletBoardSchedule.js`, `matchStats.js`. Obrazovky statistik: `MatchStatsView.jsx`, `UserProfile.jsx`.
 
 **Herní logika turnajů patří do `src/utils/`, ne do komponent.** Komponenty jen zobrazují a volají callbacky z `App.jsx`.
 
@@ -290,7 +299,7 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 | Chování X01 (bust, checkout, undo, online ACK) | `GameX01.jsx` |
 | Cricket značky / MPR | `GameCricket.jsx` |
 | Setup lokálního zápasu / bot | `App.jsx` (`setup`) |
-| Online lobby / join / abandon | `onlineGamesService.js`, `OnlineHub.jsx`, `online/*` |
+| Online lobby / join / abandon | `onlineGamesService.js` (přes `syncAdapter`), `OnlineHub.jsx`, `online/*` |
 | Los skupin, pavouk, rozhodčí | `tournamentLogic.js`, `tournamentGenerator.js` |
 | Stepper turnaje / lock rankingu | `App.jsx`, `TournamentSetup.jsx`, `tournamentRanking.js` |
 | Tablet čekárna / check-in timeout | `TabletWaitingRoom.jsx`, `tabletCheckInTimeout.js` |

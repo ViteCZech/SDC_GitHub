@@ -17,6 +17,19 @@ const mocked = vi.hoisted(() => ({
   loadTournamentSecrets: vi.fn(),
   getPublicResultById: vi.fn(),
   listenPublicResultsFeed: vi.fn(),
+  getOnlineGameById: vi.fn(),
+  cancelOnlineGame: vi.fn(),
+  abandonOnlineGameSession: vi.fn(),
+  isCloudDbReady: vi.fn(() => true),
+  savePublicMatch: vi.fn(),
+  deletePublicMatch: vi.fn(),
+  deletePublicMatchesForUser: vi.fn(),
+  getOwnerTournamentData: vi.fn(),
+  listTournamentRegistrations: vi.fn(),
+  createManualRegistration: vi.fn(),
+  adminConfirmPair: vi.fn(),
+  verifyAdminInviteToken: vi.fn(),
+  claimAdminInviteAccess: vi.fn(),
 }));
 
 vi.mock('../../tournamentSync', () => ({
@@ -41,16 +54,40 @@ vi.mock('../../publicResultsService', () => ({
   listenPublicResultsFeed: mocked.listenPublicResultsFeed,
 }));
 
+vi.mock('../../onlineGamesService', () => ({
+  getOnlineGameById: mocked.getOnlineGameById,
+  cancelOnlineGame: mocked.cancelOnlineGame,
+  abandonOnlineGameSession: mocked.abandonOnlineGameSession,
+}));
+
+vi.mock('../../matchHistoryCloud', () => ({
+  isCloudDbReady: mocked.isCloudDbReady,
+  savePublicMatch: mocked.savePublicMatch,
+  deletePublicMatch: mocked.deletePublicMatch,
+  deletePublicMatchesForUser: mocked.deletePublicMatchesForUser,
+}));
+
+vi.mock('../../tournamentPreRegService', () => ({
+  getOwnerTournamentData: mocked.getOwnerTournamentData,
+  listTournamentRegistrations: mocked.listTournamentRegistrations,
+  createManualRegistration: mocked.createManualRegistration,
+  adminConfirmPair: mocked.adminConfirmPair,
+  verifyAdminInviteToken: mocked.verifyAdminInviteToken,
+  claimAdminInviteAccess: mocked.claimAdminInviteAccess,
+}));
+
 import { createCloudSyncAdapter } from '../cloudSyncAdapter';
 
 describe('createCloudSyncAdapter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocked.isCloudDbReady.mockReturnValue(true);
   });
 
   it('maps all tournament, tablet and public APIs 1:1', async () => {
     const adapter = createCloudSyncAdapter();
     expect(adapter.mode).toBe('cloud');
+    expect(adapter.isBackendReady()).toBe(true);
 
     const tournamentUnsub = vi.fn();
     mocked.listenToCloudTournament.mockReturnValue(tournamentUnsub);
@@ -104,5 +141,42 @@ describe('createCloudSyncAdapter', () => {
     expect(mocked.releaseTabletBoardPresenceOnUnload).toHaveBeenCalledWith(releasePayload);
     expect(mocked.listenPublicResultsFeed).toHaveBeenCalledWith(cb, errCb);
     expect(mocked.getPublicResultById).toHaveBeenCalledWith('res-1');
+  });
+
+  it('maps online games, public match history and prereg admin APIs 1:1', async () => {
+    const adapter = createCloudSyncAdapter();
+    const match = { id: 'm-1', p1Name: 'A' };
+    mocked.getOnlineGameById.mockResolvedValue({ id: 'g-1', status: 'playing' });
+    mocked.savePublicMatch.mockResolvedValue('doc-1');
+    mocked.getOwnerTournamentData.mockResolvedValue({ id: 't-1' });
+    mocked.listTournamentRegistrations.mockResolvedValue([{ id: 'r-1' }]);
+    mocked.createManualRegistration.mockResolvedValue({ id: 'r-2' });
+    mocked.verifyAdminInviteToken.mockResolvedValue(true);
+
+    await adapter.getOnlineGameById('g-1');
+    await adapter.cancelOnlineGame('g-1');
+    await adapter.abandonOnlineGameSession('g-1', 'p1');
+    await adapter.savePublicMatch(match);
+    await adapter.deletePublicMatch('doc-1');
+    await adapter.deletePublicMatchesForUser('uid-1');
+    await adapter.getOwnerTournamentData('t-1');
+    await adapter.listTournamentRegistrations('t-1');
+    await adapter.createManualRegistration('t-1', { playerName: 'Pepa' });
+    await adapter.adminConfirmPair('t-1', 'r-a', 'r-b');
+    await adapter.verifyAdminInviteToken('t-1', 'tok');
+    await adapter.claimAdminInviteAccess('t-1', 'tok');
+
+    expect(mocked.getOnlineGameById).toHaveBeenCalledWith('g-1');
+    expect(mocked.cancelOnlineGame).toHaveBeenCalledWith('g-1');
+    expect(mocked.abandonOnlineGameSession).toHaveBeenCalledWith('g-1', 'p1');
+    expect(mocked.savePublicMatch).toHaveBeenCalledWith(match);
+    expect(mocked.deletePublicMatch).toHaveBeenCalledWith('doc-1');
+    expect(mocked.deletePublicMatchesForUser).toHaveBeenCalledWith('uid-1');
+    expect(mocked.getOwnerTournamentData).toHaveBeenCalledWith('t-1');
+    expect(mocked.listTournamentRegistrations).toHaveBeenCalledWith('t-1');
+    expect(mocked.createManualRegistration).toHaveBeenCalledWith('t-1', { playerName: 'Pepa' });
+    expect(mocked.adminConfirmPair).toHaveBeenCalledWith('t-1', 'r-a', 'r-b');
+    expect(mocked.verifyAdminInviteToken).toHaveBeenCalledWith('t-1', 'tok');
+    expect(mocked.claimAdminInviteAccess).toHaveBeenCalledWith('t-1', 'tok');
   });
 });

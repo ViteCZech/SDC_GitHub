@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { signInAnonymously, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, deleteUser } from 'firebase/auth';
-import { collection, addDoc, deleteDoc, doc, query, where, getDocs, onSnapshot } from 'firebase/firestore';
-import { db, auth } from './firebase';
+import { auth } from './firebase';
 import { SyncAdapterProvider, useSyncAdapter } from './context/SyncAdapterContext';
 import { createCloudSyncAdapter } from './services/syncAdapter/cloudSyncAdapter';
-import { cancelOnlineGame, getOnlineGameById, abandonOnlineGameSession } from './services/onlineGamesService';
 import {
   readLastOnlineSession,
   clearLastOnlineSession,
@@ -13,7 +11,7 @@ import {
 import { 
   AlertTriangle, ArrowLeft, Bot, CheckCircle, ChevronDown, Cpu, 
   DownloadCloud, FileText, History, Home, Info, Keyboard as KeyboardIcon, 
-  Maximize, Minimize, Monitor, MousePointer2, Pause, Play, RefreshCw, RotateCcw, 
+  Maximize, Minimize, Monitor, MousePointer2, Pause, Play, RefreshCw, 
   Target, Trash2, Trophy, Undo2, Unplug, User, Cloud, X, BarChart2, List, Swords, ClipboardList, Lock
 } from 'lucide-react';
 
@@ -47,11 +45,14 @@ import MyPreRegTournamentsList from './components/prereg/MyPreRegTournamentsList
 import AppNavBar from './components/AppNavBar';
 import PauseMenuOverlay from './components/PauseMenuOverlay';
 import ActiveSessionBanner from './components/ActiveSessionBanner';
+import FlagIcon from './components/FlagIcon';
+import MatchStatsView from './components/MatchStatsView';
+import UserProfile from './components/UserProfile';
 import { resolveAppNav, shouldParkTournamentSession } from './utils/appNavigation';
 import { shouldMountMatchSurface } from './utils/matchKeepAlive';
 import { deepEqual } from './utils/deepEqual';
 import { prefetchIceServers } from './utils/webrtcIce';
-import { loadUiResume, saveUiResume } from './utils/uiResumeStorage';
+import { saveUiResume } from './utils/uiResumeStorage';
 import { parsePreregRouteFromUrl, isPublicTournamentCatalogPath } from './utils/preregAdmin';
 import { parseTabletRouteFromUrl, ensureBoardAuthTokens } from './utils/tabletBoardQr';
 import { buildVenueDisplayUrl, parseVenueDisplayRouteFromUrl, resolveVenueLang } from './utils/venueDisplay';
@@ -64,14 +65,6 @@ import {
   resolveHelpTab,
 } from './utils/contextHelp';
 import { loadAdminInviteSession, saveAdminInviteSession } from './utils/preregStorage';
-import {
-  adminConfirmPair,
-  createManualRegistration,
-  getOwnerTournamentData,
-  listTournamentRegistrations,
-  verifyAdminInviteToken,
-  claimAdminInviteAccess,
-} from './services/tournamentPreRegService';
 import { HomeOnlineMenuTile, HomeOnlineSubmenu } from './components/HomeOnlineMenu';
 import { distributePlayersToFixedGroups, generateGroupMatches } from './utils/tournamentGenerator';
 import {
@@ -110,1108 +103,37 @@ import {
 } from './utils/doublesThrowOrder';
 import { AdminVirtualKeyboardProvider, useAdminVirtualKeyboard } from './context/AdminVirtualKeyboardContext';
 import { ThemeProvider } from './context/ThemeContext';
+import {
+  SESSION_BOARD_KEY,
+  SESSION_PIN_KEY,
+  SESSION_ROLE_KEY,
+  appendLocalTournamentHistory,
+  clearSpectatorSession,
+  clearTournamentWip,
+  createDefaultTournamentDraft,
+  generatePin,
+  getBootUiResumeOnce,
+  getInitialTournamentBootstrapOnce,
+  getSkipUiResumePersist,
+  loadSafeMatchHistory,
+  loadStoredTabletBoard,
+  mergeDraftFromResume,
+  parsePreregTournamentIdFromPath,
+  persistSpectatorSession,
+  safeStorage,
+  setSkipUiResumePersist,
+  tabletCloudAuthOpts,
+  writeTournamentWip,
+} from './utils/appSession';
+import {
+  buildTabletBoardSchedule,
+  enrichTabletMatchPlayerNames,
+  pickTabletMatchForBoard,
+} from './utils/tabletBoardSchedule';
+import { doublesResultExtras, getTranslatedName, loserRefereePerson } from './utils/matchStats';
 
 const APP_VERSION = "v1.10.2";
 const ACTIVE_PREREG_STATUSES = new Set(['CONFIRMED', 'WAITLIST', 'PENDING_PAYMENT']);
-
-function generatePin() {
-  return Math.floor(1000 + Math.random() * 9000).toString();
-}
-
-/** Veřejná předregistrace: /t/:tournamentId (?invite=token pro admin) */
-function parsePreregTournamentIdFromPath() {
-  return parsePreregRouteFromUrl()?.tournamentId ?? null;
-}
-
-function createDefaultTournamentDraft() {
-  return {
-    name: '',
-    format: 'groups_bracket',
-    groupLegs: 2,
-    bracketLegs: 3,
-    startScore: 501,
-    outMode: 'double',
-    numBoards: 2,
-    players: [],
-    /** Stejný význam jako advancePerGroup – pro Referee Engine když ještě není v tournamentData */
-    promotersCount: 2,
-    /** map groupId -> raw text z inputu (např. "1, 2") – přežije Zpět z přiřazení terčů */
-    boardAssignments: {},
-    /** Číslo terče z rozcestníku „tablet“ (Firebase později) */
-    hubTabletBoard: '',
-    /** PIN turnaje – přiřadí se hned při vstupu do administrace (před dokončením setupu) */
-    pin: '',
-    /** Síťová hra / tablety – pouze po přihlášení (Google); ukládá se do tournamentData */
-    cloudEnabled: false,
-    /** Heslo pro herní tablety (max. 5 znaků, odlišné od PIN); jen při cloudEnabled */
-    tabletPassword: '',
-    /** Žebříček ČŠO (Stedar) pro našeptávač v kroku 2: 'men' | 'women' */
-    csoRankingGender: 'men',
-    /** Zapnout oficiální žebříček ČŠO (našeptávač + auto-ranking) v kroku 2 */
-    useCsoRanking: false,
-    /** singles | random_doubles | doubles | mixed — doubles/mixed přijdou z importu párů */
-    competitionType: 'singles',
-    pairDrawRoster: null,
-    pairDrawReserve: null,
-  };
-}
-
-const safeStorage = {
-  getItem: (key) => { try { return localStorage.getItem(key); } catch { return null; } },
-  setItem: (key, value) => { try { localStorage.setItem(key, value); } catch {} },
-  removeItem: (key) => { try { localStorage.removeItem(key); } catch {} },
-  clear: () => { try { localStorage.clear(); } catch {} },
-};
-
-const TOURNAMENT_WIP_KEY = 'dartsTournamentSetupWip';
-
-const SESSION_ROLE_KEY = 'dartsSessionRole';
-const SESSION_PIN_KEY = 'dartsSessionPin';
-const SESSION_BOARD_KEY = 'dartsSessionBoard';
-const SESSION_TABLET_PW_KEY = 'dartsSessionTabletPw';
-const SESSION_BOARD_TOKEN_KEY = 'dartsSessionBoardToken';
-
-function persistSpectatorSession(role, pin, boardStr = '', tabletPassword = '', boardToken = '') {
-  if (role !== 'viewer' && role !== 'tablet') return;
-  const p = String(pin ?? '').trim();
-  if (!/^\d{4}$/.test(p)) return;
-  safeStorage.setItem(SESSION_ROLE_KEY, role);
-  safeStorage.setItem(SESSION_PIN_KEY, p);
-  if (role === 'tablet') {
-    safeStorage.setItem(SESSION_BOARD_KEY, String(boardStr ?? '').trim());
-    const bt = String(boardToken ?? '').trim();
-    const tp = String(tabletPassword ?? '').trim().slice(0, 5);
-    if (bt) {
-      safeStorage.setItem(SESSION_BOARD_TOKEN_KEY, bt);
-      safeStorage.removeItem(SESSION_TABLET_PW_KEY);
-    } else {
-      safeStorage.removeItem(SESSION_BOARD_TOKEN_KEY);
-      if (tp) safeStorage.setItem(SESSION_TABLET_PW_KEY, tp);
-      else safeStorage.removeItem(SESSION_TABLET_PW_KEY);
-    }
-  } else {
-    safeStorage.removeItem(SESSION_BOARD_KEY);
-    safeStorage.removeItem(SESSION_TABLET_PW_KEY);
-    safeStorage.removeItem(SESSION_BOARD_TOKEN_KEY);
-  }
-}
-
-function clearSpectatorSession() {
-  safeStorage.removeItem(SESSION_ROLE_KEY);
-  safeStorage.removeItem(SESSION_PIN_KEY);
-  safeStorage.removeItem(SESSION_BOARD_KEY);
-  safeStorage.removeItem(SESSION_TABLET_PW_KEY);
-  safeStorage.removeItem(SESSION_BOARD_TOKEN_KEY);
-}
-
-function loadStoredTabletPassword() {
-  try {
-    return String(safeStorage.getItem(SESSION_TABLET_PW_KEY) ?? '').trim().slice(0, 5);
-  } catch {
-    return '';
-  }
-}
-
-function loadStoredBoardAuthToken() {
-  try {
-    return String(safeStorage.getItem(SESSION_BOARD_TOKEN_KEY) ?? '').trim();
-  } catch {
-    return '';
-  }
-}
-
-function loadStoredTabletBoard() {
-  try {
-    return String(safeStorage.getItem(SESSION_BOARD_KEY) ?? '').trim();
-  } catch {
-    return '';
-  }
-}
-
-function tabletCloudAuthOpts() {
-  const boardToken = loadStoredBoardAuthToken();
-  if (boardToken) {
-    return {
-      board: loadStoredTabletBoard(),
-      boardToken,
-    };
-  }
-  return { tabletPassword: loadStoredTabletPassword() };
-}
-
-function writeTournamentWip(pin) {
-  safeStorage.setItem(TOURNAMENT_WIP_KEY, JSON.stringify({ pin: String(pin).trim() }));
-}
-
-function clearTournamentWip() {
-  safeStorage.removeItem(TOURNAMENT_WIP_KEY);
-}
-
-function mergeDraftFromResume(saved) {
-  const base = createDefaultTournamentDraft();
-  if (!saved || typeof saved !== 'object') return base;
-  return {
-    ...base,
-    ...saved,
-    players: Array.isArray(saved.players) ? saved.players : [],
-  };
-}
-
-let bootUiResumeCache;
-/** Tvrdý reset: po vymazání localStorage už znovu neukládat resume (About / turnaj). */
-let skipUiResumePersist = false;
-function getBootUiResumeOnce() {
-  if (bootUiResumeCache !== undefined) return bootUiResumeCache;
-  try {
-    if (
-      isPublicTournamentCatalogPath() ||
-      parsePreregRouteFromUrl() ||
-      parseTabletRouteFromUrl() ||
-      parseVenueDisplayRouteFromUrl()
-    ) {
-      bootUiResumeCache = null;
-      return null;
-    }
-    const role = safeStorage.getItem(SESSION_ROLE_KEY);
-    if (role === 'viewer' || role === 'tablet') {
-      bootUiResumeCache = null;
-      return null;
-    }
-    bootUiResumeCache = loadUiResume();
-    return bootUiResumeCache;
-  } catch {
-    bootUiResumeCache = null;
-    return null;
-  }
-}
-
-/** Obecné načtení JSON z localStorage s bezpečným fallbackem. */
-function loadInitialState(key, fallback) {
-  try {
-    const item = safeStorage.getItem(key);
-    if (item == null || item === '') return fallback;
-    const parsed = JSON.parse(item);
-    if (parsed === null || parsed === undefined) return fallback;
-    return parsed;
-  } catch {
-    console.error(`Chyba načítání ${key}:`, key);
-    safeStorage.removeItem(key);
-    return fallback;
-  }
-}
-
-const LOCAL_TOURNAMENT_HISTORY_KEY = 'darts_history_local';
-
-function appendLocalTournamentHistory(entry) {
-  const prev = loadInitialState(LOCAL_TOURNAMENT_HISTORY_KEY, []);
-  const arr = Array.isArray(prev) ? [...prev, entry] : [entry];
-  try {
-    safeStorage.setItem(LOCAL_TOURNAMENT_HISTORY_KEY, JSON.stringify(arr));
-  } catch {}
-}
-
-function loadSafeMatchHistory() {
-  const parsed = loadInitialState('dartsMatchHistory', []);
-  return Array.isArray(parsed) ? parsed : [];
-}
-
-/**
- * Turnaj z localStorage. Vždy vrací { value, hadError } — při prázdné paměti value === null.
- */
-function loadSafeTournamentData() {
-  try {
-    const raw = safeStorage.getItem('dartsTournamentData');
-    if (!raw) return { value: null, hadError: false };
-    const parsed = JSON.parse(raw);
-    const isObj = parsed && typeof parsed === 'object' && !Array.isArray(parsed);
-    const hasPlayers = Array.isArray(parsed?.players);
-    const hasFormat = parsed?.tournamentFormat == null || typeof parsed.tournamentFormat === 'string';
-    if (!isObj || !hasPlayers || !hasFormat) {
-      throw new Error('Invalid data format');
-    }
-    if (parsed.tournamentFormat === 'groups_ko') parsed.tournamentFormat = 'groups_bracket';
-    if (parsed.tournamentFormat === 'ko_only') parsed.tournamentFormat = 'bracket_only';
-    return { value: parsed, hadError: false };
-  } catch {
-    console.error('Chyba při načítání uloženého turnaje. Data byla resetována.');
-    safeStorage.removeItem('dartsTournamentData');
-    // legacy key cleanup
-    safeStorage.removeItem('dartsTournament');
-    return { value: null, hadError: true };
-  }
-}
-
-/** Jednorázové načtení turnaje při startu (data + pavouk z localStorage). */
-let __initialTournamentBootstrapOnce = null;
-function getInitialTournamentBootstrapOnce() {
-  if (__initialTournamentBootstrapOnce === null) {
-    const { value, hadError } = loadSafeTournamentData();
-    if (!value) {
-      __initialTournamentBootstrapOnce = { td: null, bracket: [], hadError };
-    } else {
-      const bracket = Array.isArray(value.tournamentBracket) ? value.tournamentBracket : [];
-      const { tournamentBracket: _tb, ...td } = value;
-      __initialTournamentBootstrapOnce = { td, bracket, hadError };
-    }
-  }
-  return __initialTournamentBootstrapOnce;
-}
-
-const appId = 'sdc_global_production';
-
-const ACTIVE_TOURNAMENTS_COLL = 'active_tournaments';
-
-/** Jméno hráče z turnaje (flat players + skupiny). */
-function resolveTournamentPlayerName(playerId, tournamentData) {
-  if (playerId == null || playerId === '') return '';
-  const id = String(playerId);
-  const td = tournamentData;
-  const flat = td?.players;
-  if (Array.isArray(flat)) {
-    const p = flat.find((x) => String(x.id ?? '') === id);
-    if (p?.name != null && String(p.name).trim() !== '') return String(p.name);
-  }
-  for (const g of td?.groups || []) {
-    const pl = (g.players || []).find((x) => String(x.id ?? '') === id);
-    if (pl?.name != null && String(pl.name).trim() !== '') return String(pl.name);
-  }
-  return '';
-}
-
-function enrichTabletMatchPlayerNames(raw, tournamentData, tournamentGroups) {
-  if (!raw) return raw;
-  let groupPlayers = [];
-  if (raw.groupId) {
-    const grp =
-      tournamentGroups.find((g) => g.groupId === raw.groupId) ||
-      tournamentData?.groups?.find((g) => g.groupId === raw.groupId);
-    groupPlayers = grp?.players || [];
-  }
-  const p1Raw =
-    (raw.player1Name != null && String(raw.player1Name).trim()) ||
-    (raw.p1Name != null && String(raw.p1Name).trim()) ||
-    groupPlayers.find((p) => p.id === raw.player1Id)?.name ||
-    resolveTournamentPlayerName(raw.player1Id, tournamentData) ||
-    (raw.player1Id != null ? String(raw.player1Id) : '');
-  const p2Raw =
-    (raw.player2Name != null && String(raw.player2Name).trim()) ||
-    (raw.p2Name != null && String(raw.p2Name).trim()) ||
-    groupPlayers.find((p) => p.id === raw.player2Id)?.name ||
-    resolveTournamentPlayerName(raw.player2Id, tournamentData) ||
-    (raw.player2Id != null ? String(raw.player2Id) : '');
-  const p1Slot =
-    groupPlayers.find((p) => p.id === raw.player1Id) ||
-    findTournamentSlot(raw.player1Id, tournamentData, tournamentGroups);
-  const p2Slot =
-    groupPlayers.find((p) => p.id === raw.player2Id) ||
-    findTournamentSlot(raw.player2Id, tournamentData, tournamentGroups);
-  const p1Members = isTeamPlayer(p1Slot) ? p1Slot.members.slice(0, 2) : [];
-  const p2Members = isTeamPlayer(p2Slot) ? p2Slot.members.slice(0, 2) : [];
-  const referees =
-    Array.isArray(raw.referees) && raw.referees.length > 0
-      ? raw.referees
-      : raw.referee?.name
-        ? [raw.referee]
-        : [];
-  return {
-    ...raw,
-    player1Name: p1Raw || '?',
-    player2Name: p2Raw || '?',
-    p1Members,
-    p2Members,
-    referees,
-    refereeName: formatRefereeNames({ ...raw, referees }) || raw.refereeName || '—',
-    doubles: p1Members.length >= 2 && p2Members.length >= 2,
-  };
-}
-
-/** Text výsledku pro rozpis (sety nebo legy). */
-function formatCompletedMatchScoreForSchedule(m) {
-  if (!m || m.status !== 'completed') return null;
-  const s1 = m.p1Sets;
-  const s2 = m.p2Sets;
-  if (s1 != null && s2 != null && Number.isFinite(Number(s1)) && Number.isFinite(Number(s2))) {
-    return `${Number(s1)} : ${Number(s2)}`;
-  }
-  const r = m.result || {};
-  const p1 = Number(r.p1Legs ?? m.legsP1 ?? m.score1 ?? m.score?.p1 ?? 0) || 0;
-  const p2 = Number(r.p2Legs ?? m.legsP2 ?? m.score2 ?? m.score?.p2 ?? 0) || 0;
-  return `${p1} : ${p2}`;
-}
-
-/** Zápas pro tablet na daném terči: pavouk (stejný board) nebo skupina (board ve skupině). */
-function pickTabletMatchForBoard({
-  tournamentData,
-  tournamentMatches,
-  tournamentBracket,
-  tournamentGroups,
-  tabletBoardStr,
-}) {
-  const b = String(tabletBoardStr ?? '').trim();
-  if (!b || !tournamentData) return null;
-
-  const boardMatches = (m) => {
-    if (!m || m.isBye) return false;
-    const mb = m.board != null ? String(m.board).trim() : '';
-    return mb === b && m.player1Id && m.player2Id;
-  };
-
-  const isTabletPickupCandidate = (m) => {
-    if (!m) return false;
-    const s = m.status;
-    if (s === 'pending' || s === 'playing') return true;
-    if (m.tabletStatus === 'checked_in') return true;
-    return false;
-  };
-
-  const groupsList = tournamentData.groups?.length ? tournamentData.groups : tournamentGroups;
-  const allGroupsFinished =
-    !Array.isArray(groupsList) ||
-    groupsList.length === 0 ||
-    groupsList.every((g) => {
-      const gm = (tournamentMatches || []).filter((m) => (m.groupId ?? m.group) === g.groupId);
-      return gm.length > 0 && gm.every((m) => m.status === 'completed' || m.status === 'walkover');
-    });
-
-  if (Array.isArray(tournamentBracket) && tournamentBracket.length > 0 && allGroupsFinished) {
-    for (let ri = 0; ri < tournamentBracket.length; ri++) {
-      const matches = tournamentBracket[ri]?.matches || [];
-      for (let mi = 0; mi < matches.length; mi++) {
-        const m = matches[mi];
-        if (!boardMatches(m) || !isTabletPickupCandidate(m)) continue;
-        return {
-          ...m,
-          matchType: 'bracket',
-          bracketRoundIndex: ri,
-          matchId: m.matchId ?? m.id,
-        };
-      }
-    }
-  }
-
-  const groups = tournamentData.groups?.length ? tournamentData.groups : tournamentGroups;
-  const group = Array.isArray(groups)
-    ? groups.find(
-        (gr) => Array.isArray(gr.boards) && gr.boards.some((x) => String(x).trim() === b)
-      )
-    : null;
-  if (!group) return null;
-
-  const gms = (tournamentMatches || [])
-    .filter((m) => (m.groupId ?? m.group) === group.groupId)
-    .slice()
-    .sort((a, c) => (a.round ?? 0) - (c.round ?? 0));
-  const groupBoards = (group.boards || []).map((x) => String(x).trim()).filter(Boolean);
-  const selected = pickParallelGroupMatches(gms, groupBoards.length || 1);
-  const boardIdx = groupBoards.indexOf(b);
-  const byBoard = selected.find((m) => String(m.board ?? '').trim() === b);
-  const byIndex = boardIdx >= 0 ? selected[boardIdx] : selected[0];
-  const m = byBoard || byIndex;
-  if (!m || !isTabletPickupCandidate(m)) return null;
-  return {
-    ...m,
-    matchType: 'group',
-    matchId: m.matchId ?? m.id,
-    groupId: m.groupId ?? group.groupId,
-  };
-}
-
-/** Rozpis zápasů na terči pro tablet (skupina nebo pavouk). */
-function buildTabletBoardSchedule({
-  tournamentData,
-  tournamentMatches,
-  tournamentBracket,
-  tournamentGroups,
-  tabletBoardStr,
-}) {
-  const b = String(tabletBoardStr ?? '').trim();
-  if (!b || !tournamentData) return [];
-
-  const boardMatches = (m) => {
-    if (!m || m.isBye) return false;
-    const mb = m.board != null ? String(m.board).trim() : '';
-    return mb === b && m.player1Id && m.player2Id;
-  };
-
-  const groupsList = tournamentData.groups?.length ? tournamentData.groups : tournamentGroups;
-  const allGroupsFinished =
-    !Array.isArray(groupsList) ||
-    groupsList.length === 0 ||
-    groupsList.every((g) => {
-      const gm = (tournamentMatches || []).filter((m) => (m.groupId ?? m.group) === g.groupId);
-      return gm.length > 0 && gm.every((m) => m.status === 'completed' || m.status === 'walkover');
-    });
-
-  const groups = tournamentData.groups?.length ? tournamentData.groups : tournamentGroups;
-  const groupOnBoard = Array.isArray(groups)
-    ? groups.find(
-        (gr) => Array.isArray(gr.boards) && gr.boards.some((x) => String(x).trim() === b)
-      )
-    : null;
-
-  const playersOf = (gid) => {
-    const grp =
-      tournamentGroups.find((g) => g.groupId === gid) ||
-      tournamentData?.groups?.find((g) => g.groupId === gid);
-    return grp?.players || [];
-  };
-
-  const nameFor = (m, p1, players) => {
-    const id = p1 ? m.player1Id : m.player2Id;
-    const fromMatch = p1
-      ? (m.player1Name && String(m.player1Name).trim()) || m.p1Name
-      : (m.player2Name && String(m.player2Name).trim()) || m.p2Name;
-    if (fromMatch) return String(fromMatch);
-    const fromGroup = players?.find((p) => p.id === id)?.name;
-    if (fromGroup) return fromGroup;
-    const fromTd = resolveTournamentPlayerName(id, tournamentData);
-    if (fromTd) return fromTd;
-    return id != null ? String(id) : '—';
-  };
-
-  const refereeForBracket = (m) => m.referee?.name ?? '—';
-  const refereeForGroup = (m, players) => {
-    const both = formatRefereeNames(m);
-    if (both) return both;
-    if (m.chalkerId) return players.find((p) => p.id === m.chalkerId)?.name ?? '—';
-    return '—';
-  };
-
-  const rows = [];
-
-  if (Array.isArray(tournamentBracket) && tournamentBracket.length > 0 && allGroupsFinished) {
-    for (let ri = 0; ri < tournamentBracket.length; ri++) {
-      const matches = tournamentBracket[ri]?.matches || [];
-      for (let mi = 0; mi < matches.length; mi++) {
-        const m = matches[mi];
-        if (!boardMatches(m)) continue;
-        rows.push({
-          key: `br-${ri}-${m.id ?? mi}`,
-          matchType: 'bracket',
-          roundIndex: ri,
-          match: m,
-          player1Name: nameFor(m, true, []),
-          player2Name: nameFor(m, false, []),
-          refereeName: refereeForBracket(m),
-          status: m.status,
-          tabletStatus: m.tabletStatus,
-          scoreDisplay: formatCompletedMatchScoreForSchedule(m),
-        });
-      }
-    }
-    return rows;
-  }
-
-  if (!groupOnBoard) return [];
-
-  const players = playersOf(groupOnBoard.groupId);
-  const gms = (tournamentMatches || [])
-    .filter((m) => (m.groupId ?? m.group) === groupOnBoard.groupId)
-    .slice()
-    .sort((a, c) => (a.round ?? 0) - (c.round ?? 0));
-
-  const groupBoards = (groupOnBoard.boards || []).map((x) => String(x).trim()).filter(Boolean);
-  const multiBoard = groupBoards.length > 1;
-  for (let i = 0; i < gms.length; i++) {
-    const m = gms[i];
-    const assigned = m.board != null && m.board !== '' ? String(m.board).trim() : '';
-    if (multiBoard && assigned !== b) continue;
-    rows.push({
-      key: `g-${m.matchId ?? m.id ?? i}`,
-      matchType: 'group',
-      roundIndex: m.round,
-      match: m,
-      player1Name: nameFor(m, true, players),
-      player2Name: nameFor(m, false, players),
-      refereeName: refereeForGroup(m, players),
-      status: m.status,
-      tabletStatus: m.tabletStatus,
-      scoreDisplay: formatCompletedMatchScoreForSchedule(m),
-    });
-  }
-
-  return rows;
-}
-
-// --- POMOCNÉ FUNKCE ---
-const getTranslatedName = (name, isPlayer1, currentLang) => {
-    if (!name) return '';
-    const p1Defaults = ['Domácí', 'Home', 'Gospodarze', translations?.cs?.p1Default, translations?.en?.p1Default, translations?.pl?.p1Default];
-    const p2Defaults = ['Hosté', 'Away', 'Goście', translations?.cs?.p2Default, translations?.en?.p2Default, translations?.pl?.p2Default];
-    const botDefaults = ['Robot', 'Bot', translations?.cs?.botDefault, translations?.en?.botDefault, translations?.pl?.botDefault];
-    
-    if (isPlayer1 && p1Defaults.includes(name)) return translations[currentLang]?.p1Default || 'Domácí';
-    if (!isPlayer1 && botDefaults.includes(name)) return translations[currentLang]?.botDefault || 'Robot';
-    if (!isPlayer1 && p2Defaults.includes(name)) return translations[currentLang]?.p2Default || 'Hosté';
-    return name;
-};
-
-const calculateStats = (legs, p1Name, p2Name) => {
-    let p1DartsTotal=0, p1ScoreTotal=0, p2DartsTotal=0, p2ScoreTotal=0;
-    const p1High={'60+':0,'100+':0,'140+':0,'180':0}, p2High={'60+':0,'100+':0,'140+':0,'180':0};
-    let p1HighCheck=0, p2HighCheck=0;
-    const updateHigh = (s, obj) => { if(s===180) obj['180']++; else if(s>=140) obj['140+']++; else if(s>=100) obj['100+']++; else if(s>=60) obj['60+']++; };
-
-    const legDetails = (legs||[]).map((leg, i) => {
-        const p1M = leg.history.filter(m => m.player === 'p1');
-        const p2M = leg.history.filter(m => m.player === 'p2');
-        // Bust hody se do hry nepočítají (score je jen fiktivní), proto je vynecháváme
-        const p1Valid = p1M.filter(m => !m.isBust);
-        const p2Valid = p2M.filter(m => !m.isBust);
-
-        p1Valid.forEach(m => updateHigh(m.score, p1High)); 
-        p2Valid.forEach(m => updateHigh(m.score, p2High));
-        const lP1S = p1Valid.reduce((a,b)=>a+(b.score||0),0); 
-        const lP2S = p2Valid.reduce((a,b)=>a+(b.score||0),0);
-        const lP1D = p1Valid.reduce((a,b)=>a+(b.dartsUsed||3),0); 
-        const lP2D = p2Valid.reduce((a,b)=>a+(b.dartsUsed||3),0);
-        p1ScoreTotal+=lP1S; p1DartsTotal+=lP1D; 
-        p2ScoreTotal+=lP2S; p2DartsTotal+=lP2D;
-        const winnerKey = leg.winner;
-        const winnerName = winnerKey === 'p1' ? p1Name : p2Name;
-        const winThrow = leg.history.find(m => m.player === winnerKey && m.remaining === 0);
-        const check = winThrow ? winThrow.score : 0;
-        if(winnerKey==='p1') p1HighCheck = Math.max(p1HighCheck, check); else p2HighCheck = Math.max(p2HighCheck, check);
-        const winnerDarts = winnerKey === 'p1' ? lP1D : lP2D;
-        const winnerScore = winnerKey === 'p1' ? lP1S : lP2S;
-        const winnerAvg = winnerDarts > 0 ? (winnerScore / winnerDarts) * 3 : 0;
-        return { index: i+1, winner: winnerName, winnerKey: winnerKey, darts: winnerDarts, avg: winnerAvg, checkout: check };
-    });
-    return { p1Avg: p1DartsTotal ? (p1ScoreTotal/p1DartsTotal)*3 : 0, p2Avg: p2DartsTotal ? (p2ScoreTotal/p2DartsTotal)*3 : 0, p1DartsTotal, p2DartsTotal, legDetails, p1High, p2High, p1HighCheckout: p1HighCheck, p2HighCheckout: p2HighCheck };
-};
-
-function doublesResultExtras(resultData) {
-  const extras = {};
-  if (resultData?.members) extras.members = resultData.members;
-  if (resultData?.legStarters) extras.legStarters = resultData.legStarters;
-  return extras;
-}
-
-function loserRefereePerson(loserId, loserName, matchLike, tournamentData, extraGroups) {
-  if (loserId == null) return null;
-  return (
-    resolveRefereePerson(loserId, {
-      groups: extraGroups,
-      players: tournamentData?.players,
-      match: matchLike,
-    }) || { id: loserId, name: String(loserName ?? loserId) }
-  );
-}
-
-// --- KOMPONENTY MENU / UI ---
-const FlagIcon = ({ lang }) => {
-    if (lang === 'cs') return <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" className="w-5 h-3.5 rounded-sm object-cover"><rect width="900" height="600" fill="#D7141A"/><rect width="900" height="300" fill="#FFF"/><polygon points="0,0 0,600 450,300" fill="#11457E"/></svg>;
-    if (lang === 'en') return <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" className="w-5 h-3.5 rounded-sm object-cover"><clipPath id="t"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" strokeWidth="6"/><path d="M0,0 L60,30 M60,0 L0,30" clipPath="url(#t)" stroke="#C8102E" strokeWidth="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" strokeWidth="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" strokeWidth="6"/></svg>;
-    if (lang === 'pl') return <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 10" className="w-5 h-3.5 rounded-sm object-cover border border-slate-700/50"><rect width="16" height="10" fill="#fff"/><rect width="16" height="5" y="5" fill="#dc143c"/></svg>;
-    return null;
-};
-
-const MatchStatsView = ({ data, onClose, onBack, title, lang, onStartMatch, isTournamentMode, onTournamentMatchComplete, onUndoAndResume }) => {
-    const t = (k) => translations[lang]?.[k] || k;
-    const [savingMatch, setSavingMatch] = useState(false);
-    const [saveError, setSaveError] = useState(null); // string | null
-    const [pendingSavePayload, setPendingSavePayload] = useState(null); // { matchId, resultData } | null
-    const isP1 = data.matchWinner === 'p1';
-    const displayP1Name = getTranslatedName(data.p1Name, true, lang);
-    
-    // Přidání obtížnosti Bota k zobrazenému jménu ve statistikách
-    const displayP2Name = getTranslatedName(data.p2Name, false, lang) + (data.isBot ? ` [${data.botLevel === 'custom' ? `AVG ${data.botAvg}` : (translations[lang]?.[`diff${data.botLevel.charAt(0).toUpperCase() + data.botLevel.slice(1)}`] || data.botLevel)}]` : '');
-    
-    const winColorText = isP1 ? 'text-emerald-500' : 'text-purple-500';
-    const winColorBg = isP1 ? 'from-emerald-500/20 to-emerald-600/10' : 'from-purple-500/20 to-purple-600/10';
-    const winBorder = isP1 ? 'border-emerald-500/50' : 'border-purple-500/50';
-
-    let cP1Mpr = '0.00', cP2Mpr = '0.00';
-    if (data.gameType === 'cricket' && data.completedLegs && data.completedLegs.length > 0) {
-        let p1Marks = 0, p2Marks = 0, p1Darts = 0, p2Darts = 0;
-        data.completedLegs.forEach(leg => {
-            leg.history.forEach(d => {
-                if (d.player === 'p1') { p1Darts++; if(d.target !== 0) p1Marks += d.multiplier; }
-                else { p2Darts++; if(d.target !== 0) p2Marks += d.multiplier; }
-            });
-        });
-        if (p1Darts > 0) cP1Mpr = ((p1Marks / p1Darts) * 3).toFixed(2);
-        if (p2Darts > 0) cP2Mpr = ((p2Marks / p2Darts) * 3).toFixed(2);
-    }
-
-    const stats = data.gameType !== 'cricket' ? calculateStats(data.completedLegs, displayP1Name, displayP2Name) : null;
-    const isMultiSet = (data.matchSets || 1) > 1;
-    const mainP1 = isMultiSet ? (data.p1Sets || 0) : (data.setScores?.[0]?.p1 ?? data.p1Legs ?? 0);
-    const mainP2 = isMultiSet ? (data.p2Sets || 0) : (data.setScores?.[0]?.p2 ?? data.p2Legs ?? 0);
-    const legsBreakdown = isMultiSet && data.setScores?.length ? `(${data.setScores.map(s => `${s.p1}:${s.p2}`).join(', ')})` : '';
-
-    const buildTournamentSavePayload = () => {
-      const fr = data?.finalResult;
-      const p1Legs = Number(fr?.player1?.legsWon ?? data?.p1Legs) || 0;
-      const p2Legs = Number(fr?.player2?.legsWon ?? data?.p2Legs) || 0;
-      const statsPayload =
-        stats && data?.gameType !== 'cricket'
-          ? {
-              p1Avg: stats.p1Avg,
-              p2Avg: stats.p2Avg,
-              p1DartsTotal: stats.p1DartsTotal,
-              p2DartsTotal: stats.p2DartsTotal,
-              p1High: stats.p1High,
-              p2High: stats.p2High,
-              p1HighCheckout: stats.p1HighCheckout,
-              p2HighCheckout: stats.p2HighCheckout,
-              legDetails: stats.legDetails,
-            }
-          : {};
-      return {
-        matchId: data?.tournamentMatchId ?? data?.id,
-        resultData: { p1Legs, p2Legs, ...statsPayload, ...doublesResultExtras(data) },
-      };
-    };
-
-    const runTournamentSave = async (payload) => {
-      if (!payload || savingMatch) return;
-      setSavingMatch(true);
-      setSaveError(null);
-      try {
-        await onTournamentMatchComplete?.(payload.matchId, payload.resultData);
-        setPendingSavePayload(null);
-      } catch (error) {
-        console.error('KRITICKÁ CHYBA PŘI ULOŽENÍ ZÁPASU:', error);
-        const msg = String(
-          error?.message ||
-            error ||
-            translations[lang]?.tablet?.saveMatchError ||
-            'Uložení zápasu selhalo.'
-        );
-        setSaveError(msg);
-        setPendingSavePayload(payload);
-        // Zůstat na obrazovce se skóre — nepřesměrovávat
-      } finally {
-        setSavingMatch(false);
-      }
-    };
-
-    return (
-        <div className="flex flex-col h-full w-full bg-slate-950 fixed inset-0 z-[1000] overflow-hidden">
-            {saveError && (
-              <div
-                className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center p-4 bg-black/80"
-                role="alertdialog"
-                aria-modal="true"
-                aria-labelledby="match-save-error-title"
-              >
-                <div className="w-full max-w-md rounded-2xl border-2 border-red-500/60 bg-slate-900 shadow-2xl p-5 space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-xl bg-red-500/20 text-red-400 shrink-0">
-                      <AlertTriangle className="w-6 h-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3
-                        id="match-save-error-title"
-                        className="text-lg font-black text-white tracking-tight"
-                      >
-                        {t('tournSaveMatchErrorTitle') || 'Chyba při ukládání zápasu'}
-                      </h3>
-                      <p className="text-sm text-red-200 mt-2 leading-snug break-words whitespace-pre-wrap">
-                        {`${t('tournSaveMatchErrorPrefix') || 'Chyba při ukládání zápasu:'} ${saveError}`}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      type="button"
-                      disabled={savingMatch}
-                      onClick={() =>
-                        runTournamentSave(pendingSavePayload || buildTournamentSavePayload())
-                      }
-                      className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl font-black text-sm uppercase tracking-wide bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-4 h-4 ${savingMatch ? 'animate-spin' : ''}`} />
-                      {savingMatch
-                        ? t('tournSavingMatch') || 'UKLÁDÁM…'
-                        : t('tournSaveMatchRetry') || 'Zkusit znovu'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={savingMatch}
-                      onClick={() => setSaveError(null)}
-                      className="w-full py-3.5 px-4 rounded-xl font-bold text-sm border border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700"
-                    >
-                      {t('tournSaveMatchCloseError') || 'Zavřít'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div className="relative z-20 flex items-center justify-center w-full px-4 pb-4 border-b shrink-0 pt-14 sm:p-4 bg-slate-950 border-slate-900/50">
-                <div className="absolute z-50 flex gap-2 mt-5 -translate-y-1/2 left-4 top-1/2 sm:mt-0">
-                    <button onClick={onBack || onClose} className="p-2 transition-colors border rounded-lg shadow-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border-slate-700"><ArrowLeft className="w-5 h-5" /></button>
-                    <button onClick={onClose} className="p-2 transition-colors border rounded-lg shadow-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border-slate-700">
-                      <Home className="w-5 h-5" />
-                    </button>
-                </div>
-                <div className="w-full text-center">
-                    <h2 className={`text-xl sm:text-2xl font-bold uppercase tracking-widest leading-none ${winColorText}`}>{title}</h2>
-                    <div className="text-xs sm:text-sm text-slate-500">{data.date}</div>
-                </div>
-            </div>
-            
-            <div className="flex-1 w-full overflow-x-hidden overflow-y-auto bg-slate-950 scrollbar-thin scrollbar-thumb-slate-800">
-                <div className="w-full max-w-4xl p-4 pb-12 mx-auto space-y-4 md:space-y-3 landscape:space-y-2">
-                    <div className="flex justify-center landscape:py-0">
-                        <div className={`bg-gradient-to-br ${winColorBg} border ${winBorder} rounded-xl px-6 py-3 flex items-center gap-3 shadow-lg animate-pulse landscape:py-2 landscape:px-4`}>
-                            <Trophy className={`w-8 h-8 ${winColorText} landscape:w-6 landscape:h-6`} />
-                            <div className="text-center">
-                                <div className={`text-[10px] uppercase font-bold tracking-widest ${isP1 ? 'text-emerald-300' : 'text-purple-300'}`}>{t('matchWinner')}</div>
-                                <div className="text-2xl font-black text-white landscape:text-xl">{isP1 ? displayP1Name : displayP2Name}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Celkové výsledky – v landscape dva sloupce vedle sebe */}
-                    <div className={`grid w-full gap-3 landscape:grid-cols-2 landscape:gap-4 md:grid-cols-2`}>
-                        <div className="p-3 text-center border rounded-xl bg-slate-900 border-slate-800 landscape:p-2">
-                            <div className="mb-1 text-xs font-bold text-slate-400">{displayP1Name}</div>
-                            <div className={`text-3xl font-black landscape:text-2xl ${isP1 ? 'text-emerald-500' : 'text-slate-600'}`}>{mainP1}</div>
-                            <div className="text-xs font-mono text-slate-500">{isMultiSet ? `S | L ${data.p1Legs || 0}` : 'LEGS'}</div>
-                        </div>
-                        <div className="p-3 text-center border rounded-xl bg-slate-900 border-slate-800 landscape:p-2">
-                            <div className="mb-1 text-xs font-bold text-slate-400">{displayP2Name}</div>
-                            <div className={`text-3xl font-black landscape:text-2xl ${!isP1 ? 'text-purple-500' : 'text-slate-600'}`}>{mainP2}</div>
-                            <div className="text-xs font-mono text-slate-500">{isMultiSet ? `S | L ${data.p2Legs || 0}` : 'LEGS'}</div>
-                        </div>
-                    </div>
-                    {legsBreakdown && <div className="text-sm font-mono text-slate-400 text-center landscape:text-xs">{legsBreakdown}</div>}
-
-                    {data.gameType === 'cricket' ? (
-                        <div className={`flex justify-around w-full p-4 border shadow-md bg-slate-900 rounded-xl border-slate-800 landscape:p-2`}>
-                            <div className="text-center"><div className="mb-1 text-xs font-bold tracking-widest uppercase text-slate-500 landscape:text-[10px]">MPR</div><div className="font-mono text-3xl font-black text-emerald-400 landscape:text-2xl">{cP1Mpr}</div></div>
-                            <div className="text-center"><div className="mb-1 text-xs font-bold tracking-widest uppercase text-slate-500 landscape:text-[10px]">MPR</div><div className="font-mono text-3xl font-black text-purple-400 landscape:text-2xl">{cP2Mpr}</div></div>
-                        </div>
-                    ) : (
-                        <>
-                            {/* Kompaktní 3-sloupcový grid: Průměr | Šipky (legs) | Zavření */}
-                            <div className="grid grid-cols-1 gap-2 landscape:grid-cols-3 landscape:gap-3 md:grid-cols-3">
-                                <div className="p-3 border rounded-lg bg-slate-900 border-slate-800 landscape:p-2">
-                                    <div className="mb-1 text-[10px] font-bold text-center text-slate-500 uppercase tracking-wider">{t('avg3')}</div>
-                                    <div className="flex justify-between font-mono text-lg font-bold landscape:text-base"><span className="text-emerald-400">{stats.p1Avg.toFixed(1)}</span><span className="text-purple-400">{stats.p2Avg.toFixed(1)}</span></div>
-                                </div>
-                                <div className="p-3 border rounded-lg bg-slate-900 border-slate-800 landscape:p-2">
-                                    <div className="mb-1 text-[10px] font-bold text-center text-slate-500 uppercase tracking-wider">{t('detailDarts')}</div>
-                                    <div className="flex justify-between font-mono text-lg font-bold landscape:text-base">
-                                        <span className="text-emerald-400">{stats.p1DartsTotal ?? '-'}</span>
-                                        <span className="text-purple-400">{stats.p2DartsTotal ?? '-'}</span>
-                                    </div>
-                                </div>
-                                <div className="p-3 border rounded-lg bg-slate-900 border-slate-800 landscape:p-2">
-                                    <div className="mb-1 text-[10px] font-bold text-center text-slate-500 uppercase tracking-wider">{t('highestCheckout')}</div>
-                                    <div className="flex justify-between font-mono text-lg font-bold landscape:text-base"><span className="text-emerald-400">{stats.p1HighCheckout}</span><span className="text-purple-400">{stats.p2HighCheckout}</span></div>
-                                </div>
-                            </div>
-                            {data.members && typeof data.members === 'object' && (
-                              <div className="w-full overflow-hidden border rounded-lg bg-slate-900 border-slate-800">
-                                <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-800">
-                                  {t('doublesMembersAvg')}
-                                </div>
-                                <div className="divide-y divide-slate-800">
-                                  {Object.values(data.members).map((m) => (
-                                    <div key={m.id} className="flex items-center justify-between px-3 py-1.5 text-sm">
-                                      <span className={`font-bold truncate ${m.side === 'p1' ? 'text-emerald-400' : 'text-purple-400'}`}>
-                                        {m.name}
-                                      </span>
-                                      <span className="font-mono text-slate-200">{Number(m.avg || 0).toFixed(1)}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            <div className="w-full overflow-hidden border rounded-lg bg-slate-900 border-slate-800">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="text-[10px] uppercase bg-slate-800 text-slate-400"><tr><th className="px-2 py-1.5 landscape:px-2 landscape:py-1">#</th><th className="px-2 py-1.5 landscape:px-2 landscape:py-1">{t('detailWinner')}</th><th className="px-2 py-1.5 text-center landscape:px-2 landscape:py-1">{t('detailDarts')}</th><th className="px-2 py-1.5 text-right landscape:px-2 landscape:py-1">{t('detailCheckout')}</th><th className="px-2 py-1.5 text-right landscape:px-2 landscape:py-1">{t('detailAvg')}</th></tr></thead>
-                                    <tbody className="divide-y divide-slate-800">
-                                        {stats.legDetails.map(l => {
-                                            const rowColor = l.winnerKey === 'p1' ? 'text-emerald-400' : 'text-purple-400';
-                                            return (
-                                                <tr key={l.index}>
-                                                    <td className="px-2 py-1.5 font-bold text-slate-500 landscape:py-1">{l.index}</td>
-                                                    <td className={`px-2 py-1.5 font-bold landscape:py-1 ${rowColor}`}>{l.winner}</td>
-                                                    <td className={`px-2 py-1.5 text-center font-mono landscape:py-1 ${rowColor}`}>{l.darts}</td>
-                                                    <td className={`px-2 py-1.5 text-right font-mono landscape:py-1 ${rowColor}`}>{l.checkout || '-'}</td>
-                                                    <td className={`px-2 py-1.5 text-right font-mono landscape:py-1 ${rowColor}`}>{l.avg.toFixed(1)}</td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </>
-                    )}
-                    
-                    {/* Tlačítka: turnajový režim vs. běžná hra */}
-                    <div className="flex flex-col gap-2 mt-6">
-                        {isTournamentMode ? (
-                            <>
-                                <button
-                                    type="button"
-                                    disabled={savingMatch}
-                                    onClick={() => runTournamentSave(buildTournamentSavePayload())}
-                                    className="flex items-center justify-center w-full gap-3 py-4 text-lg font-black text-white transition-all shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    <CheckCircle className="w-6 h-6" />{' '}
-                                    {savingMatch
-                                      ? t('tournSavingMatch') || 'UKLÁDÁM…'
-                                      : t('tournSaveMatch') || 'ULOŽIT ZÁPAS'}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={onUndoAndResume}
-                                    className="flex items-center justify-center w-full gap-3 py-4 text-lg font-black transition-all rounded-xl border-2 bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500 active:scale-95"
-                                >
-                                    <Undo2 className="w-6 h-6" /> {t('tournBackToGame') || 'ZPĚT DO HRY / OPRAVIT'}
-                                </button>
-                            </>
-                        ) : (
-                            <>
-                                <button onClick={onStartMatch} className="flex items-center justify-center w-full gap-3 py-4 text-lg font-black text-white transition-all shadow-lg bg-emerald-600 hover:bg-emerald-500 rounded-xl active:scale-95">
-                                    <RotateCcw className="w-6 h-6" /> {t('rematch')}
-                                </button>
-                            </>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// --- UŽIVATELSKÝ PROFIL S ROZDĚLENÍM X01 A CRICKET ---
-const UserProfile = ({ user, matches, onLogout, onDeleteAccount, onLogin, lang, currentP1Name }) => {
-    const t = (k) => translations[lang]?.[k] || k;
-    const [timeRange, setTimeRange] = useState('all');
-    const [gameTab, setGameTab] = useState('x01');
-   
-    // Zápasy patří uživateli pokud:
-    // - mají jeho UID v p1Id/p2Id (cloudové),
-    // - nebo jsou čistě lokální (bez p1Id/p2Id) a shoduje se jméno hráče 1
-    const myMatches = matches.filter(m => {
-        if (m.p1Id === user.uid || m.p2Id === user.uid) return true;
-        const isPureLocal = !m.p1Id && !m.p2Id;
-        return isPureLocal && m.p1Name === currentP1Name;
-    });
-    
-    const filteredMatches = myMatches.filter(m => {
-        const isTargetGame = gameTab === 'x01' ? m.gameType !== 'cricket' : m.gameType === 'cricket';
-        if (!isTargetGame) return false;
-        if (timeRange === 'all') return true;
-        const cutoff = Date.now() - (timeRange * 24 * 60 * 60 * 1000);
-        return m.id >= cutoff;
-    });
-
-    let x01Wins = 0, total180s = 0, total140s = 0, total100s = 0, checkouts100plus = 0, highestCheckout = 0;
-    let sumAvgs = 0, avgCount = 0, sumFirst9 = 0, first9Count = 0, sumCheckouts = 0, checkoutsCount = 0, x01LegsPlayed = 0, x01LegsWon = 0;
-    const roundsDist = {};
-
-    let cricWins = 0, cricLegsPlayed = 0, cricLegsWon = 0;
-    let sumMarks = 0, sumCricDarts = 0;
-    let whiteHorses = 0, highMarks = 0, goodMarks = 0;
-
-    [...filteredMatches].reverse().forEach(m => {
-        const isP1 = m.p1Id === user.uid || m.p1Name === currentP1Name;
-        const myKey = isP1 ? 'p1' : 'p2';
-        
-        if (gameTab === 'x01') {
-            if (m.matchWinner === myKey) x01Wins++;
-            const name1 = getTranslatedName(m.p1Name, true, lang);
-            const name2 = getTranslatedName(m.p2Name, false, lang);
-            const stats = calculateStats(m.completedLegs, name1, name2);
-            
-            const myAvg = isP1 ? stats.p1Avg : stats.p2Avg;
-            if (myAvg > 0) { sumAvgs += myAvg; avgCount++; }
-            
-            m.completedLegs.forEach(leg => {
-                x01LegsPlayed++;
-                if (leg.winner === myKey) x01LegsWon++;
-                const myThrows = leg.history.filter(h => h.player === myKey);
-                
-                myThrows.forEach(th => {
-                    if (th.score >= 180) total180s++;
-                    else if (th.score >= 140) total140s++;
-                    else if (th.score >= 100) total100s++;
-                });
-                const f9Throws = myThrows.slice(0, 3);
-                const f9Score = f9Throws.reduce((a, b) => a + b.score, 0);
-                const f9Darts = f9Throws.reduce((a, b) => a + (b.dartsUsed || 3), 0);
-                if (f9Darts > 0) { sumFirst9 += (f9Score / f9Darts) * 3; first9Count++; }
-                if (leg.winner === myKey) {
-                    const winThrow = myThrows.find(th => th.remaining === 0 && !th.isBust);
-                    if (winThrow) {
-                        sumCheckouts += winThrow.score; checkoutsCount++;
-                        if (winThrow.score > highestCheckout) highestCheckout = winThrow.score;
-                        if (winThrow.score >= 100) checkouts100plus++;
-                    }
-                    const totalDarts = myThrows.reduce((a, b) => a + (b.dartsUsed || 3), 0);
-                    const round = Math.ceil(totalDarts / 3);
-                    roundsDist[round] = (roundsDist[round] || 0) + 1;
-                }
-            });
-        } else {
-            if (m.matchWinner === myKey) cricWins++;
-            m.completedLegs.forEach(leg => {
-                cricLegsPlayed++;
-                if (leg.winner === myKey) cricLegsWon++;
-
-                const myThrows = leg.history.filter(h => h.player === myKey);
-                let currentRoundMarks = 0;
-
-                myThrows.forEach((th, idx) => {
-                    sumCricDarts++;
-                    if (th.target !== 0) {
-                        sumMarks += th.multiplier;
-                        currentRoundMarks += th.multiplier;
-                    }
-                    if ((idx + 1) % 3 === 0 || idx === myThrows.length - 1) {
-                        if (currentRoundMarks >= 9) whiteHorses++;
-                        else if (currentRoundMarks >= 7) highMarks++;
-                        else if (currentRoundMarks >= 5) goodMarks++;
-                        currentRoundMarks = 0;
-                    }
-                });
-            });
-        }
-    });
-
-    const winRate = filteredMatches.length > 0 ? Math.round(((gameTab === 'x01' ? x01Wins : cricWins) / filteredMatches.length) * 100) : 0;
-    const legWinRate = (gameTab === 'x01' ? x01LegsPlayed : cricLegsPlayed) > 0 ? Math.round(((gameTab === 'x01' ? x01LegsWon : cricLegsWon) / (gameTab === 'x01' ? x01LegsPlayed : cricLegsPlayed)) * 100) : 0;
-    
-    const overallAvg = avgCount > 0 ? (sumAvgs / avgCount).toFixed(1) : '0.0';
-    const overallFirst9 = first9Count > 0 ? (sumFirst9 / first9Count).toFixed(1) : '0.0';
-    const avgCheckout = checkoutsCount > 0 ? Math.round(sumCheckouts / checkoutsCount) : 0;
-    let maxRoundCount = 0; Object.values(roundsDist).forEach(val => { if (val > maxRoundCount) maxRoundCount = val; });
-    const overallMPR = sumCricDarts > 0 ? ((sumMarks / sumCricDarts) * 3).toFixed(2) : '0.00';
-
-    const roundEntries = Object.entries(roundsDist)
-        .map(([round, cnt]) => ({ round: parseInt(round, 10), count: cnt }))
-        .filter(x => !Number.isNaN(x.round))
-        .sort((a, b) => a.round - b.round);
-    const totalCheckouts = roundEntries.reduce((a, b) => a + (b.count || 0), 0);
-
-    return (
-        <main className="relative z-10 flex-1 w-full overflow-y-auto bg-slate-950">
-            <div className="flex flex-col w-full max-w-4xl xl:max-w-7xl gap-4 p-4 pb-24 mx-auto sm:p-6">
-                
-                <div className="flex items-center justify-between p-3 border shadow-md bg-slate-900 border-slate-800 rounded-xl sm:p-4">
-                    <div className="flex items-center min-w-0 gap-2 sm:gap-3">
-                        <div className="p-2 rounded-full bg-emerald-900/30 shrink-0"><User className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" /></div>
-                        <div className="flex flex-col min-w-0">
-                            <h2 className="text-sm font-black tracking-widest text-white uppercase truncate sm:text-base">
-                                {user.isAnonymous ? (currentP1Name || t('statsUserFallback')) : (user.displayName ? user.displayName.split(' ')[0] : t('statsUserFallback'))}
-                            </h2>
-                            <span className="text-[9px] sm:text-[10px] text-slate-500 truncate">
-                                {user.isAnonymous ? (t('localOfflineProfile') || 'Nikdo není přihlášen') : (user.email || t('localOfflineProfile'))}
-                            </span>
-                        </div>
-                    </div>
-                    {user.isAnonymous ? (
-                        <button
-                            onClick={onLogin}
-                            className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] sm:text-xs font-bold uppercase tracking-widest px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg transition-colors shrink-0 ml-2 shadow-lg flex gap-2 items-center"
-                        >
-                            <Cloud className="w-4 h-4"/> {t('backupBtn')}
-                        </button>
-                    ) : (
-                        <button onClick={onLogout} className="bg-red-900/20 hover:bg-red-900/40 text-red-400 text-[10px] sm:text-xs font-bold uppercase tracking-widest px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-red-500/30 transition-colors shrink-0 ml-2">{t('logout')}</button>
-                    )}
-                </div>
-
-                <div className="flex flex-col min-[480px]:flex-row gap-3 md:gap-4">
-                <div className="flex flex-1 min-w-0 p-1 border rounded-lg bg-slate-900 border-slate-800">
-                    {[{v:'x01', l:'X01 (501)'}, {v:'cricket', l:'CRICKET'}].map(f => (
-                        <button key={f.v} onClick={() => setGameTab(f.v)} className={`flex-1 py-3 text-xs font-black rounded-md uppercase tracking-wider transition-colors ${gameTab === f.v ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{f.l}</button>
-                    ))}
-                </div>
-                <div className="flex flex-1 min-w-0 p-1 border rounded-lg bg-slate-900 border-slate-800">
-                    {[{v:'all', l:t('statsAllTime')}, {v:7, l:t('stats7Days')}, {v:30, l:t('stats30Days')}, {v:90, l:t('stats90Days')}].map(f => (
-                        <button key={f.v} onClick={() => setTimeRange(f.v)} className={`flex-1 py-2 text-[10px] sm:text-xs font-bold rounded-md uppercase tracking-wider transition-colors ${timeRange === f.v ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>{f.l}</button>
-                    ))}
-                </div>
-                </div>
-
-                {gameTab === 'x01' && (
-                    <div className="flex flex-col gap-4 duration-300 animate-in fade-in landscape:gap-2">
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 landscape:grid-cols-4 landscape:gap-2 landscape:p-1">
-                            <div className="flex flex-col items-center justify-center p-3 text-center border bg-slate-900 border-slate-800 sm:p-4 rounded-xl landscape:p-2"><span className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">{t('avg3')}</span><span className="font-mono text-2xl font-black sm:text-3xl landscape:text-xl text-emerald-400">{overallAvg}</span></div>
-                            <div className="flex flex-col items-center justify-center p-3 text-center border bg-slate-900 border-slate-800 sm:p-4 rounded-xl landscape:p-2"><span className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">{t('statsFirst9')}</span><span className="font-mono text-2xl font-black text-indigo-400 sm:text-3xl landscape:text-xl">{overallFirst9}</span></div>
-                            <div className="flex flex-col items-center justify-center p-3 text-center border bg-slate-900 border-slate-800 sm:p-4 rounded-xl landscape:p-2">
-                                <span className="text-[8px] sm:text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1">{t('winRate')}</span>
-                                <div className="flex items-center gap-2"><span className="font-mono text-2xl font-black text-blue-400 sm:text-3xl landscape:text-xl">{winRate}%</span><span className="text-sm font-bold text-slate-600">|</span><span className="font-mono text-2xl font-black sm:text-3xl landscape:text-xl text-cyan-400">{legWinRate}%</span></div>
-                                <span className="text-[8px] sm:text-[9px] text-slate-500 mt-1">{filteredMatches.length} {t('matches')} / {x01LegsPlayed} {t('legs')}</span>
-                            </div>
-                            <div className="flex flex-col items-center justify-center p-3 text-center border bg-slate-900 border-slate-800 sm:p-4 rounded-xl landscape:p-2"><span className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">{t('statsAvgCheckout')}</span><span className="font-mono text-2xl font-black text-orange-400 sm:text-3xl landscape:text-xl">{avgCheckout}</span></div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 landscape:grid-cols-6 sm:gap-3 landscape:gap-2">
-                            <div className="flex flex-col items-center justify-center p-2 text-center border bg-slate-900 border-slate-800 sm:p-3 rounded-xl"><span className="text-[9px] text-slate-500 font-bold uppercase mb-1">{t('stats100p')}</span><span className="font-mono text-xl font-black text-white">{total100s}</span></div>
-                            <div className="flex flex-col items-center justify-center p-2 text-center border bg-slate-900 border-slate-800 sm:p-3 rounded-xl"><span className="text-[9px] text-slate-500 font-bold uppercase mb-1">{t('stats140p')}</span><span className="font-mono text-xl font-black text-white">{total140s}</span></div>
-                            <div className="flex flex-col items-center justify-center p-2 text-center border bg-slate-900 border-slate-800 sm:p-3 rounded-xl"><span className="text-[9px] text-slate-500 font-bold uppercase mb-1">{t('total180s')}</span><span className="font-mono text-xl font-black text-red-400">{total180s}</span></div>
-                            <div className="flex flex-col items-center justify-center col-span-3 p-2 text-center border bg-slate-900 border-slate-800 sm:p-3 rounded-xl landscape:col-span-3">
-                                <span className="text-[9px] text-slate-500 font-bold uppercase mb-1">{t('highestCheckout')}</span>
-                                <div className="flex items-center gap-3"><span className="font-mono text-2xl font-black text-yellow-400">{highestCheckout}</span><span className="text-[9px] text-slate-500 border-l border-slate-700 pl-3">{checkouts100plus}x {t('checkout100')}</span></div>
-                            </div>
-                        </div>
-
-                        <div className="p-4 border bg-slate-900 rounded-xl border-slate-800">
-                            <div className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                                {t('statsRoundDist')}
-                            </div>
-                            {totalCheckouts === 0 ? (
-                                <div className="text-xs text-slate-600">-</div>
-                            ) : (
-                                <div className="flex flex-col gap-2">
-                                    {roundEntries.map(({ round, count }) => {
-                                        const pct = Math.round((count / totalCheckouts) * 100);
-                                        return (
-                                            <div key={round} className="grid grid-cols-[3rem_1fr_3rem] items-center gap-3">
-                                                <div className="text-xs font-bold text-slate-500">R{round}</div>
-                                                <div className="h-3 rounded bg-slate-800 overflow-hidden border border-slate-700">
-                                                    <div className="h-full bg-emerald-500" style={{ width: `${pct}%` }} />
-                                                </div>
-                                                <div className="text-xs font-mono font-bold text-emerald-400 text-right">{pct}%</div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {gameTab === 'cricket' && (
-                    <div className="flex flex-col gap-4 duration-300 animate-in fade-in landscape:gap-2">
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 landscape:grid-cols-2 landscape:gap-2">
-                            <div className="flex flex-col items-center justify-center p-6 text-center border shadow-lg bg-slate-900 border-slate-800 rounded-xl landscape:p-3"><span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2">{t('totalMprInfo')}</span><span className="font-mono text-5xl font-black text-emerald-400 landscape:text-3xl">{overallMPR}</span></div>
-                            <div className="flex flex-col items-center justify-center p-6 text-center border bg-slate-900 border-slate-800 rounded-xl landscape:p-3">
-                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2">{t('winRate')}</span>
-                                <div className="flex items-center gap-4"><span className="font-mono text-4xl font-black text-blue-400 landscape:text-2xl">{winRate}%</span><span className="text-2xl font-bold text-slate-600 landscape:text-xl">|</span><span className="font-mono text-4xl font-black text-cyan-400 landscape:text-2xl">{legWinRate}%</span></div>
-                                <span className="text-[9px] text-slate-500 mt-2">{filteredMatches.length} {t('matches')} / {cricLegsPlayed} {t('legs')}</span>
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 mt-2 sm:gap-3 landscape:mt-0 landscape:gap-2">
-                            <div className="relative flex flex-col items-center justify-center p-4 overflow-hidden text-center border bg-slate-900 border-slate-800 rounded-xl landscape:p-2">
-                                <div className="absolute top-0 right-0 w-8 h-8 rounded-bl-full bg-yellow-500/10"></div>
-                                <span className="text-[9px] text-slate-500 font-bold uppercase mb-2 z-10">{t('whiteHorse')}</span>
-                                <span className="z-10 font-mono text-3xl font-black text-yellow-400 landscape:text-2xl">{whiteHorses}</span>
-                            </div>
-                            <div className="flex flex-col items-center justify-center p-4 text-center border bg-slate-900 border-slate-800 rounded-xl landscape:p-2">
-                                <span className="text-[9px] text-slate-500 font-bold uppercase mb-2">{t('marks7plus')}</span>
-                                <span className="font-mono text-3xl font-black text-white landscape:text-2xl">{highMarks}</span>
-                            </div>
-                            <div className="flex flex-col items-center justify-center p-4 text-center border bg-slate-900 border-slate-800 rounded-xl landscape:p-2">
-                                <span className="text-[9px] text-slate-500 font-bold uppercase mb-2">{t('marks5plus')}</span>
-                                <span className="font-mono text-3xl font-black text-slate-300 landscape:text-2xl">{goodMarks}</span>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                <button onClick={onDeleteAccount} className="w-full py-3 mt-4 text-sm font-bold tracking-widest text-red-400 uppercase transition-all border shadow-md bg-red-900/20 hover:bg-red-900/40 border-red-500/30 rounded-xl active:scale-95">{t('deleteAccount')}</button>
-            </div>
-        </main>
-    );
-};
 
 // --- HLAVNÍ KOMPONENTA (ROUTER) ---
 function AppMain({ lang, setLang }) {
@@ -1330,13 +252,13 @@ function AppMain({ lang, setLang }) {
       return { createdCount: 0, pairedCount: 0 };
     }
 
-    const sourceTournament = await getOwnerTournamentData(sourceTournamentId);
+    const sourceTournament = await syncAdapter.getOwnerTournamentData(sourceTournamentId);
     const resolvedCompetitionType = normalizeCompetitionType(
       sourceTournament?.meta?.competitionType ?? competitionType
     );
     const pairingOn = allowsPairing(resolvedCompetitionType);
     const pairFeeMode = pairingOn && normalizeFeeMode(sourceTournament) === 'pair';
-    const activeRegistrations = await listTournamentRegistrations(sourceTournamentId);
+    const activeRegistrations = await syncAdapter.listTournamentRegistrations(sourceTournamentId);
     const trackedRegs = activeRegistrations.filter((row) =>
       ACTIVE_PREREG_STATUSES.has(String(row?.status ?? ''))
     );
@@ -1363,7 +285,7 @@ function AppMain({ lang, setLang }) {
         return existing;
       }
 
-      const created = await createManualRegistration(sourceTournamentId, {
+      const created = await syncAdapter.createManualRegistration(sourceTournamentId, {
         playerName: candidate.name,
         csoPlayerId: candidate.csoPlayerId ?? null,
         nameKey: candidate.nameKey ?? null,
@@ -1460,7 +382,7 @@ function AppMain({ lang, setLang }) {
           (bStatus === 'CONFIRMED' && bPartner && bPartner !== regA.id);
         if (alreadyTogether || takenByOther) continue;
 
-        await adminConfirmPair(sourceTournamentId, regA.id, regB.id);
+        await syncAdapter.adminConfirmPair(sourceTournamentId, regA.id, regB.id);
         pairedCount += 1;
         const nextA = {
           ...regA,
@@ -1555,7 +477,7 @@ function AppMain({ lang, setLang }) {
 
       let data;
       try {
-        data = await getOnlineGameById(meta.gameId);
+        data = await syncAdapter.getOnlineGameById(meta.gameId);
       } catch {
         console.warn('resume online game');
         if (!cancelled) clearLastOnlineSession();
@@ -1615,7 +537,7 @@ function AppMain({ lang, setLang }) {
     return () => {
       cancelled = true;
     };
-  }, [handleOnlineGameStart]);
+  }, [handleOnlineGameStart, syncAdapter]);
 
   useEffect(() => {
     if (appState !== 'home') setHomeSubmenu(null);
@@ -1784,7 +706,7 @@ function AppMain({ lang, setLang }) {
       setPreregTournamentId(route.tournamentId);
 
       if (route.inviteToken) {
-        const valid = await verifyAdminInviteToken(route.tournamentId, route.inviteToken);
+        const valid = await syncAdapter.verifyAdminInviteToken(route.tournamentId, route.inviteToken);
         if (valid) {
           saveAdminInviteSession(route.tournamentId, route.inviteToken);
           setActivePreRegTournamentId(route.tournamentId);
@@ -1808,7 +730,7 @@ function AppMain({ lang, setLang }) {
       window.removeEventListener('hashchange', onRoute);
       window.removeEventListener('popstate', onRoute);
     };
-  }, []);
+  }, [syncAdapter]);
 
   /** Po přihlášení Google uplatnit invite token (spolupořaditel). */
   const claimedInviteRef = useRef(new Set());
@@ -1829,10 +751,10 @@ function AppMain({ lang, setLang }) {
     if (claimedInviteRef.current.has(claimKey)) return;
     claimedInviteRef.current.add(claimKey);
 
-    void claimAdminInviteAccess(tournamentId, token).catch(() => {
+    void syncAdapter.claimAdminInviteAccess(tournamentId, token).catch(() => {
       claimedInviteRef.current.delete(claimKey);
     });
-  }, [user?.uid, user?.isAnonymous, activePreRegTournamentId, activePreRegInviteToken]);
+  }, [user?.uid, user?.isAnonymous, activePreRegTournamentId, activePreRegInviteToken, syncAdapter]);
 
 
   const [matchHistory, setMatchHistory] = useState(() => loadSafeMatchHistory());
@@ -1922,7 +844,7 @@ function AppMain({ lang, setLang }) {
 
   /** Obnova obrazovky po zavření externího odkazu (ČŠO / mapy) v PWA/TWA. */
   useEffect(() => {
-    if (skipUiResumePersist) return;
+    if (getSkipUiResumePersist()) return;
     saveUiResume({
       appState,
       tournamentSetupStep,
@@ -2100,11 +1022,11 @@ function AppMain({ lang, setLang }) {
       t('onlineExitMatchBody'),
       async () => {
         try {
-          await abandonOnlineGameSession(onlineGameId, myOnlineRole);
+          await syncAdapter.abandonOnlineGameSession(onlineGameId, myOnlineRole);
         } catch {
           console.warn('abandonOnlineGameSession');
           try {
-            await cancelOnlineGame(onlineGameId);
+            await syncAdapter.cancelOnlineGame(onlineGameId);
           } catch {
             console.warn('cancelOnlineGame');
             showNotification(t('onlineExitMatchError'), 'error');
@@ -2120,13 +1042,13 @@ function AppMain({ lang, setLang }) {
         cancelLabel: t('cancel'),
       }
     );
-  }, [onlineGameId, myOnlineRole, t, showNotification, handleOnlineSessionEnded]);
+  }, [onlineGameId, myOnlineRole, t, showNotification, handleOnlineSessionEnded, syncAdapter]);
 
   const handleHardResetApp = () => {
     requestConfirm(
       t('headerHardResetTitle') || 'Resetovat aplikaci? Smažou se všechna lokální data a stránka se znovu načte.',
       () => {
-        skipUiResumePersist = true;
+        setSkipUiResumePersist(true);
         safeStorage.clear();
         window.location.replace('/');
       },
@@ -2323,45 +1245,37 @@ function AppMain({ lang, setLang }) {
   useEffect(() => {
     if (userRole !== 'admin') return;
     if (!tournamentData?.cloudEnabled || !user || user.isAnonymous) return;
-    if (!db) return;
+    if (!syncAdapter.isBackendReady()) return;
     const pin = String(activePin ?? '').trim();
     if (!/^\d{4}$/.test(pin)) return;
-    const ref = doc(db, ACTIVE_TOURNAMENTS_COLL, pin);
-    const unsub = onSnapshot(
-      ref,
-      (snap) => {
-        const exists = typeof snap.exists === 'function' ? snap.exists() : snap.exists;
-        if (!exists) return;
-        const d = snap.data();
-        if (!d || typeof d !== 'object') return;
+    const unsub = syncAdapter.listenTournament(pin, (cloudData) => {
+      if (!cloudData || typeof cloudData !== 'object') return;
 
-        // Označ inbound hned — sync timer nesmí mezi callbackem a renderem přepsat cloud starým stavem
-        const gen = ++inboundCloudSyncGen.current;
-        isIncomingCloudUpdate.current = true;
+      // Označ inbound hned — sync timer nesmí mezi callbackem a renderem přepsat cloud starým stavem
+      const gen = ++inboundCloudSyncGen.current;
+      isIncomingCloudUpdate.current = true;
 
-        setTournamentMatches((prev) => {
-          const next = syncAdapter.mergeGroupMatchesFromCloud(
-            prev,
-            Array.isArray(d.groupMatches) ? d.groupMatches : []
-          );
-          return next;
-        });
-        setTournamentBracket((prev) => {
-          const cloudBr = Array.isArray(d.tournamentBracket) ? d.tournamentBracket : [];
-          const merged = syncAdapter.mergeBracketFromCloud(prev, cloudBr);
-          if (merged === prev) return prev;
-          return propagateBracketWinners(merged);
-        });
+      setTournamentMatches((prev) => {
+        const next = syncAdapter.mergeGroupMatchesFromCloud(
+          prev,
+          Array.isArray(cloudData.groupMatches) ? cloudData.groupMatches : []
+        );
+        return next;
+      });
+      setTournamentBracket((prev) => {
+        const cloudBr = Array.isArray(cloudData.tournamentBracket) ? cloudData.tournamentBracket : [];
+        const merged = syncAdapter.mergeBracketFromCloud(prev, cloudBr);
+        if (merged === prev) return prev;
+        return propagateBracketWinners(merged);
+      });
 
-        // Po sloučení ještě chvíli blokuj outbound sync (React setState je async)
-        window.setTimeout(() => {
-          if (inboundCloudSyncGen.current === gen) {
-            isIncomingCloudUpdate.current = false;
-          }
-        }, 2200);
-      },
-      (err) => console.warn('Admin tournament listener:', err)
-    );
+      // Po sloučení ještě chvíli blokuj outbound sync (React setState je async)
+      window.setTimeout(() => {
+        if (inboundCloudSyncGen.current === gen) {
+          isIncomingCloudUpdate.current = false;
+        }
+      }, 2200);
+    });
     return () => unsub();
   }, [userRole, activePin, tournamentData?.cloudEnabled, user, syncAdapter]);
 
@@ -2404,7 +1318,7 @@ function AppMain({ lang, setLang }) {
   /** Pravidelná synchronizace turnaje do Firestore (admin + platný PIN), debounce kvůli šetření zápisů. */
   useEffect(() => {
     if (userRole !== 'admin') return;
-    if (!tournamentData?.cloudEnabled || !user || user.isAnonymous || !db) return;
+    if (!tournamentData?.cloudEnabled || !user || user.isAnonymous || !syncAdapter.isBackendReady()) return;
     const pin = String(activePin ?? '').trim();
     if (!/^\d{4}$/.test(pin)) return;
 
@@ -3075,7 +1989,7 @@ function AppMain({ lang, setLang }) {
         const td = fullSnapshot.tournamentData;
         const name = String(td?.name ?? '').trim();
         const pinOk = /^\d{4}$/.test(pinToDelete);
-        const wasCloudTournament = !!td?.cloudEnabled && pinOk && !!db;
+        const wasCloudTournament = !!td?.cloudEnabled && pinOk && syncAdapter.isBackendReady();
         const isCloudArchive = wasCloudTournament && user && !user.isAnonymous;
 
         if (wasCloudTournament && (!user || user.isAnonymous)) {
@@ -3948,7 +2862,7 @@ function AppMain({ lang, setLang }) {
   }, [user, matchHistory]);
 
   const handleSyncOfflineMatches = async () => {
-      if (!db || !user || user.isAnonymous) return;
+      if (!syncAdapter.isBackendReady() || !user || user.isAnonymous) return;
       try {
           const unsyncedMatches = matchHistory.filter(m => !m.synced && !m.p1Id);
           if (unsyncedMatches.length === 0) {
@@ -3958,7 +2872,7 @@ function AppMain({ lang, setLang }) {
           
           for (const match of unsyncedMatches) {
               const matchToSync = { ...match, p1Id: user.uid, synced: true };
-              await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'matches'), matchToSync);
+              await syncAdapter.savePublicMatch(matchToSync);
           }
 
           const uploadedIds = new Set(unsyncedMatches.map(m => m.id));
@@ -4036,9 +2950,9 @@ function AppMain({ lang, setLang }) {
       // Online: jen uložit historii — bez obrazovky odvetného zápasu (návrat řeší onOnlineSessionEnded → lobby).
       if (oid) {
         setMatchHistory((prev) => [fullRecord, ...prev]);
-        if (db && user && !user.isAnonymous) {
+        if (user && !user.isAnonymous) {
           try {
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'matches'), fullRecord);
+            await syncAdapter.savePublicMatch(fullRecord);
           } catch {}
         }
         return;
@@ -4051,7 +2965,7 @@ function AppMain({ lang, setLang }) {
         setAppState('match_finished');
       } else {
         setMatchHistory(prev => [fullRecord, ...prev]);
-        if(db && user && !user.isAnonymous) { try { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'matches'), fullRecord); } catch {} }
+        if (user && !user.isAnonymous) { try { await syncAdapter.savePublicMatch(fullRecord); } catch {} }
         setSelectedMatchDetail(fullRecord);
         setMatchFinishRestoreState(restorePayload);
         setAppState('match_finished');
@@ -6860,7 +5774,7 @@ function AppMain({ lang, setLang }) {
                                                 
                                             </div>
                                         </div>
-                                        <button onClick={async (e) => { e.stopPropagation(); setMatchHistory(p => p.filter(x => x.id !== m.id)); if (m.docId && db && user && !offlineMode) { try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'matches', m.docId)); } catch {} } }} className="p-3 transition-colors rounded-lg text-slate-600 hover:text-red-400 hover:bg-slate-800"><Trash2 className="w-5 h-5" /></button>
+                                        <button onClick={async (e) => { e.stopPropagation(); setMatchHistory(p => p.filter(x => x.id !== m.id)); if (m.docId && user && !offlineMode) { try { await syncAdapter.deletePublicMatch(m.docId); } catch {} } }} className="p-3 transition-colors rounded-lg text-slate-600 hover:text-red-400 hover:bg-slate-800"><Trash2 className="w-5 h-5" /></button>
                                     </div>
                                 )})}
                             </div>
@@ -7089,16 +6003,8 @@ function AppMain({ lang, setLang }) {
                   async () => {
                     try { 
                         // 1. Smazání z Firebase DB (pokud je online a přihlášen)
-                        if (db && !offlineMode && !user.isAnonymous) {
-                            const q1 = query(collection(db, 'artifacts', appId, 'public', 'data', 'matches'), where('p1Id', '==', user.uid));
-                            const q2 = query(collection(db, 'artifacts', appId, 'public', 'data', 'matches'), where('p2Id', '==', user.uid));
-                            
-                            const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
-                            const deletePromises = [];
-                            snap1.forEach(d => deletePromises.push(deleteDoc(d.ref)));
-                            snap2.forEach(d => deletePromises.push(deleteDoc(d.ref)));
-                            
-                            await Promise.all(deletePromises);
+                        if (!offlineMode && !user.isAnonymous) {
+                            await syncAdapter.deletePublicMatchesForUser(user.uid);
                         }
     
                         // 2. Vymazání z lokální paměti prohlížeče
