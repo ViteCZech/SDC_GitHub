@@ -20,4 +20,10 @@ describe('light theme CSS overlay', () => {
     expect(css).toContain('[class*="bg-slate-900/"] .text-white');
     expect(css).toContain('[class*="bg-slate-950/"] .text-white');
   });
+
+  it('přebarví i tintované callout panely (emerald/sky/amber 950) na světlé pozadí', () => {
+    expect(css).toContain('[class*="bg-emerald-950"]');
+    expect(css).toContain('[class*="bg-sky-950"]');
+    expect(css).toContain('[class*="bg-amber-950"]');
+  });
 });

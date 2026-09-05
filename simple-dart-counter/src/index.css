@@ -156,6 +156,98 @@ html.light [class*="bg-slate-800/"] [class*="text-amber-300"] {
   color: #b45309 !important;
 }
 
+html.light [class*="bg-slate-950/"] [class*="text-emerald-100"],
+html.light [class*="bg-slate-950/"] [class*="text-emerald-200"],
+html.light [class*="bg-slate-900/"] [class*="text-emerald-100"],
+html.light [class*="bg-slate-900/"] [class*="text-emerald-200"],
+html.light [class*="bg-slate-800/"] [class*="text-emerald-100"],
+html.light [class*="bg-slate-800/"] [class*="text-emerald-200"],
+html.light .bg-slate-950 [class*="text-emerald-100"],
+html.light .bg-slate-950 [class*="text-emerald-200"],
+html.light .bg-slate-900 [class*="text-emerald-100"],
+html.light .bg-slate-900 [class*="text-emerald-200"],
+html.light .bg-slate-800 [class*="text-emerald-100"],
+html.light .bg-slate-800 [class*="text-emerald-200"] {
+  color: #047857 !important;
+}
+
+html.light [class*="bg-slate-950/"] [class*="text-sky-100"],
+html.light [class*="bg-slate-950/"] [class*="text-sky-200"],
+html.light [class*="bg-slate-900/"] [class*="text-sky-100"],
+html.light [class*="bg-slate-900/"] [class*="text-sky-200"],
+html.light [class*="bg-slate-800/"] [class*="text-sky-100"],
+html.light [class*="bg-slate-800/"] [class*="text-sky-200"],
+html.light .bg-slate-950 [class*="text-sky-100"],
+html.light .bg-slate-950 [class*="text-sky-200"],
+html.light .bg-slate-900 [class*="text-sky-100"],
+html.light .bg-slate-900 [class*="text-sky-200"],
+html.light .bg-slate-800 [class*="text-sky-100"],
+html.light .bg-slate-800 [class*="text-sky-200"] {
+  color: #075985 !important;
+}
+
+html.light [class*="bg-slate-950/"] [class*="text-purple-100"],
+html.light [class*="bg-slate-950/"] [class*="text-purple-200"],
+html.light [class*="bg-slate-900/"] [class*="text-purple-100"],
+html.light [class*="bg-slate-900/"] [class*="text-purple-200"],
+html.light [class*="bg-slate-800/"] [class*="text-purple-100"],
+html.light [class*="bg-slate-800/"] [class*="text-purple-200"],
+html.light .bg-slate-950 [class*="text-purple-100"],
+html.light .bg-slate-950 [class*="text-purple-200"],
+html.light .bg-slate-900 [class*="text-purple-100"],
+html.light .bg-slate-900 [class*="text-purple-200"],
+html.light .bg-slate-800 [class*="text-purple-100"],
+html.light .bg-slate-800 [class*="text-purple-200"] {
+  color: #6b21a8 !important;
+}
+
+html.light [class*="bg-emerald-950"] {
+  background-color: #ecfdf5 !important;
+}
+
+html.light [class*="bg-sky-950"] {
+  background-color: #f0f9ff !important;
+}
+
+html.light [class*="bg-cyan-950"] {
+  background-color: #ecfeff !important;
+}
+
+html.light [class*="bg-amber-950"] {
+  background-color: #fffbeb !important;
+}
+
+html.light [class*="bg-violet-950"] {
+  background-color: #f5f3ff !important;
+}
+
+html.light [class*="bg-emerald-950"] [class*="text-emerald-100"],
+html.light [class*="bg-emerald-950"] [class*="text-emerald-200"],
+html.light [class*="bg-emerald-950"] [class*="text-emerald-300"],
+html.light [class*="bg-emerald-950"][class*="text-emerald-"] {
+  color: #047857 !important;
+}
+
+html.light [class*="bg-sky-950"] [class*="text-sky-100"],
+html.light [class*="bg-sky-950"] [class*="text-sky-200"],
+html.light [class*="bg-sky-950"] [class*="text-sky-300"],
+html.light [class*="bg-sky-950"][class*="text-sky-"] {
+  color: #075985 !important;
+}
+
+html.light [class*="bg-cyan-950"] [class*="text-cyan-100"],
+html.light [class*="bg-cyan-950"] [class*="text-cyan-200"],
+html.light [class*="bg-cyan-950"] [class*="text-cyan-300"] {
+  color: #0e7490 !important;
+}
+
+html.light [class*="bg-amber-950"] [class*="text-amber-100"],
+html.light [class*="bg-amber-950"] [class*="text-amber-200"],
+html.light [class*="bg-amber-950"] [class*="text-amber-300"],
+html.light [class*="bg-amber-950"][class*="text-amber-"] {
+  color: #b45309 !important;
+}
+
 /* Skrytí ošklivého bočního posuvníku (scrollbaru) */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

@@ -121,7 +121,7 @@ export default function PublicResultsHome({
             <button
               type="button"
               onClick={() => onOpenTopPerformances?.()}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20 transition-colors font-bold text-sm"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-purple-500/40 bg-purple-50 text-purple-800 hover:bg-purple-100 transition-colors font-bold text-sm dark:bg-purple-500/10 dark:text-purple-200 dark:hover:bg-purple-500/20"
             >
               <Crown className="w-4 h-4" />
               {dict.topPerformancesCta || 'Top výkony'}

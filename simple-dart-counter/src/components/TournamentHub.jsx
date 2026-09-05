@@ -261,7 +261,7 @@ export default function TournamentHub({
                   </div>
                 </div>
               </div>
-              <div className="rounded-lg border border-emerald-500/30 bg-emerald-950/25 px-3 py-2 text-[11px] text-emerald-200 leading-snug">
+              <div className="rounded-lg border border-emerald-600/40 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-800 leading-snug dark:border-emerald-500/30 dark:bg-emerald-950/25 dark:text-emerald-200">
                 {th('offlineModeConditions') ||
                   'Podmínky: bez cloudových tabletů a bez cloud TV feedu. Data zůstávají lokálně na zařízení.'}
               </div>
@@ -290,12 +290,12 @@ export default function TournamentHub({
                   </div>
                 </div>
               </div>
-              <div className="rounded-lg border border-sky-400/35 bg-slate-900/70 px-3 py-2 text-[11px] text-sky-100 leading-snug">
+              <div className="rounded-lg border border-sky-600/40 bg-sky-50 px-3 py-2 text-[11px] text-sky-800 leading-snug dark:border-sky-400/35 dark:bg-slate-900/70 dark:text-sky-100">
                 {th('cloudModeConditions') ||
                   'Podmínky: internet + Google přihlášení pořadatele. Diváci/tablety se připojují přes PIN.'}
               </div>
               {!isLoggedIn ? (
-                <div className="rounded-lg border border-amber-500/40 bg-amber-950/30 px-3 py-2 text-[11px] text-amber-100 leading-snug flex items-start gap-2">
+                <div className="rounded-lg border border-amber-500/50 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 leading-snug flex items-start gap-2 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-100">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>
                     {th('cloudModeLoginWarning') ||
