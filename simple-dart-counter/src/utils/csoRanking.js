@@ -183,6 +183,36 @@ export function normalizeForSearch(str) {
     .trim();
 }
 
+/** @type {WeakMap<object, { byNormName: Map<string, object>, byReg: Map<string, object>, searchRows: Array<{ player: object, nameN: string }> }>} */
+const lookupCache = new WeakMap();
+
+function getCsoLookup(players) {
+  if (!Array.isArray(players) || players.length === 0) {
+    return { byNormName: new Map(), byReg: new Map(), searchRows: [] };
+  }
+  const cached = lookupCache.get(players);
+  if (cached) return cached;
+  const byNormName = new Map();
+  const byReg = new Map();
+  const searchRows = [];
+  for (const p of players) {
+    const nameN = normalizeForSearch(p?.name);
+    const reg = String(p?.regNumber ?? '').trim();
+    if (nameN && !byNormName.has(nameN)) byNormName.set(nameN, p);
+    if (reg) byReg.set(reg, p);
+    searchRows.push({ player: p, nameN });
+  }
+  const index = { byNormName, byReg, searchRows };
+  lookupCache.set(players, index);
+  return index;
+}
+
+/** Náhled in-memory cache bez I/O (okamžité našeptávání). */
+export function peekCsoRankingCache(gender) {
+  const g = normalizeCsoListKey(gender);
+  return cache.get(g) || null;
+}
+
 /**
  * Přesná shoda jména v žebříčku (bez diakritiky / case).
  * Pro plovoucí ranking — ne fuzzy, ať se nepřiřadí špatná pozice.
@@ -193,8 +223,7 @@ export function normalizeForSearch(str) {
 export function findCsoPlayerByName(players, name) {
   const n = normalizeForSearch(name);
   if (!n || !Array.isArray(players)) return null;
-  const hit = players.find((p) => normalizeForSearch(p?.name) === n);
-  return hit ?? null;
+  return getCsoLookup(players).byNormName.get(n) ?? null;
 }
 
 /**
@@ -207,7 +236,7 @@ export function findCsoPlayerEntry(players, player) {
   const rawId = String(player.csoPlayerId ?? '').trim();
   const regFromId = rawId.startsWith('cso:') ? rawId.slice(4) : '';
   if (regFromId) {
-    const byReg = players.find((p) => String(p?.regNumber ?? '').trim() === regFromId);
+    const byReg = getCsoLookup(players).byReg.get(regFromId);
     if (byReg) return byReg;
   }
   return findCsoPlayerByName(players, player.name);
@@ -343,19 +372,16 @@ export function searchCsoPlayers(players, query, limit = 8) {
   if (!q || q.length < 2 || !Array.isArray(players)) return [];
 
   const qTokens = q.split(/[\s,]+/).filter(Boolean);
+  const { searchRows } = getCsoLookup(players);
 
-  return players
-    .filter((p) => {
-      const normName = normalizeForSearch(p?.name ?? '');
-      return qTokens.every((tok) => normName.includes(tok));
-    })
+  return searchRows
+    .filter((row) => qTokens.every((tok) => row.nameN.includes(tok)))
     .sort((a, b) => {
-      const na = normalizeForSearch(a.name);
-      const nb = normalizeForSearch(b.name);
-      const aStarts = na.startsWith(q) ? 0 : 1;
-      const bStarts = nb.startsWith(q) ? 0 : 1;
+      const aStarts = a.nameN.startsWith(q) ? 0 : 1;
+      const bStarts = b.nameN.startsWith(q) ? 0 : 1;
       if (aStarts !== bStarts) return aStarts - bStarts;
-      return (a.rank ?? 9999) - (b.rank ?? 9999);
+      return (a.player.rank ?? 9999) - (b.player.rank ?? 9999);
     })
-    .slice(0, limit);
+    .slice(0, limit)
+    .map((row) => row.player);
 }

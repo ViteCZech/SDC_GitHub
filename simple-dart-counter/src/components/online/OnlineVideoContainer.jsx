@@ -4,8 +4,7 @@ import { addDoc, collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc
 import { db } from '../../firebase';
 import { ONLINE_GAMES_COLLECTION, subscribeOnlineGame } from '../../services/onlineGamesService';
 import { translations } from '../../translations';
-
-const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
+import { getIceServers, rtcPeerConfig } from '../../utils/webrtcIce';
 
 function stopStream(stream) {
   if (!stream) return;
@@ -191,7 +190,9 @@ export default function OnlineVideoContainer({
       attachVideo(localVideoEl, local);
       applyLocalMicToStream(local, localMicMutedRef.current);
 
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const iceServers = await getIceServers();
+      if (cancelled) return;
+      const pc = new RTCPeerConnection(rtcPeerConfig(iceServers));
       pcRef.current = pc;
 
       const scheduleReconnect = () => {

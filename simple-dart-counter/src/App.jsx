@@ -17,7 +17,7 @@ import {
   Target, Trash2, Trophy, Undo2, Unplug, User, Cloud, X, BarChart2, List, Swords, ClipboardList, Lock
 } from 'lucide-react';
 
-import { translations } from './translations';
+import { translations, ensureLocale, prefetchOtherLocales } from './translations';
 import {
   TABLET_CHECKIN_MAX_WARNINGS,
   bumpRoleWarningCounts,
@@ -50,6 +50,7 @@ import ActiveSessionBanner from './components/ActiveSessionBanner';
 import { resolveAppNav, shouldParkTournamentSession } from './utils/appNavigation';
 import { shouldMountMatchSurface } from './utils/matchKeepAlive';
 import { deepEqual } from './utils/deepEqual';
+import { prefetchIceServers } from './utils/webrtcIce';
 import { loadUiResume, saveUiResume } from './utils/uiResumeStorage';
 import { parsePreregRouteFromUrl, isPublicTournamentCatalogPath } from './utils/preregAdmin';
 import { parseTabletRouteFromUrl, ensureBoardAuthTokens } from './utils/tabletBoardQr';
@@ -1619,6 +1620,10 @@ function AppMain({ lang, setLang }) {
   useEffect(() => {
     if (appState !== 'home') setHomeSubmenu(null);
   }, [appState]);
+
+  useEffect(() => {
+    if (homeSubmenu === 'online') prefetchIceServers();
+  }, [homeSubmenu]);
 
   const [userRole, setUserRole] = useState(() => {
     const r = getBootUiResumeOnce();
@@ -4006,7 +4011,7 @@ function AppMain({ lang, setLang }) {
   useEffect(() => {
       if (user && !user.isAnonymous && user.displayName) {
           setSettings(prev => {
-              const defaultNames = ['Domácí', 'Home', 'Gospodarze', translations.cs.p1Default, translations.en.p1Default, translations.pl.p1Default];
+              const defaultNames = ['Domácí', 'Home', 'Gospodarze', translations.cs?.p1Default, translations.en?.p1Default, translations.pl?.p1Default];
               if (!prev.p1Name || defaultNames.includes(prev.p1Name)) {
                   return { ...prev, p1Name: user.displayName.split(' ')[0], p1Id: user.uid };
               }
@@ -7183,8 +7188,44 @@ function AppMain({ lang, setLang }) {
 
 export default function App() {
   const venueRoute = parseVenueDisplayRouteFromUrl();
-  const [lang, setLang] = useState(() => (venueRoute ? resolveVenueLang() : 'cs'));
+  const [lang, setLangState] = useState(() => (venueRoute ? resolveVenueLang() : 'cs'));
+  const [localeReady, setLocaleReady] = useState(() => (venueRoute ? resolveVenueLang() : 'cs') === 'cs');
   const syncAdapter = useMemo(() => createCloudSyncAdapter(), []);
+
+  const setLang = React.useCallback((next) => {
+    void ensureLocale(next).then(() => {
+      setLangState(next);
+      setLocaleReady(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void ensureLocale(lang).then(() => {
+      if (!cancelled) setLocaleReady(true);
+    });
+    const idle =
+      typeof requestIdleCallback === 'function'
+        ? requestIdleCallback
+        : (cb) => window.setTimeout(cb, 1);
+    const idleId = idle(() => prefetchOtherLocales(lang));
+    return () => {
+      cancelled = true;
+      if (typeof cancelIdleCallback === 'function') {
+        try {
+          cancelIdleCallback(idleId);
+        } catch {
+          /* ignore */
+        }
+      } else {
+        window.clearTimeout(idleId);
+      }
+    };
+  }, [lang]);
+
+  if (!localeReady) {
+    return <div className="bg-slate-50 dark:bg-slate-950 w-full h-[100dvh]" />;
+  }
 
   if (venueRoute) {
     return (

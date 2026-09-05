@@ -23,6 +23,7 @@ import {
   getCsoRankingDisplayDate,
   getCsoRankingUrl,
   loadCsoRanking,
+  peekCsoRankingCache,
   resolvePlayerLiveRank,
   searchCsoPlayers,
 } from '../utils/csoRanking';
@@ -169,15 +170,19 @@ export default function TournamentSetup({
 
     let cancelled = false;
     const isReload = csoReloadKey > 0;
-    setCsoLoading(true);
     setCsoError(null);
-    // Při reloadu po Stedar update nemaž meta — jinak badge blikne na starý static JSON.
-    if (!isReload) {
-      setCsoMeta(null);
-    }
     setShowSuggestions(false);
     setNameSuggestions((prev) => (prev.length === 0 ? prev : []));
     setSelectedCsoRank(null);
+    const cached = !isReload ? peekCsoRankingCache(csoListKey) : null;
+    if (cached) {
+      setCsoList(cached.players ?? []);
+      setCsoMeta(cached.meta ?? null);
+      setCsoLoading(false);
+    } else {
+      setCsoLoading(true);
+      if (!isReload) setCsoMeta(null);
+    }
 
     loadCsoRanking(csoListKey, { bypassCache: true })
       .then((data) => {

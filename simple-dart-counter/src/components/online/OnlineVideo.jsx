@@ -3,8 +3,7 @@ import { addDoc, collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc
 import { db } from '../../firebase';
 import { ONLINE_GAMES_COLLECTION } from '../../services/onlineGamesService';
 import { translations } from '../../translations';
-
-const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
+import { getIceServers, rtcPeerConfig } from '../../utils/webrtcIce';
 
 /**
  * WebRTC video (Firebase signalling pod `onlineGames/{gameId}/webrtc/`).
@@ -93,7 +92,9 @@ export default function OnlineVideo({ gameId, myRole, currentPlayer, localStream
 
       attachLocalVideo(local);
 
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const iceServers = await getIceServers();
+      if (cancelled) return;
+      const pc = new RTCPeerConnection(rtcPeerConfig(iceServers));
       pcRef.current = pc;
 
       local.getTracks().forEach((track) => {

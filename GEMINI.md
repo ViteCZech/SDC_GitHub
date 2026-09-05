@@ -5,7 +5,7 @@ Kontextový dokument pro AI (Gemini / Cursor). Čti tento soubor před jakoukoli
 Aplikace: **Simple Dart Counter** (npm název `darts-cloud-pro`), verze UI `v1.10.2` v `simple-dart-counter/src/App.jsx`.
 Produkt: PWA počítadlo šipek + správa klubových turnajů (Česko, ČŠO žebříčky). Jazyky UI: **cs / en / pl**.
 
-Kód a komentáře jsou převážně česky. Překlady žijí v `simple-dart-counter/src/translations.js` (jeden velký objekt `translations`).
+Kód a komentáře jsou převážně česky. Překlady: `src/i18n/{cs,en,pl}.js` (cs v hlavním chunku, en/pl lazy).
 
 ---
 
@@ -143,7 +143,7 @@ Domů → Online Hra.
 - Live stav v `onlineGames/{id}.liveGameState` s `writeId` + monotonním `seq` (`onlineLiveSync.js`); pozdní snapshot nesmí přepsat novější hod
 - Heartbeat host/guest, reconnect (`onlineReconnectStorage.js`)
 - Po legu čeká **OK od poraženého** než začne další
-- Video: `OnlineVideo.jsx` / `OnlineVideoContainer.jsx`, `useLobbyMedia.js`
+- Video: `OnlineVideo.jsx` / `OnlineVideoContainer.jsx`, `useLobbyMedia.js`. ICE: STUN + volitelný TURN (`getWebRtcIceServers`, env `TURN_URLS` / `TURN_USERNAME` / `TURN_CREDENTIAL`, nebo `VITE_TURN_*`)
 - Opustit zápas = `abandoned` (soupeř to uvidí); výpadek spojení ≠ abandon
 
 Služba: `src/services/onlineGamesService.js`. Auth: **anonymní**. Kolekce `onlineGames` + subkolekce `webrtc`, `signaling`.
@@ -212,7 +212,7 @@ Typy: `src/types/tournamentPreReg.d.ts` a `functions/src/types.ts` — držet v 
 
 - Firestore `cso_rankings/{men|women|doubles}` — write jen Admin SDK
 - Fallback JSON v `public/data/cso-ranking-*.json`
-- Klient: `utils/csoRanking.js` (našeptávač jmen, live rank)
+- Klient: `utils/csoRanking.js` (našeptávač jmen, live rank, in-memory search index)
 - **Singles / online 1v1 / lokální zápas:** jen `men` (rankingId=1) a `women` (rankingId=2)
 - **Dvojice / mix / losované dvojice:** `doubles` = Stedar ČP nasazovací (rankingId=6). Nikdy ne id=5.
 - Nasazení páru: součet obou doubles ranků → lepší individuální rank → `seedTieBreak`

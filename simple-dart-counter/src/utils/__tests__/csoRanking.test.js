@@ -18,9 +18,10 @@ describe('csoRanking', () => {
     expect(byName?.rank).toBe(8);
   });
 
-  it('searchCsoPlayers najde bez diakritiky, krátký query nic', () => {
+  it('searchCsoPlayers najde bez diakritiky, krátký query nic, index je opakovatelný', () => {
     expect(searchCsoPlayers(list, 'novak').map((p) => p.rank)).toEqual([1]);
     expect(searchCsoPlayers(list, 'x')).toEqual([]);
+    expect(searchCsoPlayers(list, 'novak').map((p) => p.rank)).toEqual([1]);
   });
 
   it('buildDrawRankingSnapshot zmrazí živý rank a nenasazené dá až za ně', () => {

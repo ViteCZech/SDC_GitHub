@@ -10,5 +10,6 @@ export { verifyTabletBoardAccess } from './verifyTabletBoardAccess';
 export { claimAdminInvite, verifyAdminInvite } from './claimAdminInvite';
 export { lookupPrivateOnlineGame, joinPrivateOnlineGame } from './onlineGameActions';
 export { updateCsoRankingsScheduled, updateCsoRankingsNow } from './updateCsoRankings';
+export { getWebRtcIceServers } from './getWebRtcIceServers';
 
 

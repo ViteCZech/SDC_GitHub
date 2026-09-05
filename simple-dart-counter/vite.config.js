@@ -27,6 +27,7 @@ export default defineConfig({
           name: 'unit',
           environment: 'node',
           include: ['src/**/*.test.js'],
+          setupFiles: ['./src/test/i18nSetup.js'],
           exclude: [
             'src/utils/__tests__/preregStorage.test.js',
             'src/utils/__tests__/uiResumeStorage.test.js',
@@ -43,7 +44,7 @@ export default defineConfig({
             'src/utils/__tests__/preregStorage.test.js',
             'src/utils/__tests__/uiResumeStorage.test.js',
           ],
-          setupFiles: ['./src/test/setup.js'],
+          setupFiles: ['./src/test/setup.js', './src/test/i18nSetup.js'],
         },
       },
     ],

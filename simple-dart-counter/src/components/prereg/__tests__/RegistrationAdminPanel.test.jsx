@@ -85,6 +85,7 @@ vi.mock('../../../services/tournamentPreRegService', () => ({
 
 vi.mock('../../../utils/csoRanking', () => ({
   loadCsoRanking: vi.fn(async () => ({ players: [] })),
+  peekCsoRankingCache: vi.fn(() => null),
   resolvePlayerLiveRankFromLists: vi.fn(() => null),
 }));
 
