@@ -4,6 +4,8 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import { PLAYER_REG_LINKS_COLLECTION } from './playerRegLinks';
 import { applyRegistrationCancel, isCancellableStatus } from './registrationCancel';
+import { CALLABLE_PUBLIC } from './authz';
+import { assertPlayerActor } from './playerActor';
 import type { UnregisterPlayerResult } from './types';
 
 if (getApps().length === 0) {
@@ -25,14 +27,11 @@ function fail(code: HttpsError['code'], message: string): TxFail {
  * Identita: registrationId z localStorage, nebo Google authUid / e-mail.
  */
 export const unregisterPlayer = onCall(
-  {
-    region: 'europe-west1',
-    invoker: 'public',
-    cors: true,
-  },
+  CALLABLE_PUBLIC,
   async (request): Promise<UnregisterPlayerResult> => {
     const tournamentId = String(request.data?.tournamentId ?? '').trim();
     const registrationId = String(request.data?.registrationId ?? '').trim();
+    const cancelToken = String(request.data?.cancelToken ?? '').trim();
 
     if (!tournamentId || !registrationId) {
       throw new HttpsError('invalid-argument', 'Chybí turnaj nebo ID přihlášky.');
@@ -76,6 +75,15 @@ export const unregisterPlayer = onCall(
 
       if (!isCancellableStatus(status)) {
         return fail('failed-precondition', 'Tuto přihlášku nelze stornovat.');
+      }
+
+      try {
+        assertPlayerActor(regData, request, cancelToken);
+      } catch (err) {
+        if (err instanceof HttpsError) {
+          return fail(err.code, err.message);
+        }
+        throw err;
       }
 
       const pair = (regData.pair ?? {}) as { partnerRegistrationId?: string | null };

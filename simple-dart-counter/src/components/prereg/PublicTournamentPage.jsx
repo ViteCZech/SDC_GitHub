@@ -156,6 +156,7 @@ export default function PublicTournamentPage({ tournamentId, lang, user = null }
       phone: formSnapshot.phone,
       amount: formSnapshot.amount,
       gender: formSnapshot.gender ?? null,
+      cancelToken: result.cancelToken || undefined,
       savedAt: new Date().toISOString(),
     };
     saveStoredRegistration(tournamentId, stored);

@@ -17,6 +17,31 @@
       ]
     },
     {
+      "collectionGroup": "onlineGames",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "isPublic", "order": "ASCENDING" },
+        { "fieldPath": "pinHash", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "onlineGames",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "isPublic", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "onlineGames",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "pin", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "registrations",
       "queryScope": "COLLECTION",
       "fields": [

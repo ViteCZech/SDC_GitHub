@@ -2,6 +2,9 @@ import { initializeApp, getApps, getApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
+import { CALLABLE_PUBLIC } from './authz';
+import { validateTabletAuth } from './tabletAuth';
+import { loadTabletAuthForPin } from './tournamentSecrets';
 
 if (getApps().length === 0) {
   initializeApp();
@@ -18,36 +21,11 @@ type RegisterPayload = {
   status?: 'online' | 'offline';
 };
 
-function validateBoardAuth(
-  td: { boardAuthTokens?: Record<string, string>; tabletPassword?: string } | null,
-  board: string,
-  token: string,
-  tabletPassword?: string
-): boolean {
-  const boardToken = String(token ?? '').trim();
-  const providedPassword = String(tabletPassword ?? '').trim().slice(0, 5);
-  const expectedPassword =
-    td && td.tabletPassword != null ? String(td.tabletPassword).trim().slice(0, 5) : '';
-  const tokens = td?.boardAuthTokens;
-  if (tokens && typeof tokens === 'object' && tokens[board] != null) {
-    if (String(tokens[board]).trim() === boardToken) return true;
-    if (expectedPassword && providedPassword && providedPassword === expectedPassword) return true;
-    return false;
-  }
-
-  if (expectedPassword === '') return true;
-  return providedPassword !== '' && providedPassword === expectedPassword;
-}
-
 /**
  * Herní tablet: označí terč jako online po naskenování QR (bez Google loginu).
  */
 export const registerTabletBoardOnline = onCall(
-  {
-    region: 'europe-west1',
-    invoker: 'public',
-    cors: true,
-  },
+  CALLABLE_PUBLIC,
   async (request): Promise<{ success: true }> => {
     const data = (request.data ?? {}) as RegisterPayload;
     const pin = String(data.pin ?? '').trim();
@@ -78,7 +56,8 @@ export const registerTabletBoardOnline = onCall(
       numBoards?: number;
     } | null;
 
-    if (!validateBoardAuth(td, board, token, tabletPassword)) {
+    const authSource = await loadTabletAuthForPin(db, pin, td);
+    if (!validateTabletAuth(authSource, board, token, tabletPassword)) {
       throw new HttpsError('permission-denied', 'Neplatný token pro tento terč.');
     }
 

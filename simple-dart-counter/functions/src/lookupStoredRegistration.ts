@@ -1,6 +1,8 @@
 import { initializeApp, getApps, getApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { CALLABLE_PUBLIC } from './authz';
+import { assertPlayerActor } from './playerActor';
 import { publicPairView } from './pairing';
 
 if (getApps().length === 0) {
@@ -14,14 +16,11 @@ const db = getFirestore(getApp(), 'eur3');
  * Nevrací e-mail / telefon.
  */
 export const lookupStoredRegistration = onCall(
-  {
-    region: 'europe-west1',
-    invoker: 'public',
-    cors: true,
-  },
+  CALLABLE_PUBLIC,
   async (request) => {
     const tournamentId = String(request.data?.tournamentId ?? '').trim();
     const registrationId = String(request.data?.registrationId ?? '').trim();
+    const cancelToken = String(request.data?.cancelToken ?? '').trim();
     if (!tournamentId || !registrationId) {
       throw new HttpsError('invalid-argument', 'Chybí turnaj nebo ID přihlášky.');
     }
@@ -38,6 +37,8 @@ export const lookupStoredRegistration = onCall(
     }
 
     const data = snap.data() ?? {};
+    assertPlayerActor(data, request, cancelToken);
+
     const player = (data.player ?? {}) as { name?: string; gender?: string | null };
     const payment = (data.payment ?? {}) as {
       variableSymbol?: string | null;

@@ -15,6 +15,7 @@ import {
   playerEmailOf,
 } from './claimRegistration';
 import { randomBytes } from 'crypto';
+import { CALLABLE_PUBLIC, hashCancelToken, newCancelToken } from './authz';
 import {
   allowsPairing,
   canAppearInPartnerList,
@@ -154,11 +155,7 @@ function resolveRegistrationCsoPlayerId(
  * (typicky po přechodu Spark → Blaze / novém deployi).
  */
 export const registerPlayer = onCall(
-  {
-    region: 'europe-west1',
-    invoker: 'public',
-    cors: true,
-  },
+  CALLABLE_PUBLIC,
   async (request): Promise<RegisterPlayerResult> => {
     try {
       const data = (request.data ?? {}) as RegisterPlayerPayload;
@@ -350,6 +347,8 @@ export const registerPlayer = onCall(
         const regRef = tournamentRef.collection('registrations').doc();
         const variableSymbol = buildVariableSymbol(finance.vsPrefix, regRef.id);
         const now = FieldValue.serverTimestamp();
+        const cancelToken = newCancelToken();
+        const cancelTokenHash = hashCancelToken(cancelToken);
 
         const newRegistration: Record<string, unknown> = {
           id: regRef.id,
@@ -389,6 +388,7 @@ export const registerPlayer = onCall(
           createdAt: now,
           updatedAt: now,
           source: 'PUBLIC',
+          cancelTokenHash,
         };
 
         if (terms) {
@@ -443,6 +443,7 @@ export const registerPlayer = onCall(
             registrationId: regRef.id,
             status: newStatus,
             variableSymbol,
+            cancelToken,
           },
         };
       });

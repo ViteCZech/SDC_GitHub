@@ -272,6 +272,7 @@ export default function OnlineHub({
       startScore: row.startScore,
       outMode: row.outMode,
       isPublic: row.isPublic,
+      pin: row.pin || null,
     });
     setGuestNameInput(suggestGuestNameFromSettings(settings));
   };
@@ -343,7 +344,7 @@ export default function OnlineHub({
     setGuestJoinBusy(true);
     try {
       const gid = guestJoinDraft.gameId;
-      const merged = await joinOnlineGame(gid, name);
+      const merged = await joinOnlineGame(gid, name, guestJoinDraft.pin || '');
       setGuestJoinDraft(null);
       startOnlineGame(merged, gid, 'p2', localStream);
     } catch (e) {

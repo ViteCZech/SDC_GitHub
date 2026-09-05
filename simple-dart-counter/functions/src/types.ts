@@ -133,6 +133,8 @@ export interface RegisterPlayerResult {
   variableSymbol: string | null;
   /** True = existující přihláška (admin / dřívější) přiřazená k Google účtu. */
   alreadyRegistered?: boolean;
+  /** Jednorázově vrácený token pro storno / pairing (ukládá se jen hash). */
+  cancelToken?: string;
 }
 
 export type CancelledBy = 'PLAYER' | 'ADMIN';

@@ -2349,6 +2349,42 @@ function AppMain({ lang, setLang }) {
     return () => unsub();
   }, [userRole, activePin, tournamentData?.cloudEnabled, user, syncAdapter]);
 
+  /** Admin na jiném zařízení: doplň QR tokeny / heslo tabletů z privátní kolekce. */
+  useEffect(() => {
+    if (userRole !== 'admin') return;
+    if (!tournamentData?.cloudEnabled || !user || user.isAnonymous) return;
+    const pin = String(activePin ?? '').trim();
+    if (!/^\d{4}$/.test(pin)) return;
+    if (tournamentData.boardAuthTokens && Object.keys(tournamentData.boardAuthTokens).length) return;
+    if (typeof syncAdapter.loadTournamentSecrets !== 'function') return;
+    let cancelled = false;
+    void syncAdapter.loadTournamentSecrets(pin).then((secrets) => {
+      if (cancelled || !secrets) return;
+      setTournamentData((prev) => {
+        if (!prev) return prev;
+        const next = {
+          ...prev,
+          tabletPassword: prev.tabletPassword || secrets.tabletPassword || '',
+          boardAuthTokens: prev.boardAuthTokens || secrets.boardAuthTokens || prev.boardAuthTokens,
+        };
+        try {
+          safeStorage.setItem('dartsTournamentData', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    userRole,
+    activePin,
+    tournamentData?.cloudEnabled,
+    tournamentData?.boardAuthTokens,
+    user,
+    syncAdapter,
+  ]);
+
   /** Pravidelná synchronizace turnaje do Firestore (admin + platný PIN), debounce kvůli šetření zápisů. */
   useEffect(() => {
     if (userRole !== 'admin') return;

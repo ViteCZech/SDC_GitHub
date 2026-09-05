@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, collection, onSnapshot, runTransaction, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, deleteDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, onSnapshot, runTransaction, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, deleteDoc, writeBatch, deleteField } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app, db, auth } from '../firebase';
 import {
@@ -9,9 +9,16 @@ import {
 } from '../utils/preregAdmin';
 import { buildCzechBankAccount } from '../utils/bankAccount';
 import { findDuplicateRegistration } from '../utils/playerIdentity';
+import { loadStoredRegistration } from '../utils/preregStorage';
 
 /** Region musí odpovídat nasazení Cloud Functions (`functions/src/registerPlayer.ts`). */
 const FUNCTIONS_REGION = 'europe-west1';
+const ADMIN_PRIVATE = 'admin_private';
+const ADMIN_SECRETS_DOC = 'secrets';
+
+function storedCancelToken(tournamentId) {
+  return String(loadStoredRegistration(tournamentId)?.cancelToken ?? '').trim() || undefined;
+}
 
 export const PREREG_NOT_FOUND = 'prereg_tournament_not_found';
 export const PREREG_NO_DB = 'prereg_no_db';
@@ -87,6 +94,7 @@ export async function getPublicTournamentData(tournamentId) {
  * @property {'CONFIRMED'|'WAITLIST'|'PENDING_PAYMENT'} status
  * @property {string|null} variableSymbol
  * @property {boolean} [alreadyRegistered]
+ * @property {string} [cancelToken]
  */
 
 /**
@@ -184,6 +192,7 @@ export async function requestPairApi(tournamentId, registrationId, partnerRegist
       tournamentId: String(tournamentId ?? '').trim(),
       registrationId: String(registrationId ?? '').trim(),
       partnerRegistrationId: String(partnerRegistrationId ?? '').trim(),
+      cancelToken: storedCancelToken(tournamentId),
     });
     return result.data;
   } catch (err) {
@@ -199,6 +208,7 @@ export async function confirmPairApi(tournamentId, registrationId) {
     const result = await callPreRegFunction('confirmPair', {
       tournamentId: String(tournamentId ?? '').trim(),
       registrationId: String(registrationId ?? '').trim(),
+      cancelToken: storedCancelToken(tournamentId),
     });
     return result.data;
   } catch (err) {
@@ -214,6 +224,7 @@ export async function declinePairApi(tournamentId, registrationId) {
     const result = await callPreRegFunction('declinePair', {
       tournamentId: String(tournamentId ?? '').trim(),
       registrationId: String(registrationId ?? '').trim(),
+      cancelToken: storedCancelToken(tournamentId),
     });
     return result.data;
   } catch (err) {
@@ -231,6 +242,7 @@ export async function unregisterPlayerApi(tournamentId, registrationId) {
     const result = await fn({
       tournamentId: String(tournamentId ?? '').trim(),
       registrationId: String(registrationId ?? '').trim(),
+      cancelToken: storedCancelToken(tournamentId),
     });
     return /** @type {{ success: true, status: 'CANCELLED', refundDue: boolean, waitlistPromoted: boolean }} */ (
       result.data
@@ -256,6 +268,7 @@ export async function lookupStoredRegistrationApi(tournamentId, registrationId) 
   const result = await fn({
     tournamentId: String(tournamentId ?? '').trim(),
     registrationId: String(registrationId ?? '').trim(),
+    cancelToken: storedCancelToken(tournamentId),
   });
   return /** @type {object} */ (result.data);
 }
@@ -301,12 +314,15 @@ export async function verifyAdminInviteToken(tournamentId, token) {
   const id = String(tournamentId ?? '').trim();
   const inviteToken = String(token ?? '').trim();
   if (!id || !inviteToken) return false;
-
-  const docSnap = await getDoc(doc(requireDb(), 'tournaments', id));
-  if (!docSnap.exists()) return false;
-
-  const inviteTokens = docSnap.data()?.admin?.inviteTokens;
-  return !!(inviteTokens && typeof inviteTokens === 'object' && inviteTokens[inviteToken]);
+  try {
+    const result = await callPreRegFunction('verifyAdminInvite', {
+      tournamentId: id,
+      token: inviteToken,
+    });
+    return !!result?.data?.valid;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -315,32 +331,20 @@ export async function verifyAdminInviteToken(tournamentId, token) {
  * @param {string} token
  */
 export async function claimAdminInviteAccess(tournamentId, token) {
-  const uid = requireAuthUid();
+  requireAuthUid();
   const id = String(tournamentId ?? '').trim();
   const inviteToken = String(token ?? '').trim();
   if (!id || !inviteToken) throw new Error('prereg_invalid_invite');
-
-  await runTransaction(requireDb(), async (transaction) => {
-    const tourRef = doc(requireDb(), 'tournaments', id);
-    const tourSnap = await transaction.get(tourRef);
-    if (!tourSnap.exists()) throw new Error(PREREG_NOT_FOUND);
-
-    const data = tourSnap.data();
-    if (!data.admin?.inviteTokens?.[inviteToken]) {
-      throw new Error('prereg_invalid_invite');
-    }
-
-    const ownerUid = data.admin?.ownerUid;
-    if (ownerUid === uid) return;
-
-    const coAdmins = Array.isArray(data.admin?.coAdminUids) ? [...data.admin.coAdminUids] : [];
-    if (coAdmins.includes(uid)) return;
-
-    transaction.update(tourRef, {
-      'admin.coAdminUids': [...coAdmins, uid],
-      updatedAt: serverTimestamp(),
+  try {
+    await callPreRegFunction('claimAdminInvite', {
+      tournamentId: id,
+      token: inviteToken,
     });
-  });
+  } catch (err) {
+    const error = new Error(err?.message || 'prereg_invalid_invite');
+    error.code = String(err?.code ?? '').replace(/^functions\//, '') || 'prereg_invalid_invite';
+    throw error;
+  }
 }
 
 /**
@@ -419,18 +423,35 @@ export async function getAdminInviteLinkForTournament(tournamentId) {
 
   const data = docSnap.data();
   if (data.admin?.ownerUid !== uid) {
-    const tokens = data.admin?.inviteTokens ?? {};
-    const existing = Object.keys(tokens)[0];
-    if (existing) return getAdminInviteUrl(tournamentId, existing);
     throw new Error('prereg_access_denied');
   }
 
-  const tokens = data.admin?.inviteTokens ?? {};
+  const secretsRef = doc(requireDb(), 'tournaments', tournamentId, ADMIN_PRIVATE, ADMIN_SECRETS_DOC);
+  const secretsSnap = await getDoc(secretsRef);
+  let tokens =
+    secretsSnap.exists() && secretsSnap.data()?.inviteTokens
+      ? { ...secretsSnap.data().inviteTokens }
+      : {};
+  if (!Object.keys(tokens).length && data.admin?.inviteTokens) {
+    tokens = { ...data.admin.inviteTokens };
+  }
   let token = Object.keys(tokens)[0];
   if (!token) {
     token = generateInviteToken();
+    tokens = { [token]: { createdAt: serverTimestamp() } };
+  }
+  await setDoc(
+    secretsRef,
+    {
+      inviteTokens: tokens,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+  if (data.admin?.inviteTokens || data.admin?.adminPinHash) {
     await updateDoc(docRef, {
-      [`admin.inviteTokens.${token}`]: { createdAt: serverTimestamp() },
+      'admin.inviteTokens': deleteField(),
+      'admin.adminPinHash': deleteField(),
       updatedAt: serverTimestamp(),
     });
   }
@@ -459,6 +480,15 @@ export async function deletePreRegTournament(tournamentId) {
     const batch = writeBatch(requireDb());
     regDocs.slice(i, i + 500).forEach((d) => batch.delete(d.ref));
     await batch.commit();
+  }
+
+  const secretsSnap = await getDocs(
+    collection(requireDb(), 'tournaments', id, ADMIN_PRIVATE)
+  );
+  if (secretsSnap.size) {
+    const secretBatch = writeBatch(requireDb());
+    secretsSnap.docs.forEach((d) => secretBatch.delete(d.ref));
+    await secretBatch.commit();
   }
 
   await deleteDoc(tourRef);
@@ -538,12 +568,6 @@ export async function createPreRegTournament(input) {
     termsAndConditions: input.termsAndConditions ?? null,
     admin: {
       ownerUid,
-      adminPinHash,
-      inviteTokens: {
-        [inviteToken]: {
-          createdAt: serverTimestamp(),
-        },
-      },
     },
     counters: {
       confirmed: 0,
@@ -556,6 +580,15 @@ export async function createPreRegTournament(input) {
   };
 
   await setDoc(doc(requireDb(), 'tournaments', tournamentId), docData);
+  await setDoc(doc(requireDb(), 'tournaments', tournamentId, ADMIN_PRIVATE, ADMIN_SECRETS_DOC), {
+    adminPinHash,
+    inviteTokens: {
+      [inviteToken]: {
+        createdAt: serverTimestamp(),
+      },
+    },
+    updatedAt: serverTimestamp(),
+  });
 
   return {
     tournamentId,

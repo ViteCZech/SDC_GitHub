@@ -14,6 +14,7 @@ const mocked = vi.hoisted(() => ({
   updateCloudMatchFromTablet: vi.fn(),
   verifyTabletBoardAccess: vi.fn(),
   verifyTournamentPin: vi.fn(),
+  loadTournamentSecrets: vi.fn(),
   getPublicResultById: vi.fn(),
   listenPublicResultsFeed: vi.fn(),
 }));
@@ -32,6 +33,7 @@ vi.mock('../../tournamentSync', () => ({
   updateCloudMatchFromTablet: mocked.updateCloudMatchFromTablet,
   verifyTabletBoardAccess: mocked.verifyTabletBoardAccess,
   verifyTournamentPin: mocked.verifyTournamentPin,
+  loadTournamentSecrets: mocked.loadTournamentSecrets,
 }));
 
 vi.mock('../../publicResultsService', () => ({
@@ -66,6 +68,7 @@ describe('createCloudSyncAdapter', () => {
     await adapter.archiveTournament('owner-1', '1234', 'Friday', snap);
     await adapter.verifyTournamentPin('1234');
     await adapter.verifyTabletAccess('1234', 'abc', { board: '1' });
+    await adapter.loadTournamentSecrets('1234');
     await adapter.registerTabletPresence('1234', '1', 'token', { status: 'online' });
     await adapter.updateMatchFromTablet('1234', 'group', 'm-1', { status: 'done' }, { boardToken: 'bt' });
     adapter.mergeGroupMatchesFromCloud([{ id: 'local-group' }], [{ id: 'cloud-group' }]);
@@ -82,6 +85,7 @@ describe('createCloudSyncAdapter', () => {
     expect(mocked.archivePastTournamentAndDeleteActive).toHaveBeenCalledWith('owner-1', '1234', 'Friday', snap);
     expect(mocked.verifyTournamentPin).toHaveBeenCalledWith('1234');
     expect(mocked.verifyTabletBoardAccess).toHaveBeenCalledWith('1234', 'abc', { board: '1' });
+    expect(mocked.loadTournamentSecrets).toHaveBeenCalledWith('1234');
     expect(mocked.registerTabletBoardOnline).toHaveBeenCalledWith('1234', '1', 'token', { status: 'online' });
     expect(mocked.updateCloudMatchFromTablet).toHaveBeenCalledWith(
       '1234',

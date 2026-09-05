@@ -2,18 +2,23 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
   deleteDoc,
+  deleteField,
   onSnapshot,
   collection,
   addDoc,
   Timestamp,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app, db } from '../firebase';
+import { app, auth, db } from '../firebase';
 
 const COLLECTION = 'active_tournaments';
 const PAST_COLLECTION = 'past_tournaments';
 const PUBLIC_COLLECTION = 'public_tournaments';
+const SECRETS_COLLECTION = 'tournament_secrets';
+const PINS_COLLECTION = 'tournament_pins';
 const FUNCTIONS_REGION = 'europe-west1';
 
 function resolveFunctionsProjectId() {
@@ -71,6 +76,39 @@ function stripUndefinedDeep(val) {
     if (nv !== undefined) out[k] = nv;
   }
   return out;
+}
+
+function requireGoogleUid() {
+  const uid = auth?.currentUser?.uid;
+  if (!uid || auth.currentUser?.isAnonymous) return null;
+  return uid;
+}
+
+/** Oddělí heslo tabletů a QR tokeny od veřejného stavu turnaje. */
+export function splitTournamentSecrets(tournamentData) {
+  if (!tournamentData || typeof tournamentData !== 'object') {
+    return { publicData: tournamentData, secrets: null };
+  }
+  const { tabletPassword, boardAuthTokens, ...rest } = tournamentData;
+  const secrets = {};
+  const password = tabletPassword != null ? String(tabletPassword).trim().slice(0, 5) : '';
+  if (password) secrets.tabletPassword = password;
+  if (boardAuthTokens && typeof boardAuthTokens === 'object' && Object.keys(boardAuthTokens).length) {
+    secrets.boardAuthTokens = boardAuthTokens;
+  }
+  return {
+    publicData: rest,
+    secrets: Object.keys(secrets).length ? secrets : null,
+  };
+}
+
+function stripSecretsFromListenerData(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  const td = raw.tournamentData;
+  if (!td || typeof td !== 'object') return raw;
+  if (!('tabletPassword' in td) && !('boardAuthTokens' in td)) return raw;
+  const { publicData } = splitTournamentSecrets(td);
+  return { ...raw, tournamentData: publicData };
 }
 
 function publicResultIdFromPin(pin) {
@@ -144,6 +182,7 @@ function buildPublicTournamentPayload({
   groups,
   groupMatches,
   tournamentBracket,
+  ownerUid = null,
 }) {
   const safeTd = sanitizePublicTournamentData(tournamentData, pin);
   const safeGroups = cloneJsonSafe(groups, []);
@@ -159,6 +198,7 @@ function buildPublicTournamentPayload({
     location: safeTd.venueName || '',
     eventStartAt: safeTd?.meta?.startsAt ?? null,
     updatedAt: Timestamp.now(),
+    ownerUid: ownerUid || null,
     playersCount: counts.playersCount,
     matchesCount: counts.matchesCount,
     tournamentData: safeTd,
@@ -256,35 +296,80 @@ export async function syncTournamentToCloud(pin, tournamentState) {
     console.warn('syncTournamentToCloud: cloud merge before write failed', err);
   }
 
+  const ownerUid = requireGoogleUid();
+  if (!ownerUid) return;
+
+  const { publicData, secrets } = splitTournamentSecrets(tournamentDataSynced);
+  const publicSynced =
+    publicData && groups.length > 0 && !publicData.groups
+      ? { ...publicData, groups }
+      : publicData;
+
   const status = deriveTournamentStatus({
-    tournamentData: tournamentDataSynced,
+    tournamentData: publicSynced,
     groupMatches,
     tournamentBracket,
   });
 
   const withMeta = {
-    tournamentData: tournamentDataSynced,
+    tournamentData: publicSynced,
     groups,
     groupMatches,
     tournamentBracket,
     status,
     lastUpdated: new Date().toISOString(),
+    ownerUid,
   };
 
   const payload = cloneJsonSafe(withMeta, null);
   if (payload == null) return;
 
   await setDoc(ref, payload, { merge: true });
+  try {
+    await updateDoc(ref, {
+      'tournamentData.tabletPassword': deleteField(),
+      'tournamentData.boardAuthTokens': deleteField(),
+    });
+  } catch (err) {
+    console.warn('syncTournamentToCloud: strip public secrets failed', err);
+  }
+
+  try {
+    await setDoc(
+      doc(db, PINS_COLLECTION, id),
+      { ownerUid, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('syncTournamentToCloud: tournament_pins write failed', err);
+  }
+
+  if (secrets) {
+    try {
+      await setDoc(
+        doc(db, SECRETS_COLLECTION, id),
+        {
+          ownerUid,
+          ...secrets,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.warn('syncTournamentToCloud: tournament_secrets write failed', err);
+    }
+  }
 
   try {
     const publicPayload = buildPublicTournamentPayload({
       pin: id,
       status,
       source: 'active',
-      tournamentData: tournamentDataSynced,
+      tournamentData: publicSynced,
       groups,
       groupMatches,
       tournamentBracket,
+      ownerUid,
     });
     await upsertPublicTournamentByPin(id, publicPayload, true);
   } catch (err) {
@@ -301,6 +386,11 @@ export async function deleteCloudTournament(pin) {
   if (!/^\d{4}$/.test(id)) return;
   const ref = doc(db, COLLECTION, id);
   await deleteDoc(ref);
+  try {
+    await deleteDoc(doc(db, SECRETS_COLLECTION, id));
+  } catch (err) {
+    console.warn('deleteCloudTournament secrets delete failed:', err);
+  }
   try {
     await deletePublicLiveTournamentByPin(id);
   } catch (err) {
@@ -325,27 +415,40 @@ export async function archivePastTournamentAndDeleteActive(userId, pin, name, fu
     throw new Error('archivePastTournament: invalid data');
   }
 
+  const ownerUid = userId;
+  const { publicData } = splitTournamentSecrets(safeData.tournamentData ?? null);
+  const archivedData = {
+    ...safeData,
+    tournamentData: publicData,
+  };
+
   const payload = stripUndefinedDeep({
     // Backward compatibility: keep `userId`, but new field is `ownerId`.
     ownerId: userId,
     userId,
     date: Timestamp.now(),
     name: String(name || '').trim() || '(bez názvu)',
-    data: safeData,
+    data: archivedData,
   });
   if (!payload) throw new Error('archivePastTournament: empty payload');
 
   await addDoc(collection(db, PAST_COLLECTION), payload);
   await deleteDoc(doc(db, COLLECTION, id));
   try {
+    await deleteDoc(doc(db, SECRETS_COLLECTION, id));
+  } catch (err) {
+    console.warn('archivePastTournament secrets delete failed:', err);
+  }
+  try {
     const publicPayload = buildPublicTournamentPayload({
       pin: id,
       status: 'finished',
       source: 'archive',
-      tournamentData: safeData.tournamentData ?? null,
-      groups: safeData.groups ?? [],
-      groupMatches: safeData.groupMatches ?? [],
-      tournamentBracket: safeData.tournamentBracket ?? [],
+      tournamentData: publicData,
+      groups: archivedData.groups ?? [],
+      groupMatches: archivedData.groupMatches ?? [],
+      tournamentBracket: archivedData.tournamentBracket ?? [],
+      ownerUid,
     });
     await addDoc(collection(db, PUBLIC_COLLECTION), publicPayload);
     await deletePublicLiveTournamentByPin(id);
@@ -780,41 +883,58 @@ export async function verifyTournamentPin(pin) {
 }
 
 /**
- * Herní tablet: ověří PIN + volitelné heslo z `tournamentData.tabletPassword` ve stejném dokumentu Firestore.
- * Starší turnaje bez pole `tabletPassword` — stačí platný PIN (zpětná kompatibilita).
+ * Herní tablet: ověří PIN + board token / heslo přes Cloud Function (tajemství nejsou ve veřejném dokumentu).
  * @param {string} pin
  * @param {string} [tabletPassword]
  * @returns {Promise<{ ok: boolean, reason?: 'not_found'|'bad_password'|'error' }>}
  */
 export async function verifyTabletBoardAccess(pin, tabletPassword, opts = {}) {
-  if (!db || !pin) return { ok: false, reason: 'error' };
+  if (!app || !pin) return { ok: false, reason: 'error' };
   const id = String(pin).trim();
   if (!/^\d{4}$/.test(id)) return { ok: false, reason: 'not_found' };
   try {
-    const ref = doc(db, COLLECTION, id);
-    const docSnap = await getDoc(ref);
-    const exists = typeof docSnap.exists === 'function' ? docSnap.exists() : docSnap.exists;
-    if (!exists) return { ok: false, reason: 'not_found' };
-    const raw = docSnap.data();
-    const td = raw?.tournamentData;
-    const board = String(opts.board ?? '').replace(/\D/g, '').slice(0, 2);
-    const boardToken = String(opts.boardToken ?? '').trim();
-    if (board && boardToken) {
-      const tokens = td?.boardAuthTokens;
-      if (tokens && typeof tokens === 'object' && tokens[board] != null) {
-        if (String(tokens[board]).trim() === boardToken) return { ok: true };
-        return { ok: false, reason: 'bad_password' };
-      }
-    }
-    const expected =
-      td && td.tabletPassword != null ? String(td.tabletPassword).trim().slice(0, 5) : '';
-    if (expected === '') return { ok: true };
-    const provided = String(tabletPassword ?? '').trim().slice(0, 5);
-    if (provided !== expected) return { ok: false, reason: 'bad_password' };
-    return { ok: true };
+    const functions = getFunctions(app, FUNCTIONS_REGION);
+    const fn = httpsCallable(functions, 'verifyTabletBoardAccess');
+    const result = await fn({
+      pin: id,
+      tabletPassword: String(tabletPassword ?? '').trim().slice(0, 5) || undefined,
+      board: opts.board != null ? String(opts.board).replace(/\D/g, '').slice(0, 2) : undefined,
+      boardToken: String(opts.boardToken ?? '').trim() || undefined,
+    });
+    const data = result?.data && typeof result.data === 'object' ? result.data : {};
+    if (data.ok === true) return { ok: true };
+    const reason = data.reason === 'bad_password' ? 'bad_password' : 'not_found';
+    return { ok: false, reason };
   } catch (err) {
     console.warn('verifyTabletBoardAccess:', err);
     return { ok: false, reason: 'error' };
+  }
+}
+
+/**
+ * Vlastník: načte heslo tabletů a QR tokeny z privátní kolekce.
+ * @param {string} pin
+ * @returns {Promise<{ tabletPassword?: string, boardAuthTokens?: Record<string, string> }|null>}
+ */
+export async function loadTournamentSecrets(pin) {
+  if (!db || !pin) return null;
+  const id = String(pin).trim();
+  if (!/^\d{4}$/.test(id)) return null;
+  try {
+    const snap = await getDoc(doc(db, SECRETS_COLLECTION, id));
+    const exists = typeof snap.exists === 'function' ? snap.exists() : snap.exists;
+    if (!exists) return null;
+    const data = snap.data() || {};
+    return {
+      tabletPassword: data.tabletPassword != null ? String(data.tabletPassword) : '',
+      boardAuthTokens:
+        data.boardAuthTokens && typeof data.boardAuthTokens === 'object'
+          ? data.boardAuthTokens
+          : null,
+    };
+  } catch (err) {
+    console.warn('loadTournamentSecrets:', err);
+    return null;
   }
 }
 
@@ -850,7 +970,7 @@ export function listenToCloudTournament(pin, callback) {
         callback(null);
         return;
       }
-      callback(docSnap.data());
+      callback(stripSecretsFromListenerData(docSnap.data()));
     },
     (err) => {
       console.warn('listenToCloudTournament snapshot error:', err);

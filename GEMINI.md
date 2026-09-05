@@ -234,8 +234,11 @@ Region **europe-west1**, DB **eur3**. Export v `index.ts`:
 | `listMyRegistrations` | Přihlášky přihlášeného hráče |
 | `submitTabletMatchUpdate` | Tablet zapíše výsledek zápasu do `active_tournaments` |
 | `registerTabletBoardOnline` | Tablet se ohlásí jako online na desce |
+| `verifyTabletBoardAccess` | Ověření PIN + token/heslo tabletu (tajemství mimo public doc) |
+| `claimAdminInvite` / `verifyAdminInvite` | Spolupořadatel jen přes CF (invite token) |
+| `lookupPrivateOnlineGame` / `joinPrivateOnlineGame` | Soukromá online lobby podle PINu |
 | `updateCsoRankingsScheduled` | Cron 7:00 |
-| `updateCsoRankingsNow` | Callable, vyžaduje auth |
+| `updateCsoRankingsNow` | Callable, jen Google účet |
 
 Po změně `functions/src` vždy `npm run build` v `functions/` (tsc → `lib/`).
 
@@ -245,12 +248,15 @@ Po změně `functions/src` vždy `npm run build` v `functions/` (tsc → `lib/`)
 
 | Kolekce | Kdo čte | Kdo píše |
 |---|---|---|
-| `onlineGames` | účastník; waiting veřejně pro lobby | host create; join/heartbeat/live/complete/abandon dle rules |
-| `active_tournaments/{pin}` | kdokoli | jen `request.auth` |
-| `past_tournaments` | auth | auth |
-| `tournaments` | non-DRAFT veřejně; DRAFT jen owner | owner create/update; co-admin claim |
+| `onlineGames` | veřejné waiting; soukromé waiting jen host; po joinu účastník | host create; veřejný join/heartbeat/live; soukromý join jen CF |
+| `active_tournaments/{pin}` | kdokoli | Google `ownerUid` (ne anonymous); tablety přes CF |
+| `tournament_secrets/{pin}` | Google vlastník | Google vlastník (heslo tabletů, board tokeny) |
+| `past_tournaments` | vlastník (`ownerId` / `userId`) | vlastník |
+| `public_tournaments` | kdokoli | Google `ownerUid` |
+| `tournaments` | non-DRAFT veřejně; DRAFT jen owner | owner create/update (`ownerUid` zamčený); co-admin claim jen CF |
+| `tournaments/{id}/admin_private` | owner | owner (invite tokeny, admin PIN hash) |
 | `tournaments/{id}/registrations` | admin turnaje | admin; veřejnost jen přes CF |
-| `tournament_pins` | kdokoli | owner |
+| `tournament_pins` | vlastník PINu | owner |
 | `cso_rankings` | kdokoli | jen Functions |
 | `player_registration_links` | nikdo z klienta | jen Functions |
 

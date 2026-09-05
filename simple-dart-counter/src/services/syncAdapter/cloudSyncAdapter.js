@@ -12,6 +12,7 @@ import {
   updateCloudMatchFromTablet,
   verifyTabletBoardAccess,
   verifyTournamentPin,
+  loadTournamentSecrets,
 } from '../tournamentSync';
 import { getPublicResultById, listenPublicResultsFeed } from '../publicResultsService';
 
@@ -37,6 +38,9 @@ export function createCloudSyncAdapter() {
     },
     verifyTabletAccess(pin, tabletPassword, opts = {}) {
       return verifyTabletBoardAccess(pin, tabletPassword, opts);
+    },
+    loadTournamentSecrets(pin) {
+      return loadTournamentSecrets(pin);
     },
     registerTabletPresence(pin, board, token, opts = {}) {
       return registerTabletBoardOnline(pin, board, token, opts);

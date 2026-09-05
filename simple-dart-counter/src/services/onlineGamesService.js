@@ -5,8 +5,6 @@ import {
   deleteDoc,
   doc,
   getDoc,
-  getDocs,
-  limit,
   onSnapshot,
   query,
   runTransaction,
@@ -14,8 +12,9 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { signInAnonymously } from 'firebase/auth';
-import { auth, db } from '../firebase';
+import { app, auth, db } from '../firebase';
 
 function requireAuthUid() {
   const uid = auth?.currentUser?.uid;
@@ -24,6 +23,20 @@ function requireAuthUid() {
 }
 
 export const ONLINE_GAMES_COLLECTION = 'onlineGames';
+const FUNCTIONS_REGION = 'europe-west1';
+
+async function sha256Hex(value) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/** Stejný algoritmus jako Cloud Function `hashOnlinePin`. */
+export async function hashOnlinePin(pin) {
+  const digits = String(pin ?? '').replace(/\D/g, '').slice(0, 4);
+  return sha256Hex(`sdc-online-pin:${digits}`);
+}
 
 /**
  * Poznámka pro vývojáře: až budete zpřísňovat Firestore Rules, nastavte pro kolekci
@@ -99,9 +112,10 @@ export async function createOnlineGame(opts) {
       ? 'Cricket'
       : buildGameFormatLabel({ gameType: 'x01', startScore, outMode });
   const pin = isPublic ? null : randomFourDigitPin();
+  const pinHash = isPublic ? null : await hashOnlinePin(pin);
   const hostUid = requireAuthUid();
 
-  const doc = {
+  const payload = {
     status: 'waiting',
     hostUid,
     isPublic,
@@ -114,10 +128,10 @@ export async function createOnlineGame(opts) {
     startPlayer,
     createdAt: serverTimestamp(),
     heartbeatHost: serverTimestamp(),
-    pin,
+    ...(isPublic ? {} : { pinHash }),
   };
 
-  const ref = await addDoc(collection(db, ONLINE_GAMES_COLLECTION), doc);
+  const ref = await addDoc(collection(db, ONLINE_GAMES_COLLECTION), payload);
   return {
     gameId: ref.id,
     pin,
@@ -126,9 +140,9 @@ export async function createOnlineGame(opts) {
     legs,
     isPublic,
     gameType,
-    startScore: doc.startScore,
-    outMode: doc.outMode,
-    startPlayer: doc.startPlayer,
+    startScore: payload.startScore,
+    outMode: payload.outMode,
+    startPlayer: payload.startPlayer,
   };
 }
 
@@ -177,32 +191,51 @@ export function subscribePublicWaitingGames(onList, onError) {
  * Najde první čekající soukromou hru podle 4místného PIN.
  */
 export async function findWaitingGameByPin(pinRaw) {
-  if (!db) return null;
+  if (!app) return null;
+  await ensureAnonymousAuth();
   const pin = String(pinRaw || '').replace(/\D/g, '').slice(0, 4);
   if (pin.length !== 4) return null;
-  const q = query(
-    collection(db, ONLINE_GAMES_COLLECTION),
-    where('status', '==', 'waiting'),
-    where('pin', '==', pin),
-    limit(1)
-  );
-  const snap = await getDocs(q);
-  if (snap.empty) return null;
-  const d = snap.docs[0];
-  return { id: d.id, ...d.data() };
+  try {
+    const fn = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'lookupPrivateOnlineGame');
+    const result = await fn({ pin });
+    const game = result?.data?.game;
+    return game && game.id ? { ...game, pin } : null;
+  } catch (err) {
+    console.warn('findWaitingGameByPin', err);
+    return null;
+  }
 }
 
 /**
  * Atomicky připojí hosta jako druhého hráče (guest).
  * @returns {Promise<object>} Sloučená data dokumentu po zápisu (včetně `id` = gameId).
  */
-export async function joinOnlineGame(gameId, guestName) {
+export async function joinOnlineGame(gameId, guestName, pinRaw = '') {
   if (!db) throw new Error('no_db');
   await ensureAnonymousAuth();
   const id = String(gameId || '').trim();
   if (!id) throw new Error(ONLINE_JOIN_ERROR_NOT_AVAILABLE);
   const guest = String(guestName || '').trim();
   if (!guest) throw new Error(ONLINE_JOIN_ERROR_GUEST_NAME);
+  const pin = String(pinRaw || '').replace(/\D/g, '').slice(0, 4);
+
+  if (pin.length === 4) {
+    if (!app) throw new Error('no_db');
+    try {
+      const fn = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'joinPrivateOnlineGame');
+      const result = await fn({ gameId: id, guestName: guest, pin });
+      const game = result?.data?.game;
+      if (!game || !game.id) throw new Error(ONLINE_JOIN_ERROR_NOT_AVAILABLE);
+      return game;
+    } catch (err) {
+      const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
+      if (code.includes('not-found') || code.includes('failed-precondition') || code.includes('permission-denied')) {
+        throw new Error(ONLINE_JOIN_ERROR_NOT_AVAILABLE);
+      }
+      if (code.includes('invalid-argument')) throw new Error(ONLINE_JOIN_ERROR_GUEST_NAME);
+      throw new Error(ONLINE_JOIN_ERROR_NOT_AVAILABLE);
+    }
+  }
 
   const ref = doc(db, ONLINE_GAMES_COLLECTION, id);
 
@@ -212,7 +245,7 @@ export async function joinOnlineGame(gameId, guestName) {
       throw new Error(ONLINE_JOIN_ERROR_NOT_AVAILABLE);
     }
     const prev = snap.data();
-    if (prev.status !== 'waiting') {
+    if (prev.status !== 'waiting' || prev.isPublic !== true) {
       throw new Error(ONLINE_JOIN_ERROR_NOT_AVAILABLE);
     }
     if (prev.guestUid != null && String(prev.guestUid).length > 0) {

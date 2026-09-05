@@ -1,9 +1,10 @@
-import { randomBytes } from 'crypto';
 import { initializeApp, getApps, getApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import { ACTIVE_PREREG_STATUSES } from './playerIdentity';
+import { CALLABLE_PUBLIC, newCancelToken } from './authz';
+import { assertPlayerActor } from './playerActor';
 import {
   allowsPairing,
   applyPairConfirm,
@@ -25,14 +26,8 @@ if (getApps().length === 0) {
 
 const db = getFirestore(getApp(), 'eur3');
 
-const CALLABLE = {
-  region: 'europe-west1' as const,
-  invoker: 'public' as const,
-  cors: true,
-};
-
 function newInviteToken(): string {
-  return randomBytes(16).toString('hex');
+  return newCancelToken().slice(0, 32);
 }
 
 function assertOpen(tourData: FirebaseFirestore.DocumentData): void {
@@ -54,7 +49,7 @@ function assertPairingTournament(tourData: FirebaseFirestore.DocumentData) {
 /**
  * Seznam nespárovaných přihlášek — jen jméno a ID, bez e-mailu / telefonu.
  */
-export const listAvailablePartners = onCall(CALLABLE, async (request) => {
+export const listAvailablePartners = onCall(CALLABLE_PUBLIC, async (request) => {
   const tournamentId = String(request.data?.tournamentId ?? '').trim();
   const excludeId = String(request.data?.excludeRegistrationId ?? '').trim();
   const requesterGender = normalizeGender(request.data?.gender);
@@ -99,7 +94,7 @@ export const listAvailablePartners = onCall(CALLABLE, async (request) => {
 /**
  * Hráč vybere partnera ze seznamu — ten potvrzuje.
  */
-export const requestPair = onCall(CALLABLE, async (request) => {
+export const requestPair = onCall(CALLABLE_PUBLIC, async (request) => {
   const data = (request.data ?? {}) as PairActionPayload;
   const tournamentId = String(data.tournamentId ?? '').trim();
   const registrationId = String(data.registrationId ?? '').trim();
@@ -130,6 +125,7 @@ export const requestPair = onCall(CALLABLE, async (request) => {
     const tourData = tourSnap.data() ?? {};
     const selfData = selfSnap.data() ?? {};
     const partnerData = partnerSnap.data() ?? {};
+    assertPlayerActor(selfData, request, String(request.data?.cancelToken ?? ''));
     assertOpen(tourData);
     const type = assertPairingTournament(tourData);
 
@@ -174,7 +170,7 @@ export const requestPair = onCall(CALLABLE, async (request) => {
   return { success: true, pair: outcome };
 });
 
-export const confirmPair = onCall(CALLABLE, async (request) => {
+export const confirmPair = onCall(CALLABLE_PUBLIC, async (request) => {
   const tournamentId = String(request.data?.tournamentId ?? '').trim();
   const registrationId = String(request.data?.registrationId ?? '').trim();
   if (!tournamentId || !registrationId) {
@@ -193,6 +189,7 @@ export const confirmPair = onCall(CALLABLE, async (request) => {
 
     const tourData = tourSnap.data() ?? {};
     const selfData = selfSnap.data() ?? {};
+    assertPlayerActor(selfData, request, String(request.data?.cancelToken ?? ''));
     assertOpen(tourData);
     const type = assertPairingTournament(tourData);
 
@@ -245,7 +242,7 @@ export const confirmPair = onCall(CALLABLE, async (request) => {
   return { success: true, pairStatus: 'CONFIRMED', partnerName: outcome.partnerName };
 });
 
-export const declinePair = onCall(CALLABLE, async (request) => {
+export const declinePair = onCall(CALLABLE_PUBLIC, async (request) => {
   const tournamentId = String(request.data?.tournamentId ?? '').trim();
   const registrationId = String(request.data?.registrationId ?? '').trim();
   if (!tournamentId || !registrationId) {
@@ -264,6 +261,7 @@ export const declinePair = onCall(CALLABLE, async (request) => {
 
     const tourData = tourSnap.data() ?? {};
     const selfData = selfSnap.data() ?? {};
+    assertPlayerActor(selfData, request, String(request.data?.cancelToken ?? ''));
     assertOpen(tourData);
     assertPairingTournament(tourData);
 

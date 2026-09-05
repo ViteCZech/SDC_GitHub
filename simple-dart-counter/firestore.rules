@@ -2,6 +2,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    /** Google / e-mail účet — ne anonymní UID z online 1v1. */
+    function isGoogleUser() {
+      return isAuthenticated()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
     function gameData(gameId) {
       return get(/databases/$(database)/documents/onlineGames/$(gameId)).data;
     }
@@ -24,12 +34,21 @@ service cloud.firestore {
                 && request.auth.uid == resource.data.guestUid));
     }
 
+    function isPublicWaitingGame() {
+      return resource.data.status == 'waiting'
+        && resource.data.keys().hasAny(['isPublic'])
+        && resource.data.isPublic == true;
+    }
+
     function diffKeys() {
       return resource.data.diff(request.resource.data).affectedKeys();
     }
 
+    /** Veřejná lobby — soukromý PIN join jde jen přes Cloud Function. */
     function joinAsGuest() {
       return resource.data.status == 'waiting'
+        && resource.data.keys().hasAny(['isPublic'])
+        && resource.data.isPublic == true
         && request.resource.data.status == 'playing'
         && request.resource.data.guestUid == request.auth.uid
         && !resource.data.keys().hasAny(['guestUid'])
@@ -109,15 +128,22 @@ service cloud.firestore {
     }
 
     match /onlineGames/{gameId} {
-      // Lobby může číst jen waiting hry; ostatní stavy jen účastník.
+      // Veřejná waiting lobby; soukromé waiting jen host; po joinu účastníci.
       allow read: if request.auth != null
-        && (resource.data.status == 'waiting' || isParticipantOnGameResource());
+        && (isPublicWaitingGame() || isParticipantOnGameResource());
 
       allow create: if request.auth != null
         && request.resource.data.keys().hasAny(['hostUid'])
         && request.resource.data.hostUid == request.auth.uid
         && request.resource.data.hostUid is string
-        && request.resource.data.status == 'waiting';
+        && request.resource.data.status == 'waiting'
+        && request.resource.data.keys().hasAny(['isPublic'])
+        && (
+          request.resource.data.isPublic == true
+          || (request.resource.data.isPublic == false
+              && request.resource.data.keys().hasAny(['pinHash'])
+              && request.resource.data.pinHash is string)
+        );
 
       allow update: if request.auth != null
         && resource.data.keys().hasAny(['hostUid'])
@@ -130,7 +156,6 @@ service cloud.firestore {
             || abandonOnlineSession()
             || obsoleteOnlineSession());
 
-      // Cleanup waiting her při odchodu hostitele.
       allow delete: if request.auth != null
         && resource.data.status == 'waiting'
         && request.auth.uid == resource.data.hostUid;
@@ -144,41 +169,74 @@ service cloud.firestore {
       }
     }
 
+    function isActiveTournamentOwner() {
+      return isGoogleUser()
+        && resource.data.keys().hasAny(['ownerUid'])
+        && resource.data.ownerUid == request.auth.uid;
+    }
+
+    /** Přechod: starý dokument bez ownerUid si může přivlastnit první Google účet. */
+    function claimMissingActiveOwner() {
+      return isGoogleUser()
+        && !resource.data.keys().hasAny(['ownerUid'])
+        && request.resource.data.ownerUid == request.auth.uid;
+    }
+
     /**
-     * Turnaje pro tablet/viewer režim.
-     *
-     * - Viewer + herní tablet: musí umět číst podle PIN bez přihlášení (kiosk / veřejná obrazovka).
-     * - Admin: zapisuje/smaže jen po přihlášení (Google login v aplikaci).
+     * Živý turnaj: čtení veřejné (TV / viewer / tablet).
+     * Zápis jen Google vlastník (tablety píšou přes Cloud Functions / Admin SDK).
      */
     match /active_tournaments/{pin} {
       allow read: if true;
-      allow create, update, delete: if request.auth != null;
+      allow create: if isGoogleUser()
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isActiveTournamentOwner() || claimMissingActiveOwner();
+      allow delete: if isActiveTournamentOwner()
+        || (isGoogleUser() && !resource.data.keys().hasAny(['ownerUid']));
     }
 
     /**
-     * Archiv turnajů (historie): jen přihlášený uživatel.
-     * Pozn.: samotné filtrování "jen moje" by vyžadovalo strukturu dat + ownerId indexy.
+     * Heslo tabletů a board tokeny — nikdy ne do active_tournaments.
      */
+    match /tournament_secrets/{pin} {
+      allow read: if isGoogleUser()
+        && resource.data.ownerUid == request.auth.uid;
+      allow create: if isGoogleUser()
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isGoogleUser()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if isGoogleUser()
+        && resource.data.ownerUid == request.auth.uid;
+    }
+
+    function isPastTournamentOwner() {
+      return isGoogleUser() && (
+        (resource.data.keys().hasAny(['ownerId']) && resource.data.ownerId == request.auth.uid)
+        || (resource.data.keys().hasAny(['userId']) && resource.data.userId == request.auth.uid)
+      );
+    }
+
     match /past_tournaments/{docId} {
-      allow read, write: if request.auth != null;
+      allow read: if isPastTournamentOwner();
+      allow create: if isGoogleUser()
+        && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isPastTournamentOwner();
     }
 
-    /**
-     * Veřejný feed výsledků turnajů (list + detail + top výkony).
-     * Čtení veřejné, zápis jen autentizovaný klient/Cloud Function.
-     */
     match /public_tournaments/{docId} {
       allow read: if true;
-      allow create, update, delete: if request.auth != null;
-    }
-
-    /**
-     * Předregistrace turnajů (Fáze 1).
-     * Veřejné read jen pro non-DRAFT turnaje; registrace pouze přes Cloud Function.
-     * Citlivá data registrací (e-mail, telefon) — read jen pro ownera.
-     */
-    function isAuthenticated() {
-      return request.auth != null;
+      allow create: if isGoogleUser()
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isGoogleUser() && (
+        (resource.data.keys().hasAny(['ownerUid']) && resource.data.ownerUid == request.auth.uid)
+        || (!resource.data.keys().hasAny(['ownerUid'])
+            && request.resource.data.ownerUid == request.auth.uid)
+      );
+      allow delete: if isGoogleUser() && (
+        (resource.data.keys().hasAny(['ownerUid']) && resource.data.ownerUid == request.auth.uid)
+        || !resource.data.keys().hasAny(['ownerUid'])
+      );
     }
 
     function tournamentDoc(tournamentId) {
@@ -186,7 +244,7 @@ service cloud.firestore {
     }
 
     function isTournamentOwner(tournamentId) {
-      return isAuthenticated()
+      return isGoogleUser()
         && tournamentDoc(tournamentId).keys().hasAny(['admin'])
         && tournamentDoc(tournamentId).admin.ownerUid == request.auth.uid;
     }
@@ -196,7 +254,7 @@ service cloud.firestore {
     }
 
     function isTournamentCoAdmin(tournamentId) {
-      return isAuthenticated()
+      return isGoogleUser()
         && request.auth.uid in tournamentCoAdminUids(tournamentDoc(tournamentId));
     }
 
@@ -204,67 +262,45 @@ service cloud.firestore {
       return isTournamentOwner(tournamentId) || isTournamentCoAdmin(tournamentId);
     }
 
-    /** Spolupořadatel se přidá sám po ověření invite tokenu (Google login). */
-    function isSelfClaimCoAdmin() {
-      let oldCo = resource.data.admin.keys().hasAny(['coAdminUids'])
-        ? resource.data.admin.coAdminUids
-        : [];
-      let newCo = request.resource.data.admin.keys().hasAny(['coAdminUids'])
-        ? request.resource.data.admin.coAdminUids
-        : [];
-      return isAuthenticated()
-        && resource.data.admin.ownerUid != request.auth.uid
-        && !(request.auth.uid in oldCo)
-        && request.auth.uid in newCo
-        && newCo.size() == oldCo.size() + 1
-        && newCo.hasAll(oldCo)
-        && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['admin', 'updatedAt']);
-    }
-
     match /tournaments/{tournamentId} {
-      /**
-       * get: ne-DRAFT veřejně; vlastní DRAFT jen majitel.
-       * list: stejná logika — klientské query musí constraintovat status / ownerUid,
-       * jinak Firestore vrátí „Missing or insufficient permissions“.
-       */
       allow get: if resource.data.status != 'DRAFT'
-        || (isAuthenticated()
+        || (isGoogleUser()
           && resource.data.keys().hasAny(['admin'])
           && resource.data.admin.ownerUid == request.auth.uid);
       allow list: if resource.data.status != 'DRAFT'
-        || (isAuthenticated()
+        || (isGoogleUser()
           && resource.data.keys().hasAny(['admin'])
           && resource.data.admin.ownerUid == request.auth.uid);
-      allow create: if isAuthenticated()
+      allow create: if isGoogleUser()
         && request.resource.data.admin.ownerUid == request.auth.uid;
-      allow update: if isTournamentOwner(tournamentId) || isSelfClaimCoAdmin();
+      allow update: if isTournamentOwner(tournamentId)
+        && request.resource.data.admin.ownerUid == resource.data.admin.ownerUid;
       allow delete: if isTournamentOwner(tournamentId);
 
       match /registrations/{regId} {
         allow read: if isTournamentAdmin(tournamentId);
         allow write: if isTournamentAdmin(tournamentId);
       }
+
+      match /admin_private/{docId} {
+        allow read, write: if isTournamentOwner(tournamentId);
+      }
     }
 
     match /tournament_pins/{pin} {
-      allow read: if true;
-      allow create: if isAuthenticated()
+      allow read: if isGoogleUser()
+        && resource.data.ownerUid == request.auth.uid;
+      allow create: if isGoogleUser()
         && request.resource.data.ownerUid == request.auth.uid;
-      allow update, delete: if isAuthenticated()
+      allow update, delete: if isGoogleUser()
         && resource.data.ownerUid == request.auth.uid;
     }
 
-    /** Oficiální žebříčky ČŠO (Stedar) — čtení veřejné, zápis pouze Cloud Functions (Admin SDK). */
     match /cso_rankings/{gender} {
       allow read: if true;
       allow write: if false;
     }
 
-    /**
-     * Index hráčských přihlášek pro „Mé přihlášky“.
-     * Zápis/čtení jen přes Cloud Functions (Admin SDK) — klient nemá přístup.
-     */
     match /player_registration_links/{linkId} {
       allow read, write: if false;
     }

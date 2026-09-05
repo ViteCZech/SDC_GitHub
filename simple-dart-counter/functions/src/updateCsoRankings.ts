@@ -2,6 +2,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as logger from 'firebase-functions/logger';
 import { runCsoRankingUpdate } from './csoRankingScraper';
+import { requireGoogleUid } from './authz';
 
 const REGION = 'europe-west1';
 
@@ -39,22 +40,17 @@ export const updateCsoRankingsNow = onCall(
     memory: '512MiB',
   },
   async (request) => {
-  if (!request.auth) {
-    throw new HttpsError(
-      'unauthenticated',
-      'Pro aktualizaci žebříčků se přihlaste účtem Google.'
-    );
-  }
+  const uid = requireGoogleUid(request);
 
   try {
-    logger.info('CSO manual ranking update requested', { uid: request.auth.uid });
+    logger.info('CSO manual ranking update requested', { uid });
     const result = await runCsoRankingUpdate();
-    logger.info('CSO manual ranking update completed', { uid: request.auth.uid, ...result });
+    logger.info('CSO manual ranking update completed', { uid, ...result });
     return result;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error('CSO manual ranking update failed', {
-      uid: request.auth.uid,
+      uid,
       error: message,
       stack: err instanceof Error ? err.stack : undefined,
     });

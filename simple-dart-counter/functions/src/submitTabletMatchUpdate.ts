@@ -2,6 +2,9 @@ import { initializeApp, getApps, getApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
+import { CALLABLE_PUBLIC } from './authz';
+import { validateTabletAuth } from './tabletAuth';
+import { loadTabletAuthForPin } from './tournamentSecrets';
 
 if (getApps().length === 0) {
   initializeApp();
@@ -21,27 +24,6 @@ type SubmitPayload = {
   matchId?: string;
   matchUpdates?: Record<string, unknown>;
 };
-
-function validateTabletAuth(
-  td: { boardAuthTokens?: Record<string, string>; tabletPassword?: string } | null,
-  board: string,
-  boardToken: string,
-  tabletPassword: string
-): boolean {
-  const token = String(boardToken ?? '').trim();
-  if (board && token) {
-    const tokens = td?.boardAuthTokens;
-    if (tokens && typeof tokens === 'object' && tokens[board] != null) {
-      return String(tokens[board]).trim() === token;
-    }
-  }
-
-  const expected =
-    td && td.tabletPassword != null ? String(td.tabletPassword).trim().slice(0, 5) : '';
-  if (expected === '') return true;
-  const provided = String(tabletPassword ?? '').trim().slice(0, 5);
-  return provided !== '' && provided === expected;
-}
 
 function cloneJsonSafe<T>(value: T, fallback: T): T {
   try {
@@ -122,14 +104,10 @@ function findBracketMatchLoc(
 
 /**
  * Herní tablet: zápis stavu/výsledku zápasu bez Google loginu.
- * Ověření: platný PIN + (pokud je nastavené) heslo terče z tournamentData.tabletPassword.
+ * Ověření: platný PIN + board token nebo neprázdné heslo (tajemství v tournament_secrets).
  */
 export const submitTabletMatchUpdate = onCall(
-  {
-    region: 'europe-west1',
-    invoker: 'public',
-    cors: true,
-  },
+  CALLABLE_PUBLIC,
   async (request): Promise<{ success: true }> => {
     const data = (request.data ?? {}) as SubmitPayload;
     const pin = String(data.pin ?? '').trim();
@@ -175,7 +153,8 @@ export const submitTabletMatchUpdate = onCall(
     const board = String(data.board ?? '').replace(/\D/g, '').slice(0, 2);
     const boardToken = String(data.boardToken ?? '').trim();
     const tabletPassword = String(data.tabletPassword ?? '').trim().slice(0, 5);
-    if (!validateTabletAuth(td, board, boardToken, tabletPassword)) {
+    const authSource = await loadTabletAuthForPin(db, pin, td);
+    if (!validateTabletAuth(authSource, board, boardToken, tabletPassword)) {
       throw new HttpsError('permission-denied', 'Neplatné heslo pro herní tablet.');
     }
 
