@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import process from 'node:process';
 import { fileURLToPath } from 'url';
+import { fetchStedarHtml } from './stedarHtmlFetch.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -28,29 +29,6 @@ const RANKINGS = [
     url: 'https://www.stedar.org/alms/league/rankings.view?orgId=1&rankingId=6',
   },
 ];
-
-function withCacheBust(url) {
-  const u = new URL(url);
-  u.searchParams.set('_ts', String(Date.now()));
-  return u.toString();
-}
-
-async function fetchHtml(url) {
-  const busted = withCacheBust(url);
-  const res = await fetch(busted, {
-    headers: {
-      'User-Agent': 'SDC-Ranking-Updater/2.1 (+https://github.com/)',
-      Accept: 'text/html,application/xhtml+xml',
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      Pragma: 'no-cache',
-    },
-    cache: 'no-store',
-  });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} for ${busted}`);
-  }
-  return res.text();
-}
 
 /**
  * @param {string} raw
@@ -148,7 +126,7 @@ function parseRankingTable(html) {
 async function fetchAndSave({ gender, file, url }) {
   console.log(`[${gender}] Stahuji: ${url}`);
   try {
-    const html = await fetchHtml(url);
+    const html = await fetchStedarHtml(url);
     const pageMeta = parseRankingPageMeta(html);
     const players = parseRankingTable(html);
 

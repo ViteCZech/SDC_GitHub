@@ -2,6 +2,9 @@ import * as cheerio from 'cheerio';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApp, getApps } from 'firebase-admin/app';
 import * as logger from 'firebase-functions/logger';
+import { fetchStedarHtml } from './stedarHtmlFetch';
+
+export { withCacheBust } from './stedarHtmlFetch';
 
 export type CsoGender = 'men' | 'women';
 /** Dokument ve Firestore `cso_rankings/{id}` — doubles jen pro turnaje dvojic. */
@@ -58,30 +61,6 @@ if (getApps().length === 0) {
 }
 
 const db = getFirestore(getApp(), 'eur3');
-
-/** Přidá cache-bust query param, ať CDN/proxy nevrací starou HTML stránku. */
-export function withCacheBust(url: string): string {
-  const u = new URL(url);
-  u.searchParams.set('_ts', String(Date.now()));
-  return u.toString();
-}
-
-async function fetchHtml(url: string): Promise<string> {
-  const busted = withCacheBust(url);
-  const res = await fetch(busted, {
-    headers: {
-      'User-Agent': 'SDC-Ranking-Updater/2.1 (+https://github.com/)',
-      Accept: 'text/html,application/xhtml+xml',
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      Pragma: 'no-cache',
-    },
-    cache: 'no-store',
-  });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} for ${busted}`);
-  }
-  return res.text();
-}
 
 /**
  * Převede Stedar datum („YYYY-MM-DD“ nebo „YYYY-MM-DD HH:mm“) na ISO řetězec
@@ -180,7 +159,7 @@ export async function fetchCsoRanking(
   url: string
 ): Promise<CsoRankingPayload> {
   logger.info(`CSO ranking fetch start: ${gender}`, { url });
-  const html = await fetchHtml(url);
+  const html = await fetchStedarHtml(url);
   const pageMeta = parseRankingPageMeta(html);
   const players = parseRankingTable(html);
 
