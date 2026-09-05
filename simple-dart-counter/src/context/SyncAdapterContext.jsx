@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { createCloudSyncAdapter } from '../services/syncAdapter/cloudSyncAdapter';
 
 const defaultAdapter = createCloudSyncAdapter();
@@ -9,6 +9,9 @@ const SyncAdapterContext = createContext({
 
 export function SyncAdapterProvider({ adapter, children }) {
   const [current, setCurrent] = useState(() => adapter || defaultAdapter);
+  useEffect(() => {
+    if (adapter) setCurrent(adapter);
+  }, [adapter]);
   const value = useMemo(() => ({ adapter: current, setAdapter: setCurrent }), [current]);
   return <SyncAdapterContext.Provider value={value}>{children}</SyncAdapterContext.Provider>;
 }

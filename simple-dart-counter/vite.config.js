@@ -35,8 +35,9 @@ export default defineConfig({
       },
       manifest: false,
       workbox: {
+        cleanupOutdatedCaches: true,
         // TOTO JE KLÍČOVÉ: Říká PWA, aby ignorovalo Firebase Auth a .well-known složku
-        navigateFallbackDenylist: [/^\/__/, /^\/\.well-known\//],
+        navigateFallbackDenylist: [/^\/__/, /^\/\.well-known\//, /^\/assets\//],
         globIgnores: [
           '**/TournamentSetup-*.js',
           '**/TournamentHub-*.js',

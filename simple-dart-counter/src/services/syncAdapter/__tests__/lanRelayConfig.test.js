@@ -57,4 +57,22 @@ describe('lanRelayConfig', () => {
       resolveLanRelayConfig({ hostname: 'tv', search: '?lanHost=192.168.0.5:8787', protocol: 'http:' })
     ).toEqual({ host: '192.168.0.5', port: 8787, protocol: 'http' });
   });
+
+  it('na Firebase Hostingu ignoruje uložený LAN relay', () => {
+    rememberLanRelayConfig(localOrganizerLanConfig(8787));
+    expect(
+      resolveLanRelayConfig({
+        hostname: 'simple-dart-counter-12ff2.web.app',
+        search: '',
+        protocol: 'https:',
+      })
+    ).toBeNull();
+    expect(
+      resolveLanRelayConfig({
+        hostname: 'simple-dart-counter-12ff2.web.app',
+        search: '?lanHost=192.168.0.5:8787',
+        protocol: 'https:',
+      })
+    ).toEqual({ host: '192.168.0.5', port: 8787, protocol: 'http' });
+  });
 });

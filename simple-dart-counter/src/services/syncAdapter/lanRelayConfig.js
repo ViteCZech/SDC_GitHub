@@ -52,6 +52,12 @@ export function lanWsBase(cfg) {
   return http.replace(/^http/, 'ws');
 }
 
+/** Veřejný Firebase hosting — uložený LAN relay z lokálního testu sem nepatří. */
+export function isPublicCloudHost(hostname) {
+  const host = String(hostname || '').toLowerCase();
+  return host.endsWith('.web.app') || host.endsWith('.firebaseapp.com');
+}
+
 /**
  * @param {Pick<Location, 'hostname'|'port'|'protocol'|'search'|'origin'>|null} [loc]
  * @returns {{ host: string, port: number, protocol: 'http'|'https' }|null}
@@ -79,6 +85,7 @@ export function resolveLanRelayConfig(loc = typeof window !== 'undefined' ? wind
     const fromQuery = parseLanHost(q.get('lanHost') || q.get('lan'));
     if (fromQuery) return fromQuery;
   }
+  if (isPublicCloudHost(loc?.hostname)) return null;
   const stored = readStoredLanRelayConfig();
   if (stored) return stored;
   return null;

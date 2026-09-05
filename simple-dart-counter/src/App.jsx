@@ -14,7 +14,19 @@ const AppMain = lazy(() => import('./AppMain.jsx'));
 const VenueDisplayView = lazy(() => import('./components/VenueDisplayView.jsx'));
 
 function ShellFallback() {
-  return <div className="bg-slate-50 dark:bg-slate-950 w-full h-[100dvh]" />;
+  return (
+    <div
+      className="bg-slate-50 dark:bg-slate-950 w-full h-[100dvh] flex flex-col items-center justify-center gap-3"
+      role="status"
+      aria-live="polite"
+      data-testid="shell-fallback"
+    >
+      <div className="w-16 h-16 rounded-full bg-emerald-600 flex items-center justify-center text-slate-950 font-black tracking-widest">
+        SDC
+      </div>
+      <p className="text-xs font-bold tracking-[0.35em] uppercase text-emerald-500">Načítání</p>
+    </div>
+  );
 }
 
 const venueRouteAtBoot = parseVenueDisplayRouteFromUrl();

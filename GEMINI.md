@@ -294,7 +294,7 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 6. **AppMain.jsx je velký.** Novou logiku extrahuj do `utils/` / `services/` / komponenty. Do AppMain jen wiring. Home/setup/X01 nech eager; ostatní obrazovky lazy.
 7. **Tablet = kiosk.** Žádný Google login na tabletu. Přístup PIN + board + heslo/token.
 8. **Cloud turnaje** vyžaduje Google účet. Offline turnaj musí dál fungovat bez cloudu.
-9. **PWA:** po změně chování ověř, že service worker neservíruje starý bundle; `registerSW({ immediate: true })`. Lazy obrazovky (turnaj, cricket, online, prereg) a odložené servisy (prereg, veřejné výsledky, historie zápasů) se do precache nedávají — stáhnou se až po otevření.
+9. **PWA:** po změně chování ověř, že service worker neservíruje starý bundle; `registerSW({ immediate: true })`. `index.html` a `sw.js` musí jít s `Cache-Control: no-cache` (viz `firebase.json`) — jinak po deployi hashed `/assets/*.js` spadnou na HTML rewrite a start je černá obrazovka. Lazy obrazovky (turnaj, cricket, online, prereg) a odložené servisy (prereg, veřejné výsledky, historie zápasů) se do precache nedávají — stáhnou se až po otevření. Missing `/assets/*` se přepisuje na `stale-chunk.js`, ne na `index.html`.
 10. Neměň Firebase project ID, název DB `eur3`, ani region functions bez výslovného zadání.
 
 ---
