@@ -3,11 +3,13 @@ import {
   calculateFinalStandings,
   calculateGroupStandings,
   countPlayersAdvancingFromGroups,
+  defaultSequentialGroupBoardAssignments,
   estimateSingleEliminationWallMs,
   generateBracketStructure,
   generateRoundRobinSchedule,
   generateTournamentVariants,
   getGroupSplit,
+  hasAnyGroupBoardAssignment,
   isAllowedGroupSplit,
   isEntireTournamentFinished,
   isTournamentBracketOnlyFormat,
@@ -278,5 +280,41 @@ describe('tournamentLogic – nasazení a konec turnaje', () => {
     expect(estimateSingleEliminationWallMs(8, 10, 1)).toBe(70);
     expect(estimateSingleEliminationWallMs(8, 10, 4)).toBe(30);
     expect(estimateSingleEliminationWallMs(1, 10, 4)).toBe(0);
+  });
+});
+
+describe('tournamentLogic – výchozí přiřazení terčů skupinám', () => {
+  const groups = [{ groupId: 'A' }, { groupId: 'B' }, { groupId: 'C' }, { groupId: 'D' }];
+
+  it('přiřadí 1. skupinu na terč 1, 2. na terč 2, …', () => {
+    expect(defaultSequentialGroupBoardAssignments(groups.slice(0, 3), 3)).toEqual({
+      A: '1',
+      B: '2',
+      C: '3',
+    });
+  });
+
+  it('přebytečné skupiny nechá ve frontě, když je terčů méně', () => {
+    expect(defaultSequentialGroupBoardAssignments(groups, 2)).toEqual({
+      A: '1',
+      B: '2',
+      C: '',
+      D: '',
+    });
+  });
+
+  it('bez terčů nic nepřiřadí', () => {
+    expect(defaultSequentialGroupBoardAssignments(groups.slice(0, 2), 0)).toEqual({ A: '', B: '' });
+  });
+
+  it('hasAnyGroupBoardAssignment je false, dokud není žádný záznam', () => {
+    expect(hasAnyGroupBoardAssignment({}, {}, groups)).toBe(false);
+    expect(hasAnyGroupBoardAssignment(undefined, undefined, groups)).toBe(false);
+  });
+
+  it('hasAnyGroupBoardAssignment pozná draft, persistovanou mapu i boards na skupině', () => {
+    expect(hasAnyGroupBoardAssignment({ A: '1' }, {}, groups)).toBe(true);
+    expect(hasAnyGroupBoardAssignment({}, { B: '' }, groups)).toBe(true);
+    expect(hasAnyGroupBoardAssignment({}, {}, [{ groupId: 'A', boards: [2] }])).toBe(true);
   });
 });

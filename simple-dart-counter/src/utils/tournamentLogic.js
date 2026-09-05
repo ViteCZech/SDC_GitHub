@@ -1298,6 +1298,48 @@ export function propagateBracketWinners(bracketRounds) {
 }
 
 /**
+ * Výchozí přiřazení skupin k terčům na začátku turnaje: 1. skupina → terč 1, 2. → terč 2, …
+ * Přebytečné skupiny (více skupin než terčů) zůstanou bez terče (fronta).
+ * @param {Array<{groupId?: string}>} groups
+ * @param {number} totalBoards
+ * @returns {Record<string, string>} groupId → "1" | "2" | … | ""
+ */
+export function defaultSequentialGroupBoardAssignments(groups, totalBoards) {
+  const cap = Math.max(0, Math.floor(Number(totalBoards)) || 0);
+  const out = {};
+  (Array.isArray(groups) ? groups : []).forEach((g, i) => {
+    const gid = g?.groupId;
+    if (gid == null || gid === '') return;
+    const board = i + 1;
+    out[gid] = cap > 0 && board <= cap ? String(board) : '';
+  });
+  return out;
+}
+
+/**
+ * Už existuje nějaké přiřazení terčů (draft, persistovaná mapa, nebo `boards` na skupině)?
+ * Prázdný řetězec v mapě počítáme jako explicitní „fronta“, ne jako „ještě nepřiřazeno“.
+ * @param {Record<string, string>|null|undefined} draftBoards
+ * @param {Record<string, string>|null|undefined} persistedBoards
+ * @param {Array<{groupId?: string, boards?: Array}>} groups
+ */
+export function hasAnyGroupBoardAssignment(draftBoards, persistedBoards, groups) {
+  const maps = [draftBoards, persistedBoards];
+  for (const map of maps) {
+    if (!map || typeof map !== 'object') continue;
+    for (const g of groups || []) {
+      const gid = g?.groupId;
+      if (gid == null) continue;
+      if (map[gid] !== undefined || map[String(gid)] !== undefined) return true;
+    }
+  }
+  for (const g of groups || []) {
+    if (Array.isArray(g?.boards) && g.boards.length > 0) return true;
+  }
+  return false;
+}
+
+/**
  * Terče v jednom kole: v původním pořadí zápasů přiřadí 1…N (modulo) jen nedohraným reálným zápasům
  * (pending, dva hráči, ne BYE). Sekvence vždy začíná terčem 1.
  */

@@ -759,7 +759,7 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     tournBoardAssignmentDesc:
       'Přiřaďte každé skupině číslo terče (např. 1) nebo více čísel oddělených čárkou (např. 1, 2). Žádné číslo nesmí být přiřazeno více skupinám.',
     tournBoardAssignmentDescExtended:
-      'Přiřaďte každé skupině číslo terče, případně více čísel (např. 1, 2). Prázdné pole = skupina čeká ve frontě. Jedné skupině lze přiřadit více terčů najednou — zápasy se mezi ně rozdělí.',
+      'Skupiny se na začátku přiřadí automaticky (1. skupina → terč 1). Pořadí můžete ručně změnit. Prázdné pole = skupina čeká ve frontě. Jedné skupině lze přiřadit více terčů najednou — zápasy se mezi ně rozdělí.',
     tournBoardDoublesHint:
       'Výchozí je sériový rozvrh (jeden terč). Až skupině (jednotlivci i dvojice) dáte dva terče, hrají se najednou zápasy, které se nepotkávají hráči. Volní hráči počítají — u 6 hráčů na 2 terčích nikdo nečeká. Počtář se může lišit od sériového rozvrhu.',
     tournGroup: 'Skupina', tournPlayerSingular: 'hráč', tournPlayersFew: 'hráči', tournPlayersMany: 'hráčů',
@@ -1885,7 +1885,7 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     tournBoardAssignmentDesc:
       'Assign each group a board number (e.g. 1), or several separated by commas (e.g. 1, 2). Empty = group waits in queue. No number may be assigned to more than one group.',
     tournBoardAssignmentDescExtended:
-      'Assign each group a board number, or several (e.g. 1, 2). Empty field = group waits in queue. One group may have multiple boards — matches are split between them.',
+      'Groups start assigned automatically (group 1 → board 1). You can change the order by hand. Empty field = group waits in queue. One group may have multiple boards — matches are split between them.',
     tournBoardDoublesHint:
       'Default is sequential play (one board). Once a group (singles or doubles) has two boards, non-overlapping matches run in parallel. Free players count — with 6 players on 2 boards nobody waits. The chalker may differ from the sequential schedule.',
     tournBoardAssignmentStepTitle: 'Step 4 - Board assignment',
@@ -2981,7 +2981,7 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
     tournBoardAssignmentDesc:
       'Przypisz każdej grupie numer tarczy (np. 1) albo kilka numerów oddzielonych przecinkiem (np. 1, 2). Puste = grupa czeka w kolejce. Ten sam numer nie może być przypisany dwóm grupom.',
     tournBoardAssignmentDescExtended:
-      'Przypisz każdej grupie numer tarczy albo kilka (np. 1, 2). Puste pole = grupa czeka w kolejce. Jedna grupa może mieć kilka tarcz — mecze zostaną między nie rozdzielone.',
+      'Na starcie grupy są przypisane automatycznie (grupa 1 → tarcza 1). Kolejność możesz zmienić ręcznie. Puste pole = grupa czeka w kolejce. Jedna grupa może mieć kilka tarcz — mecze zostaną między nie rozdzielone.',
     tournBoardDoublesHint:
       'Domyślnie gra idzie seryjnie (jedna tarcza). Gdy grupa (single lub pary) dostanie dwie tarcze, równolegle idą mecze bez wspólnych zawodników. Wolni liczą — przy 6 graczach na 2 tarczach nikt nie czeka. Sędzia może różnić się od rozkładu seryjnego.',
     tournBoardAssignmentStepTitle: 'Krok 4 - Przypisanie tarcz',

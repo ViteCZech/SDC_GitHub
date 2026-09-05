@@ -1,7 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { distributePlayersToFixedGroups } from '../utils/tournamentGenerator';
-import { isTournamentBracketOnlyFormat } from '../utils/tournamentLogic';
+import {
+  defaultSequentialGroupBoardAssignments,
+  hasAnyGroupBoardAssignment,
+  isTournamentBracketOnlyFormat,
+} from '../utils/tournamentLogic';
 import { translations } from '../translations';
 import { AdminTapTextField } from './AdminTapField';
 import StickyActionBar from './StickyActionBar';
@@ -121,24 +125,57 @@ export default function TournamentBoardAssignment({
 
   useEffect(() => {
     if (groups.length === 0) return;
-    setBoardInputs((prev) => {
-      const next = { ...prev };
-      for (const g of groups) {
-        const gid = g.groupId;
-        let stored = draftBoards[gid] ?? draftBoards[String(gid)];
-        if (stored === undefined) {
-          stored = persistedBoards[gid] ?? persistedBoards[String(gid)];
-        }
-        if (stored === undefined) {
-          const boards = g.boards;
-          stored = Array.isArray(boards) && boards.length > 0 ? boards.join(', ') : '';
-        }
-        next[gid] = typeof stored === 'string' ? stored : (Array.isArray(stored) ? stored.join(', ') : String(stored ?? ''));
+    const useSequentialDefaults = !hasAnyGroupBoardAssignment(draftBoards, persistedBoards, groups);
+    const sequentialDefaults = useSequentialDefaults
+      ? defaultSequentialGroupBoardAssignments(groups, totalBoards)
+      : null;
+    const next = {};
+    for (const g of groups) {
+      const gid = g.groupId;
+      let stored = draftBoards[gid] ?? draftBoards[String(gid)];
+      if (stored === undefined) {
+        stored = persistedBoards[gid] ?? persistedBoards[String(gid)];
       }
-      return next;
+      if (stored === undefined) {
+        const boards = g.boards;
+        if (Array.isArray(boards) && boards.length > 0) {
+          stored = boards.join(', ');
+        }
+      }
+      if (stored === undefined && sequentialDefaults) {
+        stored = sequentialDefaults[gid] ?? '';
+      }
+      next[gid] =
+        typeof stored === 'string'
+          ? stored
+          : Array.isArray(stored)
+            ? stored.join(', ')
+            : String(stored ?? '');
+    }
+    setBoardInputs((prev) => {
+      const same =
+        groups.every((g) => prev[g.groupId] === next[g.groupId]) &&
+        Object.keys(prev).length === groups.length;
+      return same ? prev : next;
     });
     setBoardInputErrors({});
-  }, [groups, draftBoards, persistedBoards]);
+    if (!useSequentialDefaults || typeof setTournamentDraft !== 'function') return;
+    setTournamentDraft((d) => {
+      const current = d?.boardAssignments || {};
+      let changed = false;
+      const merged = { ...current };
+      for (const g of groups) {
+        const gid = g.groupId;
+        if (current[gid] !== undefined || current[String(gid)] !== undefined) continue;
+        if (merged[gid] !== next[gid]) {
+          merged[gid] = next[gid];
+          changed = true;
+        }
+      }
+      if (!changed) return d;
+      return { ...d, boardAssignments: merged };
+    });
+  }, [groups, draftBoards, persistedBoards, totalBoards, setTournamentDraft]);
 
   const handleBoardChange = (groupId, value) => {
     const parsed = parseBoardInput(value);
@@ -281,7 +318,7 @@ export default function TournamentBoardAssignment({
               </span>
             </h2>
             <p className="text-slate-400 text-sm mt-1">
-              {t('tournBoardAssignmentDescExtended') || 'Přiřaďte každé skupině čísla terčů (např. 1 nebo 1, 2). Prázdné = skupina čeká ve frontě. Jedné skupině můžete přiřadit i více terčů najednou (např. "1, 2"). Zápasy se mezi ně rozdělí.'}
+              {t('tournBoardAssignmentDescExtended') || 'Skupiny se na začátku přiřadí automaticky (1. skupina → terč 1). Pořadí můžete ručně změnit. Prázdné pole = skupina čeká ve frontě. Jedné skupině můžete přiřadit i více terčů najednou (např. "1, 2"). Zápasy se mezi ně rozdělí.'}
             </p>
             <p className="text-emerald-300/90 text-sm mt-2">
               {t('tournBoardDoublesHint')}
