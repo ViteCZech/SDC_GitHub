@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { ArrowLeft, Ban, CheckCircle, Delete, Trophy, Undo2, X } from 'lucide-react';
 import { translations } from '../translations';
 import {
@@ -11,8 +11,6 @@ import {
   updateOnlineGameStartPlayer,
 } from '../services/onlineGamesService';
 import { useSyncAdapter } from '../context/SyncAdapterContext';
-import OnlineVideoContainer from './online/OnlineVideoContainer';
-import PostMatchView from './online/PostMatchView';
 import DoublesThrowerPicker from './DoublesThrowerPicker';
 import ContextHelpButton from './ContextHelpButton';
 import {
@@ -29,6 +27,9 @@ import {
   seqAfterApplyingRemote,
   shouldApplyRemoteLive,
 } from '../utils/onlineLiveSync';
+
+const OnlineVideoContainer = lazy(() => import('./online/OnlineVideoContainer'));
+const PostMatchView = lazy(() => import('./online/PostMatchView'));
 
 const IMPOSSIBLE_SCORES = [163, 166, 169, 172, 173, 175, 176, 178, 179];
 
@@ -1721,7 +1722,8 @@ export default function GameX01({
         )}
         {onlineGameId && settings.gameType === 'x01' && myOnlineRole && (
           <div className={`shrink-0 ${!postMatchStatsActive && isLandscape ? 'col-span-3' : ''}`}>
-            <OnlineVideoContainer
+            <Suspense fallback={null}>
+              <OnlineVideoContainer
               onlineGameId={onlineGameId}
               myRole={myOnlineRole}
               currentPlayer={gameState.currentPlayer}
@@ -1739,10 +1741,12 @@ export default function GameX01({
               matchCompleted={onlineVideoMatchDone}
               isPostMatch={postMatchStatsActive}
             />
+            </Suspense>
           </div>
         )}
         {postMatchStatsActive && pendingOnlineMatchRecord && (
-          <PostMatchView
+          <Suspense fallback={null}>
+            <PostMatchView
             lang={lang}
             record={pendingOnlineMatchRecord}
             startScore={settings.startScore}
@@ -1750,6 +1754,7 @@ export default function GameX01({
             p1Name={getDisplayName(settings.p1Name, true, false)}
             p2Name={getDisplayName(settings.p2Name, false, settings.isBot)}
           />
+          </Suspense>
         )}
         {!postMatchStatsActive && highScoreAnimation !== null && (
           <div

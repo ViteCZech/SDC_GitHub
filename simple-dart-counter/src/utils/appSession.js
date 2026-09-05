@@ -1,7 +1,7 @@
 import { loadUiResume } from './uiResumeStorage';
 import { parsePreregRouteFromUrl, isPublicTournamentCatalogPath } from './preregAdmin';
 import { parseTabletRouteFromUrl } from './tabletBoardQr';
-import { parseVenueDisplayRouteFromUrl } from './venueDisplay';
+import { parseVenueDisplayRouteFromUrl } from './venueDisplayRoutes';
 import { safeStorage } from './safeStorage';
 
 export { safeStorage };

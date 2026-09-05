@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { ArrowLeft, Globe, LogOut, X } from 'lucide-react';
-import OnlineHub from './OnlineHub';
+
+const OnlineHub = lazy(() => import('./OnlineHub'));
 
 const tileBtnClass =
   'flex flex-col items-center gap-2 p-4 transition-transform border bg-slate-800 hover:bg-slate-700 border-slate-700 rounded-2xl active:scale-95';
@@ -75,14 +76,16 @@ export function HomeOnlineSubmenu({
         )}
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-2 [-webkit-overflow-scrolling:touch]">
-        <OnlineHub
-          t={t}
-          settings={settings}
-          onOnlineGameStart={onOnlineGameStart}
-          resumeHostWaitingSession={resumeHostWaitingSession}
-          onResumeHostWaitingConsumed={onResumeHostWaitingConsumed}
-          onLobbyChromeChange={setLobbyChrome}
-        />
+        <Suspense fallback={<div className="min-h-[12rem] rounded-2xl bg-slate-900/60" aria-busy="true" />}>
+          <OnlineHub
+            t={t}
+            settings={settings}
+            onOnlineGameStart={onOnlineGameStart}
+            resumeHostWaitingSession={resumeHostWaitingSession}
+            onResumeHostWaitingConsumed={onResumeHostWaitingConsumed}
+            onLobbyChromeChange={setLobbyChrome}
+          />
+        </Suspense>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 Kontextový dokument pro AI (Gemini / Cursor). Čti tento soubor před jakoukoli změnou kódu.
 
-Aplikace: **Simple Dart Counter** (npm název `darts-cloud-pro`), verze UI `v1.10.2` v `simple-dart-counter/src/App.jsx`.
+Aplikace: **Simple Dart Counter** (npm název `darts-cloud-pro`), verze UI `v1.10.2` v `simple-dart-counter/src/AppMain.jsx`.
 Produkt: PWA počítadlo šipek + správa klubových turnajů (Česko, ČŠO žebříčky). Jazyky UI: **cs / en / pl**.
 
 Kód a komentáře jsou převážně česky. Překlady: `src/i18n/{cs,en,pl}.js` (cs v hlavním chunku, en/pl lazy).
@@ -16,10 +16,12 @@ SDC_GitHub/
   GEMINI.md                          ← tento soubor
   .github/workflows/                 ← Firebase Hosting + Functions deploy, update žebříčků
   simple-dart-counter/               ← CELÁ APLIKACE (pracovní kořen)
-    src/App.jsx                      ← orchestrátor (stavy, auth, turnaj, online, wiring UI)
+    src/App.jsx                      ← tenký vstup: TV vs hlavní app (lazy chunky)
+    src/AppMain.jsx                  ← orchestrátor (stavy, auth, turnaj, online, wiring UI)
+    src/lazyScreens.jsx              ← React.lazy obrazovky mimo home/setup/X01
     src/context/SyncAdapterContext.jsx
     src/services/syncAdapter/        ← cloud I/O pro App (turnaj, online, historie, prereg)
-    src/utils/appSession.js          ← PIN, spectator session, resume, localStorage
+    src/utils/venueDisplayRoutes.js  ← /tv/:pin routing bez tournamentLogic
     src/utils/tabletBoardSchedule.js ← rozpis / pickup zápasu na tabletu
     src/utils/matchStats.js          ← průměry, překlad výchozích jmen
     src/main.jsx                     ← React 19 + PWA service worker
@@ -48,7 +50,7 @@ SDC_GitHub/
 | Vrstva | Technologie |
 |---|---|
 | UI | React 19, Vite 8, Tailwind 3, lucide-react, qrcode.react |
-| Stav | Žádný Redux/Router. Jeden `appState` string v `App.jsx` |
+| Stav | Žádný Redux/Router. Jeden `appState` string v `AppMain.jsx` |
 | Backend | Firebase project `simple-dart-counter-12ff2` |
 | DB | Firestore named database **`eur3`** |
 | Auth | Google (admin/cloud) + anonymní (online hry) |
@@ -62,18 +64,22 @@ Lokální běh: `cd simple-dart-counter && npm run dev`. Functions: `cd function
 
 ## Architektura (důležité)
 
-`App.jsx` je **centrální orchestrátor**, ne „hloupý router“. Drží:
+`App.jsx` je tenký vstup: `/tv/:pin` lazy-loaduje jen `VenueDisplayView`, zbytek `AppMain.jsx`.
+
+`AppMain.jsx` je **centrální orchestrátor**, ne „hloupý router“. Drží:
 
 - `appState` — která obrazovka se kreslí
 - `userRole` — `admin` | `viewer` | `tablet` | null
 - nastavení zápasu, historii, turnajová data, parked session
 - Google login, anonymous auth pro online
 
-Cloudové I/O z App jde přes `useSyncAdapter()` (`createCloudSyncAdapter`): turnaj/tablet, veřejné výsledky, online hry, záloha historie zápasů, prereg admin. Firebase SDK se v App.jsx přímo nevolá (jen Auth).
+Obrazovky mimo home / setup / X01 jdou přes `lazyScreens.jsx` (turnaj, cricket, online lobby, prereg, veřejné výsledky, profil). `GameX01` zůstává v hlavním chunku kvůli parkování zápasu. Každá lazy obrazovka má vlastní `Suspense`, aby suspend cricket/turnaje neodpojil namountovaný X01.
+
+Cloudové I/O z AppMain jde přes `useSyncAdapter()` (`createCloudSyncAdapter`): turnaj/tablet, veřejné výsledky, online hry, záloha historie zápasů, prereg admin. Firebase SDK se v AppMain přímo nevolá (jen Auth).
 
 Helpery mimo orchestrátor: `appSession.js`, `tabletBoardSchedule.js`, `matchStats.js`. Obrazovky statistik: `MatchStatsView.jsx`, `UserProfile.jsx`.
 
-**Herní logika turnajů patří do `src/utils/`, ne do komponent.** Komponenty jen zobrazují a volají callbacky z `App.jsx`.
+**Herní logika turnajů patří do `src/utils/`, ne do komponent.** Komponenty jen zobrazují a volají callbacky z `AppMain.jsx`.
 
 Navigace Domů/Zpět: `src/utils/appNavigation.js` (`resolveAppNav`). Herní plocha (`playing`, `match_finished`) má vlastní Pause menu, ne AppNavBar.
 
@@ -87,14 +93,14 @@ Parknutý zápas (`parkedSession.kind === 'match'` + `mountKept`) musí zůstat 
 ### Domů a zápasy
 | Stav | Co to je | Hlavní soubor |
 |---|---|---|
-| `home` | Menu: Nová hra, Tutorial, Historie, Turnaj, Statistiky, Online, O aplikaci | `App.jsx` |
-| `setup` | Nastavení lokálního zápasu | `App.jsx` |
+| `home` | Menu: Nová hra, Tutorial, Historie, Turnaj, Statistiky, Online, O aplikaci | `AppMain.jsx` |
+| `setup` | Nastavení lokálního zápasu | `AppMain.jsx` |
 | `playing` | Herní plocha X01 / Cricket | `GameX01.jsx`, `GameCricket.jsx` |
-| `match_finished` | Statistiky po zápase | `App.jsx` + `Stats.jsx` |
-| `history` | Historie zápasů | `App.jsx` |
-| `profile` | Osobní statistiky (vyžaduje Google) | `App.jsx` |
-| `tutorial` | Průvodce | `App.jsx` |
-| `about` | O aplikaci | `App.jsx` |
+| `match_finished` | Statistiky po zápase | `MatchStatsView.jsx` |
+| `history` | Historie zápasů | `AppMain.jsx` |
+| `profile` | Osobní statistiky (vyžaduje Google) | `UserProfile.jsx` |
+| `tutorial` | Průvodce | `AppMain.jsx` |
+| `about` | O aplikaci | `AppMain.jsx` |
 
 ### Turnaj (živý běh)
 | Stav | Krok stepperu | Role | Soubor |
@@ -106,7 +112,7 @@ Parknutý zápas (`parkedSession.kind === 'match'` + `mountKept`) musí zůstat 
 | `tournament_bracket` | 6 | admin / viewer | `TournamentBracketView.jsx` |
 | `tournament_stats` | 7 | admin / viewer | `TournamentStatisticsView.jsx` |
 | `tournament_tablet` | — | tablet | `TabletWaitingRoom.jsx` |
-| `tournament_viewer_preparing` | — | viewer | `App.jsx` |
+| `tournament_viewer_preparing` | — | viewer | `AppMain.jsx` |
 | `tournament_history` | — | admin (Google) | `TournamentHistory.jsx` |
 
 ### Předregistrace
@@ -122,7 +128,7 @@ URL deep-linky (bez React Routeru, parsují se z `window.location`):
 
 - `/t/:tournamentId` — veřejná předregistrace (`?invite=` pro spolupořadatele)
 - `/tournaments` — katalog
-- `/tv/:pin` — veřejná TV obrazovka haly (`VenueDisplayView.jsx`), mimo tok `App.jsx` (jen čte `active_tournaments/{pin}`). Kiosk: `100vh` + `overflow: hidden`, bez posuvníků. Pavouk se kreslí jen když už existuje; jinak 100 % plochy mají terče / skupiny. Terče max 6 / stránka, skupiny max 4 (mřížka 2×2), rotace 10 s.
+- `/tv/:pin` — veřejná TV obrazovka haly (`VenueDisplayView.jsx`), lazy z `App.jsx` (není `AppMain`). Jen čte `active_tournaments/{pin}`. Kiosk: `100vh` + `overflow: hidden`, bez posuvníků. Pavouk se kreslí jen když už existuje; jinak 100 % plochy mají terče / skupiny. Terče max 6 / stránka, skupiny max 4 (mřížka 2×2), rotace 10 s.
 - tablet QR: PIN + číslo terče + token (`tabletBoardQr.js`)
 
 ---
@@ -279,12 +285,12 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 
 ## Konvence při úpravách
 
-1. **Nová obrazovka** = nový `appState` + větev v `App.jsx` + záznam v `appNavigation.js`.
+1. **Nová obrazovka** = nový `appState` + větev v `AppMain.jsx` (těžké obrazovky přidej do `lazyScreens.jsx`) + záznam v `appNavigation.js`.
 2. **Nový text UI** = klíč v `translations.js` pro cs, en i pl. Nehardcodovat stringy v komponentách (výjimka: pár starších míst v Cricket).
 3. **Turnajová pravidla** (postup, pavouk, rozhodčí, odhad času) → `tournamentLogic.js`. Testuj edge cases: lichý počet, bye, walkover, JIT desky.
 4. **Identita hráče** (duplicity ČŠO vs rekreační) → `playerIdentity.js`, stejná logika na CF.
 5. **Nedávej tajemství do gitu.** Firebase web config v `firebase.js` je veřejný klientský klíč — OK. Service account nikdy.
-6. **App.jsx je velký.** Novou logiku extrahuj do `utils/` / `services/` / komponenty. Do App.jsx jen wiring.
+6. **AppMain.jsx je velký.** Novou logiku extrahuj do `utils/` / `services/` / komponenty. Do AppMain jen wiring. Home/setup/X01 nech eager; ostatní obrazovky lazy.
 7. **Tablet = kiosk.** Žádný Google login na tabletu. Přístup PIN + board + heslo/token.
 8. **Cloud turnaje** vyžaduje Google účet. Offline turnaj musí dál fungovat bez cloudu.
 9. **PWA:** po změně chování ověř, že service worker neservíruje starý bundle; `registerSW({ immediate: true })`.
@@ -298,10 +304,10 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 |---|---|
 | Chování X01 (bust, checkout, undo, online ACK) | `GameX01.jsx` |
 | Cricket značky / MPR | `GameCricket.jsx` |
-| Setup lokálního zápasu / bot | `App.jsx` (`setup`) |
+| Setup lokálního zápasu / bot | `AppMain.jsx` (`setup`) |
 | Online lobby / join / abandon | `onlineGamesService.js` (přes `syncAdapter`), `OnlineHub.jsx`, `online/*` |
 | Los skupin, pavouk, rozhodčí | `tournamentLogic.js`, `tournamentGenerator.js` |
-| Stepper turnaje / lock rankingu | `App.jsx`, `TournamentSetup.jsx`, `tournamentRanking.js` |
+| Stepper turnaje / lock rankingu | `AppMain.jsx`, `TournamentSetup.jsx`, `tournamentRanking.js` |
 | Tablet čekárna / check-in timeout | `TabletWaitingRoom.jsx`, `tabletCheckInTimeout.js` |
 | QR tabletu | `tabletBoardQr.js`, `TabletBoardQrPanel.jsx` |
 | TV obrazovka haly `/tv/:pin` | `VenueDisplayView.jsx`, `utils/venueDisplay.js` |
