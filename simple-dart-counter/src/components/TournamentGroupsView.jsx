@@ -12,35 +12,9 @@ import { formatRefereeNames } from '../utils/doublesReferee';
 import { pickParallelGroupMatches } from '../utils/groupParallelPlay';
 import ContextHelpButton from './ContextHelpButton';
 
-/** Rozdělení zobrazeného jména (mezera nebo podtržítko) pro zalamování řádků */
-function splitStandingNameParts(name) {
-  const s = String(name ?? '').trim();
-  if (!s) return [];
-  const u = s.indexOf('_');
-  if (u !== -1) {
-    const a = s.slice(0, u).trim();
-    const b = s.slice(u + 1).replace(/_/g, ' ').trim();
-    return [a, b].filter(Boolean);
-  }
-  const sp = s.indexOf(' ');
-  if (sp > 0) {
-    const a = s.slice(0, sp).trim();
-    const b = s.slice(sp + 1).trim();
-    return [a, b].filter(Boolean);
-  }
-  return [s];
-}
-
-function standingNameTextClass(name) {
-  const n = String(name ?? '').length;
-  if (n > 32) return 'text-[8px] leading-tight';
-  if (n > 20) return 'text-[9px] leading-tight';
-  return 'text-[11px] leading-snug';
-}
-
 /** Tabulka pořadí – P vlevo, No menší než zbytek řádku, ale čitelné */
 function GroupStandingsTable({ standings, advanceCount, t }) {
-  const cellBase = 'text-[11px] leading-snug';
+  const cellBase = 'text-[11px] sm:text-xs leading-snug';
   const cellMono = `${cellBase} font-mono tabular-nums`;
   const noTh =
     'text-center py-1 w-7 px-0 align-bottom text-[8px] sm:text-[9px] font-bold uppercase tracking-tight text-slate-500 leading-tight';
@@ -54,11 +28,11 @@ function GroupStandingsTable({ standings, advanceCount, t }) {
           <col className="w-5" />
           <col className="w-7" />
           <col />
-          <col className="w-7" />
-          <col className="w-[3.25rem]" />
-          <col className="w-[3.25rem]" />
-          <col className="w-7" />
-          <col className="w-9" />
+          <col className="w-[2.9rem]" />
+          <col className="w-[3.7rem]" />
+          <col className="w-[3.7rem]" />
+          <col className="w-[2.9rem]" />
+          <col className="w-[3.6rem]" />
         </colgroup>
         <thead>
           <tr className="border-b border-slate-700 text-slate-400 font-bold uppercase tracking-tight">
@@ -67,31 +41,33 @@ function GroupStandingsTable({ standings, advanceCount, t }) {
             <th className={`text-left py-1 pr-0.5 pl-0 min-w-0 align-bottom ${cellBase}`}>
               {t('playerName') || 'Hráč'}
             </th>
-            <th className={`text-center py-1 w-7 px-0.5 align-bottom whitespace-nowrap ${cellBase}`}>
-              {t('tournStandingPoints') || 'Body'}
+            <th className={`text-right py-1 pr-1 pl-0.5 align-bottom whitespace-nowrap ${cellBase}`}>
+              <span className="block w-full text-right">{t('tournStandingPoints') || 'Body'}</span>
             </th>
-            <th className={`text-center py-1 w-[3.1rem] px-0.5 align-bottom leading-tight whitespace-pre-line ${cellBase}`}>
-              {t('tournStandingMatchesShort')}
+            <th className={`text-right py-1 pr-1 pl-0.5 align-bottom leading-tight whitespace-pre-line ${cellBase}`}>
+              <span className="block w-full text-right">{t('tournStandingMatchesShort')}</span>
             </th>
-            <th className={`text-center py-1 w-[3.1rem] px-0.5 align-bottom leading-tight whitespace-pre-line ${cellBase}`}>
-              {t('tournStandingLegsShort')}
+            <th className={`text-right py-1 pr-1 pl-0.5 align-bottom leading-tight whitespace-pre-line ${cellBase}`}>
+              <span className="block w-full text-right">{t('tournStandingLegsShort')}</span>
             </th>
             <th
-              className={`text-center py-1 w-7 px-0.5 align-bottom ${cellBase}`}
+              className={`text-right py-1 pr-1 pl-0.5 align-bottom ${cellBase}`}
               title={t('tournStandingDiff') || 'Rozdíl'}
             >
               <span className="sr-only">{t('tournStandingDiff') || 'Rozdíl'}</span>
-              <span className="inline-flex flex-col items-center justify-center gap-0 text-slate-400" aria-hidden="true">
-                <Plus className="w-3 h-3 shrink-0 stroke-[2.5]" />
-                <Minus className="w-3 h-3 shrink-0 -mt-0.5 stroke-[2.5]" />
+              <span className="flex w-full justify-end" aria-hidden="true">
+                <span className="inline-flex flex-col items-end justify-center gap-0 text-slate-400">
+                  <Plus className="w-3 h-3 shrink-0 stroke-[2.5]" />
+                  <Minus className="w-3 h-3 shrink-0 -mt-0.5 stroke-[2.5]" />
+                </span>
               </span>
             </th>
             <th
-              className={`text-center py-1 w-9 px-0.5 align-bottom ${cellBase}`}
+              className={`text-right py-1 pr-1 pl-0.5 align-bottom ${cellBase}`}
               title={t('tournStandingAvg') || 'Průměr'}
             >
               <span className="sr-only">{t('tournStandingAvg') || 'Průměr'}</span>
-              <span className="text-[12px] sm:text-[13px] leading-none text-slate-400 font-semibold" aria-hidden="true">
+              <span className="text-[12px] sm:text-[13px] leading-none text-slate-400 font-semibold inline-block text-right w-full" aria-hidden="true">
                 Ø
               </span>
             </th>
@@ -123,31 +99,32 @@ function GroupStandingsTable({ standings, advanceCount, t }) {
                 ) : null}
               </td>
               <td className={noTd}>{idx + 1}</td>
-              <td className="min-w-0 px-0.5 py-1 text-slate-100 align-middle">
-                <div
-                  className={`flex flex-col justify-center gap-0 font-medium min-h-[2.25rem] ${standingNameTextClass(row.name)}`}
-                >
-                  {splitStandingNameParts(row.name).map((part, pi) => (
-                    <span key={pi} className="break-words [hyphens:auto]">
-                      {part}
-                    </span>
-                  ))}
-                </div>
+              <td className="min-w-0 pr-2 pl-1 py-1.5 text-slate-100 align-middle">
+                <span className="block font-semibold text-sm sm:text-base leading-snug whitespace-normal sm:whitespace-nowrap">
+                  {row.name}
+                </span>
               </td>
-              <td className={`py-1 px-0.5 text-center text-slate-200 font-bold align-middle ${cellMono}`}>
-                {row.points ?? row.matchesWon}
+              <td className={`py-1 pr-1 pl-0.5 text-right text-slate-200 font-bold align-middle ${cellMono}`}>
+                <span className="block w-full text-right">{row.points ?? row.matchesWon}</span>
               </td>
-              <td className={`py-1 px-0.5 text-center text-slate-300 align-middle ${cellMono}`}>
-                {row.matchesWon}:{row.matchesLost}
+              <td className={`py-1 pr-1 pl-0.5 text-right text-slate-300 align-middle ${cellMono}`}>
+                <span className="block w-full text-right">
+                  {row.matchesWon}:{row.matchesLost}
+                </span>
               </td>
-              <td className={`py-1 px-0.5 text-center text-slate-400 align-middle ${cellMono}`}>
-                {row.legsWon}:{row.legsLost}
+              <td className={`py-1 pr-1 pl-0.5 text-right text-slate-400 align-middle ${cellMono}`}>
+                <span className="block w-full text-right">
+                  {row.legsWon}:{row.legsLost}
+                </span>
               </td>
-              <td className={`py-1 px-0.5 text-center text-slate-300 align-middle ${cellMono}`}>
-                {row.legDifference > 0 ? '+' : ''}{row.legDifference}
+              <td className={`py-1 pr-1 pl-0.5 text-right text-slate-300 align-middle ${cellMono}`}>
+                <span className="block w-full text-right">
+                  {row.legDifference > 0 ? '+' : ''}
+                  {row.legDifference}
+                </span>
               </td>
-              <td className={`py-1 px-0.5 text-center text-slate-300 align-middle ${cellMono}`}>
-                {Number(row.average ?? 0).toFixed(2)}
+              <td className={`py-1 pr-1 pl-0.5 text-right text-slate-300 align-middle ${cellMono}`}>
+                <span className="block w-full text-right">{Number(row.average ?? 0).toFixed(2)}</span>
               </td>
             </tr>
             );
