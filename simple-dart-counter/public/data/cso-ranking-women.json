@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-09-06T04:03:00.000Z",
-    "effectiveDate": "2026-09-06",
-    "generatedAt": "2026-09-06 04:03",
-    "fetchedAt": "2026-09-06T09:16:47.677Z",
+    "updatedAt": "2026-09-07T10:03:00.000Z",
+    "effectiveDate": "2026-09-07",
+    "generatedAt": "2026-09-07 10:03",
+    "fetchedAt": "2026-09-07T10:06:34.967Z",
     "totalPlayers": 138
   },
   "players": [
@@ -285,15 +285,15 @@
     },
     {
       "rank": 50,
-      "name": "Eva Wagnerová",
-      "club": "Piráti Podbořany",
-      "regNumber": "6335"
-    },
-    {
-      "rank": 51,
       "name": "Martina Holubová",
       "club": "Kingsburry Darts",
       "regNumber": "5625"
+    },
+    {
+      "rank": 51,
+      "name": "Eva Wagnerová",
+      "club": "Piráti Podbořany",
+      "regNumber": "6335"
     },
     {
       "rank": 52,
