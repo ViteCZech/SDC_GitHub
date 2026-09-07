@@ -21,7 +21,7 @@ export const VENUE_CALL_MS = 8_000;
 export const VENUE_LISTEN_TIMEOUT_MS = 8_000;
 export const VENUE_GROUP_TABLE_MS = 30_000;
 export const VENUE_UPCOMING_REFRESH_MS = 10_000;
-export const VENUE_GROUPS_PER_PAGE = 4;
+export const VENUE_GROUPS_PER_PAGE = 8;
 export const VENUE_BOARDS_PER_PAGE = 6;
 export const VENUE_BOARDS_PER_PAGE_WITH_BRACKET = 4;
 

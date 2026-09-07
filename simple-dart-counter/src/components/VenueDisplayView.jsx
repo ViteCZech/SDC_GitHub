@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock3 } from 'lucide-react';
 import { translations } from '../translations';
 import { useSyncAdapter } from '../context/SyncAdapterContext';
 import {
@@ -7,10 +7,8 @@ import {
   VENUE_BOARDS_PER_PAGE_WITH_BRACKET,
   VENUE_CALL_MS,
   VENUE_CAROUSEL_MS,
-  VENUE_GROUP_TABLE_MS,
   VENUE_GROUPS_PER_PAGE,
   VENUE_LISTEN_TIMEOUT_MS,
-  VENUE_UPCOMING_REFRESH_MS,
   boardsOccupancySignature,
   buildVenueFinishedSummary,
   buildVenueDisplayModel,
@@ -148,7 +146,8 @@ function matchStatusPriority(match) {
 function resolveGroupsColumns(count) {
   if (count <= 1) return 1;
   if (count <= 4) return 2;
-  return 3;
+  if (count <= 6) return 3;
+  return 4;
 }
 
 function formatBoardBadge(boards, lang) {
@@ -158,11 +157,110 @@ function formatBoardBadge(boards, lang) {
   return `${tv(lang, 'boards') || 'Terče'} ${list.join(', ')}`;
 }
 
-function resolveGroupDisplayMode(modeMeta, nowMs) {
-  const phase = modeMeta?.phase || 'TABLE_INITIAL';
-  const phaseSince = Number(modeMeta?.phaseSince ?? nowMs);
-  const elapsedMs = Math.max(0, nowMs - phaseSince);
-  return { phase, elapsedMs };
+function resolveGroupsPerPage(groups) {
+  const list = Array.isArray(groups) ? groups : [];
+  if (list.length <= 2) return 2;
+  const maxPlayersInGroup = list.reduce((max, group) => {
+    const rows = Array.isArray(group?.rows) ? group.rows.length : 0;
+    return Math.max(max, rows);
+  }, 0);
+  if (maxPlayersInGroup >= 6) return 4;
+  if (maxPlayersInGroup >= 5) return 6;
+  return 8;
+}
+
+function normalizeForCompare(value) {
+  return String(value ?? '')
+    .normalize('NFKD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9/ ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function resolveThrowingSide(match) {
+  const thrower = normalizeForCompare(match?.throwingPlayerName);
+  if (!thrower) return null;
+  const p1 = normalizeForCompare(match?.player1Name);
+  const p2 = normalizeForCompare(match?.player2Name);
+  const hit = (player) => player && (player === thrower || player.includes(thrower) || thrower.includes(player));
+  if (hit(p1)) return 'p1';
+  if (hit(p2)) return 'p2';
+  return null;
+}
+
+function resolveMatchVisualMeta(match, lang) {
+  const status = String(match?.status ?? '').toLowerCase();
+  const tabletStatus = String(match?.tabletStatus ?? '').toLowerCase();
+  if (status === 'playing' || status === 'in_progress' || match?.playing) {
+    return {
+      key: 'live',
+      label: tv(lang, 'statusPlaying'),
+      cardClass: 'border-red-500/70 bg-red-500/10',
+      pillClass: 'border-red-400/70 bg-red-500/20 text-red-100',
+      pulseClass: 'bg-red-300',
+      icon: null,
+    };
+  }
+  if (status === 'completed' || status === 'walkover') {
+    return {
+      key: 'done',
+      label: tv(lang, 'statusDone'),
+      cardClass: 'border-emerald-500/55 bg-emerald-500/10',
+      pillClass: 'border-emerald-400/70 bg-emerald-500/20 text-emerald-100',
+      pulseClass: 'bg-emerald-300',
+      icon: CheckCircle2,
+    };
+  }
+  if (tabletStatus === 'timeout_warning') {
+    return {
+      key: 'warning',
+      label: tv(lang, 'presenceWarning'),
+      cardClass: 'border-amber-500/70 bg-amber-500/10',
+      pillClass: 'border-amber-400/70 bg-amber-500/20 text-amber-100',
+      pulseClass: 'bg-amber-300',
+      icon: AlertTriangle,
+    };
+  }
+  if (tabletStatus === 'checked_in') {
+    return {
+      key: 'ready',
+      label: tv(lang, 'statusReady'),
+      cardClass: 'border-cyan-500/60 bg-cyan-500/10',
+      pillClass: 'border-cyan-400/70 bg-cyan-500/20 text-cyan-100',
+      pulseClass: 'bg-cyan-300',
+      icon: null,
+    };
+  }
+  return {
+    key: 'pending',
+    label: tv(lang, 'statusPending'),
+    cardClass: 'border-slate-700 bg-slate-900/95',
+    pillClass: 'border-slate-600 bg-slate-800 text-slate-200',
+    pulseClass: 'bg-slate-400',
+    icon: Clock3,
+  };
+}
+
+function resolveMainScore(match, lang) {
+  if (match?.hasSets) {
+    return {
+      value: `${match.p1Sets ?? 0} : ${match.p2Sets ?? 0}`,
+      label: tv(lang, 'sets'),
+      detail: `${tv(lang, 'legs')} ${match.legsP1 ?? 0}:${match.legsP2 ?? 0}`,
+    };
+  }
+  return {
+    value: `${match?.legsP1 ?? 0} : ${match?.legsP2 ?? 0}`,
+    label: tv(lang, 'legs'),
+    detail: '',
+  };
+}
+
+function formatAvgValue(avg) {
+  const n = Number(avg);
+  return Number.isFinite(n) && n > 0 ? n.toFixed(2) : '—';
 }
 
 function buildVenueDevMockDoc() {
@@ -342,61 +440,106 @@ function PlayerName({ text, className = '', maxChars = 36 }) {
   );
 }
 
-function LiveMatchCard({ board, lang }) {
+function StatusPill({ match, lang }) {
+  const meta = resolveMatchVisualMeta(match, lang);
+  const Icon = meta.icon;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${meta.pillClass}`}>
+      {Icon ? (
+        <Icon className="h-3.5 w-3.5 shrink-0" />
+      ) : (
+        <span className={`h-2 w-2 rounded-full ${meta.pulseClass} ${meta.key === 'live' ? 'animate-pulse' : ''}`} />
+      )}
+      {meta.label}
+    </span>
+  );
+}
+
+function LiveMatchCard({ board, lang, formatLabel, compact = false }) {
   const match = board.current || board.next;
   if (!match) return null;
-  const isNow = !!board.current;
-  const scoreMain = `${match.legsP1} : ${match.legsP2}`;
+  const score = resolveMainScore(match, lang);
+  const throwingSide = resolveThrowingSide(match);
+  const statusMeta = resolveMatchVisualMeta(match, lang);
+
+  const playerCell = (side, name, avg, align) => {
+    const isThrowing = throwingSide === side;
+    return (
+      <div
+        className={`rounded-lg border px-2 py-2 ${compact ? 'min-h-[3.5rem]' : 'min-h-[5rem]'} flex flex-col justify-between ${
+          isThrowing ? 'border-emerald-400/70 bg-emerald-500/15' : 'border-slate-700 bg-slate-900/80'
+        }`}
+      >
+        <PlayerName
+          text={name}
+          maxChars={30}
+          className={`${compact ? 'text-xs xl:text-sm' : 'text-sm xl:text-xl'} font-black text-slate-50 leading-tight ${align}`}
+        />
+        <div className={`mt-1 flex items-center gap-2 ${align === 'text-right' ? 'justify-end' : ''}`}>
+          {isThrowing ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/70 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-100">
+              <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse" />
+              {tv(lang, 'throwingNow') || 'Háže'}
+            </span>
+          ) : null}
+          <span className={`${compact ? 'text-[10px]' : 'text-[11px]'} font-mono tabular-nums text-slate-300`}>
+            Ø {formatAvgValue(avg)}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <article
-      className={`h-full min-h-0 overflow-hidden rounded-xl border flex flex-col px-3 py-3 ${
-        match.playing
-          ? 'border-amber-400/70 bg-slate-900'
-          : isNow
-            ? 'border-emerald-500/50 bg-slate-900'
-            : 'border-slate-800 bg-slate-900/95'
-      }`}
-    >
-      <header className="flex items-center justify-between gap-3 shrink-0">
-        <p className="text-sm xl:text-lg font-black uppercase tracking-[0.18em] text-yellow-300">
-          {tv(lang, 'callBoard').replace('{n}', String(board.board))}
-        </p>
-        <p className="font-mono text-2xl xl:text-3xl font-black tabular-nums text-white leading-none">
-          {scoreMain}
-        </p>
+    <article className={`h-full min-h-0 overflow-hidden rounded-xl border flex flex-col px-3 py-3 ${statusMeta.cardClass}`}>
+      <header className="flex items-start justify-between gap-3 shrink-0">
+        <div className="min-w-0">
+          <p className="text-sm xl:text-base font-black uppercase tracking-[0.18em] text-yellow-300">
+            {tv(lang, 'callBoard').replace('{n}', String(board.board))}
+          </p>
+          <div className="mt-1">
+            <StatusPill match={match} lang={lang} />
+          </div>
+        </div>
+        <div className="text-right">
+          <p className={`font-mono ${compact ? 'text-xl xl:text-2xl' : 'text-2xl xl:text-4xl'} font-black tabular-nums text-white leading-none`}>
+            {score.value}
+          </p>
+          <p className="text-[10px] uppercase tracking-widest text-slate-300 font-black mt-1">{score.label}</p>
+          {formatLabel ? (
+            <p className="mt-1 inline-flex rounded-md border border-slate-600 bg-slate-900/90 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-200">
+              {formatLabel}
+            </p>
+          ) : null}
+        </div>
       </header>
 
-      <div className="flex-1 min-h-0 flex items-center justify-center py-2">
-        <div className="w-full grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 xl:gap-3">
-          <PlayerName
-            text={match.player1Name}
-            maxChars={28}
-            className="text-base xl:text-2xl font-black text-slate-50 leading-tight text-left"
-          />
-          <span className="text-xs xl:text-sm font-black uppercase tracking-widest text-slate-500 shrink-0">
+      <div className={`flex-1 min-h-0 flex items-center ${compact ? 'py-1.5' : 'py-2'}`}>
+        <div className="w-full grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-2 xl:gap-3">
+          {playerCell('p1', match.player1Name, match.p1Avg, 'text-left')}
+          <span className={`${compact ? 'text-[10px]' : 'text-xs xl:text-sm'} self-center font-black uppercase tracking-widest text-slate-500 shrink-0`}>
             {tv(lang, 'vs')}
           </span>
-          <PlayerName
-            text={match.player2Name}
-            maxChars={28}
-            className="text-base xl:text-2xl font-black text-slate-50 leading-tight text-right"
-          />
+          {playerCell('p2', match.player2Name, match.p2Avg, 'text-right')}
         </div>
       </div>
 
-      <footer className="shrink-0 pt-2 border-t border-slate-800">
-        <p className="text-xs xl:text-sm text-slate-400 truncate">
+      <footer className={`shrink-0 pt-2 border-t border-slate-700/70 ${compact ? 'space-y-0.5' : 'space-y-1'}`}>
+        {score.detail && !compact ? (
+          <p className="text-[11px] font-mono text-slate-300 tabular-nums">{score.detail}</p>
+        ) : null}
+        <p className="text-xs xl:text-sm text-slate-300 truncate">
           {tv(lang, 'referee')}:{' '}
-          <span className="font-semibold text-slate-300">{match.refereeName || '—'}</span>
+          <span className="font-semibold text-slate-100">{match.refereeName || '—'}</span>
         </p>
-        {match.throwingPlayerName ? (
+        {match.throwingPlayerName && !throwingSide ? (
           <p className="text-xs xl:text-sm text-emerald-300 truncate">
             {tv(lang, 'throwingNow') || 'Háže'}:{' '}
             <span className="font-semibold">{match.throwingPlayerName}</span>
           </p>
         ) : null}
-        {match.missingPresence.length > 0 ? (
-          <p className="mt-1 flex items-center gap-1 text-[11px] text-amber-200 truncate">
+        {Array.isArray(match.missingPresence) && match.missingPresence.length > 0 ? (
+          <p className="mt-1 flex items-center gap-1 text-[11px] text-amber-100 truncate">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
             {tv(lang, 'presenceWarning')}: {match.missingPresence.join(', ')}
           </p>
@@ -406,7 +549,16 @@ function LiveMatchCard({ board, lang }) {
   );
 }
 
-function BoardsGrid({ boards, lang }) {
+function BracketMatchCard({ match, lang, formatLabel }) {
+  const wrapped = {
+    board: match?.board ?? '—',
+    current: match,
+    next: null,
+  };
+  return <LiveMatchCard board={wrapped} lang={lang} formatLabel={formatLabel} compact />;
+}
+
+function BoardsGrid({ boards, lang, formatLabel }) {
   if (!boards.length) {
     return (
       <p className="m-auto text-2xl font-black text-slate-600 uppercase tracking-widest text-center px-4">
@@ -421,32 +573,32 @@ function BoardsGrid({ boards, lang }) {
       style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
     >
       {boards.map((board) => (
-        <LiveMatchCard key={board.board} board={board} lang={lang} />
+        <LiveMatchCard key={board.board} board={board} lang={lang} formatLabel={formatLabel} />
       ))}
     </div>
   );
 }
 
-function GroupStandingsPanel({ group, lang }) {
+function GroupStandingsPanel({ group, lang, dense }) {
   return (
     <table className="w-full table-fixed border-collapse text-left">
       <colgroup>
-        <col className="w-8" />
+        <col className="w-7" />
         <col />
-        <col className="w-[3.1rem]" />
-        <col className="w-[4rem]" />
-        <col className="w-[4rem]" />
-        <col className="w-[3.1rem]" />
-        <col className="w-[3.8rem]" />
+        <col className={dense ? 'w-[2.5rem]' : 'w-[3rem]'} />
+        <col className={dense ? 'w-[3.6rem]' : 'w-[4rem]'} />
+        <col className={dense ? 'w-[3.6rem]' : 'w-[4rem]'} />
+        {!dense ? <col className="w-[3rem]" /> : null}
+        <col className={dense ? 'w-[3rem]' : 'w-[3.6rem]'} />
       </colgroup>
-      <thead>
+      <thead className="sticky top-0 bg-slate-900/95">
         <tr className="border-b border-slate-700 text-slate-500 text-[10px] uppercase tracking-wider">
-          <th className="py-1 px-1 font-black w-8">#</th>
+          <th className="py-1 px-1 font-black w-7">#</th>
           <th className="py-1 px-2 font-black">{tv(lang, 'player')}</th>
           <th className="py-1 pr-2 pl-1 font-black text-right">{tv(lang, 'pts')}</th>
           <th className="py-1 pr-2 pl-1 font-black text-right">{tv(lang, 'matches')}</th>
           <th className="py-1 pr-2 pl-1 font-black text-right">{tv(lang, 'legs')}</th>
-          <th className="py-1 pr-2 pl-1 font-black text-right">{tv(lang, 'diff')}</th>
+          {!dense ? <th className="py-1 pr-2 pl-1 font-black text-right">{tv(lang, 'diff')}</th> : null}
           <th className="py-1 pr-2 pl-1 font-black text-right">{tv(lang, 'avg')}</th>
         </tr>
       </thead>
@@ -454,16 +606,16 @@ function GroupStandingsPanel({ group, lang }) {
         {group.rows.map((row, idx) => (
           <tr
             key={row.id ?? row.name}
-            className={`border-t border-slate-800 text-sm xl:text-base ${row.isAdvancing ? 'bg-emerald-500/15' : ''}`}
+            className={`border-t border-slate-800 ${dense ? 'text-[11px] xl:text-sm' : 'text-xs xl:text-sm'} ${row.isAdvancing ? 'bg-emerald-500/15' : ''}`}
           >
-            <td className="py-1 px-1 w-8 text-slate-400 font-mono tabular-nums">
+            <td className="py-1 px-1 w-7 text-slate-400 font-mono tabular-nums">
               <span className={`inline-flex items-center gap-1 ${row.isAdvancing ? 'text-emerald-300 font-black' : ''}`}>
                 {idx + 1}
                 {row.isAdvancing ? <span className="text-[10px] font-black">P</span> : null}
               </span>
             </td>
             <td className="py-1.5 px-2 min-w-0">
-              <span className="block text-slate-100 font-semibold text-sm xl:text-base whitespace-nowrap overflow-hidden text-ellipsis">
+              <span className={`block text-slate-100 font-semibold whitespace-nowrap overflow-hidden text-ellipsis ${dense ? 'text-[11px] xl:text-sm' : 'text-xs xl:text-sm'}`}>
                 {formatTvPlayerName(row.name, { maxChars: 34 })}
               </span>
             </td>
@@ -476,10 +628,12 @@ function GroupStandingsPanel({ group, lang }) {
             <td className="py-1 pr-2 pl-1 text-right text-slate-200 font-mono tabular-nums">
               {row.legsWon}:{row.legsLost}
             </td>
-            <td className="py-1 pr-2 pl-1 text-right text-slate-300 font-mono tabular-nums">
-              {row.legDifference > 0 ? '+' : ''}
-              {row.legDifference}
-            </td>
+            {!dense ? (
+              <td className="py-1 pr-2 pl-1 text-right text-slate-300 font-mono tabular-nums">
+                {row.legDifference > 0 ? '+' : ''}
+                {row.legDifference}
+              </td>
+            ) : null}
             <td className="py-1 pr-2 pl-1 text-right text-slate-300 font-mono tabular-nums">
               {Number(row.average ?? 0).toFixed(2)}
             </td>
@@ -490,106 +644,58 @@ function GroupStandingsPanel({ group, lang }) {
   );
 }
 
-function GroupUpcomingPanel({ match, lang, formatLabel }) {
-  if (!match) {
-    return (
-      <p className="m-auto text-center text-lg font-black text-slate-500 uppercase tracking-wider">
-        {tv(lang, 'preparing')}
-      </p>
-    );
-  }
+function GroupSummaryStrip({ group, lang, formatLabel }) {
+  const live = group?.liveMatch;
+  const upcoming = group?.upcomingMatch;
+  const focus = live || upcoming;
+  if (!focus) return null;
+  const score = resolveMainScore(focus, lang);
   return (
-    <div className="h-full min-h-0 rounded-xl border border-amber-500/50 bg-amber-500/10 px-4 py-3 flex flex-col">
-      <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-300">{tv(lang, 'upcomingMatch')}</p>
-      <p className="text-xs text-amber-100/80 mt-1">{formatLabel}</p>
-      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
-        <PlayerName text={match.player1Name} maxChars={28} className="text-base xl:text-xl font-black text-white" />
-        <span className="text-[10px] xl:text-xs font-black uppercase tracking-widest text-amber-200/80">{tv(lang, 'vs')}</span>
-        <PlayerName text={match.player2Name} maxChars={28} className="text-base xl:text-xl font-black text-white text-right" />
+    <div className="mt-2 rounded-lg border border-slate-700 bg-slate-900/85 px-2 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <StatusPill match={focus} lang={lang} />
+        <span className="text-[10px] font-mono tabular-nums text-slate-300">{score.value}</span>
       </div>
-      <div className="mt-auto pt-3 text-xs text-slate-300">
-        {tv(lang, 'referee')}: <span className="font-semibold">{match.refereeName || '—'}</span>
+      <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1">
+        <PlayerName text={focus.player1Name} maxChars={24} className="text-[11px] font-bold text-slate-100 leading-tight" />
+        <span className="text-[9px] font-black uppercase tracking-wider text-slate-500">{tv(lang, 'vs')}</span>
+        <PlayerName text={focus.player2Name} maxChars={24} className="text-[11px] font-bold text-slate-100 leading-tight text-right" />
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-slate-300">
+        <span className="truncate">{tv(lang, 'referee')}: {focus.refereeName || '—'}</span>
+        <span className="text-slate-400 shrink-0">{formatLabel}</span>
       </div>
     </div>
   );
 }
 
-function GroupLivePanel({ match, lang, formatLabel }) {
-  if (!match) return null;
-  return (
-    <div className="h-full min-h-0 rounded-xl border border-emerald-500/60 bg-emerald-500/10 px-4 py-3 flex flex-col">
-      <header className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300">{tv(lang, 'liveMatch')}</p>
-          <p className="text-xs text-emerald-100/80 mt-1">{formatLabel}</p>
-        </div>
-        <p className="font-mono text-2xl xl:text-3xl font-black text-white tabular-nums">
-          {match.legsP1} : {match.legsP2}
-        </p>
-      </header>
-      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
-        <PlayerName text={match.player1Name} maxChars={28} className="text-base xl:text-xl font-black text-white" />
-        <span className="text-[10px] xl:text-xs font-black uppercase tracking-widest text-emerald-200/80">{tv(lang, 'vs')}</span>
-        <PlayerName text={match.player2Name} maxChars={28} className="text-base xl:text-xl font-black text-white text-right" />
-      </div>
-      <div className="mt-auto pt-3 space-y-1 text-xs text-slate-300">
-        <p>
-          {tv(lang, 'referee')}: <span className="font-semibold">{match.refereeName || '—'}</span>
-        </p>
-        <p>
-          {tv(lang, 'throwingNow') || 'Háže'}: <span className="font-semibold">{match.throwingPlayerName || '—'}</span>
-        </p>
-      </div>
-    </div>
+function GroupSlotCard({ group, lang, groupBestOfLabel, dense = false }) {
+  const focus = group.liveMatch || group.upcomingMatch;
+  const statusMeta = resolveMatchVisualMeta(
+    focus || (group.allDone ? { status: 'completed' } : { status: 'pending' }),
+    lang
   );
-}
-
-function GroupSlotCard({ group, modeMeta, lang, groupBestOfLabel, nowMs }) {
-  const { phase, elapsedMs } = resolveGroupDisplayMode(modeMeta, nowMs);
-  const tableVisible = phase === 'TABLE_INITIAL' || phase === 'POST_MATCH' || phase === 'FINISHED';
-  const statusLabel =
-    phase === 'LIVE'
-      ? tv(lang, 'statusPlaying')
-      : phase === 'UPCOMING'
-        ? tv(lang, 'statusPending')
-        : phase === 'POST_MATCH'
-          ? (tv(lang, 'postMatchTable') || 'Aktualizovaná tabulka')
-        : phase === 'FINISHED'
-          ? tv(lang, 'groupFinished')
-          : tv(lang, 'groupTableWindow');
-  const timerLeftSeconds =
-    tableVisible && phase !== 'FINISHED'
-      ? Math.max(0, Math.ceil((VENUE_GROUP_TABLE_MS - elapsedMs) / 1000))
-      : 0;
 
   return (
-    <section className="h-full min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/95 px-3 py-3 flex flex-col">
+    <section className={`h-full min-h-0 overflow-hidden rounded-2xl border bg-slate-900/95 px-3 py-3 flex flex-col ${statusMeta.cardClass}`}>
       <header className="shrink-0 mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="text-sm xl:text-base font-black uppercase tracking-wider text-emerald-400 truncate">
+          <h2 className="text-sm xl:text-base font-black uppercase tracking-wider text-emerald-300 truncate">
             {group.name}
           </h2>
-          <p className="mt-1 inline-flex items-center rounded-md border border-emerald-500/40 bg-emerald-500/20 px-2 py-0.5 text-[10px] xl:text-xs font-black uppercase tracking-wide text-emerald-200">
+          <p className="mt-1 inline-flex items-center rounded-md border border-slate-600 bg-slate-800/90 px-2 py-0.5 text-[10px] xl:text-xs font-black uppercase tracking-wide text-slate-200">
             {formatBoardBadge(group.boards, lang)}
           </p>
         </div>
-        <div className="text-right shrink-0">
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{statusLabel}</p>
-          {timerLeftSeconds > 0 ? (
-            <p className="text-[10px] font-mono text-amber-300">{timerLeftSeconds}s</p>
-          ) : null}
+        <div className="shrink-0">
+          <StatusPill match={focus || { status: group.allDone ? 'completed' : 'pending' }} lang={lang} />
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-hidden">
-        {phase === 'LIVE' ? (
-          <GroupLivePanel match={group.liveMatch} lang={lang} formatLabel={groupBestOfLabel} />
-        ) : phase === 'UPCOMING' ? (
-          <GroupUpcomingPanel match={group.upcomingMatch} lang={lang} formatLabel={groupBestOfLabel} />
-        ) : (
-          <GroupStandingsPanel group={group} lang={lang} />
-        )}
+      <div className="min-h-0 flex-1 overflow-auto pr-1">
+        <GroupStandingsPanel group={group} lang={lang} dense={dense} />
       </div>
+      <GroupSummaryStrip group={group} lang={lang} formatLabel={groupBestOfLabel} />
     </section>
   );
 }
@@ -597,8 +703,7 @@ function GroupSlotCard({ group, modeMeta, lang, groupBestOfLabel, nowMs }) {
 function GroupsSlide({
   groups,
   lang,
-  groupModes,
-  nowMs,
+  groupsPerScreen,
   groupBestOfLabel,
   blockIndex = 0,
   blockCount = 1,
@@ -612,6 +717,7 @@ function GroupsSlide({
   }
 
   const groupColumns = resolveGroupsColumns(groups.length);
+  const dense = groupsPerScreen > 4;
   return (
     <div className="w-full h-full min-h-0 overflow-hidden flex flex-col">
       {blockCount > 1 ? (
@@ -629,10 +735,9 @@ function GroupsSlide({
           <GroupSlotCard
             key={group.groupId}
             group={group}
-            modeMeta={groupModes[group.groupId]}
             lang={lang}
-            nowMs={nowMs}
             groupBestOfLabel={groupBestOfLabel}
+            dense={dense}
           />
         ))}
       </div>
@@ -728,8 +833,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
   const [screenIdx, setScreenIdx] = useState(0);
   const [callQueue, setCallQueue] = useState([]);
   const [clockMs, setClockMs] = useState(() => Date.now());
-  const [upcomingTick, setUpcomingTick] = useState(0);
-  const [groupModes, setGroupModes] = useState({});
+  const [slideStartedAtMs, setSlideStartedAtMs] = useState(() => Date.now());
   const prevBoardsRef = useRef(null);
   const skipFirstCallRef = useRef(true);
 
@@ -843,13 +947,6 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
     return () => window.clearInterval(id);
   }, []);
 
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setUpcomingTick((v) => v + 1);
-    }, VENUE_UPCOMING_REFRESH_MS);
-    return () => window.clearInterval(id);
-  }, []);
-
   const model = useMemo(() => (doc ? buildVenueDisplayModel(doc) : null), [doc]);
 
   const playerNameById = useMemo(() => {
@@ -949,6 +1046,15 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
     () => buildVenueGroupSnapshots(model?.unpacked),
     [model]
   );
+  const enrichedGroupSnapshots = useMemo(
+    () =>
+      (groupSnapshots || []).map((group) => ({
+        ...group,
+        liveMatch: hydrateDisplayMatch(group.liveMatch),
+        upcomingMatch: hydrateDisplayMatch(group.upcomingMatch),
+      })),
+    [groupSnapshots, hydrateDisplayMatch]
+  );
   const groupBestOfLabel = useMemo(() => {
     const winLegs = Number(
       model?.unpacked?.tournamentData?.groupsLegs ??
@@ -967,85 +1073,21 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
     [model]
   );
 
-  useEffect(() => {
-    if (!Array.isArray(groupSnapshots) || groupSnapshots.length === 0) {
-      setGroupModes({});
-      return;
-    }
-    const now = Date.now();
-    setGroupModes((prev) => {
-      const next = {};
-      let changed = false;
-      for (const group of groupSnapshots) {
-        const prevEntry = prev[group.groupId];
-        let phase = prevEntry?.phase || 'TABLE_INITIAL';
-        let phaseSince = Number(prevEntry?.phaseSince ?? now);
-        const liveMatchId = String(group.liveMatch?.matchId ?? '');
-        const latestCompletedMatchId = String(group.latestCompletedMatchId ?? '');
-        const hadLive = prevEntry?.phase === 'LIVE';
-        const postMatchWindowDone = now - phaseSince >= VENUE_GROUP_TABLE_MS;
-        const initialWindowDone = now - phaseSince >= VENUE_GROUP_TABLE_MS;
-
-        if (tournamentFinished) {
-          phase = 'FINISHED';
-          if (prevEntry?.phase !== 'FINISHED') phaseSince = now;
-        } else if (liveMatchId) {
-          phase = 'LIVE';
-          if (prevEntry?.phase !== 'LIVE' || prevEntry?.liveMatchId !== liveMatchId) phaseSince = now;
-        } else if (
-          hadLive &&
-          latestCompletedMatchId &&
-          latestCompletedMatchId !== String(prevEntry?.latestCompletedMatchId ?? '')
-        ) {
-          phase = 'POST_MATCH';
-          phaseSince = now;
-        } else if (group.allDone) {
-          if (phase === 'POST_MATCH' && !postMatchWindowDone) {
-            phase = 'POST_MATCH';
-          } else if (phase === 'POST_MATCH' && postMatchWindowDone) {
-            phase = 'FINISHED';
-            phaseSince = now;
-          } else if (phase !== 'FINISHED') {
-            phase = 'FINISHED';
-            phaseSince = now;
-          }
-        } else if (phase === 'TABLE_INITIAL' && initialWindowDone) {
-          phase = 'UPCOMING';
-          phaseSince = now;
-        } else if (phase === 'POST_MATCH' && postMatchWindowDone) {
-          phase = 'UPCOMING';
-          phaseSince = now;
-        } else if (phase === 'UPCOMING' && !group.upcomingMatch) {
-          phase = 'TABLE_INITIAL';
-          phaseSince = now;
-        }
-
-        const entry = {
-          phase,
-          phaseSince,
-          liveMatchId,
-          latestCompletedMatchId,
-          upcomingTickSeen: phase === 'UPCOMING' ? upcomingTick : (prevEntry?.upcomingTickSeen ?? upcomingTick),
-        };
-        next[group.groupId] = entry;
-        if (!prevEntry || JSON.stringify(prevEntry) !== JSON.stringify(entry)) changed = true;
-      }
-      if (!changed && Object.keys(prev).length === Object.keys(next).length) return prev;
-      return next;
-    });
-  }, [groupSnapshots, tournamentFinished, upcomingTick, clockMs]);
-  const groupsPageSize = VENUE_GROUPS_PER_PAGE;
+  const groupsPageSize = useMemo(
+    () => Math.max(1, Math.min(VENUE_GROUPS_PER_PAGE, resolveGroupsPerPage(enrichedGroupSnapshots))),
+    [enrichedGroupSnapshots]
+  );
   const groupSlides = useMemo(() => {
     const pageSize = groupsPageSize;
     if (!pageSize) return [];
-    const blocks = chunkVenuePages(groupSnapshots, pageSize);
+    const blocks = chunkVenuePages(enrichedGroupSnapshots, pageSize);
     return blocks.map((groups, index) => ({
       type: 'groups',
       groups,
       blockIndex: index,
       blockCount: blocks.length,
     }));
-  }, [groupSnapshots, groupsPageSize]);
+  }, [enrichedGroupSnapshots, groupsPageSize]);
 
   const bracketOverview = useMemo(() => {
     const unpacked = model?.unpacked;
@@ -1095,6 +1137,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
         const legs = resolveLegs(raw);
         const sets = resolveSets(raw);
         const averages = resolveAverages(raw);
+        const throwingPlayerName = resolveThrowingPlayerName(raw, names, playerNameById);
         return {
           ...raw,
           ...names,
@@ -1106,9 +1149,14 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
           setScores: sets.setScores,
           p1Avg: averages.p1,
           p2Avg: averages.p2,
+          throwingPlayerName,
           status: String(raw?.status ?? 'pending'),
           tabletStatus: String(raw?.tabletStatus ?? ''),
           missingPresence: resolveMissingPresence(raw, names, lang),
+          playing:
+            raw?.status === 'playing' ||
+            raw?.status === 'in_progress' ||
+            raw?.tabletStatus === 'checked_in',
         };
       })
       .sort((a, b) => matchStatusPriority(a) - matchStatusPriority(b))
@@ -1202,11 +1250,17 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
     return out;
   }, [groupSlides, liveMatches, bracketOverview.hasBracket, tournamentFinished]);
 
-  const activeSlide = slides[screenIdx % slides.length];
+  const slideCount = slides.length || 1;
+  const slidePosition = ((screenIdx % slideCount) + slideCount) % slideCount;
+  const activeSlide = slides[slidePosition];
 
   useEffect(() => {
     setScreenIdx(0);
   }, [slides.length, model?.signature]);
+
+  useEffect(() => {
+    setSlideStartedAtMs(Date.now());
+  }, [slidePosition, slides.length, model?.signature]);
 
   useEffect(() => {
     if (activeCall || slides.length <= 1) return undefined;
@@ -1229,6 +1283,12 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
   const showEmpty = invalidPin || doc === null;
   const showLoading = !invalidPin && doc === undefined;
   const viewState = showEmpty ? 'empty' : showLoading ? 'loading' : 'ready';
+  const rotationRunning = !activeCall && slides.length > 1 && !showLoading && !showEmpty;
+  const rotationElapsedMs = Math.max(0, clockMs - slideStartedAtMs);
+  const rotationProgress = rotationRunning ? Math.min(1, rotationElapsedMs / VENUE_CAROUSEL_MS) : 0;
+  const rotationSecondsLeft = rotationRunning
+    ? Math.max(0, Math.ceil((VENUE_CAROUSEL_MS - rotationElapsedMs) / 1000))
+    : 0;
 
   return (
     <div
@@ -1241,9 +1301,25 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
           <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">{tv(lang, 'title')}</p>
           <h1 className="text-2xl xl:text-4xl font-black truncate">{statusLine}</h1>
         </div>
-        {pin ? (
-          <p className="font-mono text-xl xl:text-3xl font-black tracking-[0.3em] text-yellow-400">{pin}</p>
-        ) : null}
+        <div className="flex flex-col items-end gap-2">
+          {pin ? (
+            <p className="font-mono text-xl xl:text-3xl font-black tracking-[0.3em] text-yellow-400">{pin}</p>
+          ) : null}
+          {rotationRunning ? (
+            <div className="w-52 xl:w-64">
+              <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                <div
+                  className="h-full bg-emerald-400 transition-[width] duration-700 ease-linear"
+                  style={{ width: `${Math.round(rotationProgress * 100)}%` }}
+                />
+              </div>
+              <div className="mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-400">
+                <span>{slidePosition + 1}/{slides.length}</span>
+                <span>{rotationSecondsLeft}s</span>
+              </div>
+            </div>
+          ) : null}
+        </div>
       </header>
 
       <main
@@ -1276,8 +1352,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
               <GroupsSlide
                 groups={activeSlide.groups}
                 lang={lang}
-                groupModes={groupModes}
-                nowMs={clockMs}
+                groupsPerScreen={groupsPageSize}
                 groupBestOfLabel={groupBestOfLabel}
                 blockIndex={activeSlide.blockIndex}
                 blockCount={activeSlide.blockCount}
@@ -1315,7 +1390,11 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
                 ) : null}
               </div>
               <div className="min-h-0 flex-1 overflow-hidden">
-                <BoardsGrid boards={activeSlide.boards || []} lang={lang} />
+                <BoardsGrid
+                  boards={activeSlide.boards || []}
+                  lang={lang}
+                  formatLabel={bracketOverview.hasBracket ? bracketOverview.formatLabel : groupBestOfLabel}
+                />
               </div>
             </section>
 
@@ -1343,38 +1422,14 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
                       {tv(lang, 'noActiveBracketMatches')}
                     </p>
                   ) : (
-                    bracketOverview.matches.slice(0, 6).map((match, idx) => {
-                      const scoreMain = `${match.legsP1} : ${match.legsP2}`;
-                      return (
-                        <article
-                          key={match.id ?? match.matchId ?? `${idx}-${match.player1Name}-${match.player2Name}`}
-                          className="min-h-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/90 px-3 py-2 flex flex-col"
-                        >
-                          <header className="flex items-center justify-between gap-2 shrink-0">
-                            <p className="text-xs font-black uppercase tracking-wider text-yellow-300">
-                              {tv(lang, 'callBoard').replace('{n}', String(match.board ?? '—'))}
-                            </p>
-                            <p className="font-mono text-lg font-black tabular-nums text-white">{scoreMain}</p>
-                          </header>
-                          <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 min-h-0">
-                            <PlayerName
-                              text={match.player1Name}
-                              className="text-sm xl:text-base font-black text-slate-100 leading-tight"
-                            />
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                              {tv(lang, 'vs')}
-                            </span>
-                            <PlayerName
-                              text={match.player2Name}
-                              className="text-sm xl:text-base font-black text-slate-100 leading-tight text-right"
-                            />
-                          </div>
-                          <p className="mt-1 text-[11px] text-slate-400 truncate">
-                            {tv(lang, 'referee')}: {match.refereeName || '—'}
-                          </p>
-                        </article>
-                      );
-                    })
+                    bracketOverview.matches.slice(0, 4).map((match, idx) => (
+                      <BracketMatchCard
+                        key={match.id ?? match.matchId ?? `${idx}-${match.player1Name}-${match.player2Name}`}
+                        match={match}
+                        lang={lang}
+                        formatLabel={bracketOverview.formatLabel}
+                      />
+                    ))
                   )}
                 </div>
               </section>

@@ -232,13 +232,10 @@ describe('venueDisplay snapshot', () => {
     expect(ctx.createGain).toHaveBeenCalled();
   });
 
-  it('chunkuje stránky po 4 skupinách a 6 terčích', () => {
-    expect(VENUE_GROUPS_PER_PAGE).toBe(4);
+  it('chunkuje stránky po 8 skupinách a 6 terčích', () => {
+    expect(VENUE_GROUPS_PER_PAGE).toBe(8);
     expect(VENUE_BOARDS_PER_PAGE).toBe(6);
-    expect(chunkVenuePages(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], 4)).toEqual([
-      ['A', 'B', 'C', 'D'],
-      ['E', 'F', 'G', 'H'],
-    ]);
+    expect(chunkVenuePages(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], 8)).toEqual([['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']]);
     expect(chunkVenuePages([1, 2, 3, 4, 5, 6, 7], 6)).toEqual([
       [1, 2, 3, 4, 5, 6],
       [7],
