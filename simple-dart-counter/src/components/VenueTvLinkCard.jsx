@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
-import { Check, Cloud, Copy, ExternalLink, Monitor } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Check, Cloud, Copy, Monitor } from 'lucide-react';
 import { translations } from '../translations';
 import { buildVenueDisplayUrl } from '../utils/venueDisplay';
+import {
+  isVenueTvWindowOpen,
+  toggleVenueTvWindow,
+} from '../utils/venueTvWindow';
 
 /**
  * Odkaz na /tv/:pin + stav, proč je (ne)aktivní.
@@ -19,9 +23,13 @@ export default function VenueTvLinkCard({
 }) {
   const t = (k) => translations[lang]?.[k] ?? translations.cs?.[k] ?? k;
   const [copied, setCopied] = useState(false);
+  const [tvOpen, setTvOpen] = useState(() => isVenueTvWindowOpen());
   const pinOk = /^\d{4}$/.test(String(pin ?? '').trim());
   const url = pinOk ? buildVenueDisplayUrl(pin, origin, lang) : '';
   const active = !!pinOk && (!!lanEnabled || !!(isLoggedIn && cloudEnabled));
+  const toggleLabel = tvOpen
+    ? (t('venueTvCloseTab') || 'Zavřít TV')
+    : (t('venueTvOpenTab') || 'Otevřít TV');
 
   const hint = lanEnabled
     ? t('venueTvHintLan')
@@ -43,6 +51,25 @@ export default function VenueTvLinkCard({
       /* clipboard může být zakázaný */
     }
   };
+
+  const toggleTv = () => {
+    if (!url) return;
+    const result = toggleVenueTvWindow(url);
+    setTvOpen(result.isOpen);
+  };
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setTvOpen(isVenueTvWindowOpen());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const toggleBtnClasses = useMemo(() => (
+    tvOpen
+      ? 'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide bg-emerald-600 text-white hover:bg-emerald-500'
+      : 'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide bg-amber-600 text-slate-950 hover:bg-amber-500'
+  ), [tvOpen]);
 
   return (
     <div
@@ -68,15 +95,14 @@ export default function VenueTvLinkCard({
             {url}
           </p>
           <div className="flex flex-wrap gap-2">
-            <a
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide bg-amber-600 text-slate-950 hover:bg-amber-500"
+            <button
+              type="button"
+              onClick={toggleTv}
+              className={toggleBtnClasses}
             >
-              <ExternalLink className="w-3.5 h-3.5" />
-              {t('venueTvOpenTab')}
-            </a>
+              <Monitor className="w-3.5 h-3.5" />
+              {toggleLabel}
+            </button>
             <button
               type="button"
               onClick={() => void copyUrl()}
@@ -86,6 +112,11 @@ export default function VenueTvLinkCard({
               {copied ? t('venueTvCopied') : t('venueTvCopy')}
             </button>
           </div>
+          {tvOpen ? (
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+              {t('venueTvActive') || 'TV obrazovka je aktivní'}
+            </p>
+          ) : null}
         </div>
       ) : null}
 

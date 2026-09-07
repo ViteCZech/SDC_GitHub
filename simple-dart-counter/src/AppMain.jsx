@@ -71,6 +71,7 @@ import { saveUiResume } from './utils/uiResumeStorage';
 import { parsePreregRouteFromUrl, isPublicTournamentCatalogPath } from './utils/preregAdmin';
 import { parseTabletRouteFromUrl, ensureBoardAuthTokens } from './utils/tabletBoardQr';
 import { buildVenueDisplayUrl } from './utils/venueDisplayRoutes';
+import { isVenueTvWindowOpen, toggleVenueTvWindow } from './utils/venueTvWindow';
 import { parsePublicResultsRouteFromUrl } from './utils/publicResultsRoutes';
 import {
   buildHelpReturnState,
@@ -1752,6 +1753,25 @@ function AppMain({ lang, setLang }) {
     !!(tournamentData?.cloudEnabled || syncAdapter?.mode === 'lan') &&
     /^\d{4}$/.test(String(activePin ?? '').trim()) &&
     ['tournament_groups', 'tournament_bracket', 'tournament_stats'].includes(appState);
+  const venueTvUrl = showTabletQrNav
+    ? buildVenueDisplayUrl(activePin, lanPublicOrigin, lang)
+    : '';
+  const [isVenueTvOpen, setIsVenueTvOpen] = useState(() => isVenueTvWindowOpen());
+  const handleToggleVenueTv = React.useCallback(() => {
+    if (!venueTvUrl) return;
+    const result = toggleVenueTvWindow(venueTvUrl);
+    setIsVenueTvOpen(result.isOpen);
+    if (result.action === 'blocked') {
+      showNotification(t('venueTvOpenBlocked') || 'Nepodařilo se otevřít TV okno. Povolte pop-up okna.', 'error');
+    }
+  }, [venueTvUrl, showNotification, t]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setIsVenueTvOpen(isVenueTvWindowOpen());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const showTournamentPinBar =
     !!pinBarDisplayCode &&
@@ -4815,16 +4835,20 @@ function AppMain({ lang, setLang }) {
           <>
             {showTabletQrNav ? (
               <>
-                <a
-                  href={buildVenueDisplayUrl(activePin, lanPublicOrigin, lang)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="p-2 rounded-lg bg-slate-800 border border-slate-700 text-amber-400 hover:text-amber-300 hover:bg-slate-700 transition-colors"
-                  title={t('venueTvOpen') || 'TV obrazovka haly'}
-                  aria-label={t('venueTvOpen') || 'TV obrazovka haly'}
+                <button
+                  type="button"
+                  onClick={handleToggleVenueTv}
+                  className={`p-2 rounded-lg border transition-colors ${
+                    isVenueTvOpen
+                      ? 'bg-emerald-700 border-emerald-500 text-white hover:bg-emerald-600'
+                      : 'bg-slate-800 border-slate-700 text-amber-400 hover:text-amber-300 hover:bg-slate-700'
+                  }`}
+                  title={isVenueTvOpen ? (t('venueTvCloseTab') || 'Zavřít TV') : (t('venueTvOpen') || 'TV obrazovka haly')}
+                  aria-label={isVenueTvOpen ? (t('venueTvCloseTab') || 'Zavřít TV') : (t('venueTvOpen') || 'TV obrazovka haly')}
+                  aria-pressed={isVenueTvOpen}
                 >
                   <Monitor className="w-4 h-4" />
-                </a>
+                </button>
                 <TabletBoardQrPanel
                   lang={lang}
                   pin={activePin}

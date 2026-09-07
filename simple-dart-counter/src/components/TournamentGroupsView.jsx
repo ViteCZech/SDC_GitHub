@@ -100,7 +100,7 @@ function GroupStandingsTable({ standings, advanceCount, t }) {
               </td>
               <td className={noTd}>{idx + 1}</td>
               <td className="min-w-0 pr-2 pl-1 py-1.5 text-slate-100 align-middle">
-                <span className="block font-semibold text-sm sm:text-base leading-snug whitespace-normal sm:whitespace-nowrap">
+                <span className="block font-semibold text-sm sm:text-base leading-snug whitespace-nowrap overflow-hidden text-ellipsis">
                   {row.name}
                 </span>
               </td>

@@ -19,6 +19,8 @@ export const VENUE_CAROUSEL_MS = 10_000;
 export const VENUE_CALL_MS = 8_000;
 /** Když Firestore v CI / offline neodpoví, nenechat TV viset na načítání. */
 export const VENUE_LISTEN_TIMEOUT_MS = 8_000;
+export const VENUE_GROUP_TABLE_MS = 30_000;
+export const VENUE_UPCOMING_REFRESH_MS = 10_000;
 export const VENUE_GROUPS_PER_PAGE = 4;
 export const VENUE_BOARDS_PER_PAGE = 6;
 export const VENUE_BOARDS_PER_PAGE_WITH_BRACKET = 4;
@@ -88,6 +90,66 @@ function isLive(m) {
 
 function isPending(m) {
   return !!(m && !m.isBye && !isTerminal(m) && m.status === 'pending' && m.tabletStatus !== 'checked_in');
+}
+
+function isPlayableMatch(m) {
+  if (!m || m.isBye || !m.player1Id || !m.player2Id) return false;
+  if (String(m.player1Id) === 'BYE' || String(m.player2Id) === 'BYE') return false;
+  return true;
+}
+
+function normalizeTvName(raw) {
+  return String(raw ?? '')
+    .replace(/\s*\/\s*/g, ' / ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function surnameFromName(name) {
+  const parts = String(name ?? '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  return parts[parts.length - 1];
+}
+
+function initialSurnameName(name) {
+  const parts = String(name ?? '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0];
+  const first = parts[0];
+  const surname = parts[parts.length - 1];
+  return `${first.charAt(0).toUpperCase()}. ${surname}`;
+}
+
+function truncateTvName(name, maxChars) {
+  if (!name) return '';
+  if (name.length <= maxChars) return name;
+  if (maxChars <= 3) return name.slice(0, maxChars);
+  return `${name.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`;
+}
+
+/**
+ * Adaptivní formát TV jména (single i dvojice): full -> iniciála+příjmení -> příjmení.
+ * @param {string} raw
+ * @param {{ maxChars?: number }} [opts]
+ */
+export function formatTvPlayerName(raw, opts = {}) {
+  const maxChars = Math.max(8, Math.floor(Number(opts.maxChars) || 30));
+  const normalized = normalizeTvName(raw);
+  if (!normalized) return '—';
+
+  const teamParts = normalized.includes('/')
+    ? normalized.split('/').map((p) => p.trim()).filter(Boolean)
+    : [normalized];
+  const full = teamParts.join(' / ');
+  if (full.length <= maxChars) return full;
+
+  const initials = teamParts.map((p) => initialSurnameName(p) || p).join(' / ');
+  if (initials.length <= maxChars) return initials;
+
+  const surnames = teamParts.map((p) => surnameFromName(p) || p).join(' / ');
+  if (surnames.length <= maxChars) return surnames;
+
+  return truncateTvName(surnames || initials || full, maxChars);
 }
 
 function findPlayerSlot(id, tournamentData, groups) {
@@ -252,6 +314,158 @@ export function buildVenueBoardSnapshots(unpacked) {
     });
   }
   return boards;
+}
+
+function resolveGroupAdvancersCount(tournamentData, playersCount) {
+  const raw =
+    tournamentData?.promotersCount ??
+    tournamentData?.promotersPerGroup ??
+    tournamentData?.advancePerGroup ??
+    2;
+  if (raw === 'all') return Math.max(0, Number(playersCount) || 0);
+  const value = Math.max(0, Math.floor(Number(raw) || 0));
+  return Math.min(value, Math.max(0, Number(playersCount) || 0));
+}
+
+/**
+ * Připraví skupinové snapshoty pro TV stavový automat.
+ * @param {object|null|undefined} unpacked
+ */
+export function buildVenueGroupSnapshots(unpacked) {
+  if (!unpacked?.tournamentData || !Array.isArray(unpacked?.groups)) return [];
+  const groups = unpacked.groups;
+  const groupMatches = Array.isArray(unpacked.groupMatches) ? unpacked.groupMatches : [];
+  const bracketMatches = Array.isArray(unpacked.tournamentBracket)
+    ? unpacked.tournamentBracket.flatMap((r) => (Array.isArray(r?.matches) ? r.matches : []))
+    : [];
+  const bracketStarted = bracketMatches.some((m) => {
+    if (!isPlayableMatch(m)) return false;
+    return m.status === 'playing' || m.status === 'in_progress' || isTerminal(m);
+  });
+
+  return groups
+    .map((group, index) => {
+      const groupIdRaw = group?.groupId ?? group?.id ?? group?.name ?? `group-${index + 1}`;
+      const groupId = String(groupIdRaw);
+      const groupPlayers = Array.isArray(group?.players) ? group.players : [];
+      const advanceCount = resolveGroupAdvancersCount(unpacked.tournamentData, groupPlayers.length);
+      const orderedMatches = groupMatches
+        .filter((m) => String(m?.groupId ?? m?.group ?? '') === groupId)
+        .filter((m) => isPlayableMatch(m))
+        .sort((a, b) => {
+          const rd = (a?.round ?? 0) - (b?.round ?? 0);
+          if (rd !== 0) return rd;
+          return String(matchIdOf(a)).localeCompare(String(matchIdOf(b)));
+        });
+      const rows = calculateGroupStandings(groupPlayers, orderedMatches).map((row, idx) => ({
+        ...row,
+        isAdvancing: advanceCount > 0 && idx < Math.min(advanceCount, groupPlayers.length),
+      }));
+      const liveMatch = orderedMatches.find((m) => isLive(m)) || null;
+      const upcomingMatch = orderedMatches.find((m) => isPending(m)) || null;
+      const completedMatches = orderedMatches.filter((m) => isTerminal(m));
+      const latestCompleted = completedMatches[completedMatches.length - 1] || null;
+      const totalMatches = orderedMatches.length;
+      const allDone = totalMatches > 0 && completedMatches.length === totalMatches;
+
+      return {
+        groupId,
+        name: String(group?.name || `Skupina ${groupId}`),
+        boards: Array.isArray(group?.boards) ? group.boards : [],
+        rows,
+        advanceCount,
+        matches: orderedMatches,
+        liveMatch: summarizeMatch(liveMatch, unpacked.tournamentData, groups, groupPlayers),
+        upcomingMatch: summarizeMatch(upcomingMatch, unpacked.tournamentData, groups, groupPlayers),
+        latestCompletedMatchId: matchIdOf(latestCompleted),
+        allDone,
+        bracketStarted,
+      };
+    })
+    .filter((group) => group.rows.length > 0 || group.matches.length > 0);
+}
+
+/**
+ * Turnaj je na TV kompletně dokončený (včetně finále KO nebo all-matches fallbacku).
+ * @param {object|null|undefined} unpacked
+ * @returns {boolean}
+ */
+export function isVenueTournamentFinished(unpacked) {
+  if (!unpacked?.tournamentData) return false;
+  if (String(unpacked.status || '').toLowerCase() === 'finished') return true;
+  const gm = Array.isArray(unpacked.groupMatches) ? unpacked.groupMatches : [];
+  const bracketMatches = Array.isArray(unpacked.tournamentBracket)
+    ? unpacked.tournamentBracket.flatMap((r) => (Array.isArray(r?.matches) ? r.matches : []))
+    : [];
+  const playableBracket = bracketMatches.filter((m) => isPlayableMatch(m));
+  const playableGroups = gm.filter((m) => isPlayableMatch(m));
+  const allMatches = [...playableGroups, ...playableBracket];
+  if (allMatches.length === 0) return false;
+  return allMatches.every((m) => isTerminal(m));
+}
+
+function resolveBestMatchAverage(allMatches, unpacked) {
+  let best = null;
+  for (const m of allMatches) {
+    const p1 = Number(m?.p1Avg ?? m?.result?.p1Avg ?? 0);
+    const p2 = Number(m?.p2Avg ?? m?.result?.p2Avg ?? 0);
+    const p1Name = resolveMatchSideName(m, true, unpacked.tournamentData, unpacked.groups);
+    const p2Name = resolveMatchSideName(m, false, unpacked.tournamentData, unpacked.groups);
+    if (Number.isFinite(p1) && p1 > 0 && (!best || p1 > best.value)) {
+      best = { value: Number(p1.toFixed(2)), name: p1Name || '—' };
+    }
+    if (Number.isFinite(p2) && p2 > 0 && (!best || p2 > best.value)) {
+      best = { value: Number(p2.toFixed(2)), name: p2Name || '—' };
+    }
+  }
+  return best;
+}
+
+/**
+ * Finální TV souhrn po dokončení turnaje.
+ * @param {object|null|undefined} unpacked
+ */
+export function buildVenueFinishedSummary(unpacked) {
+  if (!unpacked?.tournamentData) return null;
+  const bracketMatches = Array.isArray(unpacked.tournamentBracket)
+    ? unpacked.tournamentBracket.flatMap((r) => (Array.isArray(r?.matches) ? r.matches : []))
+    : [];
+  const groupMatches = Array.isArray(unpacked.groupMatches) ? unpacked.groupMatches : [];
+  const allMatches = [...groupMatches, ...bracketMatches].filter((m) => isPlayableMatch(m) && isTerminal(m));
+
+  let stats = null;
+  try {
+    stats = calculateTournamentStats(unpacked.groups || [], unpacked.tournamentBracket || [], groupMatches);
+  } catch {
+    stats = null;
+  }
+
+  const playerStats = Array.isArray(stats?.playerStats) ? stats.playerStats : [];
+  const podium = {
+    first: playerStats.filter((p) => Number(p?.placement) === 1).map((p) => p.name).filter(Boolean),
+    second: playerStats.filter((p) => Number(p?.placement) === 2).map((p) => p.name).filter(Boolean),
+    third: playerStats.filter((p) => Number(p?.placement) === 3).map((p) => p.name).filter(Boolean),
+  };
+  if (podium.first.length === 0 && playerStats[0]?.name) podium.first = [playerStats[0].name];
+  if (podium.second.length === 0 && playerStats[1]?.name) podium.second = [playerStats[1].name];
+  if (podium.third.length === 0 && playerStats[2]?.name) podium.third = [playerStats[2].name];
+
+  const total180s = playerStats.reduce((sum, row) => sum + (Number(row?.total180s) || 0), 0);
+  const total140plus = playerStats.reduce((sum, row) => sum + (Number(row?.total140plus) || 0), 0);
+  const highestCheckoutRow = (Array.isArray(stats?.topCheckouts) ? stats.topCheckouts : [])
+    .find((x) => Number(x?.checkout) > 0);
+  const highestCheckout = highestCheckoutRow
+    ? { value: Number(highestCheckoutRow.checkout), name: String(highestCheckoutRow.name || '—') }
+    : null;
+  const highestMatchAverage = resolveBestMatchAverage(allMatches, unpacked);
+
+  return {
+    podium,
+    highestCheckout,
+    highestMatchAverage,
+    total180s,
+    total140plus,
+  };
 }
 
 /**

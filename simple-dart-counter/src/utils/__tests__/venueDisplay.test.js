@@ -4,8 +4,12 @@ import {
   buildVenueBoardSnapshots,
   buildVenueCarouselSlides,
   buildVenueDisplayUrl,
+  buildVenueFinishedSummary,
+  buildVenueGroupSnapshots,
   chunkVenuePages,
   detectVenueMatchCalls,
+  formatTvPlayerName,
+  isVenueTournamentFinished,
   parseVenueDisplayRouteFromUrl,
   playVenueGong,
   resolveVenueBoardColumns,
@@ -248,5 +252,83 @@ describe('venueDisplay snapshot', () => {
     expect(resolveVenueBoardColumns(6)).toBe(3);
     expect(venueBestOfFromWinLegs(3)).toBe(5);
     expect(venueBestOfFromWinLegs(2)).toBe(3);
+  });
+
+  it('formatTvPlayerName adaptivně zkrátí jméno dvojice', () => {
+    const full = formatTvPlayerName('Jan Novák / Petr Svoboda', { maxChars: 40 });
+    const compact = formatTvPlayerName('Jan Novák / Petr Svoboda', { maxChars: 18 });
+    expect(full).toBe('Jan Novák / Petr Svoboda');
+    expect(compact).not.toBe(full);
+    expect(compact.length).toBeLessThanOrEqual(18);
+  });
+
+  it('buildVenueGroupSnapshots vrací live/upcoming a zvýraznění postupu', () => {
+    const snapshots = buildVenueGroupSnapshots(unpackCloudTournament(cloudDoc()));
+    expect(snapshots).toHaveLength(1);
+    expect(snapshots[0].liveMatch?.matchId).toBe('m1');
+    expect(snapshots[0].upcomingMatch?.matchId).toBe('m2');
+    expect(snapshots[0].rows.filter((r) => r.isAdvancing)).toHaveLength(2);
+  });
+
+  it('isVenueTournamentFinished + buildVenueFinishedSummary pro dokončený pavouk', () => {
+    const completed = unpackCloudTournament(cloudDoc({
+      groupMatches: [
+        {
+          matchId: 'm1',
+          groupId: 'A',
+          round: 1,
+          status: 'completed',
+          player1Id: 'p1',
+          player2Id: 'p2',
+          player1Name: 'Jalůvka',
+          player2Name: 'Armlich',
+          winnerId: 'p1',
+          p1Avg: 71.1,
+          p2Avg: 64.4,
+          result: {
+            p1Legs: 2,
+            p2Legs: 1,
+            p1High: { '180': 1, '140+': 2 },
+            p2High: { '180': 0, '140+': 1 },
+            p1HighCheckout: 116,
+            p2HighCheckout: 98,
+          },
+        },
+      ],
+      tournamentBracket: [
+        {
+          round: 1,
+          matches: [
+            {
+              id: 'b1',
+              status: 'completed',
+              player1Id: 'p1',
+              player2Id: 'p3',
+              player1Name: 'Jalůvka',
+              player2Name: 'Novák',
+              winnerId: 'p3',
+              p1Avg: 67.2,
+              p2Avg: 74.8,
+              result: {
+                p1Legs: 1,
+                p2Legs: 2,
+                p1High: { '180': 0, '140+': 1 },
+                p2High: { '180': 2, '140+': 2 },
+                p1HighCheckout: 72,
+                p2HighCheckout: 132,
+              },
+            },
+          ],
+        },
+      ],
+      status: 'finished',
+    }));
+
+    expect(isVenueTournamentFinished(completed)).toBe(true);
+    const summary = buildVenueFinishedSummary(completed);
+    expect(summary.podium.first.length).toBeGreaterThan(0);
+    expect(summary.highestCheckout?.value).toBe(132);
+    expect(summary.total180s).toBe(3);
+    expect(summary.total140plus).toBe(6);
   });
 });

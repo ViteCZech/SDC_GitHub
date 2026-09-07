@@ -85,7 +85,13 @@ function injectLanMeta(html, port) {
  * @param {{ port?: number, host?: string, dataDir?: string, uiProxyTarget?: string|null, distDir?: string }} [opts]
  */
 export function startLanRelay(opts = {}) {
-  const port = Number(opts.port) || LAN_DEFAULT_PORT;
+  const rawPort = opts.port;
+  const parsedPort = Number(rawPort);
+  const hasExplicitPort = rawPort !== undefined && rawPort !== null && String(rawPort).trim() !== '';
+  const port =
+    hasExplicitPort && Number.isFinite(parsedPort)
+      ? Math.max(0, Math.floor(parsedPort))
+      : LAN_DEFAULT_PORT;
   const host = opts.host || '0.0.0.0';
   const store = createLanStore(opts.dataDir || defaultLanDataDir());
   const distDir = opts.distDir || path.join(APP_ROOT, 'dist');

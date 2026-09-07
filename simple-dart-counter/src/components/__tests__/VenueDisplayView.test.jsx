@@ -61,6 +61,63 @@ function liveDoc() {
   };
 }
 
+function finishedDoc() {
+  return {
+    ...liveDoc(),
+    status: 'finished',
+    groupMatches: [
+      {
+        matchId: 'm1',
+        groupId: 'A',
+        board: 1,
+        status: 'completed',
+        player1Id: 'p1',
+        player2Id: 'p2',
+        player1Name: 'Jalůvka',
+        player2Name: 'Armlich',
+        winnerId: 'p1',
+        p1Avg: 71.5,
+        p2Avg: 63.2,
+        result: {
+          p1Legs: 2,
+          p2Legs: 1,
+          p1High: { '180': 1, '140+': 2 },
+          p2High: { '180': 0, '140+': 1 },
+          p1HighCheckout: 112,
+          p2HighCheckout: 76,
+        },
+      },
+    ],
+    tournamentBracket: [
+      {
+        round: 1,
+        matches: [
+          {
+            id: 'b1',
+            board: 1,
+            status: 'completed',
+            player1Id: 'p1',
+            player2Id: 'p3',
+            player1Name: 'Jalůvka',
+            player2Name: 'Novák',
+            winnerId: 'p3',
+            p1Avg: 68.4,
+            p2Avg: 73.9,
+            result: {
+              p1Legs: 1,
+              p2Legs: 2,
+              p1High: { '180': 0, '140+': 1 },
+              p2High: { '180': 2, '140+': 1 },
+              p1HighCheckout: 88,
+              p2HighCheckout: 130,
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
+
 describe('VenueDisplayView', () => {
   beforeEach(() => {
     listenMock.mockReset();
@@ -211,5 +268,16 @@ describe('VenueDisplayView', () => {
     expect(document.documentElement.classList.contains('light')).toBe(false);
     unmount();
     expect(document.documentElement.classList.contains('light')).toBe(true);
+  });
+
+  it('po dokončení turnaje zobrazí celkové výsledky bez carouselu', () => {
+    listenMock.mockImplementation((_pin, cb) => {
+      cb(finishedDoc());
+      return () => {};
+    });
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
+    expect(document.body.textContent).toContain('Celkové výsledky');
+    expect(document.body.textContent).toContain('Nejvyšší zavření');
+    expect(document.body.textContent).toContain('Celkem 180');
   });
 });
