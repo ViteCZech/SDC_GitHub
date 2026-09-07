@@ -143,11 +143,29 @@ function matchStatusPriority(match) {
   return 3;
 }
 
-function resolveGroupsColumns(count) {
-  if (count <= 1) return 1;
-  if (count <= 4) return 2;
-  if (count <= 6) return 3;
-  return 4;
+const GROUP_DENSITY_RULES = [
+  { maxRows: 4, perScreen: 8, columns: 4 },
+  { maxRows: 5, perScreen: 6, columns: 3 },
+  { maxRows: Number.POSITIVE_INFINITY, perScreen: 4, columns: 2 },
+];
+
+function resolveGroupDensity(groups) {
+  const list = Array.isArray(groups) ? groups : [];
+  if (list.length <= 2) {
+    return {
+      perScreen: 2,
+      columns: Math.max(1, list.length),
+    };
+  }
+  const maxPlayersInGroup = list.reduce((max, group) => {
+    const rows = Array.isArray(group?.rows) ? group.rows.length : 0;
+    return Math.max(max, rows);
+  }, 0);
+  const matched = GROUP_DENSITY_RULES.find((rule) => maxPlayersInGroup <= rule.maxRows) || GROUP_DENSITY_RULES[GROUP_DENSITY_RULES.length - 1];
+  return {
+    perScreen: matched.perScreen,
+    columns: matched.columns,
+  };
 }
 
 function formatBoardBadge(boards, lang) {
@@ -155,18 +173,6 @@ function formatBoardBadge(boards, lang) {
   if (list.length === 0) return tv(lang, 'boardUnassigned') || 'Terč čeká';
   if (list.length === 1) return `${tv(lang, 'board') || 'Terč'} ${list[0]}`;
   return `${tv(lang, 'boards') || 'Terče'} ${list.join(', ')}`;
-}
-
-function resolveGroupsPerPage(groups) {
-  const list = Array.isArray(groups) ? groups : [];
-  if (list.length <= 2) return 2;
-  const maxPlayersInGroup = list.reduce((max, group) => {
-    const rows = Array.isArray(group?.rows) ? group.rows.length : 0;
-    return Math.max(max, rows);
-  }, 0);
-  if (maxPlayersInGroup >= 6) return 4;
-  if (maxPlayersInGroup >= 5) return 6;
-  return 8;
 }
 
 function normalizeForCompare(value) {
@@ -704,6 +710,7 @@ function GroupsSlide({
   groups,
   lang,
   groupsPerScreen,
+  groupsColumns,
   groupBestOfLabel,
   blockIndex = 0,
   blockCount = 1,
@@ -716,7 +723,7 @@ function GroupsSlide({
     );
   }
 
-  const groupColumns = resolveGroupsColumns(groups.length);
+  const groupColumns = Math.max(1, Math.min(groupsColumns || 1, groups.length));
   const dense = groupsPerScreen > 4;
   return (
     <div className="w-full h-full min-h-0 overflow-hidden flex flex-col">
@@ -1073,9 +1080,17 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
     [model]
   );
 
-  const groupsPageSize = useMemo(
-    () => Math.max(1, Math.min(VENUE_GROUPS_PER_PAGE, resolveGroupsPerPage(enrichedGroupSnapshots))),
+  const groupDensity = useMemo(
+    () => resolveGroupDensity(enrichedGroupSnapshots),
     [enrichedGroupSnapshots]
+  );
+  const groupsPageSize = useMemo(
+    () => Math.max(1, Math.min(VENUE_GROUPS_PER_PAGE, groupDensity.perScreen)),
+    [groupDensity]
+  );
+  const groupsColumns = useMemo(
+    () => Math.max(1, Math.min(4, groupDensity.columns)),
+    [groupDensity]
   );
   const groupSlides = useMemo(() => {
     const pageSize = groupsPageSize;
@@ -1353,6 +1368,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
                 groups={activeSlide.groups}
                 lang={lang}
                 groupsPerScreen={groupsPageSize}
+                groupsColumns={groupsColumns}
                 groupBestOfLabel={groupBestOfLabel}
                 blockIndex={activeSlide.blockIndex}
                 blockCount={activeSlide.blockCount}

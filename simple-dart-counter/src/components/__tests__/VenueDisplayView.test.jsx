@@ -118,6 +118,33 @@ function finishedDoc() {
   };
 }
 
+function groupsDoc(groupCount, playersPerGroup) {
+  const groups = Array.from({ length: groupCount }, (_v, idx) => {
+    const letter = String.fromCharCode(65 + idx);
+    const players = Array.from({ length: playersPerGroup }, (_p, pIdx) => ({
+      id: `${letter}${pIdx + 1}`,
+      name: `${letter} Hráč ${pIdx + 1}`,
+    }));
+    return {
+      groupId: letter,
+      name: `Skupina ${letter}`,
+      boards: [((idx % 4) + 1)],
+      players,
+    };
+  });
+  return {
+    status: 'running',
+    tournamentData: {
+      name: 'Density test',
+      numBoards: 4,
+      groups,
+    },
+    groups,
+    groupMatches: [],
+    tournamentBracket: [],
+  };
+}
+
 describe('VenueDisplayView', () => {
   beforeEach(() => {
     listenMock.mockReset();
@@ -279,5 +306,32 @@ describe('VenueDisplayView', () => {
     expect(document.body.textContent).toContain('Celkové výsledky');
     expect(document.body.textContent).toContain('Nejvyšší zavření');
     expect(document.body.textContent).toContain('Celkem 180');
+  });
+
+  it('pro skupiny do 4 hráčů zobrazuje 8 tabulek na obrazovku', () => {
+    listenMock.mockImplementation((_pin, cb) => {
+      cb(groupsDoc(8, 4));
+      return () => {};
+    });
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
+    expect(document.body.textContent).toContain('8 tabulek / obrazovka');
+  });
+
+  it('pro skupiny po 5 hráčích zobrazuje 6 tabulek na obrazovku', () => {
+    listenMock.mockImplementation((_pin, cb) => {
+      cb(groupsDoc(6, 5));
+      return () => {};
+    });
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
+    expect(document.body.textContent).toContain('6 tabulek / obrazovka');
+  });
+
+  it('pro skupiny od 6 hráčů zobrazuje 4 tabulky na obrazovku', () => {
+    listenMock.mockImplementation((_pin, cb) => {
+      cb(groupsDoc(4, 6));
+      return () => {};
+    });
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
+    expect(document.body.textContent).toContain('4 tabulek / obrazovka');
   });
 });
