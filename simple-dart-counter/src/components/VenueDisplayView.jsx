@@ -112,6 +112,42 @@ function resolveThrowingPlayerName(raw, names, playerNameById) {
   return '';
 }
 
+function resolveThrowingPlayerId(raw) {
+  const throwerId = raw?.currentThrowerId ?? raw?.throwerId ?? raw?.activeThrowerId;
+  if (throwerId == null) return '';
+  const id = String(throwerId).trim();
+  return id || '';
+}
+
+function resolveRemainingLegPoints(raw, fallback) {
+  const pickScore = (...values) => {
+    for (const value of values) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed) && parsed >= 0) return Math.max(0, Math.round(parsed));
+    }
+    return null;
+  };
+  const p1 = pickScore(
+    raw?.p1Score,
+    raw?.liveScore?.p1,
+    raw?.currentScore?.p1,
+    raw?.scoreRemaining?.p1,
+    raw?.pointsRemaining?.p1,
+    raw?.remaining?.p1,
+    fallback?.remainingP1
+  );
+  const p2 = pickScore(
+    raw?.p2Score,
+    raw?.liveScore?.p2,
+    raw?.currentScore?.p2,
+    raw?.scoreRemaining?.p2,
+    raw?.pointsRemaining?.p2,
+    raw?.remaining?.p2,
+    fallback?.remainingP2
+  );
+  return { p1, p2 };
+}
+
 function resolveMissingPresence(raw, names, lang) {
   if (!raw || raw.tabletStatus !== 'timeout_warning') return [];
   const present = raw.tabletCheckInPresent;
@@ -141,6 +177,34 @@ function matchStatusPriority(match) {
   if (status === 'pending') return 2;
   if (status === 'completed' || status === 'walkover') return 4;
   return 3;
+}
+
+function resolveMatchStatus(match) {
+  return String(match?.status ?? '').toLowerCase();
+}
+
+function isLiveMatch(match) {
+  const status = resolveMatchStatus(match);
+  return status === 'playing' || status === 'in_progress';
+}
+
+function isDoneMatch(match) {
+  const status = resolveMatchStatus(match);
+  return status === 'completed' || status === 'walkover' || match?.walkover === true;
+}
+
+function hasMeaningfulScore(match) {
+  if (!match) return false;
+  if (Number(match?.hasSets ? match?.p1Sets : match?.legsP1) > 0) return true;
+  if (Number(match?.hasSets ? match?.p2Sets : match?.legsP2) > 0) return true;
+  if (Number(match?.legsP1) > 0 || Number(match?.legsP2) > 0) return true;
+  return false;
+}
+
+function shouldShowScoreBlock(match) {
+  if (!match) return false;
+  if (isLiveMatch(match) || isDoneMatch(match)) return true;
+  return hasMeaningfulScore(match);
 }
 
 const GROUP_DENSITY_RULES = [
@@ -186,6 +250,11 @@ function normalizeForCompare(value) {
 }
 
 function resolveThrowingSide(match) {
+  const throwerId = String(match?.throwingPlayerId ?? '').trim();
+  if (throwerId) {
+    if (String(match?.player1Id ?? '').trim() === throwerId) return 'p1';
+    if (String(match?.player2Id ?? '').trim() === throwerId) return 'p2';
+  }
   const thrower = normalizeForCompare(match?.throwingPlayerName);
   if (!thrower) return null;
   const p1 = normalizeForCompare(match?.player1Name);
@@ -199,7 +268,7 @@ function resolveThrowingSide(match) {
 function resolveMatchVisualMeta(match, lang) {
   const status = String(match?.status ?? '').toLowerCase();
   const tabletStatus = String(match?.tabletStatus ?? '').toLowerCase();
-  if (status === 'playing' || status === 'in_progress' || match?.playing) {
+  if (status === 'playing' || status === 'in_progress') {
     return {
       key: 'live',
       label: tv(lang, 'statusPlaying'),
@@ -266,7 +335,16 @@ function resolveMainScore(match, lang) {
 
 function formatAvgValue(avg) {
   const n = Number(avg);
-  return Number.isFinite(n) && n > 0 ? n.toFixed(2) : '—';
+  return Number.isFinite(n) && n > 0 ? n.toFixed(2) : '';
+}
+
+function formatRemainingLegPoints(match, lang) {
+  const p1 = toFiniteNumber(match?.remainingP1);
+  const p2 = toFiniteNumber(match?.remainingP2);
+  if (p1 == null && p2 == null) return '';
+  const left = p1 == null ? '—' : String(Math.max(0, Math.round(p1)));
+  const right = p2 == null ? '—' : String(Math.max(0, Math.round(p2)));
+  return `${tv(lang, 'legPointsLeft')}: ${left} : ${right}`;
 }
 
 function buildVenueDevMockDoc() {
@@ -300,6 +378,10 @@ function buildVenueDevMockDoc() {
       result: { p1Legs: 1, p2Legs: 1, p1Avg: 66.14, p2Avg: 62.01 },
       p1Avg: 66.14,
       p2Avg: 62.01,
+      p1Score: 241,
+      p2Score: 301,
+      currentThrowerId: 'gA-p1',
+      currentPlayer: 'p1',
     },
     {
       matchId: 'm-a-2',
@@ -322,6 +404,10 @@ function buildVenueDevMockDoc() {
       result: { p1Legs: 2, p2Legs: 0, p1Avg: 71.44, p2Avg: 57.3 },
       p1Avg: 71.44,
       p2Avg: 57.3,
+      p1Score: 120,
+      p2Score: 340,
+      currentThrowerId: 'gB-p2',
+      currentPlayer: 'p2',
     },
     {
       matchId: 'm-c-1',
@@ -427,21 +513,14 @@ function shouldUseVenueDevMock(pin, invalidPin) {
   }
 }
 
-function PlayerName({ text, className = '', maxChars = 36 }) {
-  const shown = formatTvPlayerName(text, { maxChars });
+function PlayerName({ text, className = '' }) {
+  const normalized = String(text ?? '').trim() || '—';
   return (
     <span
       className={className}
-      title={String(text ?? shown)}
-      style={{
-        display: '-webkit-box',
-        WebkitLineClamp: 2,
-        WebkitBoxOrient: 'vertical',
-        overflow: 'hidden',
-        wordBreak: 'break-word',
-      }}
+      title={normalized}
     >
-      {shown}
+      {normalized}
     </span>
   );
 }
@@ -467,30 +546,35 @@ function LiveMatchCard({ board, lang, formatLabel, compact = false }) {
   const score = resolveMainScore(match, lang);
   const throwingSide = resolveThrowingSide(match);
   const statusMeta = resolveMatchVisualMeta(match, lang);
+  const showScoreBlock = shouldShowScoreBlock(match);
+  const liveOrDone = isLiveMatch(match) || isDoneMatch(match);
+  const remainingLegPoints = showScoreBlock ? formatRemainingLegPoints(match, lang) : '';
 
   const playerCell = (side, name, avg, align) => {
-    const isThrowing = throwingSide === side;
+    const isThrowing = isLiveMatch(match) && throwingSide === side;
+    const avgValue = liveOrDone ? formatAvgValue(avg) : '';
     return (
       <div
-        className={`rounded-lg border px-2 py-2 ${compact ? 'min-h-[3.5rem]' : 'min-h-[5rem]'} flex flex-col justify-between ${
+        className={`rounded-lg border px-2 py-2 ${compact ? 'min-h-[3.8rem]' : 'min-h-[5rem]'} flex flex-col justify-between ${
           isThrowing ? 'border-emerald-400/70 bg-emerald-500/15' : 'border-slate-700 bg-slate-900/80'
         }`}
       >
         <PlayerName
           text={name}
-          maxChars={30}
-          className={`${compact ? 'text-xs xl:text-sm' : 'text-sm xl:text-xl'} font-black text-slate-50 leading-tight ${align}`}
+          className={`${compact ? 'text-xs xl:text-sm' : 'text-sm xl:text-xl'} block min-w-0 truncate whitespace-nowrap font-black text-slate-50 leading-tight ${align}`}
         />
-        <div className={`mt-1 flex items-center gap-2 ${align === 'text-right' ? 'justify-end' : ''}`}>
+        <div className={`mt-1 min-h-[1rem] flex items-center gap-2 ${align === 'text-right' ? 'justify-end' : ''}`}>
           {isThrowing ? (
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/70 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-100">
               <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse" />
               {tv(lang, 'throwingNow') || 'Háže'}
             </span>
           ) : null}
-          <span className={`${compact ? 'text-[10px]' : 'text-[11px]'} font-mono tabular-nums text-slate-300`}>
-            Ø {formatAvgValue(avg)}
-          </span>
+          {avgValue ? (
+            <span className={`${compact ? 'text-[10px]' : 'text-[11px]'} font-mono tabular-nums text-slate-300`}>
+              Ø {avgValue}
+            </span>
+          ) : null}
         </div>
       </div>
     );
@@ -499,25 +583,30 @@ function LiveMatchCard({ board, lang, formatLabel, compact = false }) {
   return (
     <article className={`h-full min-h-0 overflow-hidden rounded-xl border flex flex-col px-3 py-3 ${statusMeta.cardClass}`}>
       <header className="flex items-start justify-between gap-3 shrink-0">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-sm xl:text-base font-black uppercase tracking-[0.18em] text-yellow-300">
             {tv(lang, 'callBoard').replace('{n}', String(board.board))}
           </p>
-          <div className="mt-1">
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <StatusPill match={match} lang={lang} />
+            {formatLabel ? (
+              <p className="inline-flex rounded-md border border-slate-600 bg-slate-900/90 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-200">
+                {formatLabel}
+              </p>
+            ) : null}
           </div>
         </div>
-        <div className="text-right">
-          <p className={`font-mono ${compact ? 'text-xl xl:text-2xl' : 'text-2xl xl:text-4xl'} font-black tabular-nums text-white leading-none`}>
-            {score.value}
-          </p>
-          <p className="text-[10px] uppercase tracking-widest text-slate-300 font-black mt-1">{score.label}</p>
-          {formatLabel ? (
-            <p className="mt-1 inline-flex rounded-md border border-slate-600 bg-slate-900/90 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-200">
-              {formatLabel}
+        {showScoreBlock ? (
+          <div className="text-right shrink-0">
+            <p className={`font-mono ${compact ? 'text-xl xl:text-2xl' : 'text-2xl xl:text-4xl'} font-black tabular-nums text-white leading-none`}>
+              {score.value}
             </p>
-          ) : null}
-        </div>
+            <p className="text-[10px] uppercase tracking-widest text-slate-300 font-black mt-1">{score.label}</p>
+            {remainingLegPoints ? (
+              <p className="mt-1 text-[10px] font-mono tabular-nums text-slate-400">{remainingLegPoints}</p>
+            ) : null}
+          </div>
+        ) : null}
       </header>
 
       <div className={`flex-1 min-h-0 flex items-center ${compact ? 'py-1.5' : 'py-2'}`}>
@@ -531,14 +620,14 @@ function LiveMatchCard({ board, lang, formatLabel, compact = false }) {
       </div>
 
       <footer className={`shrink-0 pt-2 border-t border-slate-700/70 ${compact ? 'space-y-0.5' : 'space-y-1'}`}>
-        {score.detail && !compact ? (
+        {showScoreBlock && score.detail && !compact ? (
           <p className="text-[11px] font-mono text-slate-300 tabular-nums">{score.detail}</p>
         ) : null}
         <p className="text-xs xl:text-sm text-slate-300 truncate">
           {tv(lang, 'referee')}:{' '}
           <span className="font-semibold text-slate-100">{match.refereeName || '—'}</span>
         </p>
-        {match.throwingPlayerName && !throwingSide ? (
+        {isLiveMatch(match) && match.throwingPlayerName && !throwingSide ? (
           <p className="text-xs xl:text-sm text-emerald-300 truncate">
             {tv(lang, 'throwingNow') || 'Háže'}:{' '}
             <span className="font-semibold">{match.throwingPlayerName}</span>
@@ -655,17 +744,17 @@ function GroupSummaryStrip({ group, lang, formatLabel }) {
   const upcoming = group?.upcomingMatch;
   const focus = live || upcoming;
   if (!focus) return null;
-  const score = resolveMainScore(focus, lang);
+  const score = shouldShowScoreBlock(focus) ? resolveMainScore(focus, lang) : null;
   return (
     <div className="mt-2 rounded-lg border border-slate-700 bg-slate-900/85 px-2 py-2">
       <div className="flex items-center justify-between gap-2">
         <StatusPill match={focus} lang={lang} />
-        <span className="text-[10px] font-mono tabular-nums text-slate-300">{score.value}</span>
+        {score ? <span className="text-[10px] font-mono tabular-nums text-slate-300">{score.value}</span> : null}
       </div>
       <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1">
-        <PlayerName text={focus.player1Name} maxChars={24} className="text-[11px] font-bold text-slate-100 leading-tight" />
+        <PlayerName text={focus.player1Name} className="block min-w-0 truncate whitespace-nowrap text-[11px] font-bold text-slate-100 leading-tight" />
         <span className="text-[9px] font-black uppercase tracking-wider text-slate-500">{tv(lang, 'vs')}</span>
-        <PlayerName text={focus.player2Name} maxChars={24} className="text-[11px] font-bold text-slate-100 leading-tight text-right" />
+        <PlayerName text={focus.player2Name} className="block min-w-0 truncate whitespace-nowrap text-[11px] font-bold text-slate-100 leading-tight text-right" />
       </div>
       <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-slate-300">
         <span className="truncate">{tv(lang, 'referee')}: {focus.refereeName || '—'}</span>
@@ -675,12 +764,23 @@ function GroupSummaryStrip({ group, lang, formatLabel }) {
   );
 }
 
+function groupHasPlayedMatches(group) {
+  const matches = Array.isArray(group?.matches) ? group.matches : [];
+  return matches.some((m) => {
+    if (!m) return false;
+    if (isLiveMatch(m) || isDoneMatch(m)) return true;
+    const legs = resolveLegs(m);
+    return Number(legs.p1) > 0 || Number(legs.p2) > 0;
+  });
+}
+
 function GroupSlotCard({ group, lang, groupBestOfLabel, dense = false }) {
   const focus = group.liveMatch || group.upcomingMatch;
   const statusMeta = resolveMatchVisualMeta(
     focus || (group.allDone ? { status: 'completed' } : { status: 'pending' }),
     lang
   );
+  const showStandingsTable = groupHasPlayedMatches(group);
 
   return (
     <section className={`h-full min-h-0 overflow-hidden rounded-2xl border bg-slate-900/95 px-3 py-3 flex flex-col ${statusMeta.cardClass}`}>
@@ -699,11 +799,38 @@ function GroupSlotCard({ group, lang, groupBestOfLabel, dense = false }) {
       </header>
 
       <div className="min-h-0 flex-1 overflow-auto pr-1">
-        <GroupStandingsPanel group={group} lang={lang} dense={dense} />
+        {showStandingsTable ? (
+          <GroupStandingsPanel group={group} lang={lang} dense={dense} />
+        ) : (
+          <div className="h-full min-h-0 rounded-lg border border-dashed border-slate-700 bg-slate-900/70 px-3 py-4 text-sm text-slate-400">
+            {tv(lang, 'groupTableAfterFirstResult')}
+          </div>
+        )}
       </div>
       <GroupSummaryStrip group={group} lang={lang} formatLabel={groupBestOfLabel} />
     </section>
   );
+}
+
+function resolveSlideDurationMs(slide) {
+  if (!slide) return VENUE_CAROUSEL_MS;
+  if (slide.type === 'finished') return 20_000;
+  if (slide.type === 'live') {
+    const boards = Array.isArray(slide.boards) ? slide.boards : [];
+    const matches = boards.map((board) => board?.current || board?.next).filter(Boolean);
+    if (matches.length === 0) return 9_000;
+    if (matches.some((match) => isLiveMatch(match))) return 13_000;
+    return 10_000;
+  }
+  if (slide.type === 'groups') {
+    const groups = Array.isArray(slide.groups) ? slide.groups : [];
+    if (groups.length === 0) return 10_000;
+    const hasLiveGroup = groups.some((group) => isLiveMatch(group?.liveMatch));
+    if (hasLiveGroup) return 18_000;
+    const hasPlayedGroup = groups.some((group) => groupHasPlayedMatches(group));
+    return hasPlayedGroup ? 16_000 : 12_000;
+  }
+  return VENUE_CAROUSEL_MS;
 }
 
 function GroupsSlide({
@@ -1000,9 +1127,13 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
     const sets = resolveSets(raw);
     const averages = resolveAverages(raw);
     const throwingPlayerName = resolveThrowingPlayerName(raw, names, playerNameById);
+    const throwingPlayerId = resolveThrowingPlayerId(raw);
+    const remainingLegPoints = resolveRemainingLegPoints(raw, summary);
     return {
       ...summary,
       ...names,
+      player1Id: summary.player1Id ?? raw?.player1Id ?? null,
+      player2Id: summary.player2Id ?? raw?.player2Id ?? null,
       legsP1: legs.p1,
       legsP2: legs.p2,
       hasSets: sets.hasSets,
@@ -1012,6 +1143,9 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
       p1Avg: averages.p1,
       p2Avg: averages.p2,
       throwingPlayerName,
+      throwingPlayerId,
+      remainingP1: remainingLegPoints.p1,
+      remainingP2: remainingLegPoints.p2,
       status: String(raw?.status ?? summary.status ?? 'pending'),
       tabletStatus: String(raw?.tabletStatus ?? summary.tabletStatus ?? ''),
       missingPresence: resolveMissingPresence(raw, names, lang),
@@ -1153,6 +1287,8 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
         const sets = resolveSets(raw);
         const averages = resolveAverages(raw);
         const throwingPlayerName = resolveThrowingPlayerName(raw, names, playerNameById);
+        const throwingPlayerId = resolveThrowingPlayerId(raw);
+        const remainingLegPoints = resolveRemainingLegPoints(raw);
         return {
           ...raw,
           ...names,
@@ -1165,6 +1301,9 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
           p1Avg: averages.p1,
           p2Avg: averages.p2,
           throwingPlayerName,
+          throwingPlayerId,
+          remainingP1: remainingLegPoints.p1,
+          remainingP2: remainingLegPoints.p2,
           status: String(raw?.status ?? 'pending'),
           tabletStatus: String(raw?.tabletStatus ?? ''),
           missingPresence: resolveMissingPresence(raw, names, lang),
@@ -1268,6 +1407,10 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
   const slideCount = slides.length || 1;
   const slidePosition = ((screenIdx % slideCount) + slideCount) % slideCount;
   const activeSlide = slides[slidePosition];
+  const activeSlideDurationMs = useMemo(
+    () => resolveSlideDurationMs(activeSlide),
+    [activeSlide]
+  );
 
   useEffect(() => {
     setScreenIdx(0);
@@ -1279,11 +1422,11 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
 
   useEffect(() => {
     if (activeCall || slides.length <= 1) return undefined;
-    const id = window.setInterval(() => {
+    const id = window.setTimeout(() => {
       setScreenIdx((i) => i + 1);
-    }, VENUE_CAROUSEL_MS);
-    return () => window.clearInterval(id);
-  }, [activeCall, slides.length, model?.signature]);
+    }, activeSlideDurationMs);
+    return () => window.clearTimeout(id);
+  }, [activeCall, slides.length, activeSlideDurationMs, slidePosition, model?.signature]);
 
   const statusLine = invalidPin
     ? tv(lang, 'invalidPin')
@@ -1300,9 +1443,9 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
   const viewState = showEmpty ? 'empty' : showLoading ? 'loading' : 'ready';
   const rotationRunning = !activeCall && slides.length > 1 && !showLoading && !showEmpty;
   const rotationElapsedMs = Math.max(0, clockMs - slideStartedAtMs);
-  const rotationProgress = rotationRunning ? Math.min(1, rotationElapsedMs / VENUE_CAROUSEL_MS) : 0;
+  const rotationProgress = rotationRunning ? Math.min(1, rotationElapsedMs / activeSlideDurationMs) : 0;
   const rotationSecondsLeft = rotationRunning
-    ? Math.max(0, Math.ceil((VENUE_CAROUSEL_MS - rotationElapsedMs) / 1000))
+    ? Math.max(0, Math.ceil((activeSlideDurationMs - rotationElapsedMs) / 1000))
     : 0;
 
   return (
@@ -1318,7 +1461,9 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
         </div>
         <div className="flex flex-col items-end gap-2">
           {pin ? (
-            <p className="font-mono text-xl xl:text-3xl font-black tracking-[0.3em] text-yellow-400">{pin}</p>
+            <p className="font-mono text-xs xl:text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
+              {tv(lang, 'pinLabel')} {pin}
+            </p>
           ) : null}
           {rotationRunning ? (
             <div className="w-52 xl:w-64">

@@ -16,39 +16,51 @@ import ContextHelpButton from './ContextHelpButton';
 function GroupStandingsTable({ standings, advanceCount, t }) {
   const cellBase = 'text-[11px] sm:text-xs leading-snug';
   const cellMono = `${cellBase} font-mono tabular-nums`;
+  const pointsLabel = t('tournStandingPointsShort') || t('tournStandingPoints') || 'Body';
+  const matchesLabel = t('tournStandingMatchesUltraShort') || 'Z';
+  const legsLabel = t('tournStandingLegsUltraShort') || 'L';
   const noTh =
     'text-center py-1 w-7 px-0 align-bottom text-[8px] sm:text-[9px] font-bold uppercase tracking-tight text-slate-500 leading-tight';
   const noTd =
     'py-1 px-0 w-7 text-center align-middle text-[8px] sm:text-[9px] font-bold tabular-nums text-slate-300 leading-none';
 
   return (
-    <div className="w-full min-w-0 -mx-0.5 sm:mx-0 overflow-x-auto">
-      <table className="w-full max-w-full table-fixed border-collapse">
+    <div className="w-full min-w-0 overflow-x-auto">
+      <table className="w-full min-w-[34rem] table-auto border-collapse">
         <colgroup>
           <col className="w-5" />
           <col className="w-7" />
-          <col />
-          <col className="w-[2.9rem]" />
-          <col className="w-[3.7rem]" />
-          <col className="w-[3.7rem]" />
-          <col className="w-[2.9rem]" />
-          <col className="w-[3.6rem]" />
+          <col className="min-w-[7.5rem]" />
+          <col className="w-[2.3rem]" />
+          <col className="w-[3.1rem]" />
+          <col className="w-[3.1rem]" />
+          <col className="w-[2.6rem]" />
+          <col className="w-[2.8rem]" />
         </colgroup>
         <thead>
           <tr className="border-b border-slate-700 text-slate-400 font-bold uppercase tracking-tight">
             <th className="p-0 w-5 align-bottom" aria-hidden="true" />
             <th className={noTh}>{t('tournStandingPos') || 'No:'}</th>
-            <th className={`text-left py-1 pr-0.5 pl-0 min-w-0 align-bottom ${cellBase}`}>
+            <th className={`text-left py-1 pr-1 pl-0 min-w-[7.5rem] align-bottom ${cellBase}`}>
               {t('playerName') || 'Hráč'}
             </th>
-            <th className={`text-right py-1 pr-1 pl-0.5 align-bottom whitespace-nowrap ${cellBase}`}>
-              <span className="block w-full text-right">{t('tournStandingPoints') || 'Body'}</span>
+            <th
+              className={`text-right py-1 pr-1 pl-0.5 align-bottom whitespace-nowrap ${cellBase}`}
+              title={t('tournStandingPoints') || 'Body'}
+            >
+              <span className="block w-full text-right">{pointsLabel}</span>
             </th>
-            <th className={`text-right py-1 pr-1 pl-0.5 align-bottom leading-tight whitespace-pre-line ${cellBase}`}>
-              <span className="block w-full text-right">{t('tournStandingMatchesShort')}</span>
+            <th
+              className={`text-right py-1 pr-1 pl-0.5 align-bottom whitespace-nowrap ${cellBase}`}
+              title={t('tournStandingMatches') || 'Zápasy (V/P)'}
+            >
+              <span className="block w-full text-right">{matchesLabel}</span>
             </th>
-            <th className={`text-right py-1 pr-1 pl-0.5 align-bottom leading-tight whitespace-pre-line ${cellBase}`}>
-              <span className="block w-full text-right">{t('tournStandingLegsShort')}</span>
+            <th
+              className={`text-right py-1 pr-1 pl-0.5 align-bottom whitespace-nowrap ${cellBase}`}
+              title={t('tournStandingLegs') || 'Legy (V:P)'}
+            >
+              <span className="block w-full text-right">{legsLabel}</span>
             </th>
             <th
               className={`text-right py-1 pr-1 pl-0.5 align-bottom ${cellBase}`}
@@ -99,8 +111,11 @@ function GroupStandingsTable({ standings, advanceCount, t }) {
                 ) : null}
               </td>
               <td className={noTd}>{idx + 1}</td>
-              <td className="min-w-0 pr-2 pl-1 py-1.5 text-slate-100 align-middle">
-                <span className="block font-semibold text-sm sm:text-base leading-snug whitespace-nowrap overflow-hidden text-ellipsis">
+              <td className="pr-2 pl-1 py-1.5 text-slate-100 align-middle min-w-[7.5rem]">
+                <span
+                  className="block font-semibold text-sm sm:text-base leading-snug whitespace-nowrap overflow-hidden text-ellipsis"
+                  title={row.name}
+                >
                   {row.name}
                 </span>
               </td>

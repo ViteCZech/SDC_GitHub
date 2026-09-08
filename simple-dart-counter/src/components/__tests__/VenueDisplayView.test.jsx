@@ -171,7 +171,7 @@ describe('VenueDisplayView', () => {
     });
     renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
     act(() => {
-      vi.advanceTimersByTime(16_000);
+      vi.advanceTimersByTime(19_000);
     });
     expect(listenMock).toHaveBeenCalledWith('1234', expect.any(Function));
     expect(screen.getByText('Hala Cup')).toBeTruthy();
@@ -248,7 +248,7 @@ describe('VenueDisplayView', () => {
     });
     renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
     act(() => {
-      vi.advanceTimersByTime(16_000);
+      vi.advanceTimersByTime(19_000);
     });
     expect(document.body.textContent).toContain('Chybí na prezentaci');
     expect(document.body.textContent).toContain('Jalůvka');
@@ -278,7 +278,7 @@ describe('VenueDisplayView', () => {
     });
     renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
     act(() => {
-      vi.advanceTimersByTime(10_000);
+      vi.advanceTimersByTime(19_000);
     });
     expect(document.body.textContent).toContain('Jalůvka');
     expect(document.body.textContent).toContain('Armlich');
@@ -333,5 +333,145 @@ describe('VenueDisplayView', () => {
     });
     renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
     expect(document.body.textContent).toContain('4 tabulek / obrazovka');
+  });
+
+  it('u čekajícího zápasu nezobrazí 0:0 ani placeholder průměru', () => {
+    vi.useFakeTimers();
+    listenMock.mockImplementation((_pin, cb) => {
+      cb({
+        ...liveDoc(),
+        groupMatches: [
+          {
+            matchId: 'm-wait',
+            groupId: 'A',
+            board: 1,
+            status: 'pending',
+            player1Id: 'p1',
+            player2Id: 'p2',
+            referee: { name: 'Novák' },
+          },
+        ],
+      });
+      return () => {};
+    });
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
+    act(() => {
+      vi.advanceTimersByTime(13_000);
+    });
+    expect(document.body.textContent).toContain('Čeká na start');
+    expect(document.body.textContent).toContain('Jalůvka');
+    expect(document.body.textContent).toContain('Armlich');
+    expect(document.body.textContent).not.toMatch(/\b0\s*:\s*0\b/);
+    expect(document.body.textContent).not.toContain('Ø —');
+    expect(document.body.textContent).not.toContain('Ø –');
+    vi.useRealTimers();
+  });
+
+  it('u živého zápasu ukáže skóre, zbývající body a kdo hází', () => {
+    vi.useFakeTimers();
+    listenMock.mockImplementation((_pin, cb) => {
+      cb({
+        ...liveDoc(),
+        groupMatches: [
+          {
+            matchId: 'm-live',
+            groupId: 'A',
+            board: 1,
+            status: 'playing',
+            player1Id: 'p1',
+            player2Id: 'p2',
+            referee: { name: 'Novák' },
+            result: { p1Legs: 1, p2Legs: 0, p1Avg: 66.1, p2Avg: 58.2 },
+            p1Avg: 66.1,
+            p2Avg: 58.2,
+            p1Score: 241,
+            p2Score: 301,
+            currentThrowerId: 'p1',
+            currentPlayer: 'p1',
+          },
+        ],
+      });
+      return () => {};
+    });
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
+    act(() => {
+      vi.advanceTimersByTime(19_000);
+    });
+    expect(document.body.textContent).toMatch(/1\s*:\s*0/);
+    expect(document.body.textContent).toContain('Body v legu');
+    expect(document.body.textContent).toContain('241');
+    expect(document.body.textContent).toContain('301');
+    expect(document.body.textContent).toContain('Háže');
+    expect(document.body.textContent).toContain('Ø 66.10');
+    vi.useRealTimers();
+  });
+
+  it('bez odehraných zápasů skryje mini-tabulku skupiny', () => {
+    listenMock.mockImplementation((_pin, cb) => {
+      cb(groupsDoc(2, 4));
+      return () => {};
+    });
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
+    expect(document.body.textContent).toContain('Tabulka se zobrazí po prvním odehraném zápasu.');
+    expect(document.body.textContent).not.toContain('Zápasy');
+  });
+
+  it('rotuje skupiny déle než čekající terče', () => {
+    vi.useFakeTimers();
+    listenMock.mockImplementation((_pin, cb) => {
+      cb({
+        ...groupsDoc(2, 4),
+        tournamentData: {
+          name: 'Rotation test',
+          numBoards: 1,
+          groups: [
+            {
+              groupId: 'A',
+              name: 'Skupina A',
+              boards: [1],
+              players: [
+                { id: 'p1', name: 'Jalůvka' },
+                { id: 'p2', name: 'Armlich' },
+              ],
+            },
+          ],
+        },
+        groups: [
+          {
+            groupId: 'A',
+            name: 'Skupina A',
+            boards: [1],
+            players: [
+              { id: 'p1', name: 'Jalůvka' },
+              { id: 'p2', name: 'Armlich' },
+            ],
+          },
+        ],
+        groupMatches: [
+          {
+            matchId: 'm-wait',
+            groupId: 'A',
+            board: 1,
+            status: 'pending',
+            player1Id: 'p1',
+            player2Id: 'p2',
+            referee: { name: 'Armlich' },
+          },
+        ],
+      });
+      return () => {};
+    });
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
+    expect(document.body.textContent).toContain('Tabulky skupin');
+    act(() => {
+      vi.advanceTimersByTime(11_500);
+    });
+    expect(document.body.textContent).toContain('Tabulky skupin');
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+    expect(document.body.textContent).toContain('Živé terče');
+    expect(document.body.textContent).toContain('Čeká na start');
+    vi.useRealTimers();
   });
 });
