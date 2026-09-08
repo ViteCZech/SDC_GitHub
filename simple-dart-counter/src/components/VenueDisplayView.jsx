@@ -122,6 +122,7 @@ function resolveThrowingPlayerId(raw) {
 function resolveRemainingLegPoints(raw, fallback) {
   const pickScore = (...values) => {
     for (const value of values) {
+      if (value == null || value === '') continue;
       const parsed = Number(value);
       if (Number.isFinite(parsed) && parsed >= 0) return Math.max(0, Math.round(parsed));
     }
@@ -342,6 +343,8 @@ function formatRemainingLegPoints(match, lang) {
   const p1 = toFiniteNumber(match?.remainingP1);
   const p2 = toFiniteNumber(match?.remainingP2);
   if (p1 == null && p2 == null) return '';
+  // 0:0 bez reálného live skóre je vizuální šum (např. chybějící sync bodů).
+  if ((p1 ?? 0) === 0 && (p2 ?? 0) === 0) return '';
   const left = p1 == null ? '—' : String(Math.max(0, Math.round(p1)));
   const right = p2 == null ? '—' : String(Math.max(0, Math.round(p2)));
   return `${tv(lang, 'legPointsLeft')}: ${left} : ${right}`;
@@ -446,6 +449,10 @@ function buildVenueDevMockDoc() {
           score: { p1: 1, p2: 0 },
           p1Avg: 74.12,
           p2Avg: 68.87,
+          p1Score: 201,
+          p2Score: 340,
+          currentThrowerId: 'gA-p1',
+          currentPlayer: 'p1',
         },
         {
           id: 'b-qf-2',
@@ -748,17 +755,23 @@ function GroupSummaryStrip({ group, lang, formatLabel }) {
   return (
     <div className="mt-2 rounded-lg border border-slate-700 bg-slate-900/85 px-2 py-2">
       <div className="flex items-center justify-between gap-2">
-        <StatusPill match={focus} lang={lang} />
-        {score ? <span className="text-[10px] font-mono tabular-nums text-slate-300">{score.value}</span> : null}
+        <div className="min-w-0 flex flex-wrap items-center gap-1.5">
+          <StatusPill match={focus} lang={lang} />
+          {formatLabel ? (
+            <span className="inline-flex rounded-md border border-slate-600 bg-slate-900/90 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-200">
+              {formatLabel}
+            </span>
+          ) : null}
+        </div>
+        {score ? <span className="text-[10px] font-mono tabular-nums text-slate-300 shrink-0">{score.value}</span> : null}
       </div>
       <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1">
         <PlayerName text={focus.player1Name} className="block min-w-0 truncate whitespace-nowrap text-[11px] font-bold text-slate-100 leading-tight" />
         <span className="text-[9px] font-black uppercase tracking-wider text-slate-500">{tv(lang, 'vs')}</span>
         <PlayerName text={focus.player2Name} className="block min-w-0 truncate whitespace-nowrap text-[11px] font-bold text-slate-100 leading-tight text-right" />
       </div>
-      <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-slate-300">
-        <span className="truncate">{tv(lang, 'referee')}: {focus.refereeName || '—'}</span>
-        <span className="text-slate-400 shrink-0">{formatLabel}</span>
+      <div className="mt-1 text-[10px] text-slate-300 truncate">
+        {tv(lang, 'referee')}: {focus.refereeName || '—'}
       </div>
     </div>
   );
@@ -766,12 +779,9 @@ function GroupSummaryStrip({ group, lang, formatLabel }) {
 
 function groupHasPlayedMatches(group) {
   const matches = Array.isArray(group?.matches) ? group.matches : [];
-  return matches.some((m) => {
-    if (!m) return false;
-    if (isLiveMatch(m) || isDoneMatch(m)) return true;
-    const legs = resolveLegs(m);
-    return Number(legs.p1) > 0 || Number(legs.p2) > 0;
-  });
+  if (matches.some((m) => isDoneMatch(m))) return true;
+  const rows = Array.isArray(group?.rows) ? group.rows : [];
+  return rows.some((row) => (Number(row?.matchesWon) || 0) + (Number(row?.matchesLost) || 0) > 0);
 }
 
 function GroupSlotCard({ group, lang, groupBestOfLabel, dense = false }) {
