@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-09-10T04:03:00.000Z",
-    "effectiveDate": "2026-09-10",
-    "generatedAt": "2026-09-10 04:03",
-    "fetchedAt": "2026-09-10T09:33:17.579Z",
+    "updatedAt": "2026-09-11T04:03:00.000Z",
+    "effectiveDate": "2026-09-11",
+    "generatedAt": "2026-09-11 04:03",
+    "fetchedAt": "2026-09-11T09:29:59.643Z",
     "totalPlayers": 139
   },
   "players": [
@@ -357,14 +357,14 @@
     },
     {
       "rank": 63,
-      "name": "Lenka Domaniková",
-      "regNumber": "6853"
-    },
-    {
-      "rank": 63,
       "name": "Jiřina Zahradníková",
       "club": "Vostrý koně Pardubice",
       "regNumber": "3182"
+    },
+    {
+      "rank": 64,
+      "name": "Lenka Domaniková",
+      "regNumber": "6853"
     },
     {
       "rank": 65,
