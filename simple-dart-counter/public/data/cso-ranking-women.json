@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-09-11T04:03:00.000Z",
-    "effectiveDate": "2026-09-11",
-    "generatedAt": "2026-09-11 04:03",
-    "fetchedAt": "2026-09-11T09:29:59.643Z",
+    "updatedAt": "2026-09-12T04:03:00.000Z",
+    "effectiveDate": "2026-09-12",
+    "generatedAt": "2026-09-12 04:03",
+    "fetchedAt": "2026-09-12T09:10:15.256Z",
     "totalPlayers": 139
   },
   "players": [
@@ -68,15 +68,15 @@
     },
     {
       "rank": 11,
-      "name": "Renata Horáková",
-      "club": "Pivní Baroni",
-      "regNumber": "5753"
-    },
-    {
-      "rank": 12,
       "name": "Petra Valentová",
       "club": "Black Panthers",
       "regNumber": "1544"
+    },
+    {
+      "rank": 12,
+      "name": "Renata Horáková",
+      "club": "Pivní Baroni",
+      "regNumber": "5753"
     },
     {
       "rank": 13,
@@ -164,14 +164,14 @@
     },
     {
       "rank": 28,
-      "name": "Martina Vaňková",
-      "club": "Kladno Steel",
-      "regNumber": "5700"
+      "name": "Veronika Vašutová",
+      "regNumber": "7238"
     },
     {
       "rank": 29,
-      "name": "Veronika Vašutová",
-      "regNumber": "7238"
+      "name": "Martina Vaňková",
+      "club": "Kladno Steel",
+      "regNumber": "5700"
     },
     {
       "rank": 30,
@@ -198,14 +198,14 @@
     },
     {
       "rank": 34,
-      "name": "Irena Vybíralová",
-      "regNumber": "6251"
-    },
-    {
-      "rank": 35,
       "name": "Markéta Fryštacká",
       "club": "Black Panthers",
       "regNumber": "3815"
+    },
+    {
+      "rank": 35,
+      "name": "Irena Vybíralová",
+      "regNumber": "6251"
     },
     {
       "rank": 36,
@@ -476,7 +476,7 @@
       "regNumber": "1144"
     },
     {
-      "rank": 86,
+      "rank": 78,
       "name": "Veronika Kocařová",
       "regNumber": "6314"
     },
