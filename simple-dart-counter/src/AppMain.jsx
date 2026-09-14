@@ -32,6 +32,15 @@ import {
 import GameX01 from './components/GameX01';
 import AppNavBar from './components/AppNavBar';
 import PauseMenuOverlay from './components/PauseMenuOverlay';
+import TabletKioskPinModal from './components/TabletKioskPinModal';
+import TabletKioskLockBadge from './components/TabletKioskLockBadge';
+import {
+  clearTabletKioskLock,
+  isTabletKioskSessionValid,
+  loadTabletKioskLocked,
+  persistTabletKioskLocked,
+  resolveTabletKioskPin,
+} from './utils/tabletKioskLock';
 import ActiveSessionBanner from './components/ActiveSessionBanner';
 import FlagIcon from './components/FlagIcon';
 import {
@@ -220,6 +229,13 @@ function AppMain({ lang, setLang }) {
   const [homeSubmenu, setHomeSubmenu] = useState(null);
   /** Pause overlay na herní obrazovce. */
   const [pauseMenuOpen, setPauseMenuOpen] = useState(false);
+  /** Jednorázová autorizace Kiosk zámku po odemčení pause menu (spotřebuje ji další chráněná akce). */
+  const kioskPauseAuthRef = useRef(false);
+  /** Zavře pause menu a zneplatní jednorázovou kiosk autorizaci. */
+  const closePauseMenu = React.useCallback(() => {
+    kioskPauseAuthRef.current = false;
+    setPauseMenuOpen(false);
+  }, []);
   /**
    * Zaparkovaná relace pro resume lištu na Domů.
    * match + mountKept: herní strom zůstane namountovaný (skrytý), ať se neztratí stav GameX01/Cricket.
@@ -1726,6 +1742,104 @@ function AppMain({ lang, setLang }) {
       tabletPassword: String(auth.tabletPassword ?? '').trim().slice(0, 5),
     };
   }, [activePin, tabletBoardStr]);
+
+  /* ---- Kiosk PIN zámek tabletu u terče ----
+   * Tablet je kiosk: citlivé akce (odpojit tablet, opustit/resetovat zápas,
+   * otevřít pause menu s nastavením) vyžadují 4místný Kiosk PIN. PIN se odvodí
+   * z hesla tabletu, jinak z PINu turnaje. Stav zámku přežívá refresh
+   * (sessionStorage) po celou dobu provozu tabletu. Běžný herní režim netkne. */
+  const [isKioskLocked, setIsKioskLocked] = React.useState(() => loadTabletKioskLocked(safeStorage));
+  const [kioskPinRequest, setKioskPinRequest] = React.useState(null);
+  const kioskPendingRef = useRef(null);
+
+  const tabletKioskPin = React.useMemo(
+    () =>
+      resolveTabletKioskPin({
+        tabletPassword: String(tabletPresence?.tabletPassword ?? '').trim(),
+        activePin,
+        tournamentPin: tournamentData?.pin ?? tournamentData?.tournamentId,
+      }),
+    [tabletPresence?.tabletPassword, activePin, tournamentData?.pin, tournamentData?.tournamentId]
+  );
+  const tabletKioskActive =
+    userRole === 'tablet' &&
+    isTabletKioskSessionValid({ pin: activePin, board: tabletBoardStr }) &&
+    tabletKioskPin !== '';
+
+  const setKioskLockedWithPersist = React.useCallback((locked) => {
+    setIsKioskLocked(locked);
+    persistTabletKioskLocked(safeStorage, locked);
+  }, []);
+
+  const runTabletKioskGuarded = React.useCallback(
+    (key, label, fn, opts = {}) => {
+      if (!tabletKioskActive || !isKioskLocked || !tabletKioskPin) {
+        fn();
+        return;
+      }
+      if (kioskPauseAuthRef.current) {
+        kioskPauseAuthRef.current = false;
+        fn();
+        return;
+      }
+      kioskPendingRef.current = { key, fn, grantPauseAuth: !!opts.grantPauseAuth };
+      setKioskPinRequest({ key, label });
+    },
+    [tabletKioskActive, isKioskLocked, tabletKioskPin]
+  );
+
+  const handleKioskPinSuccess = React.useCallback(() => {
+    const pending = kioskPendingRef.current;
+    kioskPendingRef.current = null;
+    setKioskPinRequest(null);
+    if (pending?.grantPauseAuth) kioskPauseAuthRef.current = true;
+    if (pending?.unlock) {
+      setKioskLockedWithPersist(false);
+      return;
+    }
+    try {
+      pending?.fn?.();
+    } catch (e) {
+      console.warn('kioskGuarded:', e);
+    }
+  }, [setKioskLockedWithPersist]);
+
+  const handleKioskPinCancel = React.useCallback(() => {
+    kioskPendingRef.current = null;
+    setKioskPinRequest(null);
+  }, []);
+
+  const handleKioskBadgeToggle = React.useCallback(() => {
+    if (!tabletKioskActive) return;
+    if (!isKioskLocked) {
+      setKioskLockedWithPersist(true);
+      return;
+    }
+    kioskPendingRef.current = { key: 'unlock', unlock: true, fn: null };
+    setKioskPinRequest({ key: 'unlock', label: t('kioskUnlockAction') || 'Odemknout Kiosk zámek' });
+  }, [tabletKioskActive, isKioskLocked, setKioskLockedWithPersist, t]);
+
+  useEffect(() => {
+    if (!tabletKioskActive || !isKioskLocked) return undefined;
+    const handleKioskBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleKioskBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleKioskBeforeUnload);
+  }, [tabletKioskActive, isKioskLocked]);
+
+  const kioskPinModalNode = (
+    <TabletKioskPinModal
+      open={!!kioskPinRequest}
+      lang={lang}
+      expectedPin={tabletKioskPin}
+      actionLabel={kioskPinRequest?.label ?? ''}
+      onSuccess={handleKioskPinSuccess}
+      onCancel={handleKioskPinCancel}
+    />
+  );
+
   const pinBarTitle =
     tournamentData?.name ??
     tournamentMatchContext?.tabletTitle ??
@@ -2326,7 +2440,7 @@ function AppMain({ lang, setLang }) {
     setAppState('tournament_viewer_preparing');
   };
 
-  const handleSpectatorDisconnect = React.useCallback(() => {
+  const handleSpectatorDisconnectRaw = React.useCallback(() => {
     if (userRole === 'tablet') {
       const pin = String(activePin ?? '').trim();
       const board = String(tournamentDraft?.hubTabletBoard ?? loadStoredTabletBoard()).trim();
@@ -2340,6 +2454,11 @@ function AppMain({ lang, setLang }) {
         }).catch((err) => console.warn('releaseTabletBoardPresence(disconnect):', err));
       }
     }
+    kioskPauseAuthRef.current = false;
+    kioskPendingRef.current = null;
+    setKioskPinRequest(null);
+    setKioskLockedWithPersist(true);
+    clearTabletKioskLock(safeStorage);
     clearSpectatorSession();
     setUserRole(null);
     setActivePin('');
@@ -2349,7 +2468,20 @@ function AppMain({ lang, setLang }) {
     setTournamentMatchContext(null);
     setParkedSession(null);
     setAppState('tournament_hub');
-  }, [activePin, syncAdapter, tournamentDraft?.hubTabletBoard, userRole]);
+  }, [activePin, syncAdapter, tournamentDraft?.hubTabletBoard, userRole, setKioskLockedWithPersist]);
+
+  /** Odpojení tabletu / diváka; v tabletovém kiosku chráněno PINem. */
+  const handleSpectatorDisconnect = React.useCallback(() => {
+    if (userRole === 'tablet') {
+      runTabletKioskGuarded(
+        'disconnect',
+        t('tournamentHub.disconnect') || 'Odpojit',
+        () => handleSpectatorDisconnectRaw()
+      );
+      return;
+    }
+    handleSpectatorDisconnectRaw();
+  }, [userRole, runTabletKioskGuarded, handleSpectatorDisconnectRaw, t]);
 
   const dismissParkedSession = React.useCallback(() => {
     setParkedSession((prev) => {
@@ -2382,8 +2514,8 @@ function AppMain({ lang, setLang }) {
     });
   }, []);
 
-  const goHomeFromNav = React.useCallback(() => {
-    setPauseMenuOpen(false);
+  const goHomeFromNavRaw = React.useCallback(() => {
+    closePauseMenu();
     setHomeSubmenu(null);
 
     if (appState === 'playing') {
@@ -2429,7 +2561,20 @@ function AppMain({ lang, setLang }) {
     settings?.p2Name,
     onlineGameId,
     t,
+    closePauseMenu,
   ]);
+
+  /** Domů; v tabletovém kiosku (čekárna i rozehraný zápas) chráněno PINem. */
+  const goHomeFromNav = React.useCallback(() => {
+    const tabletCtx =
+      userRole === 'tablet' ||
+      (appState === 'playing' && tournamentMatchContextRef.current?.type === 'tablet');
+    if (tabletCtx) {
+      runTabletKioskGuarded('home', t('navHome') || 'Domů', () => goHomeFromNavRaw());
+      return;
+    }
+    goHomeFromNavRaw();
+  }, [userRole, appState, runTabletKioskGuarded, goHomeFromNavRaw, t]);
 
   const handleNavBackTarget = React.useCallback(
     (backTarget) => {
@@ -2503,8 +2648,8 @@ function AppMain({ lang, setLang }) {
     ]
   );
 
-  const leavePlayingToTournamentBoard = React.useCallback(() => {
-    setPauseMenuOpen(false);
+  const leavePlayingToTournamentBoardRaw = React.useCallback(() => {
+    closePauseMenu();
     setParkedSession(null);
     const ctx = tournamentMatchContextRef.current;
     clearPlayingTournamentMatchWithoutResult();
@@ -2516,7 +2661,41 @@ function AppMain({ lang, setLang }) {
           ? 'tournament_bracket'
           : 'tournament_groups'
     );
-  }, [clearPlayingTournamentMatchWithoutResult]);
+  }, [clearPlayingTournamentMatchWithoutResult, closePauseMenu]);
+
+  /** Návrat z rozehraného zápasu na desku; u tabletu = zrušení zápisu, chráněno PINem. */
+  const leavePlayingToTournamentBoard = React.useCallback(() => {
+    if (tournamentMatchContextRef.current?.type === 'tablet') {
+      runTabletKioskGuarded(
+        'leave-match',
+        t('navBackToTournament') || 'Zpět na turnaj',
+        () => leavePlayingToTournamentBoardRaw()
+      );
+      return;
+    }
+    leavePlayingToTournamentBoardRaw();
+  }, [runTabletKioskGuarded, leavePlayingToTournamentBoardRaw, t]);
+
+  /** Ukončení rozehraného turnajového zápasu z herní plochy (onAbort); u tabletu chráněno PINem. */
+  const abortPlayingTournamentMatchGuarded = React.useCallback(() => {
+    const run = () => {
+      const ctx = tournamentMatchContextRef.current;
+      clearPlayingTournamentMatchWithoutResult();
+      setTournamentMatchContext(null);
+      setAppState(
+        ctx?.type === 'bracket'
+          ? 'tournament_bracket'
+          : ctx?.type === 'tablet'
+            ? 'tournament_tablet'
+            : 'tournament_groups'
+      );
+    };
+    if (tournamentMatchContextRef.current?.type === 'tablet') {
+      runTabletKioskGuarded('leave-match', t('navBackToTournament') || 'Zpět na turnaj', run);
+      return;
+    }
+    run();
+  }, [clearPlayingTournamentMatchWithoutResult, runTabletKioskGuarded, t]);
 
   const leavePlayingToSetup = React.useCallback(() => {
     setPauseMenuOpen(false);
@@ -4187,6 +4366,13 @@ function AppMain({ lang, setLang }) {
                           {t('tournEndTournament') || 'Ukončit turnaj'}
                         </button>
                         )}
+                        {tabletKioskActive && (
+                          <TabletKioskLockBadge
+                            lang={lang}
+                            locked={isKioskLocked}
+                            onToggle={handleKioskBadgeToggle}
+                          />
+                        )}
                         {(userRole === 'viewer' || userRole === 'tablet') && (
                           <button
                             type="button"
@@ -4205,7 +4391,18 @@ function AppMain({ lang, setLang }) {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => setPauseMenuOpen(true)}
+                      onClick={() => {
+                        if (userRole === 'tablet' && tournamentMatchContext?.type === 'tablet') {
+                          runTabletKioskGuarded(
+                            'pause-settings',
+                            t('navPause') || 'Pauza',
+                            () => setPauseMenuOpen(true),
+                            { grantPauseAuth: true }
+                          );
+                          return;
+                        }
+                        setPauseMenuOpen(true);
+                      }}
                       className="p-2 transition-colors rounded-lg hover:bg-slate-800 text-slate-400 hover:text-amber-300"
                       aria-label={t('navPause') || 'Pauza'}
                       title={t('navPause') || 'Pauza'}
@@ -4261,18 +4458,7 @@ function AppMain({ lang, setLang }) {
                     onOpenContextHelp={openContextHelp}
                     onAbort={
                       isTournamentPlaying
-                        ? () => {
-                            const ctx = tournamentMatchContextRef.current;
-                            clearPlayingTournamentMatchWithoutResult();
-                            setTournamentMatchContext(null);
-                            setAppState(
-                              ctx?.type === 'bracket'
-                                ? 'tournament_bracket'
-                                : ctx?.type === 'tablet'
-                                  ? 'tournament_tablet'
-                                  : 'tournament_groups'
-                            );
-                          }
+                        ? abortPlayingTournamentMatchGuarded
                         : () => {
                             if (onlineGameId) {
                               handleOnlineSessionEnded();
@@ -4296,18 +4482,7 @@ function AppMain({ lang, setLang }) {
                     onlineGameId={onlineGameId || undefined}
                     onAbort={
                       isTournamentPlaying
-                        ? () => {
-                            const ctx = tournamentMatchContextRef.current;
-                            clearPlayingTournamentMatchWithoutResult();
-                            setTournamentMatchContext(null);
-                            setAppState(
-                              ctx?.type === 'bracket'
-                                ? 'tournament_bracket'
-                                : ctx?.type === 'tablet'
-                                  ? 'tournament_tablet'
-                                  : 'tournament_groups'
-                            );
-                          }
+                        ? abortPlayingTournamentMatchGuarded
                         : () => {
                             if (onlineGameId) {
                               handleOnlineSessionEnded();
@@ -4681,6 +4856,7 @@ function AppMain({ lang, setLang }) {
               <>
                   {matchSurfaceNode}
                   {matchStatsScreen}
+                  {kioskPinModalNode}
               </>
           );
       }
@@ -4695,7 +4871,7 @@ function AppMain({ lang, setLang }) {
       label: t('navResumePlay') || 'Pokračovat ve hře',
       icon: 'play',
       variant: 'primary',
-      onClick: () => setPauseMenuOpen(false),
+      onClick: closePauseMenu,
     });
     if (onlineGameId) {
       pauseActions.push({
@@ -4704,7 +4880,7 @@ function AppMain({ lang, setLang }) {
         icon: 'exit',
         variant: 'danger',
         onClick: () => {
-          setPauseMenuOpen(false);
+          closePauseMenu();
           handleOnlineExitMatchRequest();
         },
       });
@@ -4745,10 +4921,11 @@ function AppMain({ lang, setLang }) {
         {matchSurfaceNode}
         <PauseMenuOverlay
           open={pauseMenuOpen}
-          onClose={() => setPauseMenuOpen(false)}
+          onClose={closePauseMenu}
           title={t('navPause') || 'Pauza'}
           actions={pauseActions}
         />
+        {kioskPinModalNode}
       </div>
     );
   }
@@ -4802,6 +4979,13 @@ function AppMain({ lang, setLang }) {
             >
               {t('tournEndTournament') || 'Ukončit turnaj'}
             </button>
+            )}
+            {tabletKioskActive && (
+              <TabletKioskLockBadge
+                lang={lang}
+                locked={isKioskLocked}
+                onToggle={handleKioskBadgeToggle}
+              />
             )}
             {(userRole === 'viewer' || userRole === 'tablet') && (
               <button
@@ -6226,6 +6410,7 @@ function AppMain({ lang, setLang }) {
         </div>
       )}
 
+      {kioskPinModalNode}
     </div>
   );
 }
