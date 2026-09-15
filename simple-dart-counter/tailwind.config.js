@@ -8,6 +8,10 @@ export default {
   theme: {
     extend: {
       keyframes: {
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
         'slide-in': {
           '0%': { opacity: '0', transform: 'translate(-50%, 12px)' },
           '100%': { opacity: '1', transform: 'translate(-50%, 0)' },
@@ -23,6 +27,7 @@ export default {
         },
       },
       animation: {
+        'fade-in': 'fade-in 0.3s ease-in-out forwards',
         'slide-in': 'slide-in 0.25s ease-out forwards',
         'high-score-pop': 'high-score-pop 1.5s ease-out forwards',
       },

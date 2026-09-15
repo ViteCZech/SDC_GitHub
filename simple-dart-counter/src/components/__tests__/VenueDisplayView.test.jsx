@@ -464,7 +464,7 @@ describe('VenueDisplayView', () => {
     renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
     expect(document.body.textContent).toContain('Tabulky skupin');
     act(() => {
-      vi.advanceTimersByTime(11_500);
+      vi.advanceTimersByTime(7_500);
     });
     expect(document.body.textContent).toContain('Tabulky skupin');
     act(() => {
@@ -472,6 +472,51 @@ describe('VenueDisplayView', () => {
     });
     expect(document.body.textContent).toContain('Živé terče');
     expect(document.body.textContent).toContain('Čeká na start');
+    vi.useRealTimers();
+  });
+
+  it('renders sync indicator in online, stale, and offline states', () => {
+    vi.useFakeTimers();
+    let pushData;
+    listenMock.mockImplementation((_pin, cb) => {
+      pushData = cb;
+      cb(liveDoc());
+      return () => {};
+    });
+
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
+    const indicator = screen.getByTestId('venue-sync-indicator');
+    expect(indicator).toHaveAttribute('data-sync-state', 'online');
+    expect(indicator.textContent).toContain('Živě');
+
+    // After 10s: still online, updated 10s ago
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(indicator).toHaveAttribute('data-sync-state', 'online');
+    expect(indicator.textContent).toContain('Aktualizováno před 10 s');
+
+    // After 40s total: stale state (30s - 90s)
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(indicator).toHaveAttribute('data-sync-state', 'stale');
+    expect(indicator.textContent).toContain('Čekání na data…');
+
+    // After 100s total: offline state (> 90s)
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(indicator).toHaveAttribute('data-sync-state', 'offline');
+    expect(indicator.textContent).toContain('Spojení přerušeno');
+
+    // Receiving new data restores online status
+    act(() => {
+      pushData(liveDoc());
+    });
+    expect(indicator).toHaveAttribute('data-sync-state', 'online');
+    expect(indicator.textContent).toContain('Živě');
+
     vi.useRealTimers();
   });
 });

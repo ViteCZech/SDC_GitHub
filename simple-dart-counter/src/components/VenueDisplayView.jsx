@@ -18,6 +18,8 @@ import {
   formatTvPlayerName,
   isVenueTournamentFinished,
   resolveVenueBoardColumns,
+  resolveVenueSlideDurationMs,
+  resolveVenueSyncStatus,
   venueBestOfFromWinLegs,
 } from '../utils/venueDisplay';
 
@@ -823,24 +825,7 @@ function GroupSlotCard({ group, lang, groupBestOfLabel, dense = false }) {
 }
 
 function resolveSlideDurationMs(slide) {
-  if (!slide) return VENUE_CAROUSEL_MS;
-  if (slide.type === 'finished') return 20_000;
-  if (slide.type === 'live') {
-    const boards = Array.isArray(slide.boards) ? slide.boards : [];
-    const matches = boards.map((board) => board?.current || board?.next).filter(Boolean);
-    if (matches.length === 0) return 9_000;
-    if (matches.some((match) => isLiveMatch(match))) return 13_000;
-    return 10_000;
-  }
-  if (slide.type === 'groups') {
-    const groups = Array.isArray(slide.groups) ? slide.groups : [];
-    if (groups.length === 0) return 10_000;
-    const hasLiveGroup = groups.some((group) => isLiveMatch(group?.liveMatch));
-    if (hasLiveGroup) return 18_000;
-    const hasPlayedGroup = groups.some((group) => groupHasPlayedMatches(group));
-    return hasPlayedGroup ? 16_000 : 12_000;
-  }
-  return VENUE_CAROUSEL_MS;
+  return resolveVenueSlideDurationMs(slide);
 }
 
 function GroupsSlide({
@@ -944,6 +929,43 @@ function TournamentFinishedScreen({ summary, lang }) {
   );
 }
 
+function VenueSyncIndicator({ syncStatus }) {
+  if (syncStatus.state === 'online') {
+    return (
+      <div
+        data-testid="venue-sync-indicator"
+        data-sync-state="online"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-600/40 text-emerald-300 text-[11px] font-bold tracking-wide"
+      >
+        <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" />
+        <span>{syncStatus.label}</span>
+      </div>
+    );
+  }
+  if (syncStatus.state === 'stale') {
+    return (
+      <div
+        data-testid="venue-sync-indicator"
+        data-sync-state="stale"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-950/70 border border-amber-600/40 text-amber-300 text-[11px] font-bold tracking-wide"
+      >
+        <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+        <span>{syncStatus.label}</span>
+      </div>
+    );
+  }
+  return (
+    <div
+      data-testid="venue-sync-indicator"
+      data-sync-state="offline"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-950/80 border border-red-500/50 text-red-200 text-[11px] font-bold tracking-wide animate-pulse"
+    >
+      <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,1)]" />
+      <span>{syncStatus.label}</span>
+    </div>
+  );
+}
+
 function CallOverlay({ call, lang }) {
   if (!call) return null;
   return (
@@ -974,12 +996,25 @@ function CallOverlay({ call, lang }) {
 export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false }) {
   const syncAdapter = useSyncAdapter();
   const [doc, setDoc] = useState(undefined);
+  const [lastDataAtMs, setLastDataAtMs] = useState(null);
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
   const [screenIdx, setScreenIdx] = useState(0);
   const [callQueue, setCallQueue] = useState([]);
   const [clockMs, setClockMs] = useState(() => Date.now());
   const [slideStartedAtMs, setSlideStartedAtMs] = useState(() => Date.now());
   const prevBoardsRef = useRef(null);
   const skipFirstCallRef = useRef(true);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -997,15 +1032,20 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
   useEffect(() => {
     if (shouldUseVenueDevMock(pin, invalidPin)) {
       setDoc(buildVenueDevMockDoc());
+      setLastDataAtMs(Date.now());
       return undefined;
     }
     if (invalidPin || !pin) {
       setDoc(null);
+      setLastDataAtMs(null);
       return undefined;
     }
     setDoc(undefined);
     const unsub = syncAdapter.listenTournament(pin, (data) => {
       setDoc(data ?? null);
+      if (data) {
+        setLastDataAtMs(Date.now());
+      }
     });
     const timeoutId = window.setTimeout(() => {
       setDoc((prev) => (prev === undefined ? null : prev));
@@ -1438,6 +1478,31 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
     return () => window.clearTimeout(id);
   }, [activeCall, slides.length, activeSlideDurationMs, slidePosition, model?.signature]);
 
+  const syncStatus = useMemo(() => {
+    const status = resolveVenueSyncStatus({
+      lastDataMs: lastDataAtMs,
+      nowMs: clockMs,
+      isOnline,
+    });
+    let label = '';
+    if (status.state === 'online') {
+      if (typeof status.secondsAgo === 'number' && status.secondsAgo >= 2) {
+        label = tv(lang, 'syncUpdatedAgo').replace('{s}', String(status.secondsAgo));
+      } else {
+        label = tv(lang, 'syncLive');
+      }
+    } else if (status.state === 'stale') {
+      label = tv(lang, 'syncStale');
+    } else {
+      label = tv(lang, 'syncOffline');
+    }
+    return {
+      state: status.state,
+      label,
+      secondsAgo: status.secondsAgo,
+    };
+  }, [lastDataAtMs, clockMs, isOnline, lang]);
+
   const statusLine = invalidPin
     ? tv(lang, 'invalidPin')
     : doc === undefined
@@ -1465,9 +1530,16 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
       style={{ height: '100vh', overflow: 'hidden' }}
     >
       <header className="shrink-0 flex items-center justify-between gap-4 px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 border-b border-slate-900">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">{tv(lang, 'title')}</p>
-          <h1 className="text-2xl xl:text-4xl font-black truncate">{statusLine}</h1>
+        <div className="min-w-0 flex items-center gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">{tv(lang, 'title')}</p>
+              {pin && !invalidPin && doc !== null ? (
+                <VenueSyncIndicator syncStatus={syncStatus} />
+              ) : null}
+            </div>
+            <h1 className="text-2xl xl:text-4xl font-black truncate">{statusLine}</h1>
+          </div>
         </div>
         <div className="flex flex-col items-end gap-2">
           {pin ? (
@@ -1493,7 +1565,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
       </header>
 
       <main
-        className="flex-1 min-h-0 overflow-hidden p-4 xl:p-6 flex flex-col"
+        className="flex-1 min-h-0 overflow-hidden p-4 xl:p-6 flex flex-col relative"
         data-testid="venue-display-status"
         data-state={viewState}
       >
@@ -1505,108 +1577,115 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
           <p className="m-auto text-4xl xl:text-6xl font-black text-slate-400 text-center px-6">{statusLine}</p>
         ) : null}
 
-        {model && activeSlide?.type === 'groups' ? (
-          <section className="w-full h-full min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/85 p-3 xl:p-4 flex flex-col">
-            <div className="mb-3 flex items-start justify-between gap-3 shrink-0">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
-                  {tv(lang, 'groups')}
-                </p>
-                <h2 className="text-lg xl:text-2xl font-black text-white">{tv(lang, 'groupTables')}</h2>
-              </div>
-              <span className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                {tv(lang, 'groupsPerScreen').replace('{n}', String(groupsPageSize || 0))}
-              </span>
-            </div>
-            <div className="min-h-0 flex-1 overflow-hidden">
-              <GroupsSlide
-                groups={activeSlide.groups}
-                lang={lang}
-                groupsPerScreen={groupsPageSize}
-                groupsColumns={groupsColumns}
-                groupBestOfLabel={groupBestOfLabel}
-                blockIndex={activeSlide.blockIndex}
-                blockCount={activeSlide.blockCount}
-              />
-            </div>
-          </section>
-        ) : null}
-
-        {model && activeSlide?.type === 'finished' ? (
-          <TournamentFinishedScreen summary={tournamentFinishedSummary} lang={lang} />
-        ) : null}
-
-        {model && activeSlide?.type === 'live' ? (
+        {model && (
           <div
-            className={`w-full h-full min-h-0 overflow-hidden grid gap-4 xl:gap-6 ${
-              bracketOverview.hasBracket
-                ? 'grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]'
-                : 'grid-cols-1'
-            }`}
+            key={activeSlide?.key || activeSlide?.type || slidePosition}
+            className="w-full h-full min-h-0 flex-1 flex flex-col animate-fade-in transition-opacity duration-300"
           >
-            <section className="min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/85 p-3 xl:p-4 flex flex-col">
-              <div className="mb-3 shrink-0 flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
-                    {tv(lang, 'liveMatches')}
-                  </p>
-                  <h2 className="text-lg xl:text-2xl font-black text-white">{tv(lang, 'currentBoards')}</h2>
-                </div>
-                {activeSlide.pageCount > 1 ? (
-                  <span className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                    {tv(lang, 'boardsPage')
-                      .replace('{page}', String(activeSlide.pageIndex + 1))
-                      .replace('{total}', String(activeSlide.pageCount))}
-                  </span>
-                ) : null}
-              </div>
-              <div className="min-h-0 flex-1 overflow-hidden">
-                <BoardsGrid
-                  boards={activeSlide.boards || []}
-                  lang={lang}
-                  formatLabel={bracketOverview.hasBracket ? bracketOverview.formatLabel : groupBestOfLabel}
-                />
-              </div>
-            </section>
-
-            {bracketOverview.hasBracket ? (
-              <section className="min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/85 p-3 xl:p-4 flex flex-col">
-                <div className="mb-3 shrink-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
-                    {tv(lang, 'bracket')}
-                  </p>
-                  <h2 className="text-lg xl:text-2xl font-black text-white">
-                    {bracketOverview.phaseName}
-                  </h2>
-                  <p className="mt-1 text-xs xl:text-sm text-slate-300 font-semibold">
-                    {bracketOverview.formatLabel}
-                    {' · '}
-                    {tv(lang, 'phaseRound')
-                      .replace('{round}', String(bracketOverview.roundIndex + 1))
-                      .replace('{total}', String(bracketOverview.roundCount))}
-                  </p>
-                </div>
-
-                <div className="min-h-0 flex-1 overflow-hidden grid gap-2 auto-rows-fr content-start">
-                  {bracketOverview.matches.length === 0 ? (
-                    <p className="m-auto text-center text-lg font-black text-slate-500 uppercase tracking-wider">
-                      {tv(lang, 'noActiveBracketMatches')}
+            {activeSlide?.type === 'groups' ? (
+              <section className="w-full h-full min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/85 p-3 xl:p-4 flex flex-col">
+                <div className="mb-3 flex items-start justify-between gap-3 shrink-0">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                      {tv(lang, 'groups')}
                     </p>
-                  ) : (
-                    bracketOverview.matches.slice(0, 4).map((match, idx) => (
-                      <BracketMatchCard
-                        key={match.id ?? match.matchId ?? `${idx}-${match.player1Name}-${match.player2Name}`}
-                        match={match}
-                        lang={lang}
-                        formatLabel={bracketOverview.formatLabel}
-                      />
-                    ))
-                  )}
+                    <h2 className="text-lg xl:text-2xl font-black text-white">{tv(lang, 'groupTables')}</h2>
+                  </div>
+                  <span className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    {tv(lang, 'groupsPerScreen').replace('{n}', String(groupsPageSize || 0))}
+                  </span>
+                </div>
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <GroupsSlide
+                    groups={activeSlide.groups}
+                    lang={lang}
+                    groupsPerScreen={groupsPageSize}
+                    groupsColumns={groupsColumns}
+                    groupBestOfLabel={groupBestOfLabel}
+                    blockIndex={activeSlide.blockIndex}
+                    blockCount={activeSlide.blockCount}
+                  />
                 </div>
               </section>
             ) : null}
+
+            {activeSlide?.type === 'finished' ? (
+              <TournamentFinishedScreen summary={tournamentFinishedSummary} lang={lang} />
+            ) : null}
+
+            {activeSlide?.type === 'live' ? (
+              <div
+                className={`w-full h-full min-h-0 overflow-hidden grid gap-4 xl:gap-6 ${
+                  bracketOverview.hasBracket
+                    ? 'grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]'
+                    : 'grid-cols-1'
+                }`}
+              >
+                <section className="min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/85 p-3 xl:p-4 flex flex-col">
+                  <div className="mb-3 shrink-0 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                        {tv(lang, 'liveMatches')}
+                      </p>
+                      <h2 className="text-lg xl:text-2xl font-black text-white">{tv(lang, 'currentBoards')}</h2>
+                    </div>
+                    {activeSlide.pageCount > 1 ? (
+                      <span className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        {tv(lang, 'boardsPage')
+                          .replace('{page}', String(activeSlide.pageIndex + 1))
+                          .replace('{total}', String(activeSlide.pageCount))}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-hidden">
+                    <BoardsGrid
+                      boards={activeSlide.boards || []}
+                      lang={lang}
+                      formatLabel={bracketOverview.hasBracket ? bracketOverview.formatLabel : groupBestOfLabel}
+                    />
+                  </div>
+                </section>
+
+                {bracketOverview.hasBracket ? (
+                  <section className="min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/85 p-3 xl:p-4 flex flex-col">
+                    <div className="mb-3 shrink-0">
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                        {tv(lang, 'bracket')}
+                      </p>
+                      <h2 className="text-lg xl:text-2xl font-black text-white">
+                        {bracketOverview.phaseName}
+                      </h2>
+                      <p className="mt-1 text-xs xl:text-sm text-slate-300 font-semibold">
+                        {bracketOverview.formatLabel}
+                        {' · '}
+                        {tv(lang, 'phaseRound')
+                          .replace('{round}', String(bracketOverview.roundIndex + 1))
+                          .replace('{total}', String(bracketOverview.roundCount))}
+                      </p>
+                    </div>
+
+                    <div className="min-h-0 flex-1 overflow-hidden grid gap-2 auto-rows-fr content-start">
+                      {bracketOverview.matches.length === 0 ? (
+                        <p className="m-auto text-center text-lg font-black text-slate-500 uppercase tracking-wider">
+                          {tv(lang, 'noActiveBracketMatches')}
+                        </p>
+                      ) : (
+                        bracketOverview.matches.slice(0, 4).map((match, idx) => (
+                          <BracketMatchCard
+                            key={match.id ?? match.matchId ?? `${idx}-${match.player1Name}-${match.player2Name}`}
+                            match={match}
+                            lang={lang}
+                            formatLabel={bracketOverview.formatLabel}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </section>
+                ) : null}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        )}
       </main>
 
       <CallOverlay call={activeCall} lang={lang} />

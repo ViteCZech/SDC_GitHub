@@ -14,10 +14,16 @@ import {
   playVenueGong,
   resolveVenueBoardColumns,
   resolveVenueLang,
+  resolveVenueSlideDurationMs,
+  resolveVenueSyncStatus,
   unpackCloudTournament,
   venueBestOfFromWinLegs,
   VENUE_BOARDS_PER_PAGE,
   VENUE_GROUPS_PER_PAGE,
+  VENUE_SLIDE_DURATION_BASE_MS,
+  VENUE_SLIDE_DURATION_MID_MS,
+  VENUE_SLIDE_DURATION_DENSE_MS,
+  VENUE_SLIDE_DURATION_FINISHED_MS,
 } from '../venueDisplay';
 
 function cloudDoc(overrides = {}) {
@@ -327,5 +333,92 @@ describe('venueDisplay snapshot', () => {
     expect(summary.highestCheckout?.value).toBe(132);
     expect(summary.total180s).toBe(3);
     expect(summary.total140plus).toBe(6);
+  });
+
+  describe('resolveVenueSlideDurationMs', () => {
+    it('returns finished duration for finished slide', () => {
+      expect(resolveVenueSlideDurationMs({ type: 'finished' })).toBe(VENUE_SLIDE_DURATION_FINISHED_MS);
+    });
+
+    it('returns base duration (8s) for 1-2 boards', () => {
+      expect(resolveVenueSlideDurationMs({ type: 'live', boards: [{ board: 1 }] })).toBe(VENUE_SLIDE_DURATION_BASE_MS);
+      expect(resolveVenueSlideDurationMs({ type: 'live', boards: [{ board: 1 }, { board: 2 }] })).toBe(VENUE_SLIDE_DURATION_BASE_MS);
+    });
+
+    it('returns mid duration (12s) for 3-4 boards', () => {
+      expect(resolveVenueSlideDurationMs({ type: 'live', boards: [{ board: 1 }, { board: 2 }, { board: 3 }] })).toBe(VENUE_SLIDE_DURATION_MID_MS);
+      expect(resolveVenueSlideDurationMs({ type: 'live', boards: [{ board: 1 }, { board: 2 }, { board: 3 }, { board: 4 }] })).toBe(VENUE_SLIDE_DURATION_MID_MS);
+    });
+
+    it('returns dense duration (15s) for 5-6 boards', () => {
+      expect(resolveVenueSlideDurationMs({
+        type: 'live',
+        boards: [{ board: 1 }, { board: 2 }, { board: 3 }, { board: 4 }, { board: 5 }, { board: 6 }],
+      })).toBe(VENUE_SLIDE_DURATION_DENSE_MS);
+    });
+
+    it('returns base duration (8s) for small idle groups and mid/dense for full groups', () => {
+      expect(resolveVenueSlideDurationMs({
+        type: 'groups',
+        groups: [{ groupId: 'A', rows: [{ matchesWon: 0, matchesLost: 0 }] }],
+      })).toBe(VENUE_SLIDE_DURATION_BASE_MS);
+
+      expect(resolveVenueSlideDurationMs({
+        type: 'groups',
+        groups: [{ groupId: 'A', rows: [{ matchesWon: 1, matchesLost: 0 }] }],
+      })).toBe(VENUE_SLIDE_DURATION_MID_MS);
+
+      expect(resolveVenueSlideDurationMs({
+        type: 'groups',
+        groups: [{ groupId: 'A' }, { groupId: 'B' }, { groupId: 'C' }],
+      })).toBe(VENUE_SLIDE_DURATION_MID_MS);
+    });
+  });
+
+  describe('resolveVenueSyncStatus', () => {
+    const now = 100_000;
+
+    it('returns offline when isOnline is false regardless of timestamp', () => {
+      expect(resolveVenueSyncStatus({ lastDataMs: now - 1000, nowMs: now, isOnline: false })).toEqual({
+        state: 'offline',
+        secondsAgo: 1,
+      });
+    });
+
+    it('returns stale when lastDataMs is null and online', () => {
+      expect(resolveVenueSyncStatus({ lastDataMs: null, nowMs: now, isOnline: true })).toEqual({
+        state: 'stale',
+        secondsAgo: 0,
+      });
+    });
+
+    it('returns online for data under 30s old', () => {
+      expect(resolveVenueSyncStatus({ lastDataMs: now - 5000, nowMs: now, isOnline: true })).toEqual({
+        state: 'online',
+        secondsAgo: 5,
+      });
+      expect(resolveVenueSyncStatus({ lastDataMs: now - 29_000, nowMs: now, isOnline: true })).toEqual({
+        state: 'online',
+        secondsAgo: 29,
+      });
+    });
+
+    it('returns stale for data between 30s and 90s old', () => {
+      expect(resolveVenueSyncStatus({ lastDataMs: now - 30_000, nowMs: now, isOnline: true })).toEqual({
+        state: 'stale',
+        secondsAgo: 30,
+      });
+      expect(resolveVenueSyncStatus({ lastDataMs: now - 90_000, nowMs: now, isOnline: true })).toEqual({
+        state: 'stale',
+        secondsAgo: 90,
+      });
+    });
+
+    it('returns offline for data older than 90s', () => {
+      expect(resolveVenueSyncStatus({ lastDataMs: now - 91_000, nowMs: now, isOnline: true })).toEqual({
+        state: 'offline',
+        secondsAgo: 91,
+      });
+    });
   });
 });

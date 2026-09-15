@@ -25,6 +25,75 @@ export const VENUE_GROUPS_PER_PAGE = 8;
 export const VENUE_BOARDS_PER_PAGE = 6;
 export const VENUE_BOARDS_PER_PAGE_WITH_BRACKET = 4;
 
+export const VENUE_SLIDE_DURATION_BASE_MS = 8_000;
+export const VENUE_SLIDE_DURATION_MID_MS = 12_000;
+export const VENUE_SLIDE_DURATION_DENSE_MS = 15_000;
+export const VENUE_SLIDE_DURATION_FINISHED_MS = 20_000;
+
+/**
+ * Adaptivní délka rotace slidu podle množství a charakteru obsahu:
+ * - 8 s pro 1–2 terče / malé tabulky
+ * - 12 s pro 3–4 terče / plné tabulky skupin
+ * - 15 s pro plně obsazených 6 živých terčů (hustý obsah)
+ * @param {object|null|undefined} slide
+ * @returns {number} délka v milisekundách
+ */
+export function resolveVenueSlideDurationMs(slide) {
+  if (!slide || typeof slide !== 'object') return VENUE_CAROUSEL_MS;
+  if (slide.type === 'finished') return VENUE_SLIDE_DURATION_FINISHED_MS;
+
+  if (slide.type === 'live') {
+    const boards = Array.isArray(slide.boards) ? slide.boards : [];
+    const count = boards.length;
+    if (count <= 2) return VENUE_SLIDE_DURATION_BASE_MS;
+    if (count <= 4) return VENUE_SLIDE_DURATION_MID_MS;
+    return VENUE_SLIDE_DURATION_DENSE_MS; // 5–6 terčů
+  }
+
+  if (slide.type === 'groups') {
+    const groups = Array.isArray(slide.groups) ? slide.groups : [];
+    const count = groups.length;
+    if (count === 0) return VENUE_SLIDE_DURATION_BASE_MS;
+    // Malé tabulky: 1–2 skupiny bez odehraných/živých zápasů
+    const hasLiveOrPlayed = groups.some(
+      (g) =>
+        g?.liveMatch ||
+        (Array.isArray(g?.rows) && g.rows.some((r) => (Number(r?.matchesWon) || 0) + (Number(r?.matchesLost) || 0) > 0))
+    );
+    if (count <= 2 && !hasLiveOrPlayed) return VENUE_SLIDE_DURATION_BASE_MS;
+    if (count <= 2) return VENUE_SLIDE_DURATION_MID_MS;
+    // Plné / větší tabulky skupin: 3 a více skupin
+    if (count <= 4) return VENUE_SLIDE_DURATION_MID_MS;
+    return VENUE_SLIDE_DURATION_DENSE_MS;
+  }
+
+  return VENUE_CAROUSEL_MS;
+}
+
+/**
+ * Stav synchronizace TV obrazovky s Firestore daty.
+ * @param {{ lastDataMs: number|null, nowMs?: number, isOnline?: boolean }} params
+ * @returns {{ state: 'online'|'stale'|'offline', secondsAgo: number }}
+ */
+export function resolveVenueSyncStatus({ lastDataMs, nowMs = Date.now(), isOnline = true }) {
+  if (!isOnline) {
+    const secondsAgo = lastDataMs ? Math.max(0, Math.floor((nowMs - lastDataMs) / 1000)) : 0;
+    return { state: 'offline', secondsAgo };
+  }
+  if (!lastDataMs) {
+    return { state: 'stale', secondsAgo: 0 };
+  }
+  const diffMs = Math.max(0, nowMs - lastDataMs);
+  const secondsAgo = Math.floor(diffMs / 1000);
+  if (secondsAgo < 30) {
+    return { state: 'online', secondsAgo };
+  }
+  if (secondsAgo <= 90) {
+    return { state: 'stale', secondsAgo };
+  }
+  return { state: 'offline', secondsAgo };
+}
+
 /**
  * @template T
  * @param {T[]} items
