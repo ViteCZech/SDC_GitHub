@@ -23,6 +23,7 @@ SDC_GitHub/
     src/services/syncAdapter/        ← cloud I/O: jádro turnaj/tablet eager; prereg/online/historie lazy
     src/utils/venueDisplayRoutes.js  ← /tv/:pin routing bez tournamentLogic
     src/utils/tabletBoardSchedule.js ← rozpis / pickup zápasu na tabletu
+    src/utils/tabletKioskLock.js     ← Kiosk PIN zámek tabletu (odvození PINu, perzistence v sessionStorage)
     src/utils/matchStats.js          ← průměry, překlad výchozích jmen
     src/main.jsx                     ← React 19 + PWA service worker
     src/firebase.js                  ← Firebase Auth + Firestore DB `eur3`
@@ -170,6 +171,10 @@ Vstup: Domů → Turnaj (`TournamentHub`).
 **Role**
 - **Admin** (Google, pokud cloud): setup, los, terče, řízení, statistiky, QR pro tablety
 - **Tablet** (kiosk u terče): PIN + číslo desky + heslo/token → čekárna, check-in, zadávání zápasu
+  - **Kiosk PIN zámek:** Tablet běží v chráněném kiosk režimu (`utils/tabletKioskLock.js`). Kiosk PIN má 4 číslice (priorita heslo tabletu, fallback PIN turnaje). Stav zamčení (`isKioskLocked`) se ukládá v `sessionStorage` a přežívá refresh po celou dobu provozu tabletu.
+  - **Chráněné akce (Guarded Actions):** Odpojení tabletu, návrat/opuštění zápasu (Domů), storno/reset rozehraného zápasu (`onAbort`) a otevření pokročilého nastavení / pause menu vyžadují zadání Kiosk PINu přes `TabletKioskPinModal.jsx`.
+  - **Ochrana proti zavření (`beforeunload`):** V aktivním zamčeném tabletovém režimu brání náhodnému zavření záložky či refreshi stránky.
+  - **Indikátor zámku:** V hlavičce (PIN bar) je ikona 🔒/🔓 (`TabletKioskLockBadge.jsx`) pro odemčení nebo opětovné zamknutí.
 - **Viewer**: jen PIN → sleduje skupiny / pavouka / statistiky (live)
 
 **Formáty** (`tournamentLogic.js`)
@@ -292,7 +297,7 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 4. **Identita hráče** (duplicity ČŠO vs rekreační) → `playerIdentity.js`, stejná logika na CF.
 5. **Nedávej tajemství do gitu.** Firebase web config v `firebase.js` je veřejný klientský klíč — OK. Service account nikdy.
 6. **AppMain.jsx je velký.** Novou logiku extrahuj do `utils/` / `services/` / komponenty. Do AppMain jen wiring. Home/setup/X01 nech eager; ostatní obrazovky lazy.
-7. **Tablet = kiosk.** Žádný Google login na tabletu. Přístup PIN + board + heslo/token.
+7. **Tablet = kiosk.** Žádný Google login na tabletu. Přístup PIN + board + heslo/token. Aktivní tablet má Kiosk PIN zámek (`utils/tabletKioskLock.js`), ochranu před opuštěním/refreshem (`beforeunload`) a chráněné citlivé akce (odpojit, resetovat zápas, otevřít pause menu).
 8. **Cloud turnaje** vyžaduje Google účet. Offline turnaj musí dál fungovat bez cloudu.
 9. **PWA:** po změně chování ověř, že service worker neservíruje starý bundle; `registerSW({ immediate: true })`. `index.html` a `sw.js` musí jít s `Cache-Control: no-cache` (viz `firebase.json`) — jinak po deployi hashed `/assets/*.js` spadnou na HTML rewrite a start je černá obrazovka. Lazy obrazovky (turnaj, cricket, online, prereg) a odložené servisy (prereg, veřejné výsledky, historie zápasů) se do precache nedávají — stáhnou se až po otevření. Missing `/assets/*` se přepisuje na `stale-chunk.js`, ne na `index.html`.
 10. Neměň Firebase project ID, název DB `eur3`, ani region functions bez výslovného zadání.
@@ -310,6 +315,7 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 | Los skupin, pavouk, rozhodčí | `tournamentLogic.js`, `tournamentGenerator.js` |
 | Stepper turnaje / lock rankingu | `AppMain.jsx`, `TournamentSetup.jsx`, `tournamentRanking.js` |
 | Tablet čekárna / check-in timeout | `TabletWaitingRoom.jsx`, `tabletCheckInTimeout.js` |
+| Kiosk PIN zámek tabletu / ochrana akcí | `TabletKioskPinModal.jsx`, `TabletKioskLockBadge.jsx`, `tabletKioskLock.js`, `AppMain.jsx` |
 | QR tabletu | `tabletBoardQr.js`, `TabletBoardQrPanel.jsx` |
 | TV obrazovka haly `/tv/:pin` | `VenueDisplayView.jsx`, `utils/venueDisplay.js` |
 | Předregistrace / platby | `tournamentPreRegService.js`, `prereg/*`, `functions/src/registerPlayer.ts` |
