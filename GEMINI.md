@@ -22,12 +22,13 @@ SDC_GitHub/
     src/context/SyncAdapterContext.jsx
     src/services/syncAdapter/        ← cloud I/O: jádro turnaj/tablet eager; prereg/online/historie lazy
     src/utils/venueDisplayRoutes.js  ← /tv/:pin routing bez tournamentLogic
+    src/utils/venueDisplay.js        ← PDC-style TV display stavový automat a data
     src/utils/tabletBoardSchedule.js ← rozpis / pickup zápasu na tabletu
     src/utils/tabletKioskLock.js     ← Kiosk PIN zámek tabletu (odvození PINu, perzistence v sessionStorage)
     src/utils/matchStats.js          ← průměry, překlad výchozích jmen
     src/main.jsx                     ← React 19 + PWA service worker
     src/firebase.js                  ← Firebase Auth + Firestore DB `eur3`
-    src/translations.js              ← jen kompatibilní re-export `src/i18n/catalog.js`; nové texty sem nepatří
+    src/i18n/                        ← UI texty ({cs,en,pl}.js + catalog.js; translations.js je jen zastaralý re-export)
     src/components/                  ← obrazovky a UI
     src/components/online/           ← online lobby / video / post-match
     src/components/prereg/           ← předregistrace turnajů
@@ -129,7 +130,7 @@ URL deep-linky (bez React Routeru, parsují se z `window.location`):
 
 - `/t/:tournamentId` — veřejná předregistrace (`?invite=` pro spolupořadatele)
 - `/tournaments` — katalog
-- `/tv/:pin` — veřejná TV obrazovka haly (`VenueDisplayView.jsx`), lazy z `App.jsx` (není `AppMain`). Jen čte `active_tournaments/{pin}`. Kiosk: `100vh` + `overflow: hidden`, bez posuvníků. Pavouk se kreslí jen když už existuje; jinak 100 % plochy mají terče / skupiny. Terče max 6 / stránka, skupiny max 4 (mřížka 2×2), rotace 10 s.
+- `/tv/:pin` — veřejná TV obrazovka haly (`VenueDisplayView.jsx`), lazy z `App.jsx` (není `AppMain`). PDC-style TV display redesign s real-time stavovým automatem a tabulkami. Jen čte `active_tournaments/{pin}`. Kiosk: `100vh` + `overflow: hidden`, bez posuvníků, tmavé téma a Screen Wake Lock. Rotuje skupinové tabulky (až 8 skupin/stránka s leg rozdíly), živé terče (probíhající i příští zápas, průměry, házející hráč, skóre, rozhodčí), stav pavouka a finální vyhlášení; překryvné výzvy nových zápasů (`callQueue`) s časovačem.
 - tablet QR: PIN + číslo terče + token (`tabletBoardQr.js`)
 
 ---
@@ -171,10 +172,6 @@ Vstup: Domů → Turnaj (`TournamentHub`).
 **Role**
 - **Admin** (Google, pokud cloud): setup, los, terče, řízení, statistiky, QR pro tablety
 - **Tablet** (kiosk u terče): PIN + číslo desky + heslo/token → čekárna, check-in, zadávání zápasu
-  - **Kiosk PIN zámek:** Tablet běží v chráněném kiosk režimu (`utils/tabletKioskLock.js`). Kiosk PIN má 4 číslice (priorita heslo tabletu, fallback PIN turnaje). Stav zamčení (`isKioskLocked`) se ukládá v `sessionStorage` a přežívá refresh po celou dobu provozu tabletu.
-  - **Chráněné akce (Guarded Actions):** Odpojení tabletu, návrat/opuštění zápasu (Domů), storno/reset rozehraného zápasu (`onAbort`) a otevření pokročilého nastavení / pause menu vyžadují zadání Kiosk PINu přes `TabletKioskPinModal.jsx`.
-  - **Ochrana proti zavření (`beforeunload`):** V aktivním zamčeném tabletovém režimu brání náhodnému zavření záložky či refreshi stránky.
-  - **Indikátor zámku:** V hlavičce (PIN bar) je ikona 🔒/🔓 (`TabletKioskLockBadge.jsx`) pro odemčení nebo opětovné zamknutí.
 - **Viewer**: jen PIN → sleduje skupiny / pavouka / statistiky (live)
 
 **Formáty** (`tournamentLogic.js`)
@@ -242,13 +239,27 @@ Typy: `src/types/tournamentPreReg.d.ts` a `functions/src/types.ts` — držet v 
 - Scraper (`stedarHtmlFetch.ts`): HTTPS → při TLS chybě HTTPS bez ověření certu → čisté HTTP (3xx na HTTPS se nebere). Odkazy v UI zůstávají `https://www.stedar.org`.
 - Identita hráče: `playerIdentity.js` / `functions/src/playerIdentity.ts` (nameKey + `csoPlayerId`)
 
-### 6. TV display haly — PDC-style redesign (dokončeno)
+### 6. PDC-style TV display redesign (`/tv/:pin`)
 
-`/tv/:pin` (`VenueDisplayView.jsx` + `utils/venueDisplay.js`, lazy z `App.jsx`, mimo `AppMain`). Jen čte `active_tournaments/{pin}` přes sync adapter (live subscription). Real-time stavový automat: `empty` (neplatný PIN / turnaj neaktivní) → `loading` → `ready`, uvnitř `live` / `finished` obsah (skupiny → pavouk → celkové výsledky). PDC-style vzhled: no-scroll kiosk (`100vh`, `overflow: hidden`), stránkované terče a tabulky skupin s rotací, vynucený dark režim.
+Veřejná TV obrazovka haly běžící v samostatném lazy chunku mimo orchestrátor (`VenueDisplayView.jsx`, `utils/venueDisplay.js`, `utils/venueDisplayRoutes.js`):
+- **Architektura:** Čistě read-only snapshot z `active_tournaments/{pin}` přes `SyncAdapterContext` (live subscription), bez závislosti na `tournamentLogic` a `AppMain`.
+- **Kiosk layout:** PDC-style tmavý vizuál, `100vh` bez scrollbarů (`overflow: hidden`), automatická aktivace Screen Wake Lock (`navigator.wakeLock`).
+- **Real-time stavový automat a kolotoč slidů:**
+  - Stavový cyklus: prázdný/neplatný PIN (`empty`) → načítání (`loading`) → živý přehled (`ready` / `live`) / ukončený turnaj (`finished`).
+  - **Skupinové tabulky:** Dynamická mřížka (až 8 skupin na stránku dle velikosti skupin a počtu sloupců), body, skóre legů, leg difference, přehled živého a nadcházejícího zápasu skupiny.
+  - **Živé terče a zápasy:** Karty terčů s probíhajícím (`current`) a příštím (`next`) zápasem, indikátor hráče na hodu, zbývající body (remaining), legové a setové skóre, 3-dart průměry (avg), jméno rozhodčího/počtáře a chybějící přítomnost hráčů pro check-in.
+  - **Přehled pavouka:** Automatická detekce aktivní fáze (předkolo, čtvrtfinále, semifinále, finále), Best of formát a průběh dohraných zápasů.
+  - **Souhrn turnaje (`finished`):** Po skončení turnaje automatické zobrazení medailistů a celkových statistik.
+  - **Výzvy k terčům (`callQueue`):** Detekce nově nasazených zápasů na terče; zobrazí prioritní alert pruh (overlay) s odpočtem (`VENUE_CALL_MS`, 8 s), který dočasně pozastaví běžnou rotaci.
 
-### 7. Tablet Kiosk PIN lock (dokončeno)
+### 7. Tablet Kiosk PIN lock
 
-Tablet u terče je kiosk: citlivé akce (odpojit tablet, Domů z čekárny i rozehraného zápasu, opustit/resetovat zápas, pause menu) vyžadují 4místný Kiosk PIN (`TabletKioskPinModal.jsx` — dotyková klávesnice, auto-ověření po 4. číslici, po 3. neúspěchu 5s lockout; `TabletKioskLockBadge.jsx` — stav/odemknutí). Logika v `utils/tabletKioskLock.js`: PIN se odvodí z hesla tabletu, jinak z PINu turnaje; stav zámku (`isKioskLocked`) přežívá refresh v `sessionStorage`. Wiring v `AppMain.jsx` (`runTabletKioskGuarded`); zamčený kiosk blokuje i zavření okna (`beforeunload`).
+Bezpečnostní režim pro tablety u terče (`TabletKioskPinModal.jsx`, `TabletKioskLockBadge.jsx`, `utils/tabletKioskLock.js`, integrace v `AppMain.jsx`, `TabletWaitingRoom.jsx`, `GameX01.jsx`):
+- **Účel:** Tablet u terče je kiosk. Zamezení nechtěnému opuštění rozehraného zápasu, resetu desky nebo ukončení tabletové relace hráči bez vědomí pořadatele. Citlivé akce (odpojit tablet, Domů z čekárny i zápasu, opustit/resetovat zápas, pause menu) vyžadují 4místný Kiosk PIN (`runTabletKioskGuarded`).
+- **Kiosk PIN:** 4místný číselný kód odvozený prioritně z hesla tabletu (`tabletPassword`), případně z admin PINu turnaje (`activePin` / `tournamentPin`).
+- **Perzistence stavu:** Stav zamčení (`sdc_tablet_kiosk_locked`) se ukládá do `sessionStorage`, takže přežije i reload stránky. Výchozí stav je vždy zamčeno (`locked`).
+- **Ověření a lockout:** Virtuální numerický PIN pad (`TabletKioskPinModal`) s okamžitým ověřením po 4 číslicích; po 3 neúspěšných pokusech dojde k dočasnému uzamčení klávesnice na 5 sekund (`TABLET_KIOSK_LOCKOUT_SECONDS`).
+- **Ochrana proti opuštění a zavření okna:** Registrován `beforeunload` handler v `AppMain.jsx` a herních komponentách, který varuje při pokusu o zavření okna či navigaci pryč. Opuštění zápasu nebo odhlášení desky vyžaduje zadání Kiosk PINu.
 
 ---
 
@@ -300,16 +311,16 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 ## Konvence při úpravách
 
 1. **Nová obrazovka** = nový `appState` + větev v `AppMain.jsx` (těžké obrazovky přidej do `lazyScreens.jsx`) + záznam v `appNavigation.js`.
-2. **Nový text UI** = klíč v `src/i18n/{cs,en,pl}.js` pro cs, en i pl (`cs` je v hlavním chunku, `en`/`pl` se dotahují lazy přes `src/i18n/catalog.js` → `ensureLocale` / `prefetchOtherLocales`). `src/translations.js` je jen zpětně kompatibilní re-export katalogu — nové klíče se přidávají přímo do `src/i18n/cs.js`, `src/i18n/en.js` a `src/i18n/pl.js`. Nehardcodovat stringy v komponentách (výjimka: pár starších míst v Cricket).
+2. **Nový text UI** = přidávat výhradně do `src/i18n/{cs,en,pl}.js` pro cs, en i pl (`cs` je v hlavním chunku, `en`/`pl` se dotahují lazy přes `src/i18n/catalog.js` → `ensureLocale` / `prefetchOtherLocales`). `src/translations.js` je jen zastaralý zpětně kompatibilní re-export katalogu — nové klíče se přidávají přímo do `src/i18n/cs.js`, `src/i18n/en.js` a `src/i18n/pl.js`. Nehardcodovat stringy v komponentách (výjimka: pár starších míst v Cricket).
 3. **Turnajová pravidla** (postup, pavouk, rozhodčí, odhad času) → `tournamentLogic.js`. Testuj edge cases: lichý počet, bye, walkover, JIT desky.
 4. **Identita hráče** (duplicity ČŠO vs rekreační) → `playerIdentity.js`, stejná logika na CF.
 5. **Nedávej tajemství do gitu.** Firebase web config v `firebase.js` je veřejný klientský klíč — OK. Service account nikdy.
 6. **AppMain.jsx je velký.** Novou logiku extrahuj do `utils/` / `services/` / komponenty. Do AppMain jen wiring. Home/setup/X01 nech eager; ostatní obrazovky lazy.
-7. **Tablet = kiosk.** Žádný Google login na tabletu. Přístup PIN + board + heslo/token. Aktivní tablet má Kiosk PIN zámek (`utils/tabletKioskLock.js`), ochranu před opuštěním/refreshem (`beforeunload`) a chráněné citlivé akce (odpojit, resetovat zápas, otevřít pause menu).
+7. **Tablet = kiosk.** Žádný Google login na tabletu. Přístup PIN + board + heslo/token. Aktivní tablet má Kiosk PIN zámek (`TabletKioskPinModal`, `utils/tabletKioskLock.js`), ochranu před opuštěním/refreshem (`beforeunload`) a chráněné citlivé akce (odpojit, resetovat zápas, otevřít pause menu).
 8. **Cloud turnaje** vyžaduje Google účet. Offline turnaj musí dál fungovat bez cloudu.
 9. **PWA:** po změně chování ověř, že service worker neservíruje starý bundle; `registerSW({ immediate: true })`. `index.html` a `sw.js` musí jít s `Cache-Control: no-cache` (viz `firebase.json`) — jinak po deployi hashed `/assets/*.js` spadnou na HTML rewrite a start je černá obrazovka. Lazy obrazovky (turnaj, cricket, online, prereg) a odložené servisy (prereg, veřejné výsledky, historie zápasů) se do precache nedávají — stáhnou se až po otevření. Missing `/assets/*` se přepisuje na `stale-chunk.js`, ne na `index.html`.
 10. Neměň Firebase project ID, název DB `eur3`, ani region functions bez výslovného zadání.
-11. **Pro UI a vizuální úlohy NIKDY neprovádět video testy ani nahrávání obrazovky. Pro ověření používat výhradně linter, unit testy a produkční build.**
+11. **Pravidlo pro AI agenty (zákaz video testování):** Pro UI a vizuální úlohy NIKDY neprovádět video testy ani nahrávání obrazovky. Pro ověření používat výhradně linter, unit testy a produkční build.
 
 ---
 
@@ -324,11 +335,12 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 | Los skupin, pavouk, rozhodčí | `tournamentLogic.js`, `tournamentGenerator.js` |
 | Stepper turnaje / lock rankingu | `AppMain.jsx`, `TournamentSetup.jsx`, `tournamentRanking.js` |
 | Tablet čekárna / check-in timeout | `TabletWaitingRoom.jsx`, `tabletCheckInTimeout.js` |
-| Kiosk PIN zámek tabletu / ochrana akcí | `TabletKioskPinModal.jsx`, `TabletKioskLockBadge.jsx`, `tabletKioskLock.js`, `AppMain.jsx` |
+| Tablet Kiosk PIN lock & ochrana okna | `TabletKioskPinModal.jsx`, `TabletKioskLockBadge.jsx`, `utils/tabletKioskLock.js`, `AppMain.jsx` |
 | QR tabletu | `tabletBoardQr.js`, `TabletBoardQrPanel.jsx` |
-| TV obrazovka haly `/tv/:pin` | `VenueDisplayView.jsx`, `utils/venueDisplay.js` |
+| TV obrazovka haly (PDC-style `/tv/:pin`) | `VenueDisplayView.jsx`, `utils/venueDisplay.js`, `utils/venueDisplayRoutes.js` |
 | Předregistrace / platby | `tournamentPreRegService.js`, `prereg/*`, `functions/src/registerPlayer.ts` |
 | ČŠO našeptávač | `csoRanking.js`, `CsoPlayerNameField.jsx` |
+| UI texty a lokalizace (i18n) | `src/i18n/{cs,en,pl}.js`, `src/i18n/catalog.js` |
 | Navigace Domů/Zpět | `appNavigation.js`, `AppNavBar.jsx` |
 | Firestore oprávnění | `firestore.rules` |
 
