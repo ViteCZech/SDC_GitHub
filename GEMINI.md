@@ -27,7 +27,7 @@ SDC_GitHub/
     src/utils/matchStats.js          ← průměry, překlad výchozích jmen
     src/main.jsx                     ← React 19 + PWA service worker
     src/firebase.js                  ← Firebase Auth + Firestore DB `eur3`
-    src/translations.js
+    src/translations.js              ← jen kompatibilní re-export `src/i18n/catalog.js`; nové texty sem nepatří
     src/components/                  ← obrazovky a UI
     src/components/online/           ← online lobby / video / post-match
     src/components/prereg/           ← předregistrace turnajů
@@ -242,6 +242,14 @@ Typy: `src/types/tournamentPreReg.d.ts` a `functions/src/types.ts` — držet v 
 - Scraper (`stedarHtmlFetch.ts`): HTTPS → při TLS chybě HTTPS bez ověření certu → čisté HTTP (3xx na HTTPS se nebere). Odkazy v UI zůstávají `https://www.stedar.org`.
 - Identita hráče: `playerIdentity.js` / `functions/src/playerIdentity.ts` (nameKey + `csoPlayerId`)
 
+### 6. TV display haly — PDC-style redesign (dokončeno)
+
+`/tv/:pin` (`VenueDisplayView.jsx` + `utils/venueDisplay.js`, lazy z `App.jsx`, mimo `AppMain`). Jen čte `active_tournaments/{pin}` přes sync adapter (live subscription). Real-time stavový automat: `empty` (neplatný PIN / turnaj neaktivní) → `loading` → `ready`, uvnitř `live` / `finished` obsah (skupiny → pavouk → celkové výsledky). PDC-style vzhled: no-scroll kiosk (`100vh`, `overflow: hidden`), stránkované terče a tabulky skupin s rotací, vynucený dark režim.
+
+### 7. Tablet Kiosk PIN lock (dokončeno)
+
+Tablet u terče je kiosk: citlivé akce (odpojit tablet, Domů z čekárny i rozehraného zápasu, opustit/resetovat zápas, pause menu) vyžadují 4místný Kiosk PIN (`TabletKioskPinModal.jsx` — dotyková klávesnice, auto-ověření po 4. číslici, po 3. neúspěchu 5s lockout; `TabletKioskLockBadge.jsx` — stav/odemknutí). Logika v `utils/tabletKioskLock.js`: PIN se odvodí z hesla tabletu, jinak z PINu turnaje; stav zámku (`isKioskLocked`) přežívá refresh v `sessionStorage`. Wiring v `AppMain.jsx` (`runTabletKioskGuarded`); zamčený kiosk blokuje i zavření okna (`beforeunload`).
+
 ---
 
 ## Cloud Functions (`functions/src/`)
@@ -292,7 +300,7 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 ## Konvence při úpravách
 
 1. **Nová obrazovka** = nový `appState` + větev v `AppMain.jsx` (těžké obrazovky přidej do `lazyScreens.jsx`) + záznam v `appNavigation.js`.
-2. **Nový text UI** = klíč v `translations.js` pro cs, en i pl. Nehardcodovat stringy v komponentách (výjimka: pár starších míst v Cricket).
+2. **Nový text UI** = klíč v `src/i18n/{cs,en,pl}.js` pro cs, en i pl (`cs` je v hlavním chunku, `en`/`pl` se dotahují lazy přes `src/i18n/catalog.js` → `ensureLocale` / `prefetchOtherLocales`). `src/translations.js` je jen zpětně kompatibilní re-export katalogu — nové klíče se přidávají přímo do `src/i18n/cs.js`, `src/i18n/en.js` a `src/i18n/pl.js`. Nehardcodovat stringy v komponentách (výjimka: pár starších míst v Cricket).
 3. **Turnajová pravidla** (postup, pavouk, rozhodčí, odhad času) → `tournamentLogic.js`. Testuj edge cases: lichý počet, bye, walkover, JIT desky.
 4. **Identita hráče** (duplicity ČŠO vs rekreační) → `playerIdentity.js`, stejná logika na CF.
 5. **Nedávej tajemství do gitu.** Firebase web config v `firebase.js` je veřejný klientský klíč — OK. Service account nikdy.
@@ -301,6 +309,7 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 8. **Cloud turnaje** vyžaduje Google účet. Offline turnaj musí dál fungovat bez cloudu.
 9. **PWA:** po změně chování ověř, že service worker neservíruje starý bundle; `registerSW({ immediate: true })`. `index.html` a `sw.js` musí jít s `Cache-Control: no-cache` (viz `firebase.json`) — jinak po deployi hashed `/assets/*.js` spadnou na HTML rewrite a start je černá obrazovka. Lazy obrazovky (turnaj, cricket, online, prereg) a odložené servisy (prereg, veřejné výsledky, historie zápasů) se do precache nedávají — stáhnou se až po otevření. Missing `/assets/*` se přepisuje na `stale-chunk.js`, ne na `index.html`.
 10. Neměň Firebase project ID, název DB `eur3`, ani region functions bez výslovného zadání.
+11. **Pro UI a vizuální úlohy NIKDY neprovádět video testy ani nahrávání obrazovky. Pro ověření používat výhradně linter, unit testy a produkční build.**
 
 ---
 
