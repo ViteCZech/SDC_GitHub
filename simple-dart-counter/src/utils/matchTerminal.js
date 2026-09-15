@@ -13,7 +13,10 @@ export function applyMatchPatchPreservingTerminal(current, patches) {
   const patch = patches && typeof patches === 'object' ? patches : {};
   const merged = { ...cur, ...patch };
 
-  if (isMatchTerminal(cur) && !isMatchTerminal(merged)) {
+  const curTerminal = isMatchTerminal(cur);
+  const mergedTerminal = isMatchTerminal(merged);
+
+  if (curTerminal && !mergedTerminal) {
     const telemetry = {};
     for (const key of [
       'tabletStatus',
@@ -31,7 +34,7 @@ export function applyMatchPatchPreservingTerminal(current, patches) {
     return { ...cur, ...telemetry };
   }
 
-  if (isMatchTerminal(cur) && isMatchTerminal(merged)) {
+  if (curTerminal && mergedTerminal) {
     const left = Number(cur.completedAt) || 0;
     const right = Number(merged.completedAt) || 0;
     if (left > right) return { ...cur };

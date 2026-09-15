@@ -96,20 +96,33 @@ export async function fetchStedarHtml(url: string, get: StedarGet = defaultSteda
   try {
     return await readOkHtml(await get(httpsUrl), httpsUrl);
   } catch (err) {
-    errors.push(`https: ${errMsg(err)}`);
-    logger.warn('Stedar HTTPS fetch failed, trying insecure TLS then HTTP', {
+    const errorDetails = errMsg(err);
+    errors.push(`https: ${errorDetails}`);
+    console.warn(`[Stedar Scraper] TLS certificate verification failed, falling back to insecure connection for target URL: ${httpsUrl}`, {
       url: httpsUrl,
-      error: errMsg(err),
+      error: errorDetails,
+    });
+    logger.warn('[Stedar Scraper] TLS certificate verification failed, falling back to insecure connection for target URL', {
+      url: httpsUrl,
+      error: errorDetails,
     });
   }
 
   try {
     const html = await readOkHtml(await get(httpsUrl, { insecure: true }), httpsUrl);
-    logger.warn('Stedar HTML fetched over insecure HTTPS (certificate not verified)', { url: httpsUrl });
+    console.warn(`[Stedar Scraper] Stedar HTML fetched over insecure HTTPS (certificate not verified) for target URL: ${httpsUrl}`);
+    logger.warn('[Stedar Scraper] Stedar HTML fetched over insecure HTTPS (certificate not verified)', { url: httpsUrl });
     return html;
   } catch (err) {
-    errors.push(`https-insecure: ${errMsg(err)}`);
-    logger.warn('Stedar insecure HTTPS fetch failed', { error: errMsg(err) });
+    const errorDetails = errMsg(err);
+    errors.push(`https-insecure: ${errorDetails}`);
+    console.warn(`[Stedar Scraper] Insecure HTTPS fetch failed, falling back to plain HTTP for target URL: ${httpUrl}`, {
+      error: errorDetails,
+    });
+    logger.warn('[Stedar Scraper] Stedar insecure HTTPS fetch failed, falling back to plain HTTP', {
+      url: httpsUrl,
+      error: errorDetails,
+    });
   }
 
   try {
@@ -118,7 +131,8 @@ export async function fetchStedarHtml(url: string, get: StedarGet = defaultSteda
       throw new Error(`HTTP ${res.status} redirect to ${res.headers.get('location') || '?'}`);
     }
     const html = await readOkHtml(res, httpUrl);
-    logger.warn('Stedar HTML fetched over plain HTTP', { url: httpUrl });
+    console.warn(`[Stedar Scraper] Stedar HTML fetched over plain HTTP for target URL: ${httpUrl}`);
+    logger.warn('[Stedar Scraper] Stedar HTML fetched over plain HTTP', { url: httpUrl });
     return html;
   } catch (err) {
     errors.push(`http: ${errMsg(err)}`);

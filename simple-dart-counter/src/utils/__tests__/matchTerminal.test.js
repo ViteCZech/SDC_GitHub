@@ -51,4 +51,80 @@ describe('applyMatchPatchPreservingTerminal', () => {
       tabletStatus: 'ready_to_play',
     });
   });
+
+  it('isMatchTerminal správně rozpoznává terminální stavy', () => {
+    expect(isMatchTerminal(null)).toBe(false);
+    expect(isMatchTerminal(undefined)).toBe(false);
+    expect(isMatchTerminal({})).toBe(false);
+    expect(isMatchTerminal({ status: 'pending' })).toBe(false);
+    expect(isMatchTerminal({ status: 'playing' })).toBe(false);
+    expect(isMatchTerminal({ status: 'completed' })).toBe(true);
+    expect(isMatchTerminal({ status: 'walkover' })).toBe(true);
+    expect(isMatchTerminal({ walkover: true })).toBe(true);
+    expect(isMatchTerminal({ status: 'pending', walkover: true })).toBe(true);
+  });
+
+  it('zachová walkover terminální stav před přepsáním pending nebo playing', () => {
+    const walkoverMatch = {
+      matchId: 'm1',
+      status: 'walkover',
+      winnerId: 'p2',
+      walkover: true,
+      completedAt: 150,
+      whoStarts: 'p1',
+    };
+    const incomingPending = {
+      status: 'pending',
+      walkover: false,
+      tabletStatus: 'assigned',
+      whoStarts: 'p2',
+    };
+    const res = applyMatchPatchPreservingTerminal(walkoverMatch, incomingPending);
+    expect(isMatchTerminal(res)).toBe(true);
+    expect(res.status).toBe('walkover');
+    expect(res.winnerId).toBe('p2');
+    expect(res.walkover).toBe(true);
+    // povolené telemetry a metadata vlastnosti se přenesou
+    expect(res.tabletStatus).toBe('assigned');
+    expect(res.whoStarts).toBe('p2');
+  });
+
+  it('při souběžném zápisu dvou dokončení se stejným časem nebo bez completedAt vyhraje příchozí patch', () => {
+    const cur = { status: 'completed', winnerId: 'p1', completedAt: 100, score: '2:1' };
+    const patchSameTime = { status: 'completed', winnerId: 'p2', completedAt: 100, score: '1:2' };
+    const res = applyMatchPatchPreservingTerminal(cur, patchSameTime);
+    expect(res.winnerId).toBe('p2');
+    expect(res.score).toBe('1:2');
+  });
+
+  it('propíše všechny specifikované tablet telemetry klíče i když je zápas hotový', () => {
+    const cur = {
+      matchId: 'm2',
+      status: 'completed',
+      winnerId: 'p1',
+      completedAt: 200,
+    };
+    const patch = {
+      status: 'pending',
+      tabletStatus: 'waiting_room',
+      tabletCheckInPresent: { p1: true, p2: true, referee: true },
+      tabletCheckInResume: { leg: 2 },
+      tabletTimeoutWarningCount: 2,
+      tabletTimeoutAdminAckedCount: 1,
+      tabletTimeoutRoleWarningCounts: { p1: 1, p2: 0, referee: 1 },
+      whoStarts: 'p1',
+      customIgnoredField: 'should_not_be_copied',
+    };
+    const res = applyMatchPatchPreservingTerminal(cur, patch);
+    expect(res.status).toBe('completed');
+    expect(res.winnerId).toBe('p1');
+    expect(res.tabletStatus).toBe('waiting_room');
+    expect(res.tabletCheckInPresent).toEqual({ p1: true, p2: true, referee: true });
+    expect(res.tabletCheckInResume).toEqual({ leg: 2 });
+    expect(res.tabletTimeoutWarningCount).toBe(2);
+    expect(res.tabletTimeoutAdminAckedCount).toBe(1);
+    expect(res.tabletTimeoutRoleWarningCounts).toEqual({ p1: 1, p2: 0, referee: 1 });
+    expect(res.whoStarts).toBe('p1');
+    expect(res.customIgnoredField).toBeUndefined();
+  });
 });

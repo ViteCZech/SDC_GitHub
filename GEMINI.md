@@ -236,7 +236,7 @@ Typy: `src/types/tournamentPreReg.d.ts` a `functions/src/types.ts` — držet v 
 - Import předregistrace u dvojic skládá `players[]` jako týmy (`kind: 'team'`, `members`). U `random_doubles` importuje jednotlivce; admin v kroku 2 spustí los párů. Seed páru = součet ČP dvojice.
 - **X01 dvojice:** `settings.doubles` + `settings.teams.{p1,p2}.members`. Zápas zůstává 2 sloty (`player1Id`/`player2Id` = tým). Každý leg: začínající dvojice musí vybrat házejícího; druhá může hned, nebo až po prvním hodu. Pak střídání uvnitř páru. Historie hodu má `throwerId`. Výsledek: `result.p1Avg/p2Avg` = pár, `result.members` = 4 hráči, `result.legStarters`. Tablet check-in = 4 hráči + 1 počtář. Skupinová tabulka bere **týmový** průměr. Počtář je **osoba** — sériový rozvrh jako u jednotlivců (`chalkerId` = slot), z páru vždy 1 hráč, střídání napříč zápasy. **1 terč = sériový ČŠO rozvrh.** Až admin skupině (singles i dvojice) dá 2+ terče, `adaptGroupParallelPlay` pustí jen zápasy bez společných hráčů (`pickParallelGroupMatches`); volní počítají. U 6 jednotlivců na 2 terčích hrají 4 + 2 počítají (nikdo nečeká). Počtář se může lišit od sériového slotu. Cricket a online 1v1 dvojice nemají.
 - Scheduled CF denně 7:00 Europe/Prague + ruční tlačítko `CsoRankingUpdateButton`
-- Scraper (`stedarHtmlFetch.ts`): HTTPS → při TLS chybě HTTPS bez ověření certu → čisté HTTP (3xx na HTTPS se nebere). Odkazy v UI zůstávají `https://www.stedar.org`.
+- Scraper (`stedarHtmlFetch.ts`): HTTPS → při TLS chybě HTTPS bez ověření certu → čisté HTTP (3xx na HTTPS se nebere). Při selhání TLS ověření zapisuje explicitní varovný auditní log `[Stedar Scraper] TLS certificate verification failed, falling back to insecure connection for target URL` do Firebase Cloud Logs (`logger.warn` + `console.warn`). Odkazy v UI zůstávají `https://www.stedar.org`.
 - Identita hráče: `playerIdentity.js` / `functions/src/playerIdentity.ts` (nameKey + `csoPlayerId`)
 
 ### 6. PDC-style TV display redesign (`/tv/:pin`)
@@ -348,6 +348,7 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 | Los skupin, pavouk, rozhodčí | `tournamentLogic.js`, `tournamentGenerator.js` |
 | Stepper turnaje / lock rankingu | `AppMain.jsx`, `TournamentSetup.jsx`, `tournamentRanking.js` |
 | Tablet čekárna / check-in timeout | `TabletWaitingRoom.jsx`, `tabletCheckInTimeout.js` |
+| Ochrana terminálních výsledků a souběžnost zápisů | `matchTerminal.js`, `__tests__/matchTerminal.test.js` |
 | Tablet Kiosk PIN lock & ochrana okna | `TabletKioskPinModal.jsx`, `TabletKioskLockBadge.jsx`, `utils/tabletKioskLock.js`, `AppMain.jsx` |
 | QR tabletu | `tabletBoardQr.js`, `TabletBoardQrPanel.jsx` |
 | TV obrazovka haly (PDC-style `/tv/:pin`) | `VenueDisplayView.jsx`, `utils/venueDisplay.js`, `utils/venueDisplayRoutes.js` |
