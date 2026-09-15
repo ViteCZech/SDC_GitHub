@@ -244,6 +244,19 @@ Typy: `src/types/tournamentPreReg.d.ts` a `functions/src/types.ts` — držet v 
 Veřejná TV obrazovka haly běžící v samostatném lazy chunku mimo orchestrátor (`VenueDisplayView.jsx`, `utils/venueDisplay.js`, `utils/venueDisplayRoutes.js`):
 - **Architektura:** Čistě read-only snapshot z `active_tournaments/{pin}` přes `SyncAdapterContext` (live subscription), bez závislosti na `tournamentLogic` a `AppMain`.
 - **Kiosk layout:** PDC-style tmavý vizuál, `100vh` bez scrollbarů (`overflow: hidden`), automatická aktivace Screen Wake Lock (`navigator.wakeLock`).
+- **Indikátor stavu připojení a čerstvosti dat (Connection & Freshness Indicator):**
+  - Estetický odznak v hlavičce (`VenueSyncIndicator`, `resolveVenueSyncStatus`):
+    - **Online / čerstvá data (< 30 s):** Zelená pulzující tečka s textem `Živě` / `Aktualizováno před X s`.
+    - **Zpoždění dat / Stale (30–90 s):** Žlutá tečka s textem `Čekání na data…`.
+    - **Ztráta spojení / Offline (> 90 s nebo `navigator.onLine === false`):** Červený blikající indikátor `⚠️ Spojení přerušeno (Reconnecting…)`.
+- **Adaptivní délka rotace a plynulé přechody (Dynamic Slide Duration & Transitions):**
+  - Funkce `resolveVenueSlideDurationMs(slide)` dynamicky určuje délku rotace podle obsahu:
+    - **8 s** (`VENUE_SLIDE_DURATION_BASE_MS`): 1–2 terče nebo malé neodehrané tabulky.
+    - **12 s** (`VENUE_SLIDE_DURATION_MID_MS`): 3–4 terče nebo plné tabulky skupin.
+    - **15 s** (`VENUE_SLIDE_DURATION_DENSE_MS`): 5–6 živých terčů (hustý obsah).
+    - **20 s** (`VENUE_SLIDE_DURATION_FINISHED_MS`): Závěrečná obrazovka turnaje.
+  - Progress bar a sekundový odpočet v hlavičce plynule reflektují tuto dynamicky vypočítanou délku.
+  - Plynulé CSS přechody mezi rotujícími slidy (CSS klíčové snímky `fade-in` 0.3s).
 - **Real-time stavový automat a kolotoč slidů:**
   - Stavový cyklus: prázdný/neplatný PIN (`empty`) → načítání (`loading`) → živý přehled (`ready` / `live`) / ukončený turnaj (`finished`).
   - **Skupinové tabulky:** Dynamická mřížka (až 8 skupin na stránku dle velikosti skupin a počtu sloupců), body, skóre legů, leg difference, přehled živého a nadcházejícího zápasu skupiny.
