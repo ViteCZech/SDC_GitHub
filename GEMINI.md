@@ -277,6 +277,45 @@ Bezpečnostní režim pro tablety u terče (`TabletKioskPinModal.jsx`, `TabletKi
 
 ---
 
+## Plánované moduly (Budoucí rozvoj)
+
+### Modul: Turnajové série (SDC Circuit System)
+
+Turnajové okruhy a dlouhodobé sezóny zastřešující více samostatných turnajů s průběžným bodováním, finančním fondem (Jackpot) a kvalifikací na závěrečný finálový turnaj.
+
+#### 1. Datový model & Firestore architektura
+- **Kolekce `tournament_series/{seriesId}`**: Nadřazený dokument série (`meta`, `config`, `financials`, `tournaments[]`).
+- **Kompaktní Žebříček (`tournament_series/{seriesId}/data/standings_compact`)**: Všechny agregované výsledky a statistiky hráčů se ukládají do **1 denormalizovaného dokumentu**. Garantuje načtení celého žebříčku v UI jedním Firestore readem.
+- **Bezpečnost (`firestore.rules`)**: Vzor z předregistrací – čtení veřejné (non-DRAFT), zápis pouze vlastník (`ownerUid`) a ověření spolupořadatelé (`coAdmins` / `invite` token).
+
+#### 2. Herní & Finanční logika
+- **Kvalifikační režimy finále**:
+  1. `TOP N` (např. TOP 32 / TOP 64)
+  2. `Minimální počet účastí` (např. ≥ 5 turnajů)
+  3. `Kombinovaný` (TOP N + podmiňující min. účasti)
+  4. `Otevřené finále` (pořadí v sérii určuje pouze nasazení)
+- **Nasazení ve finále (`seedingSource: 'series'`)**:
+  - V `TournamentSetup.jsx` přibude výslovný přepínač zdroje nasazení.
+  - Pro skupiny (`groups_bracket`): nasazení *hadovitým systémem (Snake Draft)*.
+  - Pro KO pavouka (`direct-ko`): nasazení dle klíče 1. vs 32., 2. vs 31.
+- **Formát-agnostický Tie-break**: Vyřazen průměr (X01 vs. MPR nelze srovnávat). Pořadí při shodě bodů:
+  `Body` → `Počet odehraných turnajů` → `Match Win %` → `Počet vyhraných turnajů` → `Zásah admina / Los`.
+
+#### 3. Cloud Function `aggregateSeriesResults`
+- **Idempotentní plný přepočet**: Při dokončení nebo opravení turnaje projde funkce celou sérii znovu. Zapíše timestamp `seriesAggregatedAt` do turnaje.
+- **Ochrana proti souběhu (Race Condition)**: Použití Firestore Transakce (`db.runTransaction`). Při souběžném dokončení dvou turnajů Firestore transakci automaticky zopakuje nad novými daty.
+- **Live Broadcast na TV (`seriesContext`)**: Po přepočtu provedou Cloud Functions patch pole `seriesContext` (Jackpot + TOP pořadí) do všech dotčených `active_tournaments/{pin}`. Zachovává 1-read-only architekturu `VenueDisplayView.jsx`.
+
+#### 4. UI & Vizualizace
+- **Katalog sérií**: Samostatná sekce s filtrem podle ročníků (např. 2025, 2026).
+- **Stavové štítky (Bez chybné prediktivní matematiky)**:
+  - 🟢 *V postupové zóně* (aktuální umístění v TOP N)
+  - ✅ *Splněna účast* (dosaženo min. turnajů)
+  - 🔒 *Potvrzený postup* (uzamčeno adminem po skončení série)
+- **TV Kiosk Karta (`/tv/:pin`)**: Karta v rotaci zobrazující aktuální Jackpot a TOP pořadí.
+
+---
+
 ## Cloud Functions (`functions/src/`)
 
 Region **europe-west1**, DB **eur3**. Export v `index.ts`:
@@ -297,6 +336,7 @@ Region **europe-west1**, DB **eur3**. Export v `index.ts`:
 | `lookupPrivateOnlineGame` / `joinPrivateOnlineGame` | Soukromá online lobby podle PINu |
 | `updateCsoRankingsScheduled` | Cron 7:00 |
 | `updateCsoRankingsNow` | Callable, jen Google účet |
+| `aggregateSeriesResults` | Přepočet žebříčku série + TV live broadcast (`seriesContext`) |
 
 Po změně `functions/src` vždy `npm run build` v `functions/` (tsc → `lib/`).
 
@@ -317,6 +357,8 @@ Po změně `functions/src` vždy `npm run build` v `functions/` (tsc → `lib/`)
 | `tournament_pins` | vlastník PINu | owner |
 | `cso_rankings` | kdokoli | jen Functions |
 | `player_registration_links` | nikdo z klienta | jen Functions |
+| `tournament_series` | non-DRAFT veřejně; DRAFT jen owner | owner create/update (`ownerUid`); co-admin claim jen CF |
+| `tournament_series/{id}/data/standings_compact` | kdokoli | jen Functions (`aggregateSeriesResults`) |
 
 Při změně datového modelu **uprav i `firestore.rules`**.
 
@@ -353,6 +395,7 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 | Tablet Kiosk PIN lock, perzistence desky & OS Kiosk nápověda | `TabletKioskPinModal.jsx`, `TabletKioskLockBadge.jsx`, `utils/tabletKioskLock.js`, `TabletWaitingRoom.jsx`, `AppMain.jsx` |
 | QR tabletu | `tabletBoardQr.js`, `TabletBoardQrPanel.jsx` |
 | TV obrazovka haly (PDC-style `/tv/:pin`) | `VenueDisplayView.jsx`, `utils/venueDisplay.js`, `utils/venueDisplayRoutes.js` |
+| Turnajové série (Circuit System) | `tournament_series`, `standings_compact`, CF `aggregateSeriesResults` |
 | Předregistrace / platby | `tournamentPreRegService.js`, `prereg/*`, `functions/src/registerPlayer.ts` |
 | ČŠO našeptávač | `csoRanking.js`, `CsoPlayerNameField.jsx` |
 | UI texty a lokalizace (i18n) | `src/i18n/{cs,en,pl}.js`, `src/i18n/catalog.js` |
