@@ -268,6 +268,8 @@ gameStatsTitle: 'Statystyki gry', activity7Days: 'Aktywność (Ostatnie 7 dni)',
     kioskLockedShort: 'Zablokowano',
     kioskUnlockedShort: 'Odblokowano',
     kioskUnlockAction: 'Odblokuj kiosk',
+    kioskOsRecommendation:
+      'Aby uzyskać 100% blokady na iPadzie, włącz Dostęp nadzorowany (Guided Access), na Androidzie Przypinanie aplikacji.',
     historyLoginInfo: 'Tylko mecze lokalne.', historyLoginBtn: 'Zaloguj',
     statsAllTime: 'Zawsze', stats7Days: '7 Dni', stats30Days: '30 Dni', stats90Days: '90 Dni',
     matchesPlayed: 'Mecze', winRate: 'Wygrane', total180s: 'Ilość 180', statsPersonal: 'Moje Statystyki', publicResultsMenu: 'Wyniki publiczne',

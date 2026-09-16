@@ -265,12 +265,13 @@ Veřejná TV obrazovka haly běžící v samostatném lazy chunku mimo orchestr�
   - **Souhrn turnaje (`finished`):** Po skončení turnaje automatické zobrazení medailistů a celkových statistik.
   - **Výzvy k terčům (`callQueue`):** Detekce nově nasazených zápasů na terče; zobrazí prioritní alert pruh (overlay) s odpočtem (`VENUE_CALL_MS`, 8 s), který dočasně pozastaví běžnou rotaci.
 
-### 7. Tablet Kiosk PIN lock
+### 7. Tablet Kiosk PIN lock & OS resilience
 
 Bezpečnostní režim pro tablety u terče (`TabletKioskPinModal.jsx`, `TabletKioskLockBadge.jsx`, `utils/tabletKioskLock.js`, integrace v `AppMain.jsx`, `TabletWaitingRoom.jsx`, `GameX01.jsx`):
 - **Účel:** Tablet u terče je kiosk. Zamezení nechtěnému opuštění rozehraného zápasu, resetu desky nebo ukončení tabletové relace hráči bez vědomí pořadatele. Citlivé akce (odpojit tablet, Domů z čekárny i zápasu, opustit/resetovat zápas, pause menu) vyžadují 4místný Kiosk PIN (`runTabletKioskGuarded`).
 - **Kiosk PIN:** 4místný číselný kód odvozený prioritně z hesla tabletu (`tabletPassword`), případně z admin PINu turnaje (`activePin` / `tournamentPin`).
-- **Perzistence stavu:** Stav zamčení (`sdc_tablet_kiosk_locked`) se ukládá do `sessionStorage`, takže přežije i reload stránky. Výchozí stav je vždy zamčeno (`locked`).
+- **Perzistence relace a stavu (`localStorage`):** Stav zamčení se ukládá perzistentně do `localStorage` pod klíčem pro konkrétní desku (`SDC_TABLET_KIOSK_LOCKED_<boardNumber>`). Pokud dojde k neplánovanému zavření Safari / restartu tabletu u terče, po znovuotevření aplikace se tablet automaticky zreconnectuje na stejnou desku v zamčeném stavu bez nutnosti znovu procházet celým párováním. Výchozí stav je vždy zamčeno (`locked`).
+- **Doporučení pro OS Kiosk:** V hlavičce a čekárně tabletu (`TabletKioskLockBadge`, `TabletWaitingRoom`) je diskrétní tooltip/nápověda s doporučením pro pořadatele: *„Pro 100% uzamčení na iPadu zapněte Asistovaný přístup (Guided Access), na Androidu Připnutí aplikace.“*
 - **Ověření a lockout:** Virtuální numerický PIN pad (`TabletKioskPinModal`) s okamžitým ověřením po 4 číslicích; po 3 neúspěšných pokusech dojde k dočasnému uzamčení klávesnice na 5 sekund (`TABLET_KIOSK_LOCKOUT_SECONDS`).
 - **Ochrana proti opuštění a zavření okna:** Registrován `beforeunload` handler v `AppMain.jsx` a herních komponentách, který varuje při pokusu o zavření okna či navigaci pryč. Opuštění zápasu nebo odhlášení desky vyžaduje zadání Kiosk PINu.
 
@@ -349,7 +350,7 @@ Při změně datového modelu **uprav i `firestore.rules`**.
 | Stepper turnaje / lock rankingu | `AppMain.jsx`, `TournamentSetup.jsx`, `tournamentRanking.js` |
 | Tablet čekárna / check-in timeout | `TabletWaitingRoom.jsx`, `tabletCheckInTimeout.js` |
 | Ochrana terminálních výsledků a souběžnost zápisů | `matchTerminal.js`, `__tests__/matchTerminal.test.js` |
-| Tablet Kiosk PIN lock & ochrana okna | `TabletKioskPinModal.jsx`, `TabletKioskLockBadge.jsx`, `utils/tabletKioskLock.js`, `AppMain.jsx` |
+| Tablet Kiosk PIN lock, perzistence desky & OS Kiosk nápověda | `TabletKioskPinModal.jsx`, `TabletKioskLockBadge.jsx`, `utils/tabletKioskLock.js`, `TabletWaitingRoom.jsx`, `AppMain.jsx` |
 | QR tabletu | `tabletBoardQr.js`, `TabletBoardQrPanel.jsx` |
 | TV obrazovka haly (PDC-style `/tv/:pin`) | `VenueDisplayView.jsx`, `utils/venueDisplay.js`, `utils/venueDisplayRoutes.js` |
 | Předregistrace / platby | `tournamentPreRegService.js`, `prereg/*`, `functions/src/registerPlayer.ts` |

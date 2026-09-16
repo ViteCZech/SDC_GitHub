@@ -1746,11 +1746,20 @@ function AppMain({ lang, setLang }) {
   /* ---- Kiosk PIN zámek tabletu u terče ----
    * Tablet je kiosk: citlivé akce (odpojit tablet, opustit/resetovat zápas,
    * otevřít pause menu s nastavením) vyžadují 4místný Kiosk PIN. PIN se odvodí
-   * z hesla tabletu, jinak z PINu turnaje. Stav zámku přežívá refresh
-   * (sessionStorage) po celou dobu provozu tabletu. Běžný herní režim netkne. */
-  const [isKioskLocked, setIsKioskLocked] = React.useState(() => loadTabletKioskLocked(safeStorage));
+   * z hesla tabletu, jinak z PINu turnaje. Stav zámku přežívá refresh i restart prohlížeče
+   * (localStorage s klíčem desky) po celou dobu provozu tabletu. Běžný herní režim netkne. */
+  const [isKioskLocked, setIsKioskLocked] = React.useState(() =>
+    loadTabletKioskLocked(safeStorage, String(tournamentDraft?.hubTabletBoard ?? loadStoredTabletBoard()).trim())
+  );
   const [kioskPinRequest, setKioskPinRequest] = React.useState(null);
   const kioskPendingRef = useRef(null);
+
+  // Synchronizace stavu zámku při načtení / změně desky
+  useEffect(() => {
+    if (tabletBoardStr) {
+      setIsKioskLocked(loadTabletKioskLocked(safeStorage, tabletBoardStr));
+    }
+  }, [tabletBoardStr]);
 
   const tabletKioskPin = React.useMemo(
     () =>
@@ -1768,8 +1777,8 @@ function AppMain({ lang, setLang }) {
 
   const setKioskLockedWithPersist = React.useCallback((locked) => {
     setIsKioskLocked(locked);
-    persistTabletKioskLocked(safeStorage, locked);
-  }, []);
+    persistTabletKioskLocked(safeStorage, locked, tabletBoardStr);
+  }, [tabletBoardStr]);
 
   const runTabletKioskGuarded = React.useCallback(
     (key, label, fn, opts = {}) => {
@@ -2457,8 +2466,9 @@ function AppMain({ lang, setLang }) {
     kioskPauseAuthRef.current = false;
     kioskPendingRef.current = null;
     setKioskPinRequest(null);
+    const boardToClear = String(tournamentDraft?.hubTabletBoard ?? loadStoredTabletBoard()).trim();
     setKioskLockedWithPersist(true);
-    clearTabletKioskLock(safeStorage);
+    clearTabletKioskLock(safeStorage, boardToClear);
     clearSpectatorSession();
     setUserRole(null);
     setActivePin('');

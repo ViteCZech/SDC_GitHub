@@ -274,6 +274,8 @@ gameStatsTitle: 'Game Statistics', activity7Days: 'Activity (Last 7 Days)',
     kioskLockedShort: 'Locked',
     kioskUnlockedShort: 'Unlocked',
     kioskUnlockAction: 'Unlock kiosk',
+    kioskOsRecommendation:
+      'For 100% kiosk lockdown on iPad turn on Guided Access, on Android use App Pinning.',
     loginRequired: 'Login required for this feature',
     archiveSuccess: 'Tournament successfully saved to history.',
     historyLoginInfo: 'Local matches only. Log in for cloud.', historyLoginBtn: 'Sign in to Cloud',

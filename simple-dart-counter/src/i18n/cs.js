@@ -142,6 +142,8 @@ gameStatsTitle: 'Statistiky her', activity7Days: 'Aktivita za posledních 7 dní
     kioskLockedShort: 'Zamčeno',
     kioskUnlockedShort: 'Odemčeno',
     kioskUnlockAction: 'Odemknout Kiosk zámek',
+    kioskOsRecommendation:
+      'Pro 100% uzamčení na iPadu zapněte Asistovaný přístup (Guided Access), na Androidu Připnutí aplikace.',
     headerHardResetTitle: 'Tvrdý reset – smaže všechna lokální data a znovu načte stránku',
     headerHardResetAria: 'Tvrdý reset aplikace',
     resetApp: 'Resetovat aplikaci',

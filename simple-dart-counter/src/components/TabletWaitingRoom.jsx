@@ -580,10 +580,19 @@ export default function TabletWaitingRoom({
         </main>
       ) : (
         <main className="flex flex-col flex-1 min-h-0 h-full max-h-[calc(100dvh-2.5rem-3.5rem)] w-full max-w-2xl lg:max-w-7xl mx-auto overflow-hidden bg-slate-950 px-3 lg:px-6 pt-2 pb-3">
-          <div className="shrink-0 mb-2 flex items-center justify-between">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-              {tt('waitingForMatch')}
-            </p>
+          <div className="shrink-0 mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                {tt('waitingForMatch')}
+              </p>
+              <span
+                data-testid="tablet-kiosk-os-hint"
+                title={tFlat('kioskOsRecommendation')}
+                className="hidden sm:inline-flex items-center rounded-full bg-slate-900 border border-slate-800 px-2 py-0.5 text-[9px] font-semibold text-slate-400 truncate max-w-xs md:max-w-md lg:max-w-lg"
+              >
+                💡 {tFlat('kioskOsRecommendation')}
+              </span>
+            </div>
             <ContextHelpButton
               topicId="tablet-room"
               lang={lang}

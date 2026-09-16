@@ -9,11 +9,22 @@
  *  1. heslo tabletu z přihlášení (`tabletPassword`), je-li 4místné číselné,
  *  2. PIN turnaje (`activePin` / `tournamentData.pin`) — „admin PIN turnaje".
  *
- * Stav zamčení (`isKioskLocked`) se drží v `sessionStorage`, aby zámek přežil
- * refresh stránky po celou dobu provozu tabletu u terče.
+ * Stav zamčení (`isKioskLocked`) se drží perzistentně v `localStorage`
+ * pod klíčem navázaným na číslo desky (`SDC_TABLET_KIOSK_LOCKED_<boardNumber>`),
+ * aby zámek i relace přežily neočekávané zavření prohlížeče, restart Safari či tabletu.
  */
 
+export const TABLET_KIOSK_LOCK_STORAGE_PREFIX = 'SDC_TABLET_KIOSK_LOCKED_';
 export const TABLET_KIOSK_LOCK_STORAGE_KEY = 'sdc_tablet_kiosk_locked';
+
+/** Vrátí perzistentní klíč pro uložení stavu Kiosk zámku pro danou desku. */
+export function getTabletKioskLockStorageKey(boardNumber) {
+  const b = String(boardNumber ?? '').trim();
+  if (b) {
+    return `${TABLET_KIOSK_LOCK_STORAGE_PREFIX}${b}`;
+  }
+  return TABLET_KIOSK_LOCK_STORAGE_KEY;
+}
 
 export const TABLET_KIOSK_MAX_ATTEMPTS = 3;
 export const TABLET_KIOSK_LOCKOUT_SECONDS = 5;
@@ -58,9 +69,14 @@ export function verifyTabletKioskPin(kioskPin, enteredPin) {
 }
 
 /** Načte perzistovaný stav zámku; výchozí je zamčeno (true). */
-export function loadTabletKioskLocked(storage) {
+export function loadTabletKioskLocked(storage, boardNumber = '') {
   try {
-    const raw = storage?.getItem(TABLET_KIOSK_LOCK_STORAGE_KEY);
+    const key = getTabletKioskLockStorageKey(boardNumber);
+    let raw = storage?.getItem(key);
+    // Zpětná kompatibilita: pokud není nalezeno pod specifickým klíčem desky, zkus obecný klíč
+    if (raw == null && key !== TABLET_KIOSK_LOCK_STORAGE_KEY) {
+      raw = storage?.getItem(TABLET_KIOSK_LOCK_STORAGE_KEY);
+    }
     if (raw == null) return true;
     return raw !== 'unlocked';
   } catch {
@@ -68,18 +84,21 @@ export function loadTabletKioskLocked(storage) {
   }
 }
 
-/** Uloží stav zámku do session storage. */
-export function persistTabletKioskLocked(storage, locked) {
+/** Uloží stav zámku do localStorage (s klíčem desky). */
+export function persistTabletKioskLocked(storage, locked, boardNumber = '') {
   try {
-    storage?.setItem(TABLET_KIOSK_LOCK_STORAGE_KEY, locked ? 'locked' : 'unlocked');
+    const key = getTabletKioskLockStorageKey(boardNumber);
+    storage?.setItem(key, locked ? 'locked' : 'unlocked');
   } catch {
     /* storage nedostupné (SSR/testy) — zámek zůstává jen v paměti */
   }
 }
 
 /** Vyčistí perzistovaný stav zámku (konec tabletové relace). */
-export function clearTabletKioskLock(storage) {
+export function clearTabletKioskLock(storage, boardNumber = '') {
   try {
+    const key = getTabletKioskLockStorageKey(boardNumber);
+    storage?.removeItem(key);
     storage?.removeItem(TABLET_KIOSK_LOCK_STORAGE_KEY);
   } catch {
     /* ignoruj */

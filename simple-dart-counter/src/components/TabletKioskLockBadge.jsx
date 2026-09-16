@@ -10,15 +10,21 @@ import { translations } from '../translations';
 export default function TabletKioskLockBadge({ lang = 'cs', locked = true, onToggle }) {
   const t = (k, fallback) => translations[lang]?.[k] ?? fallback ?? k;
   const Icon = locked ? Lock : LockOpen;
+  const osHint = t(
+    'kioskOsRecommendation',
+    'Pro 100% uzamčení na iPadu zapněte Asistovaný přístup (Guided Access), na Androidu Připnutí aplikace.'
+  );
+  const badgeTitle = `${t('kioskLockTitle', 'Kiosk zámek desky')} — ${osHint}`;
+
   return (
     <button
       type="button"
       onClick={onToggle}
-      title={t('kioskLockTitle', 'Kiosk zámek desky')}
+      title={badgeTitle}
       aria-label={
         locked
-          ? t('kioskTapToUnlock', 'Klepnutím odemknete Kiosk zámek (PIN)')
-          : t('kioskTapToLock', 'Klepnutím zamknete Kiosk zámek')
+          ? `${t('kioskTapToUnlock', 'Klepnutím odemknete Kiosk zámek (PIN)')}. ${osHint}`
+          : `${t('kioskTapToLock', 'Klepnutím zamknete Kiosk zámek')}. ${osHint}`
       }
       aria-pressed={!locked}
       className={`flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-black uppercase tracking-wider transition-colors sm:text-xs ${

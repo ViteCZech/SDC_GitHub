@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   TABLET_KIOSK_LOCK_STORAGE_KEY,
+  TABLET_KIOSK_LOCK_STORAGE_PREFIX,
+  getTabletKioskLockStorageKey,
   clearTabletKioskLock,
   isTabletKioskSessionValid,
   loadTabletKioskLocked,
@@ -20,6 +22,13 @@ const memStorage = () => {
 };
 
 describe('tabletKioskLock', () => {
+  it('generuje správný klíč úložiště pro desku', () => {
+    expect(getTabletKioskLockStorageKey('3')).toBe(`${TABLET_KIOSK_LOCK_STORAGE_PREFIX}3`);
+    expect(getTabletKioskLockStorageKey(' 5 ')).toBe(`${TABLET_KIOSK_LOCK_STORAGE_PREFIX}5`);
+    expect(getTabletKioskLockStorageKey('')).toBe(TABLET_KIOSK_LOCK_STORAGE_KEY);
+    expect(getTabletKioskLockStorageKey(null)).toBe(TABLET_KIOSK_LOCK_STORAGE_KEY);
+  });
+
   it('normalizuje jen 4místný číselný PIN', () => {
     expect(normalizeKioskPinCandidate('1234')).toBe('1234');
     expect(normalizeKioskPinCandidate(' 1234 ')).toBe('1234');
@@ -49,7 +58,7 @@ describe('tabletKioskLock', () => {
     expect(isTabletKioskSessionValid({ pin: '1234', board: '' })).toBe(false);
   });
 
-  it('výchozí stav je zamčeno; perzistence přežije refresh', () => {
+  it('výchozí stav je zamčeno; perzistence přežije refresh (obecný klíč)', () => {
     const s = memStorage();
     expect(loadTabletKioskLocked(s)).toBe(true);
     persistTabletKioskLocked(s, false);
@@ -59,5 +68,27 @@ describe('tabletKioskLock', () => {
     expect(loadTabletKioskLocked(s)).toBe(true);
     clearTabletKioskLock(s);
     expect(loadTabletKioskLocked(s)).toBe(true);
+  });
+
+  it('perzistence s číslem desky ukládá pod SDC_TABLET_KIOSK_LOCKED_<boardNumber>', () => {
+    const s = memStorage();
+    const boardKey = `${TABLET_KIOSK_LOCK_STORAGE_PREFIX}2`;
+    expect(loadTabletKioskLocked(s, '2')).toBe(true);
+    persistTabletKioskLocked(s, false, '2');
+    expect(s.getItem(boardKey)).toBe('unlocked');
+    expect(loadTabletKioskLocked(s, '2')).toBe(false);
+
+    // Jiná deska zůstává ve výchozím zamčeném stavu
+    expect(loadTabletKioskLocked(s, '3')).toBe(true);
+
+    // Opětovné zamčení desky 2
+    persistTabletKioskLocked(s, true, '2');
+    expect(s.getItem(boardKey)).toBe('locked');
+    expect(loadTabletKioskLocked(s, '2')).toBe(true);
+
+    // Vyčištění zámku pro desku 2
+    clearTabletKioskLock(s, '2');
+    expect(s.getItem(boardKey)).toBe(null);
+    expect(loadTabletKioskLocked(s, '2')).toBe(true);
   });
 });
