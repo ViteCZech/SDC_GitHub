@@ -1,11 +1,11 @@
 {
   "meta": {
     "gender": "men",
-    "updatedAt": "2026-09-16T04:01:00.000Z",
-    "effectiveDate": "2026-09-16",
-    "generatedAt": "2026-09-16 04:01",
-    "fetchedAt": "2026-09-16T09:49:00.635Z",
-    "totalPlayers": 1890
+    "updatedAt": "2026-09-17T04:01:00.000Z",
+    "effectiveDate": "2026-09-17",
+    "generatedAt": "2026-09-17 04:01",
+    "fetchedAt": "2026-09-17T09:55:51.017Z",
+    "totalPlayers": 1886
   },
   "players": [
     {
@@ -517,21 +517,21 @@
     },
     {
       "rank": 86,
-      "name": "Michal Havlík",
-      "club": "DC Bull's-eye Riviéra F-M",
-      "regNumber": "2427"
-    },
-    {
-      "rank": 87,
       "name": "Stanislav Kořínek",
       "club": "Brněnská šipková z.s.",
       "regNumber": "1692"
     },
     {
-      "rank": 88,
+      "rank": 87,
       "name": "Miroslav Vrba",
       "club": "Renegade's",
       "regNumber": "4849"
+    },
+    {
+      "rank": 87,
+      "name": "Michal Havlík",
+      "club": "DC Bull's-eye Riviéra F-M",
+      "regNumber": "2427"
     },
     {
       "rank": 89,
@@ -705,12 +705,6 @@
     },
     {
       "rank": 118,
-      "name": "Tomáš Fiala",
-      "club": "DC Sokolka Dobříš",
-      "regNumber": "5729"
-    },
-    {
-      "rank": 118,
       "name": "Tomáš Kváčala",
       "club": "Brněnská šipková z.s.",
       "regNumber": "2360"
@@ -721,10 +715,16 @@
       "regNumber": "6265"
     },
     {
-      "rank": 121,
+      "rank": 120,
       "name": "Martin Steiner",
       "club": "Tučňáci Nový Jičín",
       "regNumber": "6308"
+    },
+    {
+      "rank": 121,
+      "name": "Tomáš Fiala",
+      "club": "DC Sokolka Dobříš",
+      "regNumber": "5729"
     },
     {
       "rank": 122,
@@ -969,15 +969,15 @@
     },
     {
       "rank": 163,
-      "name": "Vlastimil Zahradník",
-      "club": "Vostrý koně Pardubice",
-      "regNumber": "2095"
-    },
-    {
-      "rank": 164,
       "name": "Kristián Pistovčák",
       "club": "Jelen Kyjovice",
       "regNumber": "4300"
+    },
+    {
+      "rank": 164,
+      "name": "Kamil Chládek",
+      "club": "FJ Sokol AŠKK Vejprnice",
+      "regNumber": "1771"
     },
     {
       "rank": 165,
@@ -987,69 +987,69 @@
     },
     {
       "rank": 165,
-      "name": "Kamil Chládek",
-      "club": "FJ Sokol AŠKK Vejprnice",
-      "regNumber": "1771"
-    },
-    {
-      "rank": 167,
       "name": "Svatopluk Huličný",
       "club": "Dalas Uničov",
       "regNumber": "4190"
     },
     {
-      "rank": 168,
+      "rank": 167,
       "name": "Jakub Fryštacký",
       "club": "Black Panthers",
       "regNumber": "3130"
     },
     {
-      "rank": 169,
-      "name": "Dušan Dedek",
-      "club": "Iris Club",
-      "regNumber": "709"
-    },
-    {
-      "rank": 169,
+      "rank": 168,
       "name": "Jiří Dvořák (Blatná)",
       "club": "DC Vikings Blatná",
       "regNumber": "1427"
     },
     {
-      "rank": 171,
+      "rank": 169,
+      "name": "Vlastimil Zahradník",
+      "club": "Vostrý koně Pardubice",
+      "regNumber": "2095"
+    },
+    {
+      "rank": 169,
       "name": "Petr Sládek (Plzeň)",
       "club": "Legendario Plzeň",
       "regNumber": "1903"
     },
     {
-      "rank": 171,
+      "rank": 169,
       "name": "Stanislav Holoubek",
       "club": "Šipky Třešť",
       "regNumber": "3157"
     },
     {
-      "rank": 173,
+      "rank": 172,
       "name": "Pavel Vestfál",
       "club": "DC Vikings Blatná",
       "regNumber": "1060"
     },
     {
-      "rank": 174,
+      "rank": 173,
       "name": "Michal Vitásek",
       "club": "Guru-Caffé Nekonečný příběh ...",
       "regNumber": "2677"
     },
     {
-      "rank": 175,
+      "rank": 174,
       "name": "Petr Brandejs",
       "club": "Tělocvičná jednota Sokol Lukavice",
       "regNumber": "3762"
     },
     {
-      "rank": 176,
+      "rank": 175,
       "name": "Lukáš Křeček",
       "club": "DC Radopo Kladno",
       "regNumber": "3358"
+    },
+    {
+      "rank": 175,
+      "name": "Dušan Dedek",
+      "club": "Iris Club",
+      "regNumber": "709"
     },
     {
       "rank": 177,
@@ -1064,16 +1064,16 @@
       "regNumber": "1928"
     },
     {
-      "rank": 178,
-      "name": "Patrik Dědina",
-      "club": "DC Sokolka Dobříš",
-      "regNumber": "6277"
-    },
-    {
-      "rank": 180,
+      "rank": 179,
       "name": "Tadeáš Čad",
       "club": "Vostrý koně Pardubice",
       "regNumber": "6549"
+    },
+    {
+      "rank": 179,
+      "name": "Patrik Dědina",
+      "club": "DC Sokolka Dobříš",
+      "regNumber": "6277"
     },
     {
       "rank": 181,
@@ -1100,26 +1100,26 @@
     },
     {
       "rank": 185,
-      "name": "David Tamchyna",
-      "club": "Vostrý koně Pardubice",
-      "regNumber": "6007"
-    },
-    {
-      "rank": 185,
       "name": "David Bašný",
       "club": "DC Mustang Knínice",
       "regNumber": "2054"
     },
     {
-      "rank": 187,
+      "rank": 186,
       "name": "Jan Lang st.",
       "club": "Pivní Baroni",
       "regNumber": "5752"
     },
     {
-      "rank": 187,
+      "rank": 186,
       "name": "Tomáš Kočenda",
       "regNumber": "4903"
+    },
+    {
+      "rank": 188,
+      "name": "David Tamchyna",
+      "club": "Vostrý koně Pardubice",
+      "regNumber": "6007"
     },
     {
       "rank": 189,
@@ -1152,7 +1152,7 @@
       "regNumber": "5477"
     },
     {
-      "rank": 194,
+      "rank": 192,
       "name": "Ondřej Dušička",
       "club": "Pivní Baroni",
       "regNumber": "5754"
@@ -1397,23 +1397,23 @@
     },
     {
       "rank": 235,
+      "name": "Pavel  Pászti Novák",
+      "club": "Plaská Zvěř",
+      "regNumber": "5203"
+    },
+    {
+      "rank": 235,
       "name": "Pavel Hránek",
       "club": "Scorpions Plzeň",
       "regNumber": "2116"
     },
     {
-      "rank": 236,
-      "name": "Marcel Suchánek",
-      "club": "Vostrý koně Pardubice",
-      "regNumber": "5158"
-    },
-    {
-      "rank": 236,
+      "rank": 237,
       "name": "Petr Svoboda",
       "regNumber": "7196"
     },
     {
-      "rank": 236,
+      "rank": 237,
       "name": "Martin Liguš",
       "club": "SmallBalls",
       "regNumber": "2121"
@@ -1444,6 +1444,12 @@
     },
     {
       "rank": 242,
+      "name": "Marcel Suchánek",
+      "club": "Vostrý koně Pardubice",
+      "regNumber": "5158"
+    },
+    {
+      "rank": 242,
       "name": "Michal Procházka",
       "club": "DC Mustang Knínice",
       "regNumber": "1482"
@@ -1455,19 +1461,13 @@
       "regNumber": "6895"
     },
     {
-      "rank": 245,
-      "name": "Pavel  Pászti Novák",
-      "club": "Plaská Zvěř",
-      "regNumber": "5203"
-    },
-    {
-      "rank": 245,
+      "rank": 246,
       "name": "Václav Vondrák",
       "club": "ŠK Sokol Dobříš",
       "regNumber": "3867"
     },
     {
-      "rank": 245,
+      "rank": 246,
       "name": "Zdeněk Vaisar",
       "club": "Bombarďáci",
       "regNumber": "1207"
@@ -1645,180 +1645,180 @@
     },
     {
       "rank": 278,
-      "name": "Martin Holík",
-      "club": "Brněnská šipková z.s.",
-      "regNumber": "735"
-    },
-    {
-      "rank": 279,
-      "name": "Luděk Schovánek",
-      "club": "Schovi Darts",
-      "regNumber": "4185"
-    },
-    {
-      "rank": 279,
-      "name": "Petr Toufar",
-      "club": "Bez klubové příslušnosti",
-      "regNumber": "970"
-    },
-    {
-      "rank": 279,
-      "name": "David Zapletal",
-      "club": "Black Panthers",
-      "regNumber": "3989"
-    },
-    {
-      "rank": 279,
-      "name": "Petr Sinkule",
-      "regNumber": "7107"
-    },
-    {
-      "rank": 279,
-      "name": "Ondřej Skalický",
-      "club": "DC NoA!m",
-      "regNumber": "3593"
-    },
-    {
-      "rank": 279,
-      "name": "Libor Batista",
-      "club": "DC NoA!m",
-      "regNumber": "2918"
-    },
-    {
-      "rank": 285,
-      "name": "Daniel Vrběcký",
-      "club": "Pitbull Bažiny",
-      "regNumber": "5795"
-    },
-    {
-      "rank": 285,
-      "name": "Martin Kliment",
-      "club": "Guru-Caffé Nekonečný příběh ...",
-      "regNumber": "2035"
-    },
-    {
-      "rank": 285,
-      "name": "Martin Hanko ml.",
-      "club": "ŠK Sokol Dobříš",
-      "regNumber": "4137"
-    },
-    {
-      "rank": 285,
-      "name": "Mikuláš Rouč",
-      "regNumber": "1466"
-    },
-    {
-      "rank": 289,
-      "name": "Luke Tucker",
-      "club": "Žraloci Cerhenice",
-      "regNumber": "2743"
-    },
-    {
-      "rank": 289,
-      "name": "Ondřej Panoš",
-      "club": "Spolek neratovických šipkařů",
-      "regNumber": "5535"
-    },
-    {
-      "rank": 289,
-      "name": "Jiří  Chmelař",
-      "regNumber": "4707"
-    },
-    {
-      "rank": 292,
-      "name": "Walter Skála",
-      "club": "Black Panthers",
-      "regNumber": "1151"
-    },
-    {
-      "rank": 293,
-      "name": "Jaroslav Mikulík",
-      "club": "Kladno Steel",
-      "regNumber": "6146"
-    },
-    {
-      "rank": 294,
-      "name": "Petr Rezek",
-      "club": "Bombarďáci",
-      "regNumber": "2779"
-    },
-    {
-      "rank": 294,
-      "name": "Josef Korytář",
-      "regNumber": "3967"
-    },
-    {
-      "rank": 294,
-      "name": "Václav Musel",
-      "club": "Kašna Vraclav",
-      "regNumber": "5251"
-    },
-    {
-      "rank": 294,
-      "name": "Josef Částek",
-      "club": "Kašna Vraclav",
-      "regNumber": "1734"
-    },
-    {
-      "rank": 294,
-      "name": "Petr Pavlica",
-      "club": "Bowling Bar",
-      "regNumber": "4987"
-    },
-    {
-      "rank": 299,
-      "name": "Martin Macíček",
-      "club": "Steel Darts Skalička",
-      "regNumber": "6337"
-    },
-    {
-      "rank": 299,
-      "name": "Petr Sucharda",
-      "club": "Banditi z Krkonoš",
-      "regNumber": "718"
-    },
-    {
-      "rank": 299,
-      "name": "Miroslav Vaculík",
-      "regNumber": "5699"
-    },
-    {
-      "rank": 302,
-      "name": "Marian Priesol",
-      "club": "DC Steelový Šílenci Teplice",
-      "regNumber": "1985"
-    },
-    {
-      "rank": 303,
-      "name": "Lukáš Kmoníček",
-      "club": "Vostrý koně Pardubice",
-      "regNumber": "2594"
-    },
-    {
-      "rank": 304,
       "name": "Štefan Chrien",
       "club": "Plaská Zvěř",
       "regNumber": "3327"
     },
     {
+      "rank": 278,
+      "name": "Martin Holík",
+      "club": "Brněnská šipková z.s.",
+      "regNumber": "735"
+    },
+    {
+      "rank": 280,
+      "name": "Luděk Schovánek",
+      "club": "Schovi Darts",
+      "regNumber": "4185"
+    },
+    {
+      "rank": 280,
+      "name": "Petr Toufar",
+      "club": "Bez klubové příslušnosti",
+      "regNumber": "970"
+    },
+    {
+      "rank": 280,
+      "name": "David Zapletal",
+      "club": "Black Panthers",
+      "regNumber": "3989"
+    },
+    {
+      "rank": 280,
+      "name": "Petr Sinkule",
+      "regNumber": "7107"
+    },
+    {
+      "rank": 280,
+      "name": "Ondřej Skalický",
+      "club": "DC NoA!m",
+      "regNumber": "3593"
+    },
+    {
+      "rank": 280,
+      "name": "Libor Batista",
+      "club": "DC NoA!m",
+      "regNumber": "2918"
+    },
+    {
+      "rank": 286,
+      "name": "Daniel Vrběcký",
+      "club": "Pitbull Bažiny",
+      "regNumber": "5795"
+    },
+    {
+      "rank": 286,
+      "name": "Martin Kliment",
+      "club": "Guru-Caffé Nekonečný příběh ...",
+      "regNumber": "2035"
+    },
+    {
+      "rank": 286,
+      "name": "Martin Hanko ml.",
+      "club": "ŠK Sokol Dobříš",
+      "regNumber": "4137"
+    },
+    {
+      "rank": 286,
+      "name": "Mikuláš Rouč",
+      "regNumber": "1466"
+    },
+    {
+      "rank": 290,
+      "name": "Luke Tucker",
+      "club": "Žraloci Cerhenice",
+      "regNumber": "2743"
+    },
+    {
+      "rank": 290,
+      "name": "Ondřej Panoš",
+      "club": "Spolek neratovických šipkařů",
+      "regNumber": "5535"
+    },
+    {
+      "rank": 290,
+      "name": "Jiří  Chmelař",
+      "regNumber": "4707"
+    },
+    {
+      "rank": 293,
+      "name": "Walter Skála",
+      "club": "Black Panthers",
+      "regNumber": "1151"
+    },
+    {
+      "rank": 294,
+      "name": "Jaroslav Mikulík",
+      "club": "Kladno Steel",
+      "regNumber": "6146"
+    },
+    {
+      "rank": 295,
+      "name": "Petr Rezek",
+      "club": "Bombarďáci",
+      "regNumber": "2779"
+    },
+    {
+      "rank": 295,
+      "name": "Josef Korytář",
+      "regNumber": "3967"
+    },
+    {
+      "rank": 295,
+      "name": "Václav Musel",
+      "club": "Kašna Vraclav",
+      "regNumber": "5251"
+    },
+    {
+      "rank": 295,
+      "name": "Josef Částek",
+      "club": "Kašna Vraclav",
+      "regNumber": "1734"
+    },
+    {
+      "rank": 295,
+      "name": "Petr Pavlica",
+      "club": "Bowling Bar",
+      "regNumber": "4987"
+    },
+    {
+      "rank": 300,
+      "name": "Martin Macíček",
+      "club": "Steel Darts Skalička",
+      "regNumber": "6337"
+    },
+    {
+      "rank": 300,
+      "name": "Petr Sucharda",
+      "club": "Banditi z Krkonoš",
+      "regNumber": "718"
+    },
+    {
+      "rank": 300,
+      "name": "Miroslav Vaculík",
+      "regNumber": "5699"
+    },
+    {
+      "rank": 303,
+      "name": "Marian Priesol",
+      "club": "DC Steelový Šílenci Teplice",
+      "regNumber": "1985"
+    },
+    {
       "rank": 304,
+      "name": "Lukáš Kmoníček",
+      "club": "Vostrý koně Pardubice",
+      "regNumber": "2594"
+    },
+    {
+      "rank": 305,
       "name": "Tomáš  Spurný",
       "regNumber": "7275"
     },
     {
-      "rank": 304,
+      "rank": 305,
       "name": "Petr Pusch",
       "club": "DC Steelový Šílenci Teplice",
       "regNumber": "3639"
     },
     {
-      "rank": 304,
+      "rank": 305,
       "name": "Viktor Koch",
       "club": "Ostrostřelci",
       "regNumber": "5620"
     },
     {
-      "rank": 304,
+      "rank": 305,
       "name": "Lukáš Kostner",
       "regNumber": "7074"
     },
@@ -1987,158 +1987,152 @@
     },
     {
       "rank": 335,
-      "name": "Jiří Krůza",
-      "club": "Ripper Ostrava",
-      "regNumber": "5363"
-    },
-    {
-      "rank": 335,
       "name": "Igor Mrviš",
       "club": "Bowling Bar",
       "regNumber": "4719"
     },
     {
-      "rank": 339,
+      "rank": 338,
       "name": "Michal Valaškovčák",
       "club": "SD Brno",
       "regNumber": "5638"
     },
     {
-      "rank": 339,
+      "rank": 338,
       "name": "Martin Zoula",
       "club": "Terryho máma",
       "regNumber": "2404"
     },
     {
-      "rank": 339,
-      "name": "Gabriel Podmanický",
-      "club": "Dart Vaders",
-      "regNumber": "2027"
-    },
-    {
-      "rank": 339,
+      "rank": 338,
       "name": "Richard Wiesner",
       "club": "Spolek neratovických šipkařů",
       "regNumber": "6338"
     },
     {
-      "rank": 343,
+      "rank": 341,
       "name": "Karel Kufner",
       "club": "ŠK Snipers",
       "regNumber": "5268"
     },
     {
-      "rank": 343,
+      "rank": 341,
+      "name": "Gabriel Podmanický",
+      "club": "Dart Vaders",
+      "regNumber": "2027"
+    },
+    {
+      "rank": 341,
+      "name": "Adam Voleský",
+      "club": "Pivní Baroni",
+      "regNumber": "7053"
+    },
+    {
+      "rank": 341,
       "name": "Martin Dufek",
       "club": "Steel Darts Přerov",
       "regNumber": "572"
     },
     {
-      "rank": 343,
+      "rank": 341,
       "name": "Rostislav Březina",
       "club": "Silesia Opava",
       "regNumber": "2176"
     },
     {
-      "rank": 343,
+      "rank": 341,
+      "name": "Jiří Krůza",
+      "club": "Ripper Ostrava",
+      "regNumber": "5363"
+    },
+    {
+      "rank": 341,
       "name": "Tomáš Hájek",
       "club": "Bejci Býčkovice",
       "regNumber": "1397"
     },
     {
-      "rank": 343,
+      "rank": 341,
       "name": "Vilém Šedivý",
       "club": "Barbaři Vysoké Mýto",
       "regNumber": "1736"
     },
     {
-      "rank": 343,
+      "rank": 341,
       "name": "Tomáš Kupilík",
       "regNumber": "6947"
     },
     {
-      "rank": 343,
+      "rank": 341,
       "name": "Milan Černý",
       "regNumber": "6167"
     },
     {
-      "rank": 343,
+      "rank": 341,
       "name": "Lubomír Vochozka",
       "regNumber": "6786"
     },
     {
-      "rank": 351,
+      "rank": 352,
       "name": "Libor Chybík",
       "regNumber": "4864"
     },
     {
-      "rank": 351,
+      "rank": 352,
       "name": "Jiří Lakomý",
       "regNumber": "3233"
     },
     {
-      "rank": 351,
+      "rank": 352,
       "name": "Petr Pánek",
       "club": "Steel Brothers",
       "regNumber": "6633"
     },
     {
-      "rank": 351,
+      "rank": 352,
       "name": "Miroslav Mamčák",
       "club": "Vostrý koně Pardubice",
       "regNumber": "5731"
     },
     {
-      "rank": 355,
+      "rank": 356,
       "name": "Martin Grulich",
       "regNumber": "6546"
     },
     {
-      "rank": 355,
+      "rank": 356,
       "name": "Jaroslav Pavlištík",
       "club": "Hranický Šenk",
       "regNumber": "3961"
     },
     {
-      "rank": 355,
+      "rank": 356,
       "name": "Štefan Szöke",
       "regNumber": "6554"
     },
     {
-      "rank": 358,
+      "rank": 359,
       "name": "Ondřej Balogh",
       "club": "Terryho máma",
       "regNumber": "2587"
     },
     {
-      "rank": 358,
+      "rank": 359,
       "name": "Petr Rogowski",
       "club": "Sport Bar Miapr",
       "regNumber": "6082"
     },
     {
-      "rank": 358,
-      "name": "Jan Štětina",
-      "club": "Vostrý koně Pardubice",
-      "regNumber": "3525"
-    },
-    {
-      "rank": 358,
+      "rank": 359,
       "name": "Marcel Chudárek",
       "club": "Black Panthers",
       "regNumber": "2341"
     },
     {
-      "rank": 358,
+      "rank": 359,
       "name": "Karel Schwarzer",
       "club": "PBL45",
       "regNumber": "2099"
-    },
-    {
-      "rank": 363,
-      "name": "Adam Voleský",
-      "club": "Pivní Baroni",
-      "regNumber": "7053"
     },
     {
       "rank": 363,
@@ -2159,194 +2153,200 @@
       "regNumber": "4201"
     },
     {
-      "rank": 367,
+      "rank": 366,
       "name": "Pavel Svoboda",
       "club": "Šipky Třešť",
       "regNumber": "5847"
     },
     {
-      "rank": 367,
+      "rank": 366,
       "name": "Karel Kniezek",
       "regNumber": "7197"
     },
     {
-      "rank": 367,
+      "rank": 366,
       "name": "Zdeněk Okoun",
       "club": "Brněnská šipková z.s.",
       "regNumber": "5784"
     },
     {
-      "rank": 367,
+      "rank": 366,
       "name": "Michal Kern",
       "club": "Glassdarts Přelouč",
       "regNumber": "3983"
     },
     {
-      "rank": 367,
+      "rank": 366,
       "name": "Jan Veselý",
       "club": "Hero steel Ostrava",
       "regNumber": "1192"
     },
     {
-      "rank": 367,
+      "rank": 366,
       "name": "Marek Nerušil",
       "club": "ŠK Pivnice Radegast",
       "regNumber": "3534"
     },
     {
-      "rank": 373,
+      "rank": 372,
       "name": "Tomáš Šabršula",
       "club": "Brněnská šipková z.s.",
       "regNumber": "2043"
     },
     {
-      "rank": 373,
+      "rank": 372,
       "name": "Jakub Šebesta",
       "club": "Šipky Třešť",
       "regNumber": "5848"
     },
     {
-      "rank": 373,
+      "rank": 372,
       "name": "Robert Heinz",
       "club": "Iris Club",
       "regNumber": "976"
     },
     {
-      "rank": 373,
+      "rank": 372,
       "name": "Dominik Chrenčík",
       "regNumber": "6617"
     },
     {
-      "rank": 373,
+      "rank": 372,
       "name": "Martin Šulista",
       "club": "DC Fénix Strakonice",
       "regNumber": "4090"
     },
     {
-      "rank": 378,
+      "rank": 377,
       "name": "Boleslav Krotík",
       "club": "Cowhand Dušníky",
       "regNumber": "3998"
     },
     {
-      "rank": 378,
+      "rank": 377,
       "name": "Stanislav Žampach",
       "club": "Terryho máma",
       "regNumber": "2769"
     },
     {
-      "rank": 378,
+      "rank": 377,
       "name": "Adam Nezbeda",
       "club": "ŠK Pivnice Radegast",
       "regNumber": "4820"
     },
     {
-      "rank": 378,
+      "rank": 377,
       "name": "Josef Klika",
       "club": "Pojď mi hop",
       "regNumber": "1631"
     },
     {
-      "rank": 382,
-      "name": "Pavel Kovařík",
-      "club": "Steel Darts Jičín",
-      "regNumber": "4091"
-    },
-    {
-      "rank": 382,
-      "name": "Martin Bečka",
-      "regNumber": "6960"
-    },
-    {
-      "rank": 382,
-      "name": "Jakub Žabka",
-      "club": "Ostrostřelci",
-      "regNumber": "5442"
-    },
-    {
-      "rank": 382,
-      "name": "Šimon Sura",
-      "club": "Škodíci Ostrov",
-      "regNumber": "5471"
-    },
-    {
-      "rank": 386,
-      "name": "Jakub Forejt",
-      "club": "Steel darts club Vršovice",
-      "regNumber": "5916"
-    },
-    {
-      "rank": 386,
-      "name": "Lukáš Pups",
-      "club": "The Badgers",
-      "regNumber": "960"
-    },
-    {
-      "rank": 386,
-      "name": "Marián Eigl",
-      "club": "Pivní Jistota Praha",
-      "regNumber": "5390"
-    },
-    {
-      "rank": 386,
-      "name": "Ladislav Eliášek",
-      "regNumber": "7111"
-    },
-    {
-      "rank": 386,
-      "name": "Bedřich Fiala",
-      "regNumber": "4205"
-    },
-    {
-      "rank": 391,
-      "name": "Jan Bobek",
-      "club": "ŠK Ložisková Mafie Pšov",
-      "regNumber": "5944"
-    },
-    {
-      "rank": 391,
-      "name": "Jiří Brejcha",
-      "club": "Scorpions Plzeň",
-      "regNumber": "622"
-    },
-    {
-      "rank": 391,
-      "name": "Petr Suk",
-      "club": "DC Radopo Kladno",
-      "regNumber": "3411"
-    },
-    {
-      "rank": 391,
-      "name": "Martin Amler",
-      "club": "ŠK Pivnice Radegast",
-      "regNumber": "1744"
-    },
-    {
-      "rank": 391,
-      "name": "Milan Jičínský",
-      "club": "Mexiko Chomutov",
-      "regNumber": "2500"
-    },
-    {
-      "rank": 391,
-      "name": "Vojtěch Cibula",
-      "club": "Pivní bar ČB",
-      "regNumber": "3915"
-    },
-    {
-      "rank": 397,
-      "name": "Jan Stoklasa",
-      "club": "Posázavský Pacifik Kožlí",
-      "regNumber": "1356"
-    },
-    {
-      "rank": 397,
+      "rank": 377,
       "name": "Lukáš Ovečka",
       "club": "U Kalicha Prostějov",
       "regNumber": "5000"
     },
     {
-      "rank": 397,
+      "rank": 377,
+      "name": "Jan Štětina",
+      "club": "Vostrý koně Pardubice",
+      "regNumber": "3525"
+    },
+    {
+      "rank": 383,
+      "name": "Pavel Kovařík",
+      "club": "Steel Darts Jičín",
+      "regNumber": "4091"
+    },
+    {
+      "rank": 383,
+      "name": "Martin Bečka",
+      "regNumber": "6960"
+    },
+    {
+      "rank": 383,
+      "name": "Jakub Žabka",
+      "club": "Ostrostřelci",
+      "regNumber": "5442"
+    },
+    {
+      "rank": 383,
+      "name": "Šimon Sura",
+      "club": "Škodíci Ostrov",
+      "regNumber": "5471"
+    },
+    {
+      "rank": 387,
+      "name": "Jakub Forejt",
+      "club": "Steel darts club Vršovice",
+      "regNumber": "5916"
+    },
+    {
+      "rank": 387,
+      "name": "Lukáš Pups",
+      "club": "The Badgers",
+      "regNumber": "960"
+    },
+    {
+      "rank": 387,
+      "name": "Marián Eigl",
+      "club": "Pivní Jistota Praha",
+      "regNumber": "5390"
+    },
+    {
+      "rank": 387,
+      "name": "Ladislav Eliášek",
+      "regNumber": "7111"
+    },
+    {
+      "rank": 387,
+      "name": "Bedřich Fiala",
+      "regNumber": "4205"
+    },
+    {
+      "rank": 392,
+      "name": "Jan Bobek",
+      "club": "ŠK Ložisková Mafie Pšov",
+      "regNumber": "5944"
+    },
+    {
+      "rank": 392,
+      "name": "Jiří Brejcha",
+      "club": "Scorpions Plzeň",
+      "regNumber": "622"
+    },
+    {
+      "rank": 392,
+      "name": "Petr Suk",
+      "club": "DC Radopo Kladno",
+      "regNumber": "3411"
+    },
+    {
+      "rank": 392,
+      "name": "Martin Amler",
+      "club": "ŠK Pivnice Radegast",
+      "regNumber": "1744"
+    },
+    {
+      "rank": 392,
+      "name": "Milan Jičínský",
+      "club": "Mexiko Chomutov",
+      "regNumber": "2500"
+    },
+    {
+      "rank": 392,
+      "name": "Vojtěch Cibula",
+      "club": "Pivní bar ČB",
+      "regNumber": "3915"
+    },
+    {
+      "rank": 398,
+      "name": "Jan Stoklasa",
+      "club": "Posázavský Pacifik Kožlí",
+      "regNumber": "1356"
+    },
+    {
+      "rank": 398,
       "name": "David Kořínek",
       "club": "Brněnská šipková z.s.",
       "regNumber": "2841"
@@ -2364,22 +2364,22 @@
       "regNumber": "5226"
     },
     {
-      "rank": 402,
+      "rank": 400,
+      "name": "Martin  Novák",
+      "club": "Plaská Zvěř",
+      "regNumber": "6088"
+    },
+    {
+      "rank": 403,
       "name": "Adam Šatný",
       "club": "Korbel II Litvínov",
       "regNumber": "6726"
     },
     {
-      "rank": 402,
+      "rank": 403,
       "name": "Zdeněk Fabišik",
       "club": "SmallBalls",
       "regNumber": "3704"
-    },
-    {
-      "rank": 402,
-      "name": "Jan Kočík",
-      "club": "DC Sokolka Dobříš",
-      "regNumber": "4833"
     },
     {
       "rank": 405,
@@ -2392,12 +2392,6 @@
       "name": "Jaroslav Faltín",
       "club": "Kanec Most",
       "regNumber": "4028"
-    },
-    {
-      "rank": 405,
-      "name": "Martin  Novák",
-      "club": "Plaská Zvěř",
-      "regNumber": "6088"
     },
     {
       "rank": 405,
@@ -2421,6 +2415,12 @@
       "rank": 405,
       "name": "František Červenka",
       "regNumber": "7212"
+    },
+    {
+      "rank": 405,
+      "name": "Jan Kočík",
+      "club": "DC Sokolka Dobříš",
+      "regNumber": "4833"
     },
     {
       "rank": 412,
@@ -2613,102 +2613,102 @@
     },
     {
       "rank": 445,
-      "name": "Radek Klas st.",
-      "regNumber": "5763"
-    },
-    {
-      "rank": 446,
       "name": "Lukáš Kucián",
       "club": "Steel Darts Hodonín",
       "regNumber": "3920"
     },
     {
-      "rank": 446,
+      "rank": 445,
       "name": "Tomáš Ščotka",
       "regNumber": "3966"
     },
     {
-      "rank": 446,
+      "rank": 445,
       "name": "Petr Seifert",
       "regNumber": "5126"
     },
     {
-      "rank": 446,
+      "rank": 445,
       "name": "Lukáš Pánek",
       "club": "Steel Brothers",
       "regNumber": "6634"
     },
     {
-      "rank": 450,
+      "rank": 449,
       "name": "Radim Volný",
       "club": "Jelen Kyjovice",
       "regNumber": "4934"
     },
     {
-      "rank": 450,
+      "rank": 449,
       "name": "Martin Kutzler",
       "club": "Cowhand Dušníky",
       "regNumber": "4461"
     },
     {
-      "rank": 450,
+      "rank": 449,
       "name": "Radek Švagr",
       "regNumber": "5386"
     },
     {
-      "rank": 450,
+      "rank": 449,
       "name": "Jiří  Grulich",
       "club": "Steel Brothers",
       "regNumber": "6637"
     },
     {
-      "rank": 450,
+      "rank": 449,
       "name": "Jan Klimt",
       "club": "ŠK Křižáci Barrandov",
       "regNumber": "6378"
     },
     {
-      "rank": 450,
+      "rank": 449,
       "name": "Antonín Zapletal",
       "club": "Black Panthers",
       "regNumber": "6225"
     },
     {
-      "rank": 450,
+      "rank": 449,
       "name": "Petr Sláma",
       "regNumber": "2836"
     },
     {
-      "rank": 450,
+      "rank": 449,
       "name": "Petr Zamrazil",
       "club": "ŠK Šneci Bělčice",
       "regNumber": "1718"
     },
     {
-      "rank": 458,
+      "rank": 457,
       "name": "Miroslav Borovský",
       "club": "ŠK Rebelové Myštěves",
       "regNumber": "3777"
     },
     {
-      "rank": 458,
+      "rank": 457,
       "name": "Michal Genik",
       "club": "Pojď mi hop",
       "regNumber": "959"
     },
     {
-      "rank": 458,
+      "rank": 457,
       "name": "Václav Bomba",
       "club": "DC Radopo Kladno",
       "regNumber": "6168"
     },
     {
-      "rank": 458,
+      "rank": 457,
       "name": "Tomáš Maceček",
       "regNumber": "6540"
     },
     {
-      "rank": 458,
+      "rank": 457,
+      "name": "Michal Knedlík",
+      "regNumber": "7276"
+    },
+    {
+      "rank": 457,
       "name": "Lukáš Novotný",
       "club": "Terryho máma",
       "regNumber": "5930"
@@ -2736,48 +2736,48 @@
       "regNumber": "6804"
     },
     {
-      "rank": 466,
-      "name": "Michal Knedlík",
-      "regNumber": "7276"
-    },
-    {
-      "rank": 468,
+      "rank": 467,
       "name": "Robert Kuric",
       "club": "Bombarďáci",
       "regNumber": "2331"
     },
     {
-      "rank": 468,
+      "rank": 467,
       "name": "Tomáš  Suchánek",
       "club": "Vostrý koně Pardubice",
       "regNumber": "5159"
     },
     {
-      "rank": 468,
+      "rank": 467,
       "name": "Milan Vašíček",
       "club": "STEEL HUNTERS",
       "regNumber": "5541"
     },
     {
-      "rank": 468,
+      "rank": 467,
       "name": "Václav  Ježek",
       "club": "Pivní Baroni",
       "regNumber": "7248"
     },
     {
-      "rank": 468,
+      "rank": 467,
       "name": "Filip Alexa",
       "club": "Samuraj Olomouc",
       "regNumber": "5782"
     },
     {
-      "rank": 468,
+      "rank": 467,
       "name": "Martin Karvay",
       "club": "Hranický Šenk",
       "regNumber": "6329"
     },
     {
-      "rank": 468,
+      "rank": 467,
+      "name": "Radek Klas st.",
+      "regNumber": "5763"
+    },
+    {
+      "rank": 467,
       "name": "Petr Janáček",
       "club": "Pivní Baroni",
       "regNumber": "5758"
@@ -3285,6 +3285,11 @@
     },
     {
       "rank": 557,
+      "name": "Lukáš Motl",
+      "regNumber": "6847"
+    },
+    {
+      "rank": 557,
       "name": "Jindřich Závodník",
       "club": "Brněnská šipková z.s.",
       "regNumber": "2250"
@@ -3296,524 +3301,519 @@
       "regNumber": "3171"
     },
     {
-      "rank": 564,
+      "rank": 565,
       "name": "Matyáš  Vystrčil",
       "club": "Guru-Caffé Nekonečný příběh ...",
       "regNumber": "6577"
     },
     {
-      "rank": 564,
+      "rank": 565,
       "name": "Aleš Chrastina",
       "club": "Renegade's",
       "regNumber": "6230"
     },
     {
-      "rank": 564,
+      "rank": 565,
       "name": "Josef Šabršula",
       "club": "Brněnská šipková z.s.",
       "regNumber": "2681"
     },
     {
-      "rank": 564,
+      "rank": 565,
       "name": "Jan Gehry",
       "club": "Windson Ostrava",
       "regNumber": "5303"
     },
     {
-      "rank": 564,
+      "rank": 565,
       "name": "Kristián Váchal",
       "club": "Flamethrowers Kytschow",
       "regNumber": "5381"
     },
     {
-      "rank": 564,
+      "rank": 565,
       "name": "Tomáš Navrátil",
       "club": "Piráti Podbořany",
       "regNumber": "6889"
     },
     {
-      "rank": 564,
+      "rank": 565,
       "name": "Adam Barcal",
       "club": "Brněnská šipková z.s.",
       "regNumber": "6487"
     },
     {
-      "rank": 564,
+      "rank": 565,
       "name": "Lukáš Pilař",
       "club": "Vostrý koně Pardubice",
       "regNumber": "4341"
     },
     {
-      "rank": 572,
+      "rank": 573,
       "name": "Adam Kedroň",
       "regNumber": "7281"
     },
     {
-      "rank": 572,
+      "rank": 573,
       "name": "Roman Chudej",
       "club": "Valašské Křídla 2014",
       "regNumber": "1472"
     },
     {
-      "rank": 572,
+      "rank": 573,
       "name": "Stanislav Surma",
       "club": "Windson Ostrava",
       "regNumber": "804"
     },
     {
-      "rank": 572,
+      "rank": 573,
       "name": "Ondřej Vysloužil",
       "regNumber": "4900"
     },
     {
-      "rank": 572,
+      "rank": 573,
       "name": "Roman Mudřík",
       "club": "Renegade's",
       "regNumber": "4593"
     },
     {
-      "rank": 572,
+      "rank": 573,
       "name": "Martin Zelenka",
       "club": "Bowling Bar",
       "regNumber": "5432"
     },
     {
-      "rank": 572,
+      "rank": 573,
       "name": "Patrik Naniáš",
       "club": "PV - Knihovna Olomouc",
       "regNumber": "3290"
     },
     {
-      "rank": 572,
+      "rank": 573,
       "name": "David Hvolka",
       "regNumber": "1592"
     },
     {
-      "rank": 572,
+      "rank": 573,
       "name": "Martin Moravec",
       "club": "Akademie DC",
       "regNumber": "3791"
     },
     {
-      "rank": 572,
+      "rank": 573,
       "name": "Václav Váňa",
       "club": "Tučňáci Nový Jičín",
       "regNumber": "6560"
     },
     {
-      "rank": 572,
+      "rank": 573,
       "name": "David Batelka",
       "club": "DC Radopo Kladno",
       "regNumber": "3904"
     },
     {
-      "rank": 583,
+      "rank": 584,
       "name": "Martin Chvojka",
       "club": "Bombarďáci",
       "regNumber": "5316"
     },
     {
-      "rank": 583,
+      "rank": 584,
       "name": "Vladimír Slezák",
       "club": "Brněnská šipková z.s.",
       "regNumber": "3754"
     },
     {
-      "rank": 583,
+      "rank": 584,
       "name": "Adam Mareš",
       "club": "Banditi z Krkonoš",
       "regNumber": "6641"
     },
     {
-      "rank": 583,
-      "name": "Antonín Müller",
-      "club": "Banditi z Krkonoš",
-      "regNumber": "4780"
-    },
-    {
-      "rank": 583,
-      "name": "Martin Prus",
-      "regNumber": "6127"
-    },
-    {
-      "rank": 583,
-      "name": "Martin Filka",
-      "regNumber": "7070"
-    },
-    {
-      "rank": 583,
-      "name": "Adam Foršt",
-      "regNumber": "7385"
-    },
-    {
-      "rank": 583,
-      "name": "Martin Bednář",
-      "club": "To je toho",
-      "regNumber": "4975"
-    },
-    {
-      "rank": 583,
-      "name": "Martin Orság",
-      "regNumber": "7029"
-    },
-    {
-      "rank": 592,
-      "name": "Matěj Příkazský",
-      "regNumber": "5652"
-    },
-    {
-      "rank": 592,
-      "name": "Vojtěch  Šindelka",
-      "regNumber": "6930"
-    },
-    {
-      "rank": 592,
-      "name": "Jan Sleza",
-      "regNumber": "6929"
-    },
-    {
-      "rank": 592,
-      "name": "Václav Panoš",
-      "club": "Spolek neratovických šipkařů",
-      "regNumber": "5858"
-    },
-    {
-      "rank": 592,
-      "name": "Patrik Pavlorek",
-      "club": "Darts Club Billiard Bar Ostrava",
-      "regNumber": "1605"
-    },
-    {
-      "rank": 592,
-      "name": "Dominik Belka",
-      "club": "Ferrari Darts Kyjov",
-      "regNumber": "6437"
-    },
-    {
-      "rank": 592,
-      "name": "Petr Špaček",
-      "regNumber": "7278"
-    },
-    {
-      "rank": 599,
-      "name": "Jan Lang ml.",
-      "club": "Pivní Baroni",
-      "regNumber": "6580"
-    },
-    {
-      "rank": 599,
-      "name": "Marek Ledecký",
-      "regNumber": "5321"
-    },
-    {
-      "rank": 599,
-      "name": "Petr Schneider",
-      "club": "Windson Ostrava",
-      "regNumber": "1181"
-    },
-    {
-      "rank": 599,
-      "name": "Matyáš Galuška",
-      "club": "NAPA Darts",
-      "regNumber": "6559"
-    },
-    {
-      "rank": 599,
-      "name": "Zdeněk Pangrác",
-      "regNumber": "6413"
-    },
-    {
-      "rank": 599,
+      "rank": 584,
       "name": "Jiří Nakládal",
       "club": "U Kalicha Prostějov",
       "regNumber": "4671"
     },
     {
-      "rank": 599,
+      "rank": 584,
+      "name": "Antonín Müller",
+      "club": "Banditi z Krkonoš",
+      "regNumber": "4780"
+    },
+    {
+      "rank": 584,
+      "name": "Martin Prus",
+      "regNumber": "6127"
+    },
+    {
+      "rank": 584,
+      "name": "Martin Filka",
+      "regNumber": "7070"
+    },
+    {
+      "rank": 584,
+      "name": "Adam Foršt",
+      "regNumber": "7385"
+    },
+    {
+      "rank": 584,
+      "name": "Martin Bednář",
+      "club": "To je toho",
+      "regNumber": "4975"
+    },
+    {
+      "rank": 584,
+      "name": "Martin Orság",
+      "regNumber": "7029"
+    },
+    {
+      "rank": 594,
+      "name": "Matěj Příkazský",
+      "regNumber": "5652"
+    },
+    {
+      "rank": 594,
+      "name": "Vojtěch  Šindelka",
+      "regNumber": "6930"
+    },
+    {
+      "rank": 594,
+      "name": "Jan Lang ml.",
+      "club": "Pivní Baroni",
+      "regNumber": "6580"
+    },
+    {
+      "rank": 594,
+      "name": "Jan Sleza",
+      "regNumber": "6929"
+    },
+    {
+      "rank": 594,
+      "name": "Václav Panoš",
+      "club": "Spolek neratovických šipkařů",
+      "regNumber": "5858"
+    },
+    {
+      "rank": 594,
+      "name": "Patrik Pavlorek",
+      "club": "Darts Club Billiard Bar Ostrava",
+      "regNumber": "1605"
+    },
+    {
+      "rank": 594,
+      "name": "Dominik Belka",
+      "club": "Ferrari Darts Kyjov",
+      "regNumber": "6437"
+    },
+    {
+      "rank": 594,
+      "name": "Petr Špaček",
+      "regNumber": "7278"
+    },
+    {
+      "rank": 602,
+      "name": "Marek Ledecký",
+      "regNumber": "5321"
+    },
+    {
+      "rank": 602,
+      "name": "Petr Schneider",
+      "club": "Windson Ostrava",
+      "regNumber": "1181"
+    },
+    {
+      "rank": 602,
+      "name": "Matyáš Galuška",
+      "club": "NAPA Darts",
+      "regNumber": "6559"
+    },
+    {
+      "rank": 602,
+      "name": "Zdeněk Pangrác",
+      "regNumber": "6413"
+    },
+    {
+      "rank": 602,
       "name": "Tomáš Ujčík",
       "club": "DC Steelový Šílenci Teplice",
       "regNumber": "3378"
     },
     {
-      "rank": 599,
+      "rank": 602,
       "name": "Josef Holub",
       "club": "Kingsburry Darts",
       "regNumber": "5626"
     },
     {
-      "rank": 599,
-      "name": "Petr Doležal",
-      "club": "Avengers Dašice",
-      "regNumber": "3435"
+      "rank": 602,
+      "name": "Radek Julínek",
+      "regNumber": "6310"
     },
     {
-      "rank": 608,
+      "rank": 609,
       "name": "Matyáš Sinkule",
       "regNumber": "7106"
     },
     {
-      "rank": 608,
+      "rank": 609,
       "name": "Lukáš Benda",
       "club": "Slušnej oddíl Jihlava",
       "regNumber": "2985"
     },
     {
-      "rank": 608,
+      "rank": 609,
       "name": "Jiří Plch",
       "club": "ŠK Sokol Dobříš",
       "regNumber": "4106"
     },
     {
-      "rank": 608,
+      "rank": 609,
       "name": "Petr Kubík",
       "regNumber": "7066"
     },
     {
-      "rank": 608,
+      "rank": 609,
       "name": "Jan Havel 2003",
       "regNumber": "6117"
     },
     {
-      "rank": 608,
+      "rank": 609,
       "name": "Petr Křížek",
       "club": "Darts Steel NHK",
       "regNumber": "3955"
     },
     {
-      "rank": 608,
+      "rank": 609,
       "name": "Martin Čimbora",
       "club": "DARTS CLUB ORLOVÁ",
       "regNumber": "6606"
     },
     {
-      "rank": 608,
+      "rank": 609,
       "name": "Petr Dian",
       "club": "Terryho máma",
       "regNumber": "1108"
     },
     {
-      "rank": 608,
-      "name": "Lukáš Motl",
-      "regNumber": "6847"
-    },
-    {
-      "rank": 608,
+      "rank": 609,
       "name": "Vladimír Milý",
       "club": "SmallBalls",
       "regNumber": "2119"
     },
     {
-      "rank": 618,
+      "rank": 609,
+      "name": "Petr Doležal",
+      "club": "Avengers Dašice",
+      "regNumber": "3435"
+    },
+    {
+      "rank": 619,
       "name": "Martin Chuchel",
       "club": "Steel darts club Vršovice",
       "regNumber": "4916"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Tomáš Hrabovszki",
       "club": "DC Radopo Kladno",
       "regNumber": "5392"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Milan Beneš",
       "club": "Kladno Steel",
       "regNumber": "6717"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Lukáš Adámek",
       "club": "Pivníci z Jablonce nad Nisou",
       "regNumber": "3194"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Ondřej Bali ml.",
       "club": "DC Steel Masters Těmice",
       "regNumber": "6382"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Michal Šulc",
       "club": "Kladno Steel",
       "regNumber": "5701"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Martin Trobl",
       "club": "DC Budějce",
       "regNumber": "2005"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Lukáš Míka",
       "club": "Pitbull Bažiny",
       "regNumber": "3572"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Jan Vráždil",
       "club": "ŠK eMHáčko z.s.",
       "regNumber": "6774"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Petr Matouš",
       "regNumber": "5128"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Tomáš Doležal (UL)",
       "regNumber": "5614"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Patrik Veselý",
       "regNumber": "7011"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Pavel Doležal",
       "club": "Pitbull Bažiny",
       "regNumber": "2518"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Radek Schulz",
       "club": "Blankyt",
       "regNumber": "92"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Lukáš Dubělčík",
       "club": "Iris Club",
       "regNumber": "2450"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Pavel Korbelář",
       "regNumber": "7404"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Josef Šimončík",
       "club": "DC Bull's-eye Riviéra F-M",
       "regNumber": "4687"
     },
     {
-      "rank": 618,
+      "rank": 619,
       "name": "Radek Řebíček",
       "club": "ŠK Pivnice Radegast",
       "regNumber": "4445"
     },
     {
-      "rank": 636,
+      "rank": 637,
       "name": "Matěj Ogrodník",
       "club": "Hero steel Ostrava",
       "regNumber": "6661"
     },
     {
-      "rank": 636,
+      "rank": 637,
       "name": "Lubor Český",
       "club": "DC Radopo Kladno",
       "regNumber": "326"
     },
     {
-      "rank": 636,
+      "rank": 637,
       "name": "Josef Sedláček",
       "club": "TJ START Olešnice v Orlických horách, z.s.",
       "regNumber": "3678"
     },
     {
-      "rank": 636,
+      "rank": 637,
       "name": "Šimon Šimík",
       "regNumber": "7082"
     },
     {
-      "rank": 636,
+      "rank": 637,
       "name": "Pavel Pjajčík",
       "club": "Steel Darts Skalička",
       "regNumber": "6375"
     },
     {
-      "rank": 636,
+      "rank": 637,
       "name": "Ondřej Fiala",
       "club": "DC Sokolka Dobříš",
       "regNumber": "6383"
     },
     {
-      "rank": 642,
+      "rank": 643,
       "name": "Petr Hofman",
       "regNumber": "1729"
     },
     {
-      "rank": 642,
+      "rank": 643,
       "name": "Pavel Hostýnek",
       "regNumber": "3301"
     },
     {
-      "rank": 642,
+      "rank": 643,
       "name": "Martin Benka",
       "regNumber": "4095"
     },
     {
-      "rank": 642,
+      "rank": 643,
       "name": "Jakub Justych",
       "regNumber": "6459"
     },
     {
-      "rank": 642,
+      "rank": 643,
       "name": "Tomáš Janoušek",
       "club": "Tělocvičná jednota Sokol Lukavice",
       "regNumber": "3760"
     },
     {
-      "rank": 642,
+      "rank": 643,
       "name": "Vilém Mičulka",
       "club": "Tučňáci Nový Jičín",
       "regNumber": "5485"
     },
     {
-      "rank": 642,
+      "rank": 643,
       "name": "Ladislav Vysloužil",
       "regNumber": "4901"
     },
     {
-      "rank": 642,
+      "rank": 643,
       "name": "Bedřich Zázvorka",
       "club": "Piráti Podbořany",
       "regNumber": "425"
     },
     {
-      "rank": 642,
+      "rank": 643,
       "name": "Petr Hindi",
       "club": "Bejvávalo u Kolečka - spolek",
       "regNumber": "4053"
     },
     {
-      "rank": 642,
+      "rank": 643,
       "name": "Ondřej Jokl",
       "regNumber": "7189"
     },
     {
-      "rank": 642,
+      "rank": 643,
       "name": "Jiří Šobr ml.",
       "club": "DC Budějce",
       "regNumber": "1682"
     },
     {
-      "rank": 642,
-      "name": "Radek Julínek",
-      "regNumber": "6310"
-    },
-    {
-      "rank": 642,
+      "rank": 643,
       "name": "Teo Novák",
       "club": "Piráti Podbořany",
       "regNumber": "6090"
     },
     {
-      "rank": 642,
+      "rank": 643,
       "name": "Peter Chrt",
       "club": "Darts Steel NHK",
       "regNumber": "4047"
@@ -3992,12 +3992,6 @@
     },
     {
       "rank": 676,
-      "name": "Martin Kaňok",
-      "club": "DC Bull's-eye Riviéra F-M",
-      "regNumber": "6824"
-    },
-    {
-      "rank": 676,
       "name": "Tomáš Lammel",
       "regNumber": "6475"
     },
@@ -4042,77 +4036,83 @@
       "regNumber": "5285"
     },
     {
-      "rank": 695,
+      "rank": 694,
       "name": "Miroslav Slusarčík",
       "club": "Kanec Most",
       "regNumber": "763"
     },
     {
-      "rank": 695,
+      "rank": 694,
       "name": "Josef Kujal",
       "club": "Darts Steel NHK",
       "regNumber": "3261"
     },
     {
-      "rank": 695,
+      "rank": 694,
       "name": "Jakub Vlach",
       "club": "Stiflerovci",
       "regNumber": "3895"
     },
     {
-      "rank": 695,
+      "rank": 694,
       "name": "Tomáš Dinter",
       "club": "Jelen Kyjovice",
       "regNumber": "5482"
     },
     {
-      "rank": 695,
+      "rank": 694,
       "name": "Miroslav Kratochvíl",
       "club": "Šipky Třešť",
       "regNumber": "5851"
     },
     {
-      "rank": 695,
+      "rank": 694,
       "name": "Vlastimil Jelínek",
       "club": "Spolek neratovických šipkařů",
       "regNumber": "230"
     },
     {
-      "rank": 695,
+      "rank": 694,
       "name": "Jiří Štolfa",
       "regNumber": "1910"
     },
     {
-      "rank": 695,
+      "rank": 694,
       "name": "Zdeněk Baier",
       "club": "Silesia Opava",
       "regNumber": "1812"
     },
     {
-      "rank": 695,
+      "rank": 694,
       "name": "Jiří Trnka",
       "club": "DC RR Kraslice",
       "regNumber": "3556"
     },
     {
-      "rank": 695,
+      "rank": 694,
+      "name": "Martin Kaňok",
+      "club": "DC Bull's-eye Riviéra F-M",
+      "regNumber": "6824"
+    },
+    {
+      "rank": 694,
       "name": "Martin Pleskač",
       "club": "Spolek neratovických šipkařů",
       "regNumber": "4985"
     },
     {
-      "rank": 695,
+      "rank": 694,
       "name": "Jaroslav Kolář",
       "regNumber": "7128"
     },
     {
-      "rank": 695,
+      "rank": 694,
       "name": "Jiří Beran",
       "club": "SBH Česká Lípa",
       "regNumber": "5384"
     },
     {
-      "rank": 695,
+      "rank": 694,
       "name": "Dian Samuel",
       "regNumber": "7038"
     },
@@ -4321,6 +4321,11 @@
     },
     {
       "rank": 735,
+      "name": "Oskar Vegricht",
+      "regNumber": "7277"
+    },
+    {
+      "rank": 735,
       "name": "Petr Fiala",
       "club": "DC RR Kraslice",
       "regNumber": "4434"
@@ -4398,83 +4403,78 @@
       "regNumber": "5504"
     },
     {
-      "rank": 758,
+      "rank": 759,
       "name": "Tomáš  Vrbka",
       "regNumber": "6843"
     },
     {
-      "rank": 758,
+      "rank": 759,
       "name": "Petr Janda",
       "club": "Plaská Zvěř",
       "regNumber": "5266"
     },
     {
-      "rank": 758,
+      "rank": 759,
       "name": "Tomáš Taťák",
       "club": "Bowling Bar",
       "regNumber": "5244"
     },
     {
-      "rank": 758,
+      "rank": 759,
       "name": "Adam Túma",
       "regNumber": "6392"
     },
     {
-      "rank": 758,
+      "rank": 759,
       "name": "David Stuchlík",
       "regNumber": "6395"
     },
     {
-      "rank": 758,
+      "rank": 759,
       "name": "Radim Fikáček",
       "club": "Desítka",
       "regNumber": "2286"
     },
     {
-      "rank": 758,
+      "rank": 759,
       "name": "Petr Paluřík",
       "regNumber": "5249"
     },
     {
-      "rank": 758,
-      "name": "Oskar Vegricht",
-      "regNumber": "7277"
-    },
-    {
-      "rank": 758,
+      "rank": 759,
       "name": "Svatopluk Zíka",
       "club": "Rychlé Šípy Chrastava",
       "regNumber": "5042"
     },
     {
-      "rank": 758,
+      "rank": 759,
       "name": "Pavel Mach",
       "regNumber": "6945"
     },
     {
-      "rank": 758,
+      "rank": 759,
       "name": "Lukáš Kossakowski",
       "regNumber": "7425"
     },
     {
-      "rank": 758,
+      "rank": 759,
       "name": "Dominik Vala",
       "club": "Silesia Opava",
       "regNumber": "4033"
     },
     {
-      "rank": 758,
+      "rank": 759,
       "name": "Radek Kreisel",
       "regNumber": "7289"
     },
     {
-      "rank": 758,
+      "rank": 759,
       "name": "Ondřej Gabzdyl",
       "club": "Tučňáci Nový Jičín",
       "regNumber": "5695"
     },
     {
-      "rank": 758,
+      "rank": 759,
       "name": "Tomáš Chládek",
       "club": "Brněnská šipková z.s.",
       "regNumber": "5775"
@@ -4514,6 +4514,12 @@
     },
     {
       "rank": 773,
+      "name": "Vlastimil Frána",
+      "club": "Pivní Baroni",
+      "regNumber": "6579"
+    },
+    {
+      "rank": 773,
       "name": "Tomáš Kouba",
       "regNumber": "7422"
     },
@@ -4546,52 +4552,46 @@
       "regNumber": "6281"
     },
     {
-      "rank": 785,
+      "rank": 786,
       "name": "Petr Šesták",
       "regNumber": "7293"
     },
     {
-      "rank": 785,
+      "rank": 786,
       "name": "Jan Špaček",
       "regNumber": "6368"
     },
     {
-      "rank": 785,
+      "rank": 786,
       "name": "Petr Merva",
       "club": "Iris Club",
       "regNumber": "5966"
     },
     {
-      "rank": 785,
-      "name": "Vlastimil Frána",
-      "club": "Pivní Baroni",
-      "regNumber": "6579"
-    },
-    {
-      "rank": 785,
+      "rank": 786,
       "name": "Václav Poklemba",
       "club": "SD Brno",
       "regNumber": "2098"
     },
     {
-      "rank": 785,
+      "rank": 786,
       "name": "Josef Škopek",
       "club": "Desítka",
       "regNumber": "81"
     },
     {
-      "rank": 785,
+      "rank": 786,
       "name": "Lukáš Sadílek",
       "regNumber": "7140"
     },
     {
-      "rank": 785,
+      "rank": 786,
       "name": "Jaroslav  Boháč",
       "club": "Terryho máma",
       "regNumber": "5054"
     },
     {
-      "rank": 785,
+      "rank": 786,
       "name": "Marcin Bolek",
       "club": "Plaská Zvěř",
       "regNumber": "5115"
@@ -4644,11 +4644,6 @@
     },
     {
       "rank": 794,
-      "name": "Tomáš Jindra",
-      "regNumber": "5822"
-    },
-    {
-      "rank": 794,
       "name": "Martin Gál",
       "club": "Bowling Bar",
       "regNumber": "4312"
@@ -4677,165 +4672,170 @@
       "regNumber": "6905"
     },
     {
-      "rank": 808,
+      "rank": 807,
       "name": "Michal Rovný",
       "regNumber": "7284"
     },
     {
-      "rank": 808,
+      "rank": 807,
       "name": "Čestmír Randa",
       "regNumber": "7223"
     },
     {
-      "rank": 808,
+      "rank": 807,
       "name": "František Janda",
       "regNumber": "7328"
     },
     {
-      "rank": 808,
+      "rank": 807,
       "name": "Pavel Fuksa",
       "club": "Vostrý koně Pardubice",
       "regNumber": "5734"
     },
     {
-      "rank": 808,
+      "rank": 807,
       "name": "Kamil Baláž",
       "club": "Kanec Most",
       "regNumber": "6059"
     },
     {
-      "rank": 808,
+      "rank": 807,
       "name": "Dalibor Sedlář",
       "regNumber": "7461"
     },
     {
-      "rank": 808,
+      "rank": 807,
       "name": "Vojtěch Vaňousek",
       "club": "ŠK Pivnice Radegast",
       "regNumber": "6523"
     },
     {
-      "rank": 808,
+      "rank": 807,
       "name": "Martin Kvapil",
       "regNumber": "7288"
     },
     {
-      "rank": 808,
+      "rank": 807,
       "name": "Zdeněk Kubík",
       "club": "Stromovka Humpolec",
       "regNumber": "6897"
     },
     {
-      "rank": 808,
+      "rank": 807,
       "name": "Radim Herzog",
       "club": "Brněnská šipková z.s.",
       "regNumber": "6585"
     },
     {
-      "rank": 808,
+      "rank": 807,
       "name": "Roman Albrecht",
       "regNumber": "5496"
     },
     {
-      "rank": 808,
+      "rank": 807,
       "name": "Lukáš Chromý",
       "club": "Šipky Třešť",
       "regNumber": "5845"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "David Trubka",
       "regNumber": "2852"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "Pavel Paděra",
       "club": "U Kalicha Prostějov",
       "regNumber": "3498"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "Radek Till",
       "club": "SBH Česká Lípa",
       "regNumber": "5030"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "Filip Slovák",
       "club": "Sport Bar Miapr",
       "regNumber": "5357"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "František Šejna",
       "regNumber": "7342"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "Ondřej Vaníček",
       "club": "Terryho máma",
       "regNumber": "1009"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "Martin Švec",
       "club": "U Kalicha Prostějov",
       "regNumber": "5005"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "Jaroslav Jerhot",
       "club": "Piráti Podbořany",
       "regNumber": "2494"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "Jakub Moravec",
       "club": "Spolek neratovických šipkařů",
       "regNumber": "5912"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "Daniel Pomeje",
       "club": "Eden",
       "regNumber": "2498"
     },
     {
-      "rank": 820,
+      "rank": 819,
+      "name": "Tomáš Jindra",
+      "regNumber": "5822"
+    },
+    {
+      "rank": 819,
       "name": "Lukáš  Klas",
       "regNumber": "6105"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "Ondřej Černík",
       "club": "Pivní Jistota Praha",
       "regNumber": "3898"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "David Šebela",
       "club": "SD Brno",
       "regNumber": "6394"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "Miroslav Seifert",
       "club": "Bombarďáci",
       "regNumber": "2344"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "Zdeněk  Hájek (Lib)",
       "regNumber": "5521"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "Radim Hanzelka",
       "club": "Steel Brothers",
       "regNumber": "3964"
     },
     {
-      "rank": 820,
+      "rank": 819,
       "name": "Jan Mareš",
       "club": "Mendosino Joint 902 10",
       "regNumber": "4"
@@ -5062,11 +5062,6 @@
     },
     {
       "rank": 869,
-      "name": "Karel Pomahač",
-      "regNumber": "6115"
-    },
-    {
-      "rank": 869,
       "name": "Václav Vlachynský",
       "club": "Axa",
       "regNumber": "3804"
@@ -5133,328 +5128,333 @@
       "regNumber": "2822"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "František Poledno",
       "regNumber": "4329"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Josef Lukš",
       "club": "S.D.A. CB",
       "regNumber": "839"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Marek Mleziva",
       "club": "Cowhand Dušníky",
       "regNumber": "4464"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Mariusz Gembala",
       "regNumber": "7433"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Libor Weigel",
       "club": "Blankyt",
       "regNumber": "477"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Vlastimil Pokorný",
       "club": "WFS Evaň",
       "regNumber": "1290"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Martin Kvetko",
       "regNumber": "7283"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Jan Záruba",
       "club": "STS Chvojkovice Brod",
       "regNumber": "937"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Stanislav Petro",
       "regNumber": "6345"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Václav Pěchoušek FRC",
       "regNumber": "6838"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Milan Zlatohlávek",
       "club": "Steel Darts Hodonín",
       "regNumber": "4856"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Petr Urbánek",
       "club": "Windson Ostrava",
       "regNumber": "4169"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "David Čermák",
       "club": "Vostrý koně Pardubice",
       "regNumber": "2590"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Miroslav Kubáň",
       "regNumber": "4104"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Mika Klocek",
       "regNumber": "7052"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Radim Tvarůžek",
       "club": "Šipkaři Stvolová",
       "regNumber": "4773"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Vojtěch Hromada",
       "regNumber": "7251"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Václav Holý",
       "regNumber": "7325"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Jakub Janda",
       "regNumber": "7326"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Tomáš Meister",
       "regNumber": "5838"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Milan  Mika",
       "regNumber": "7236"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Michal Novák",
       "club": "ALL-IN-DARTS MT",
       "regNumber": "5989"
     },
     {
-      "rank": 889,
+      "rank": 888,
+      "name": "Karel Pomahač",
+      "regNumber": "6115"
+    },
+    {
+      "rank": 888,
       "name": "Kryštof Robin Grepi",
       "regNumber": "7068"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Patrik Kovář",
       "regNumber": "7377"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Dimitrije Pavičevič",
       "club": "Blankyt",
       "regNumber": "93"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Tomáš Strnisko",
       "regNumber": "5503"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Jiří Hájek",
       "club": "WFS Evaň",
       "regNumber": "1259"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Stanislav Kúřil",
       "club": "ŠK Velké Meziříčí",
       "regNumber": "3479"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Pavel Šmíd",
       "club": "Windson Ostrava",
       "regNumber": "4206"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Jiří Reich",
       "regNumber": "6965"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Lukáš Zvolánek",
       "club": "Flamethrowers Kytschow",
       "regNumber": "5372"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Ivan Pychora",
       "regNumber": "6987"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Miroslav Kubica",
       "regNumber": "7334"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Jaroslav Lavička",
       "regNumber": "7440"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Juraj Hodonský",
       "club": "Bowling Bar",
       "regNumber": "4902"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Erikos Papoutsides",
       "club": "Scorpions Plzeň",
       "regNumber": "6954"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Oldřich Šidlo",
       "regNumber": "6072"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Radek Kotrba",
       "club": "ŠK Velké Meziříčí",
       "regNumber": "3480"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Jan Zahradníček",
       "regNumber": "6359"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Tomáš Václavík",
       "club": "Steel Darts Jičín",
       "regNumber": "4743"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Michal Staněk",
       "club": "Bombarďáci",
       "regNumber": "2330"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Petr Ulčík",
       "club": "Axa",
       "regNumber": "4804"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Michal Kubiš",
       "club": "Valašské Křídla 2014",
       "regNumber": "1704"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Šimon Mahdal",
       "club": "Bowling Bar",
       "regNumber": "7021"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Hynek Lindner",
       "club": "Samuraj Olomouc",
       "regNumber": "3159"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Jan Kuneš",
       "regNumber": "7274"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Radek Bajnar",
       "club": "Hero steel Ostrava",
       "regNumber": "1708"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Jan Novák",
       "regNumber": "7257"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Martin Kovačík",
       "club": "DC Lipenský expres",
       "regNumber": "2414"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Milan Matouš",
       "club": "DC Ďáblové",
       "regNumber": "5562"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Štěpán Kostrhún",
       "regNumber": "7110"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Zbyšek Pořízka",
       "regNumber": "6990"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Miloš Civín",
       "regNumber": "7045"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Daniel Velebný",
       "club": "Bumerang Team Plzeň",
       "regNumber": "4438"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Tomáš Janalík",
       "club": "Black Panthers",
       "regNumber": "4601"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Arkadiusz Sikora",
       "club": "Dart Club Podbeskidzie",
       "regNumber": "1799"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Jan  Zajíc  (HK)",
       "regNumber": "7122"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Martin Šafránek",
       "club": "DC NoA!m",
       "regNumber": "2356"
     },
     {
-      "rank": 889,
+      "rank": 888,
       "name": "Petr Kudlic",
       "regNumber": "3629"
     },
@@ -5481,6 +5481,11 @@
       "name": "Michal Benkovský",
       "club": "Terryho máma",
       "regNumber": "1115"
+    },
+    {
+      "rank": 948,
+      "name": "Jaroslav Olach",
+      "regNumber": "7323"
     },
     {
       "rank": 948,
@@ -5513,9 +5518,9 @@
     },
     {
       "rank": 948,
-      "name": "David Šimonek",
-      "club": "Vostrý koně Pardubice",
-      "regNumber": "4018"
+      "name": "Jan Fiala",
+      "club": "Plaská Zvěř",
+      "regNumber": "7002"
     },
     {
       "rank": 948,
@@ -5528,12 +5533,6 @@
       "name": "Martin Pecl",
       "club": "Brněnská šipková z.s.",
       "regNumber": "2352"
-    },
-    {
-      "rank": 948,
-      "name": "Miroslav Beránek",
-      "club": "DC Sokolka Dobříš",
-      "regNumber": "6156"
     },
     {
       "rank": 948,
@@ -5572,11 +5571,6 @@
       "rank": 962,
       "name": "Ondřej Bureš",
       "regNumber": "6398"
-    },
-    {
-      "rank": 962,
-      "name": "Jaroslav Olach",
-      "regNumber": "7323"
     },
     {
       "rank": 962,
@@ -5635,14 +5629,14 @@
     },
     {
       "rank": 962,
-      "name": "Jan Fiala",
-      "club": "Plaská Zvěř",
-      "regNumber": "7002"
+      "name": "Jiří Jáchym",
+      "regNumber": "7193"
     },
     {
       "rank": 962,
-      "name": "Jiří Jáchym",
-      "regNumber": "7193"
+      "name": "David Šimonek",
+      "club": "Vostrý koně Pardubice",
+      "regNumber": "4018"
     },
     {
       "rank": 962,
@@ -5688,101 +5682,107 @@
       "regNumber": "4803"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Michal Novotný",
       "club": "Blankyt",
       "regNumber": "190"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Luboš Prusík",
       "club": "Pivní Baroni",
       "regNumber": "5757"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Josef Holub",
       "club": "Kingsburry Darts",
       "regNumber": "5697"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Tomáš Šabata",
       "club": "Tělocvičná jednota Sokol Lukavice",
       "regNumber": "3758"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Michal Kozaňák 92 ml.(92)",
       "club": "Banditi z Krkonoš",
       "regNumber": "4783"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Martin Skokan",
       "regNumber": "5499"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Luboš Cikánek",
       "club": "Speed Flies Kostelec n. L.",
       "regNumber": "4945"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Tomáš Zoulek",
       "club": "Pivní Jistota Praha",
       "regNumber": "6697"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Miloslav Vaněk",
       "regNumber": "6982"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Aleš  Jeřábek",
       "regNumber": "6176"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Jindřich Adamus",
       "club": "DC Bull's-eye Riviéra F-M",
       "regNumber": "4684"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Ivo Šuman",
       "club": "Bažbend steel Praha",
       "regNumber": "729"
     },
     {
-      "rank": 989,
+      "rank": 988,
+      "name": "Miroslav Beránek",
+      "club": "DC Sokolka Dobříš",
+      "regNumber": "6156"
+    },
+    {
+      "rank": 988,
       "name": "Radim Krejčí",
       "regNumber": "6078"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Roman Pech",
       "regNumber": "4782"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "David Srb",
       "regNumber": "7381"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Tadeáš Pykal",
       "regNumber": "6245"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Jan Bendl",
       "regNumber": "7184"
     },
     {
-      "rank": 989,
+      "rank": 988,
       "name": "Michal Čmarada",
       "club": "Steel Darts Hodonín",
       "regNumber": "7014"
@@ -6513,12 +6513,6 @@
     },
     {
       "rank": 1122,
-      "name": "Jakub Pánek",
-      "club": "DC Bull's-eye Riviéra F-M",
-      "regNumber": "5608"
-    },
-    {
-      "rank": 1122,
       "name": "Radek Tvarůžek",
       "club": "Steel Brothers",
       "regNumber": "6632"
@@ -6546,1150 +6540,1156 @@
       "regNumber": "5733"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Samuel Čepera",
       "regNumber": "6845"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Jakub Němec",
       "regNumber": "7042"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Zdeněk Machala",
       "club": "Šipky Třešť",
       "regNumber": "6910"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Václav Kuchař",
       "club": "Steel Darts Hodonín",
       "regNumber": "4865"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Miroslav Moravský",
       "club": "Šipky Třešť",
       "regNumber": "5849"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Ondřej Špalek",
       "regNumber": "6371"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Petr Adamec",
       "regNumber": "6322"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Daniel Kotzur",
       "club": "Sport Bar Miapr",
       "regNumber": "5356"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Jiří Dlouhý",
       "club": "Démoni Originál",
       "regNumber": "4276"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Lukáš Šalša",
       "club": "Steel Darts Hodonín",
       "regNumber": "4855"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Radek Ťápal",
       "club": "Šipky Třešť",
       "regNumber": "6909"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "František Kovář",
       "club": "Schovi Darts",
       "regNumber": "795"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Jan Stariat",
       "club": "DC RR Kraslice",
       "regNumber": "1527"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Pavel Malík",
       "regNumber": "7076"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Jakub Šebek",
       "club": "Steel Darts Hodonín",
       "regNumber": "4818"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Jan Koždoň",
       "club": "DC Bull's-eye Riviéra F-M",
       "regNumber": "3055"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Michal Ulrich",
       "club": "Bombarďáci",
       "regNumber": "2100"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Lukáš  Štefanko",
       "regNumber": "7226"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Petr Smrček",
       "regNumber": "6647"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Patrik Štábl",
       "regNumber": "7077"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Kamil Šimandl",
       "club": "Scorpions Plzeň",
       "regNumber": "202"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Vojtěch Korynta",
       "club": "Terryho máma",
       "regNumber": "6155"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Jan Petřík",
       "regNumber": "2723"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Roman Hauge",
       "regNumber": "7181"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Martin Depta",
       "club": "DARTS CLUB ORLOVÁ",
       "regNumber": "4604"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Matěj Nezbeda",
       "club": "ŠK Pivnice Radegast",
       "regNumber": "6823"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Jiří Balaštík",
       "club": "Steel Darts Hodonín",
       "regNumber": "4249"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Petr Vodička",
       "club": "DC RR Kraslice",
       "regNumber": "4625"
     },
     {
-      "rank": 1142,
+      "rank": 1141,
       "name": "Petr Černocký",
       "club": "Silesia Opava",
       "regNumber": "1442"
     },
     {
-      "rank": 1142,
-      "name": "Bohumil Bocviňok",
-      "club": "DC Bull's-eye Riviéra F-M",
-      "regNumber": "1183"
-    },
-    {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Tomáš Stříbný",
       "club": "Iris Club",
       "regNumber": "1101"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Jiří Vimr",
       "club": "DC Ravens Říčany",
       "regNumber": "426"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Květoslav Justych",
       "regNumber": "6458"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Otakar Špás",
       "club": "Darts Steel NHK",
       "regNumber": "1847"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Luděk Ekstein",
       "club": "FJ Sokol AŠKK Vejprnice",
       "regNumber": "1940"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Adam Janda",
       "club": "Brněnská šipková z.s.",
       "regNumber": "7268"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Marek Slába",
       "regNumber": "6136"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Pavel Václav Touš",
       "regNumber": "7435"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Jakub Mrviš",
       "club": "Bowling Bar",
       "regNumber": "4943"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Milan Vytlačil",
       "club": "Pitbull Bažiny",
       "regNumber": "2522"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Tomáš Jirchář ml.",
       "club": "Bowling Bar",
       "regNumber": "2693"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Roman Orgoň",
       "regNumber": "7437"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Adam Dryák",
       "regNumber": "5606"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Kilián Hrdina",
       "regNumber": "2738"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Dušan Chlebek",
       "regNumber": "4051"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Jan  Hromada",
       "regNumber": "7229"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Miroslav Nauč",
       "regNumber": "7460"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Roman Stromšík",
       "regNumber": "7237"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Michael Bajer",
       "club": "Iris Club",
       "regNumber": "2013"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Miroslav Bäuml",
       "regNumber": "930"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Václav Wertheim",
       "regNumber": "7241"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Josef Jůna",
       "regNumber": "395"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Jiří Vítek",
       "regNumber": "3960"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Tomáš Trefil",
       "regNumber": "5317"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Zdeněk Daněk",
       "regNumber": "4706"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Václav Hochman",
       "club": "SD Brno",
       "regNumber": "1143"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Martin Pasterčík",
       "club": "DC Nagano Kladno",
       "regNumber": "3973"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Martin Karafiát",
       "club": "ŠK Velké Meziříčí",
       "regNumber": "7135"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Milan Frejvolt",
       "club": "Iris Club",
       "regNumber": "5815"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Štěpán Karvay",
       "regNumber": "6407"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Michal Weintritt",
       "club": "Bowling Bar",
       "regNumber": "4311"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Filip Vedral",
       "regNumber": "7250"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Ondřej Sedlák",
       "regNumber": "7224"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Tomáš Novobilský",
       "club": "Tučňáci Nový Jičín",
       "regNumber": "6503"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Stanislav Kouba",
       "regNumber": "6327"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Michal Kulhánek",
       "club": "Eden",
       "regNumber": "5231"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Pavel Novák",
       "regNumber": "5704"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Michal Zelenka",
       "club": "Steel Darts Club Petrovice",
       "regNumber": "3671"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Milan Lichnovský",
       "regNumber": "6518"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Jiří Kalášek",
       "club": "Kanec Most",
       "regNumber": "3561"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Marek Truhlář",
       "regNumber": "7416"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "David Kummer",
       "club": "Brněnská šipková z.s.",
       "regNumber": "2890"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Josef Matocha",
       "regNumber": "7006"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Jakub Větrovský",
       "club": "Legendario Plzeň",
       "regNumber": "4523"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Jan Šťastný",
       "club": "HO-WADA AŠ",
       "regNumber": "2550"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Michal Klement",
       "club": "Pitbull Bažiny",
       "regNumber": "6201"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Miroslav Kolář",
       "regNumber": "87"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Igor Balog",
       "club": "Ripper Ostrava",
       "regNumber": "2346"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Viktor Jakeš",
       "regNumber": "6358"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Stanislav Novák",
       "regNumber": "6418"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Radek Kotek",
       "club": "Axa",
       "regNumber": "4278"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Adam Kubik",
       "regNumber": "6978"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Tomáš Gasser",
       "club": "Eden",
       "regNumber": "1689"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Tadeáš Slivka",
       "regNumber": "6552"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Marek Pýcha",
       "regNumber": "7413"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Karel Polomis",
       "club": "Steel ORTHODOX",
       "regNumber": "3631"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Tomáš Počta",
       "club": "Club Náplavka",
       "regNumber": "5076"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Adam Suchánek",
       "regNumber": "7018"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Richard Fodor",
       "regNumber": "7096"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Vojtěch Novotný",
       "club": "Šipky Třešť",
       "regNumber": "6913"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Zdeněk Patala",
       "club": "Valašské Křídla 2014",
       "regNumber": "1629"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Petr Vajce ml.",
       "club": "Piráti Podbořany",
       "regNumber": "5618"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Babka Matyáš",
       "club": "Flamethrowers Kytschow",
       "regNumber": "7215"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Jakub Matulík",
       "regNumber": "6430"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Jakub  Grabiec",
       "regNumber": "6974"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Matyáš Kaufner",
       "regNumber": "7439"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Lukáš Hájek",
       "regNumber": "7420"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Václav Hejtmánek",
       "club": "Piráti Podbořany",
       "regNumber": "1675"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Adam Lukáč",
       "regNumber": "7182"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Pavel Novák",
       "club": "Speed Flies Kostelec n. L.",
       "regNumber": "780"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Tomáš Matoušek",
       "regNumber": "7132"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Jan Zolman",
       "regNumber": "6977"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Václav Lochman",
       "regNumber": "836"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Patrik Fuciman st.",
       "regNumber": "7062"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Filip Dřevojan",
       "regNumber": "5603"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Vojtěch Žák",
       "regNumber": "2851"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Václav Procházka",
       "club": "Terryho máma",
       "regNumber": "2682"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
+      "name": "Bohumil Bocviňok",
+      "club": "DC Bull's-eye Riviéra F-M",
+      "regNumber": "1183"
+    },
+    {
+      "rank": 1170,
       "name": "Jan Bartoš",
       "regNumber": "7421"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Tomáš Nešpor",
       "regNumber": "7220"
     },
     {
-      "rank": 1172,
+      "rank": 1170,
       "name": "Michal Franc",
       "club": "DC NoA!m",
       "regNumber": "4591"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Vojtěch Kopáček",
       "club": "DC Sokolka Dobříš",
       "regNumber": "6396"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Michal  Nicek",
       "club": "Cowhand Dušníky",
       "regNumber": "6856"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Jan Choboda",
       "club": "Šipky Třešť",
       "regNumber": "6370"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Petr Jarcovák",
       "regNumber": "5491"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Zbyslav Vytisk",
       "club": "Silesia Opava",
       "regNumber": "1445"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Martin Pelikán",
       "club": "Bez klubové příslušnosti",
       "regNumber": "1008"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Miroslav Lichý",
       "club": "Jelen Kyjovice",
       "regNumber": "4933"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Hubert Gramel",
       "regNumber": "7010"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Lukáš Otrusiník",
       "club": "NAPA Darts",
       "regNumber": "6325"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Tomáš Vavrečka",
       "club": "Jelen Kyjovice",
       "regNumber": "5723"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Zdeněk Leinveber",
       "club": "ŠK Panapr 2011",
       "regNumber": "3276"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Vojtěch Mičulka",
       "regNumber": "6470"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Jakub Marek",
       "club": "Steel Devils",
       "regNumber": "1160"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Tomáš Navrátil",
       "club": "STEEL HUNTERS",
       "regNumber": "5635"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Tomáš Mychajlov",
       "club": "Legendario Plzeň",
       "regNumber": "5899"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Vojtěch Mňuk",
       "regNumber": "6946"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Jan Kujal",
       "club": "Darts Steel NHK",
       "regNumber": "6790"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Maxim Sroka",
       "club": "Pivní Jistota Praha",
       "regNumber": "6699"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Jiří Šoula",
       "regNumber": "5530"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Michal Hanák",
       "regNumber": "4745"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Pavel Šimek",
       "club": "Spolek neratovických šipkařů",
       "regNumber": "927"
     },
     {
-      "rank": 1252,
+      "rank": 1251,
       "name": "Martin Čábelka",
       "regNumber": "3833"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Leoš Vrána",
       "club": "ŠK Velké Meziříčí",
       "regNumber": "5794"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Marek Stolín",
       "club": "The Badgers",
       "regNumber": "3684"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Libor Nebes",
       "club": "Steel darts club Vršovice",
       "regNumber": "4388"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "František Stranský",
       "regNumber": "2805"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Pavel Touš",
       "regNumber": "7434"
     },
     {
-      "rank": 1274,
-      "name": "Radek Hanačík",
-      "regNumber": "6499"
-    },
-    {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Lukáš Beran",
       "club": "OKO Plzeň",
       "regNumber": "2145"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Jakub Karvay",
       "regNumber": "6478"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Antonín  Sobotka",
       "club": "Šipky Třešť",
       "regNumber": "5846"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Lukáš Popďakunik",
       "club": "STS Chvojkovice Brod",
       "regNumber": "2220"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Tomáš Kolařík",
       "club": "Terryho máma",
       "regNumber": "4621"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Adam Eichhorn",
       "club": "Spolek neratovických šipkařů",
       "regNumber": "6841"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Jiří Kůrka",
       "club": "ŠK Šneci Bělčice",
       "regNumber": "1394"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Zbyněk Janíček",
       "regNumber": "7234"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Miloslav Navrátil",
       "club": "Š.K. AJETO",
       "regNumber": "511"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Matěj Procházka",
       "club": "TJ Sokol Luka nad Jihlavou",
       "regNumber": "6918"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Jan Haas",
       "club": "DC Sokolka Dobříš",
       "regNumber": "6397"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Tomáš Ziembinski",
       "club": "DARTS CLUB ORLOVÁ",
       "regNumber": "6608"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Marian Macíček",
       "regNumber": "6474"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Miroslav Matucha",
       "club": "Bowling Bar",
       "regNumber": "3620"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Petr Jelínek",
       "club": "DC Pohoda Kladno",
       "regNumber": "460"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Jan Kučera",
       "regNumber": "7119"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Přemysl Čečka",
       "regNumber": "7438"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Oldřich Prokopec",
       "regNumber": "7086"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Marek Dvorjančarský",
       "club": "Darts Club Billiard Bar Ostrava",
       "regNumber": "3118"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Miroslav Sedlák",
       "regNumber": "6749"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Viktor Petr",
       "club": "U Kalicha Prostějov",
       "regNumber": "6881"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Dušan Martének",
       "regNumber": "7316"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Filip Chmelař",
       "club": "Stýlaři Jundrov",
       "regNumber": "3200"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Karol Cirok",
       "club": "Dream team Jirkov",
       "regNumber": "4467"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Lukáš Koudelka",
       "club": "Samuraj Olomouc",
       "regNumber": "1359"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Lukáš Paukner",
       "regNumber": "3975"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Jan Bubla",
       "club": "DC RR Kraslice",
       "regNumber": "3851"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Kamil Hrtoň",
       "club": "Silesia Opava",
       "regNumber": "1818"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Jiří Fučík",
       "club": "Steel Darts Hodonín",
       "regNumber": "4869"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Patrik Sinkule",
       "regNumber": "7348"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Dominik Valda",
       "regNumber": "6599"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Lukáš Anýž",
       "regNumber": "7124"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Petr  Pozděna",
       "regNumber": "4757"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Tomáš Mihulka",
       "club": "Darts Steel NHK",
       "regNumber": "3956"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Jáchym Hrdina",
       "regNumber": "4537"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Adam Pořízka",
       "regNumber": "6293"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Antonín Molek",
       "club": "ŠK Velké Meziříčí",
       "regNumber": "6614"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Martin Chadim",
       "regNumber": "1770"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
+      "name": "Jakub Pánek",
+      "club": "DC Bull's-eye Riviéra F-M",
+      "regNumber": "5608"
+    },
+    {
+      "rank": 1273,
       "name": "Miloš Telvák",
       "regNumber": "7125"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Jakub Ondračka",
       "club": "Sport Bar Miapr",
       "regNumber": "5789"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Jakub Knápek",
       "regNumber": "7210"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Václav Zahradník",
       "club": "Tělocvičná jednota Sokol Lukavice",
       "regNumber": "3759"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Lukáš Matulík",
       "regNumber": "6429"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Jan Doležal",
       "club": "Darts Team SC Velké Meziříčí",
       "regNumber": "3472"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Antonio Kavan",
       "regNumber": "7263"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Robin Matulík",
       "regNumber": "6427"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Jiří Zelený",
       "club": "Steel Darts Přerov",
       "regNumber": "4810"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Tomáš Wolny",
       "club": "Iris Club",
       "regNumber": "1601"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Tomáš Kubec",
       "club": "Speed Flies Kostelec n. L.",
       "regNumber": "5501"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Jaroslav Stehlík",
       "regNumber": "6747"
     },
     {
-      "rank": 1274,
+      "rank": 1273,
       "name": "Marek Slába",
       "regNumber": "7401"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
+      "name": "Radek Hanačík",
+      "regNumber": "6499"
+    },
+    {
+      "rank": 1330,
       "name": "Petr Šopík",
       "club": "Black Panthers",
       "regNumber": "3139"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Eduard Beneš",
       "regNumber": "4628"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Adam Krchňavý",
       "club": "Šipky Třešť",
       "regNumber": "5305"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Michal Vondřich",
       "regNumber": "2854"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Jiří Libertin",
       "club": "ŠK Pivnice Radegast",
       "regNumber": "4821"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Luňák Michal",
       "club": "Hanácká Trefa Prostějov",
       "regNumber": "5013"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Adam Šatný",
       "regNumber": "5513"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Petr Stříteský",
       "club": "Tělocvičná jednota Sokol Lukavice",
       "regNumber": "3946"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "David Švec",
       "club": "DC Bull's-eye Riviéra F-M",
       "regNumber": "4980"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Ondřej Veselý",
       "club": "ŠK Pivnice Radegast",
       "regNumber": "4027"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Martin Staněk",
       "club": "Spolek neratovických šipkařů",
       "regNumber": "1549"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Jiří Svět",
       "club": "Dřeváci",
       "regNumber": "3575"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Michal Píštěk",
       "club": "Bowling Bar",
       "regNumber": "4907"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Ondřej Maleček",
       "regNumber": "1052"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Lukáš Kašný",
       "club": "Spolek neratovických šipkařů",
       "regNumber": "5649"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Tomáš Houlík",
       "club": "Spolek neratovických šipkařů",
       "regNumber": "6842"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Josef Petřík",
       "regNumber": "4087"
     },
     {
-      "rank": 1331,
+      "rank": 1330,
       "name": "Petr Třešňák",
       "regNumber": "6553"
     },
@@ -8537,12 +8537,6 @@
     },
     {
       "rank": 1435,
-      "name": "Pavel Polách",
-      "club": "DC Bull's-eye Riviéra F-M",
-      "regNumber": "4298"
-    },
-    {
-      "rank": 1435,
       "name": "Ondřej Šafář",
       "regNumber": "7344"
     },
@@ -8669,760 +8663,754 @@
       "regNumber": "2710"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Radek Kovářík",
       "regNumber": "368"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Michal Pastrňák",
       "club": "Iris Club",
       "regNumber": "805"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Daniel Šimek",
       "club": "NAPA Darts",
       "regNumber": "3737"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Martin Kříž",
       "club": "SD Brno",
       "regNumber": "5797"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Alexandr Vaněk",
       "club": "ALL-IN-DARTS MT",
       "regNumber": "6145"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Slávek Paclt",
       "regNumber": "5328"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Pavel Rutar",
       "club": "Bez klubové příslušnosti",
       "regNumber": "411"
     },
     {
-      "rank": 1525,
-      "name": "Pavel Světelský",
-      "club": "DC Bull's-eye Riviéra F-M",
-      "regNumber": "6639"
-    },
-    {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Ján Melich",
       "club": "Spolek neratovických šipkařů",
       "regNumber": "3034"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Jiří Horsicza",
       "regNumber": "6051"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Petr Svoboda",
       "regNumber": "1573"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Petr Wiedeman",
       "regNumber": "6175"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Daniel Volf",
       "club": "ŠK Pivnice Radegast",
       "regNumber": "1962"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Oldřich Ott",
       "regNumber": "6972"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Martin Ševčík",
       "club": "Double Trouble",
       "regNumber": "4748"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Andrej Chardikov",
       "club": "Black Panthers",
       "regNumber": "3281"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Milan Bučil",
       "regNumber": "3269"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Šimon Kamarád",
       "regNumber": "6362"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Ondřej Pavlík",
       "regNumber": "7139"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Vojtěch Kohoutek",
       "club": "ŠK eMHáčko z.s.",
       "regNumber": "6777"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Martin Bass",
       "regNumber": "7048"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Martin Košťál",
       "club": "Pomatenci steel darts",
       "regNumber": "3502"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Jan Stezka",
       "regNumber": "6344"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Daniel Jaroš",
       "club": "Steel ORTHODOX",
       "regNumber": "2118"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Jindřích Vacek",
       "club": "Bohunická Šipka",
       "regNumber": "6671"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Ondřej Galovič",
       "club": "Stromovka Humpolec",
       "regNumber": "5368"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Jan Kracík",
       "club": "Pivníci JBC",
       "regNumber": "4016"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Lukáš Pfeiler",
       "club": "NAPA Darts",
       "regNumber": "3739"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Vojtěch Veselý",
       "club": "U Pilnáčka",
       "regNumber": "6011"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Radek Šeďa",
       "regNumber": "5668"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Radim Nikl",
       "club": "DC Bull's-eye Riviéra F-M",
       "regNumber": "3770"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Petr Příkazský",
       "club": "Steel Darts Hodonín",
       "regNumber": "4690"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Max Valenčík",
       "regNumber": "7265"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Ondřej Hoferek",
       "regNumber": "5970"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Martin Hofman",
       "club": "Bombarďáci",
       "regNumber": "1726"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Michal Marčišovský",
       "club": "Steel Brothers",
       "regNumber": "6635"
     },
     {
-      "rank": 1525,
+      "rank": 1524,
       "name": "Radim Čech",
       "regNumber": "6507"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jan Fák",
       "club": "Šipky Třešť",
       "regNumber": "5843"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jaroslav Raška",
       "club": "Black Panthers",
       "regNumber": "6870"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Michael Horák",
       "regNumber": "7164"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Petr Čámský",
       "club": "Posázavský Pacifik Kožlí",
       "regNumber": "3184"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Martin Chrobák",
       "club": "DC Renegades",
       "regNumber": "1721"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Tomáš Bervid",
       "regNumber": "7190"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Petr Kubját",
       "club": "Steel Darts Přerov",
       "regNumber": "2902"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "David Doležal",
       "club": "U Pilnáčka",
       "regNumber": "3881"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Vlastimil Sliva",
       "regNumber": "7286"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "David Davídek",
       "regNumber": "4827"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Zdeněk  Kroča",
       "club": "Bowling Bar",
       "regNumber": "5683"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "David Redeker",
       "club": "Mouchy v medu",
       "regNumber": "5092"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jaromír  Blažek",
       "club": "Steel Gang Rokycany",
       "regNumber": "6262"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Vojtěch Klaub",
       "club": "Plaská Zvěř",
       "regNumber": "5760"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Michal Fiala",
       "regNumber": "5329"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
+      "name": "Pavel Světelský",
+      "club": "DC Bull's-eye Riviéra F-M",
+      "regNumber": "6639"
+    },
+    {
+      "rank": 1560,
       "name": "David Staš",
       "regNumber": "6047"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Petr Durčák",
       "club": "DARTS CLUB ORLOVÁ",
       "regNumber": "5125"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Vlastimil Černý",
       "club": "DC RR Kraslice",
       "regNumber": "5284"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Marek Lihotský",
       "club": "Hanácká Trefa Prostějov",
       "regNumber": "6874"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Dominik Beran",
       "club": "Šipky Třešť",
       "regNumber": "6350"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jan Lukeš",
       "regNumber": "7432"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Petr Svoboda",
       "regNumber": "951"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Filip Lapčík",
       "regNumber": "7015"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Radek Kopp",
       "regNumber": "2942"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Lubomír Pokorný",
       "club": "DC RR Kraslice",
       "regNumber": "5877"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Pavel Vintrlík",
       "regNumber": "293"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Andrej Belák",
       "club": "DC Barflies",
       "regNumber": "3864"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Karel Hošek",
       "regNumber": "1968"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "David Pintera",
       "regNumber": "5674"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Lukáš Opravil",
       "club": "DC Kansas",
       "regNumber": "1606"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Pavel Landa",
       "club": "DC Renegades",
       "regNumber": "1722"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jan Jireš",
       "regNumber": "3272"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Zdeněk Hamerník",
       "club": "Samuraj Olomouc",
       "regNumber": "3117"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Ondřej Javorský",
       "club": "DC Barflies",
       "regNumber": "4630"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Matěj Malurek",
       "club": "Hero steel Ostrava",
       "regNumber": "6667"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jakub Škrdla",
       "club": "ŠK Pivnice Radegast",
       "regNumber": "7309"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Karel Král",
       "club": "Bowling Bar",
       "regNumber": "4747"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jiří Huml",
       "club": "Eden",
       "regNumber": "1291"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "František Schottl",
       "regNumber": "5183"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Petr Cimrman",
       "club": "Bez klubové příslušnosti",
       "regNumber": "560"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jiří Mrkvánek",
       "regNumber": "2294"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jan Karas",
       "club": "D.C. Qýčepu",
       "regNumber": "663"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jan Rambousek",
       "regNumber": "7332"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Petr Balcárek",
       "club": "U Kalicha Prostějov",
       "regNumber": "6880"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Aleš Mašťálko",
       "regNumber": "3544"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Bronislav Kuda",
       "regNumber": "4168"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Vladimír Pritoka",
       "regNumber": "5573"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jakub Čech",
       "club": "DC RR Kraslice",
       "regNumber": "5874"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Štefan Bočkay",
       "club": "Démoni od 5V",
       "regNumber": "6258"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Tomáš Prudík",
       "club": "Darts Club Břeclav",
       "regNumber": "6511"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Radek Stržínek",
       "regNumber": "4887"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Radek Vajda",
       "club": "ŠK Pačlavice",
       "regNumber": "5111"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Dominik Vémola",
       "club": "Hamerské kladivo",
       "regNumber": "3496"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Martin Pychora",
       "regNumber": "6988"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Josef Javornický",
       "club": "Kbely",
       "regNumber": "4256"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Martin Tomanec",
       "regNumber": "2579"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Roman Očenášek",
       "club": "Darts Club Břeclav",
       "regNumber": "6620"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Ladislav Tomov",
       "club": "ŠK Ložisková Mafie Pšov",
       "regNumber": "3061"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Michal Silbernágl",
       "regNumber": "2266"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Lukáš Valchař",
       "club": "DARTS CLUB ORLOVÁ",
       "regNumber": "6778"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Luboš Pochobradský st.",
       "regNumber": "4096"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Vladimír Duda ml.",
       "club": "Legendario Plzeň",
       "regNumber": "2248"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Martin Pohl",
       "club": "Kobry Liberec",
       "regNumber": "4410"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jan Minařík",
       "regNumber": "3253"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Ondřej Pecha",
       "club": "Ostrostřelci",
       "regNumber": "1674"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jiří Švaříček",
       "club": "Wüdle Brtnice",
       "regNumber": "2971"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Richard Svěchota",
       "regNumber": "2465"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Marek Kunák",
       "club": "DC Steelový Šílenci Teplice",
       "regNumber": "4457"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "David Bártů",
       "club": "Šipky Třešť",
       "regNumber": "6911"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "David Stropnický",
       "club": "Piráti Podbořany",
       "regNumber": "2496"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
+      "name": "Pavel Polách",
+      "club": "DC Bull's-eye Riviéra F-M",
+      "regNumber": "4298"
+    },
+    {
+      "rank": 1560,
       "name": "Tomáš Jankovský",
       "regNumber": "3959"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jan Příkaszký",
       "club": "Plaská Zvěř",
       "regNumber": "4380"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jan Sýkora",
       "regNumber": "7430"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Marek Moravec",
       "regNumber": "7134"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Pavel Adamec",
       "regNumber": "2612"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jiří Škaroupka",
       "regNumber": "7019"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Radomír Kaša",
       "regNumber": "4207"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Tomáš Rotyka",
       "club": "Legendario Plzeň",
       "regNumber": "2538"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Vojtěch Zárychta",
       "club": "Jelen Kyjovice",
       "regNumber": "5480"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "David Vávra",
       "club": "Vostrý koně Pardubice",
       "regNumber": "2589"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Ondřej  Vilímek",
       "club": "Iris Club",
       "regNumber": "4299"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Aleš Drozda",
       "regNumber": "7118"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Filip Jelínek",
       "club": "Brněnská šipková z.s.",
       "regNumber": "7094"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Vojtěch Ších",
       "club": "ŠK Pivnice Radegast",
       "regNumber": "4026"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Miloslav Sýkora",
       "club": "DC Barflies",
       "regNumber": "3721"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Tomáš Draštík",
       "regNumber": "4505"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Michal Petřek",
       "club": "ŠK Pačlavice",
       "regNumber": "3354"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Lukáš Novotný",
       "regNumber": "3987"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Juan Lores",
       "regNumber": "4740"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Zdeněk Janda",
       "regNumber": "7145"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Tomáš Grassl",
       "club": "DC Pohoda Kladno",
       "regNumber": "2004"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jiří Balaštík",
       "regNumber": "5187"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jiří Žalmánek",
       "club": "Bowling Bar",
       "regNumber": "7177"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Miroslav Sekula",
       "club": "Hero steel Ostrava",
       "regNumber": "6189"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jakub Szabó",
       "club": "TJ Sokol Luka nad Jihlavou",
       "regNumber": "6323"
     },
     {
-      "rank": 1562,
+      "rank": 1560,
       "name": "Jiří Pelan",
       "club": "ŠK Slováci Plzeň",
       "regNumber": "3724"
-    },
-    {
-      "rank": 1658,
-      "name": "Miroslav Neužil",
-      "club": "ŠK Panapr 2011",
-      "regNumber": "3828"
-    },
-    {
-      "rank": 1658,
-      "name": "Ondřej Langr",
-      "club": "Vostrý koně Pardubice",
-      "regNumber": "2599"
     },
     {
       "rank": 1658,
@@ -9851,12 +9839,6 @@
     },
     {
       "rank": 1658,
-      "name": "Martin Pešek",
-      "club": "ŠK Sokol Dobříš",
-      "regNumber": "2458"
-    },
-    {
-      "rank": 1658,
       "name": "Martin Šabršula",
       "club": "Brněnská šipková z.s.",
       "regNumber": "2680"
@@ -10166,562 +10148,557 @@
       "regNumber": "5341"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
+      "name": "Ondřej Langr",
+      "club": "Vostrý koně Pardubice",
+      "regNumber": "2599"
+    },
+    {
+      "rank": 1788,
       "name": "Filip Mück",
       "regNumber": "7209"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "David Smejkal",
       "club": "Samuraj Olomouc",
       "regNumber": "3997"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Martin Komárek",
       "club": "Dart Vaders",
       "regNumber": "2026"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Jan Kořínek",
       "club": "Steel Darts Jičín",
       "regNumber": "5166"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Tomáš Vlček",
       "club": "DC Bastards Praha",
       "regNumber": "6706"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Tomáš Dokoupil",
       "regNumber": "4119"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Tomáš Sleza",
       "club": "ŠK Sokol Dobříš",
       "regNumber": "4294"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Vojtěch Pražák",
       "regNumber": "7396"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Vladimír Šveňha",
       "club": "STS Chvojkovice Brod",
       "regNumber": "938"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Jakub Haisman",
       "club": "DC Nagano Kladno",
       "regNumber": "3166"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Luděk Tihlařík",
       "club": "Ferrari Darts Kyjov",
       "regNumber": "6684"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Tomáš Hala",
       "club": "Stýlaři Jundrov",
       "regNumber": "5954"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Vojtěch Rubeš",
       "regNumber": "6134"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Marek Rychnavský",
       "regNumber": "7201"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Jan Sládek",
       "club": "Brněnská šipková z.s.",
       "regNumber": "3385"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "David Křeček",
       "club": "Brněnská šipková z.s.",
       "regNumber": "4125"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Martin Ševr",
       "club": "Dart Vaders",
       "regNumber": "3519"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Jan Čábelka",
       "club": "DC Steel Masters Těmice",
       "regNumber": "2802"
     },
     {
-      "rank": 1791,
-      "name": "Jan Krištof",
-      "regNumber": "3344"
-    },
-    {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Václav Novák",
       "club": "Steel darts club Vršovice",
       "regNumber": "3229"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Miloslav Mlejnek",
       "club": "Steel Darts Jičín",
       "regNumber": "5658"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Petr Sedláček",
       "regNumber": "5457"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Radek Sedláček ml.",
       "regNumber": "6505"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Petr Gebauer",
       "club": "Tučňáci Nový Jičín",
       "regNumber": "5707"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Jan Šprinc",
       "club": "Sport Bar Miapr",
       "regNumber": "5358"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Vladimír Pavliska",
       "regNumber": "3594"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Radek Svoboda",
       "club": "Iris Club",
       "regNumber": "3765"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Martin Kotala",
       "regNumber": "3298"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Martin  Buchta (Zlín)",
       "club": "Bowling Bar",
       "regNumber": "5198"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Lukáš  Pokorný",
       "regNumber": "7130"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Milan Nemáš",
       "club": "Bowling Bar",
       "regNumber": "6160"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Miroslav Smetana",
       "club": "DC Ravens Říčany",
       "regNumber": "5911"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Adam Sliva",
       "club": "DARTS CLUB ORLOVÁ",
       "regNumber": "3927"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Martin Pecha",
       "club": "Ostrostřelci",
       "regNumber": "3405"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Michal Pop",
       "club": "Hranický Šenk",
       "regNumber": "6882"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Petr Nesnídal",
       "club": "Stýlaři Jundrov",
       "regNumber": "5842"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Lukáš Hrabák",
       "regNumber": "2267"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Daniel  Mikula",
       "club": "Axa",
       "regNumber": "4284"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Petr Dulava",
       "club": "DC Bull's-eye Riviéra F-M",
       "regNumber": "3346"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Martin Sedláček",
       "regNumber": "7055"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Jan Karkoška",
       "regNumber": "6404"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Josef Jouza",
       "regNumber": "6501"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Jindřich Pavlica",
       "regNumber": "5492"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Václav Schwab",
       "club": "Brněnská šipková z.s.",
       "regNumber": "2326"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Lukáš Dlouhý",
       "regNumber": "5397"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Petr Ročňák",
       "club": "Vostrý koně Pardubice",
       "regNumber": "3994"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Petr  Litman",
       "club": "Ostrostřelci",
       "regNumber": "5857"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Dominik Uhliárik",
       "regNumber": "7399"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Peter Jonáš",
       "club": "Brněnská šipková z.s.",
       "regNumber": "3338"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Patrik Čech",
       "regNumber": "6592"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Aleš Pavelka",
       "regNumber": "3243"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Adam Franěk",
       "club": "Bowling Bar",
       "regNumber": "4315"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Václav Baroch",
       "club": "DC Nagano Kladno",
       "regNumber": "2948"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Radek Magyar",
       "regNumber": "5672"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Pavel Šroubek",
       "club": "PV - Knihovna Olomouc",
       "regNumber": "913"
     },
     {
-      "rank": 1791,
-      "name": "Michal Šírek",
-      "club": "Vostrý koně Pardubice",
-      "regNumber": "3880"
-    },
-    {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Lukáš Pšenčík",
       "regNumber": "7336"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Tomáš Vondrovský",
       "club": "Steel ORTHODOX",
       "regNumber": "2123"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Roman Duna",
       "regNumber": "2189"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Milan Niemczyk",
       "club": "Jelen Kyjovice",
       "regNumber": "5484"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Pavel Rýznar",
       "club": "SD Brno",
       "regNumber": "3925"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Martin  Hübl",
       "club": "Steel Darts Hodonín",
       "regNumber": "4247"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Pavel Hečko",
       "regNumber": "7137"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Vladimír Kůrka",
       "club": "DC Sokolka Dobříš",
       "regNumber": "6278"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Radek Šulc",
       "club": "DC New Village",
       "regNumber": "3008"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Quido Boleloucký",
       "regNumber": "6212"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Kamil Chalachan",
       "club": "Maníci Frýdek-Místek",
       "regNumber": "4767"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Ondřej Davídek",
       "club": "Steel ORTHODOX",
       "regNumber": "2124"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Jiří Stehlík",
       "regNumber": "6542"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Václav Srba",
       "regNumber": "7195"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Marek Nemáš",
       "regNumber": "6099"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Martin Hampejs",
       "regNumber": "4111"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Roman Heinz",
       "club": "Bejvávalo u Kolečka - spolek",
       "regNumber": "6678"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Jiří Oppenauer",
       "regNumber": "6543"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Josef Danihelka",
       "club": "Tělovýchovná jednota Kožlany z.s.",
       "regNumber": "7001"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Vojtěch Voštinka",
       "club": "DC Nagano Kladno",
       "regNumber": "2909"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Stanislav Písek",
       "regNumber": "3268"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Radim Ganczarczyk",
       "club": "Iris Club",
       "regNumber": "5814"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Lubomír Krayzel",
       "club": "Jelen Kyjovice",
       "regNumber": "4940"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Petr Hieke",
       "club": "Eden",
       "regNumber": "3361"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Marek Viščak",
       "club": "Stiflerovci",
       "regNumber": "3651"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Tomáš Jech",
       "regNumber": "5041"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Petr Drmola",
       "club": "Steel Darts Přerov",
       "regNumber": "1833"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Jindřich Zmidloch st.",
       "regNumber": "336"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Radek Krůta",
       "regNumber": "5604"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "David  Dlabal",
       "regNumber": "4152"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Petr Schraml",
       "club": "Ostrostřelci",
       "regNumber": "5289"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Tomáš Vala",
       "club": "Wüdle Brtnice",
       "regNumber": "6050"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Lukáš Kučera",
       "club": "Brněnská šipková z.s.",
       "regNumber": "2843"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Pavel Martínek",
       "club": "Démoni od 5V",
       "regNumber": "7040"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Matyáš Schovanec",
       "regNumber": "6443"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Jindřich Ottl",
       "club": "Dart Vaders",
       "regNumber": "2025"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Luboš Hrabák",
       "club": "ŠK Panapr 2011",
       "regNumber": "1793"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Lukáč Kamil",
       "regNumber": "5360"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Petr Vaněk",
       "regNumber": "2707"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Ondřej Kostelecký",
       "club": "Sport Bar Miapr",
       "regNumber": "6586"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Tomáš Felis",
       "club": "DC Nagano Kladno",
       "regNumber": "3820"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Václav Vacek",
       "club": "Stýlaři Jundrov",
       "regNumber": "6014"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Petr Vaněk",
       "regNumber": "7205"
     },
     {
-      "rank": 1791,
+      "rank": 1788,
       "name": "Antonín Kůt",
       "club": "Bez klubové příslušnosti",
       "regNumber": "551"
