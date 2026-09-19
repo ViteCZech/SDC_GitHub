@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-09-18T04:03:00.000Z",
-    "effectiveDate": "2026-09-18",
-    "generatedAt": "2026-09-18 04:03",
-    "fetchedAt": "2026-09-18T09:34:31.354Z",
+    "updatedAt": "2026-09-19T04:03:00.000Z",
+    "effectiveDate": "2026-09-19",
+    "generatedAt": "2026-09-19 04:03",
+    "fetchedAt": "2026-09-19T09:21:25.828Z",
     "totalPlayers": 137
   },
   "players": [
@@ -130,15 +130,15 @@
     },
     {
       "rank": 22,
-      "name": "Michaela Beranová",
-      "club": "STEEL HUNTERS",
-      "regNumber": "4517"
-    },
-    {
-      "rank": 23,
       "name": "Tereza Doubravová",
       "club": "PV-Knihovna Olomouc",
       "regNumber": "6233"
+    },
+    {
+      "rank": 22,
+      "name": "Michaela Beranová",
+      "club": "STEEL HUNTERS",
+      "regNumber": "4517"
     },
     {
       "rank": 24,
@@ -248,16 +248,16 @@
     },
     {
       "rank": 43,
+      "name": "Marie Petrová",
+      "regNumber": "6993"
+    },
+    {
+      "rank": 44,
       "name": "Kateřina Vorochtová",
       "regNumber": "5293"
     },
     {
       "rank": 44,
-      "name": "Marie Petrová",
-      "regNumber": "6993"
-    },
-    {
-      "rank": 45,
       "name": "Barbora Dlabalová",
       "club": "DC Bull's-eye Riviéra F-M",
       "regNumber": "4151"
