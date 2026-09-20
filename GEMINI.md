@@ -281,8 +281,6 @@ Bezpečnostní režim pro tablety u terče (`TabletKioskPinModal.jsx`, `TabletKi
 
 ### Modul: Turnajové série (SDC Circuit System)
 
-Turnajové okruhy a dlouhodobé sezóny zastřešující více samostatných turnajů s průběžným bodováním, finančním fondem (Jackpot) a kvalifikací na závěrečný finálový turnaj.
-
 #### 1. Datový model & Firestore architektura
 - **Kolekce `tournament_series/{seriesId}`**: Nadřazený dokument série (`meta`, `config`, `financials`, `tournaments[]`, `placeholders[]`).
 - **Kompaktní Žebříček (`tournament_series/{seriesId}/data/standings_compact`)**: Všechny agregované výsledky a statistiky hráčů se ukládají do **1 denormalizovaného dokumentu** pro rychlé načtení 1 readem.
