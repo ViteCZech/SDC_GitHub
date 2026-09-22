@@ -1,11 +1,11 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-09-21T10:03:00.000Z",
-    "effectiveDate": "2026-09-21",
-    "generatedAt": "2026-09-21 10:03",
-    "fetchedAt": "2026-09-21T10:35:45.939Z",
-    "totalPlayers": 136
+    "updatedAt": "2026-09-22T04:03:00.000Z",
+    "effectiveDate": "2026-09-22",
+    "generatedAt": "2026-09-22 04:03",
+    "fetchedAt": "2026-09-22T09:48:58.239Z",
+    "totalPlayers": 138
   },
   "players": [
     {
@@ -22,37 +22,37 @@
     },
     {
       "rank": 3,
-      "name": "Sabina Doubková",
-      "regNumber": "5403"
-    },
-    {
-      "rank": 4,
       "name": "Monika Hocková",
       "club": "ŠK Sokol Dobříš",
       "regNumber": "2155"
     },
     {
-      "rank": 5,
-      "name": "Jana Kazdová",
-      "regNumber": "4754"
+      "rank": 4,
+      "name": "Sabina Doubková",
+      "regNumber": "5403"
     },
     {
-      "rank": 6,
+      "rank": 5,
       "name": "Martina Cihelková",
       "club": "DC Ravens Říčany",
       "regNumber": "1789"
     },
     {
-      "rank": 7,
-      "name": "Kristýna Loudová",
-      "club": "Pivní Baroni",
-      "regNumber": "6137"
+      "rank": 6,
+      "name": "Jana Kazdová",
+      "regNumber": "4754"
     },
     {
-      "rank": 8,
+      "rank": 7,
       "name": "Silvie Gáfriková",
       "club": "SD Brno",
       "regNumber": "6973"
+    },
+    {
+      "rank": 8,
+      "name": "Kristýna Loudová",
+      "club": "Pivní Baroni",
+      "regNumber": "6137"
     },
     {
       "rank": 9,
@@ -68,42 +68,42 @@
     },
     {
       "rank": 11,
-      "name": "Daniela Miřiňovská",
-      "regNumber": "6887"
-    },
-    {
-      "rank": 12,
-      "name": "Petra Valentová",
-      "club": "Black Panthers",
-      "regNumber": "1544"
-    },
-    {
-      "rank": 13,
       "name": "Renata Horáková",
       "club": "Pivní Baroni",
       "regNumber": "5753"
     },
     {
+      "rank": 12,
+      "name": "Daniela Miřiňovská",
+      "regNumber": "6887"
+    },
+    {
+      "rank": 13,
+      "name": "Petra Valentová",
+      "club": "Black Panthers",
+      "regNumber": "1544"
+    },
+    {
       "rank": 14,
-      "name": "Hana Bělobrádková",
-      "regNumber": "885"
-    },
-    {
-      "rank": 15,
-      "name": "Pavlína Zemčíková",
-      "regNumber": "1545"
-    },
-    {
-      "rank": 16,
       "name": "Kateřina Tučková",
       "club": "SD Brno",
       "regNumber": "6979"
     },
     {
+      "rank": 15,
+      "name": "Hana Bělobrádková",
+      "regNumber": "885"
+    },
+    {
+      "rank": 16,
+      "name": "Pavlína Zemčíková",
+      "regNumber": "1545"
+    },
+    {
       "rank": 17,
-      "name": "Veronika Panošová",
-      "club": "Spolek neratovických šipkařů",
-      "regNumber": "6016"
+      "name": "Naděžda Waldhauserová",
+      "club": "Korbel II Litvínov",
+      "regNumber": "1594"
     },
     {
       "rank": 18,
@@ -119,58 +119,59 @@
     },
     {
       "rank": 20,
-      "name": "Tereza Sedláčková",
-      "regNumber": "6108"
+      "name": "Veronika Panošová",
+      "club": "Spolek neratovických šipkařů",
+      "regNumber": "6016"
     },
     {
       "rank": 21,
-      "name": "Naděžda Waldhauserová",
-      "club": "Korbel II Litvínov",
-      "regNumber": "1594"
-    },
-    {
-      "rank": 22,
-      "name": "Tereza Doubravová",
-      "club": "PV-Knihovna Olomouc",
-      "regNumber": "6233"
-    },
-    {
-      "rank": 22,
-      "name": "Michaela Beranová",
-      "club": "STEEL HUNTERS",
-      "regNumber": "4517"
-    },
-    {
-      "rank": 24,
-      "name": "Dagmar Jandová",
-      "regNumber": "7144"
-    },
-    {
-      "rank": 25,
-      "name": "Žaneta Šmejcová",
-      "regNumber": "5506"
-    },
-    {
-      "rank": 26,
-      "name": "Helena Čílová",
-      "club": "ŠK Rebelové Myštěves",
-      "regNumber": "4814"
-    },
-    {
-      "rank": 27,
       "name": "Veronika Vašutová",
       "regNumber": "7238"
     },
     {
-      "rank": 28,
+      "rank": 22,
+      "name": "Dagmar Jandová",
+      "regNumber": "7144"
+    },
+    {
+      "rank": 23,
+      "name": "Tereza Sedláčková",
+      "regNumber": "6108"
+    },
+    {
+      "rank": 24,
+      "name": "Anna Brandejsová",
+      "club": "Tělocvičná jednota Sokol Lukavice",
+      "regNumber": "7044"
+    },
+    {
+      "rank": 25,
       "name": "Martina Vaňková",
       "club": "Kladno Steel",
       "regNumber": "5700"
     },
     {
-      "rank": 29,
+      "rank": 26,
+      "name": "Miroslava Richterová",
+      "club": "DC Ostrovani Šebestěnice",
+      "regNumber": "296"
+    },
+    {
+      "rank": 27,
       "name": "Pavla Pokorná",
       "regNumber": "7239"
+    },
+    {
+      "rank": 28,
+      "name": "Tereza Doubravová",
+      "club": "PV-Knihovna Olomouc",
+      "regNumber": "6233"
+    },
+    {
+      "rank": 28,
+      "name": "Michaela Beranová",
+      "club": "STEEL HUNTERS",
+      "regNumber": "4517"
     },
     {
       "rank": 30,
@@ -179,574 +180,584 @@
       "regNumber": "5086"
     },
     {
-      "rank": 30,
-      "name": "Anna Brandejsová",
-      "club": "Tělocvičná jednota Sokol Lukavice",
-      "regNumber": "7044"
+      "rank": 31,
+      "name": "Žaneta Šmejcová",
+      "regNumber": "5506"
     },
     {
       "rank": 32,
+      "name": "Helena Čílová",
+      "club": "ŠK Rebelové Myštěves",
+      "regNumber": "4814"
+    },
+    {
+      "rank": 33,
+      "name": "Michaela  Kolářová",
+      "regNumber": "7349"
+    },
+    {
+      "rank": 34,
       "name": "Irena Vybíralová",
       "regNumber": "6251"
     },
     {
-      "rank": 33,
+      "rank": 35,
+      "name": "Lucie Škardová",
+      "regNumber": "7423"
+    },
+    {
+      "rank": 36,
       "name": "Marika Benešová",
       "regNumber": "714"
     },
     {
-      "rank": 34,
+      "rank": 37,
       "name": "Vladimíra Tonarová",
       "club": "ŠK Sokol Dobříš",
       "regNumber": "1755"
     },
     {
-      "rank": 35,
+      "rank": 38,
       "name": "Jitka Šnejdarová",
       "club": "Dřeváci",
       "regNumber": "3606"
     },
     {
-      "rank": 36,
+      "rank": 39,
       "name": "Kateřina Amlerová",
       "club": "D.C.O.B.",
       "regNumber": "1743"
     },
     {
-      "rank": 37,
+      "rank": 40,
       "name": "Hana Schmidtová",
       "regNumber": "6556"
     },
     {
-      "rank": 38,
-      "name": "Eliška Panošová",
-      "club": "Spolek neratovických šipkařů",
-      "regNumber": "6171"
-    },
-    {
-      "rank": 39,
-      "name": "Markéta Fryštacká",
-      "club": "Black Panthers",
-      "regNumber": "3815"
-    },
-    {
-      "rank": 39,
-      "name": "Monika Krotká",
-      "club": "Plaská Zvěř",
-      "regNumber": "4673"
-    },
-    {
       "rank": 41,
-      "name": "Marie Petrová",
-      "regNumber": "6993"
-    },
-    {
-      "rank": 42,
-      "name": "Kateřina Vorochtová",
-      "regNumber": "5293"
-    },
-    {
-      "rank": 43,
-      "name": "Alena Vestfálová",
-      "club": "DC Vikings Blatná",
-      "regNumber": "1069"
-    },
-    {
-      "rank": 44,
-      "name": "Nikola Axmannová",
-      "regNumber": "6850"
-    },
-    {
-      "rank": 45,
-      "name": "Barbora Dlabalová",
-      "club": "DC Bull's-eye Riviéra F-M",
-      "regNumber": "4151"
-    },
-    {
-      "rank": 46,
       "name": "Martina Holubová",
       "club": "Kingsburry Darts",
       "regNumber": "5625"
     },
     {
+      "rank": 42,
+      "name": "Eliška Panošová",
+      "club": "Spolek neratovických šipkařů",
+      "regNumber": "6171"
+    },
+    {
+      "rank": 43,
+      "name": "Markéta Fryštacká",
+      "club": "Black Panthers",
+      "regNumber": "3815"
+    },
+    {
+      "rank": 43,
+      "name": "Monika Krotká",
+      "club": "Plaská Zvěř",
+      "regNumber": "4673"
+    },
+    {
+      "rank": 45,
+      "name": "Marie Petrová",
+      "regNumber": "6993"
+    },
+    {
+      "rank": 46,
+      "name": "Kateřina Vorochtová",
+      "regNumber": "5293"
+    },
+    {
       "rank": 47,
-      "name": "Lucie Škardová",
-      "regNumber": "7423"
+      "name": "Alena Vestfálová",
+      "club": "DC Vikings Blatná",
+      "regNumber": "1069"
     },
     {
       "rank": 48,
+      "name": "Nikola Axmannová",
+      "regNumber": "6850"
+    },
+    {
+      "rank": 49,
+      "name": "Barbora Dlabalová",
+      "club": "DC Bull's-eye Riviéra F-M",
+      "regNumber": "4151"
+    },
+    {
+      "rank": 50,
       "name": "Eva Wagnerová",
       "club": "Piráti Podbořany",
       "regNumber": "6335"
     },
     {
-      "rank": 49,
+      "rank": 51,
       "name": "Hana Konvalinková",
       "regNumber": "7271"
     },
     {
-      "rank": 50,
+      "rank": 52,
       "name": "Anna Votavová",
       "club": "ŠK Pivnice Radegast",
       "regNumber": "1854"
     },
     {
-      "rank": 51,
-      "name": "Michaela  Kolářová",
-      "regNumber": "7349"
-    },
-    {
-      "rank": 52,
+      "rank": 53,
       "name": "Jitka Grebáčová",
       "regNumber": "3869"
     },
     {
-      "rank": 53,
+      "rank": 54,
       "name": "Ivana Vodenková",
       "regNumber": "5821"
     },
     {
-      "rank": 53,
+      "rank": 54,
       "name": "Radka Langová",
       "club": "Pivní Baroni",
       "regNumber": "5751"
     },
     {
-      "rank": 55,
+      "rank": 56,
       "name": "Jitka Dorazilová",
       "club": "PV-Knihovna Olomouc",
       "regNumber": "6049"
     },
     {
-      "rank": 55,
+      "rank": 56,
       "name": "Nela Svobodová",
       "regNumber": "6213"
     },
     {
-      "rank": 57,
+      "rank": 58,
       "name": "Tereza Šlichtová",
       "club": "Brněnská šipková z.s.",
       "regNumber": "5680"
     },
     {
-      "rank": 58,
+      "rank": 59,
       "name": "Nikola Fofová",
       "regNumber": "6849"
     },
     {
-      "rank": 58,
+      "rank": 59,
       "name": "Jiřina Zahradníková",
       "club": "Vostrý koně Pardubice",
       "regNumber": "3182"
     },
     {
-      "rank": 60,
+      "rank": 61,
+      "name": "Lenka Chudobová",
+      "regNumber": "6421"
+    },
+    {
+      "rank": 62,
       "name": "Adriana Brhelová",
       "regNumber": "5926"
     },
     {
-      "rank": 61,
+      "rank": 63,
       "name": "Monika Doležalová",
       "club": "Pitbull Bažiny",
       "regNumber": "3423"
     },
     {
-      "rank": 62,
+      "rank": 64,
       "name": "Lenka Křivková",
       "regNumber": "5624"
     },
     {
-      "rank": 63,
+      "rank": 65,
       "name": "Adéla Hipíková",
       "regNumber": "4914"
     },
     {
-      "rank": 64,
+      "rank": 66,
       "name": "Michaela Dukátová",
       "regNumber": "7103"
     },
     {
-      "rank": 64,
+      "rank": 66,
       "name": "Růžena Rýdelová",
       "regNumber": "6297"
     },
     {
-      "rank": 64,
+      "rank": 66,
       "name": "Jana Duroňová",
       "regNumber": "7317"
     },
     {
-      "rank": 64,
+      "rank": 66,
       "name": "Marie Kropíková",
       "club": "Schovi Darts",
       "regNumber": "6466"
     },
     {
-      "rank": 68,
+      "rank": 66,
+      "name": "Andrea Vodáková",
+      "regNumber": "6044"
+    },
+    {
+      "rank": 71,
       "name": "Helena Židková",
       "regNumber": "6321"
     },
     {
-      "rank": 69,
+      "rank": 72,
       "name": "Martina Sedláčková",
       "club": "Mr. Boombastic",
       "regNumber": "6287"
     },
     {
-      "rank": 70,
+      "rank": 73,
       "name": "Veronika Kocařová",
       "regNumber": "6314"
     },
     {
-      "rank": 71,
+      "rank": 74,
       "name": "Nela Woleschenská",
       "club": "Plaská Zvěř",
       "regNumber": "5240"
     },
     {
-      "rank": 72,
+      "rank": 75,
       "name": "Pavlína  Pokorná",
       "regNumber": "5291"
     },
     {
-      "rank": 72,
+      "rank": 75,
       "name": "Eliška Jandová",
       "regNumber": "7315"
     },
     {
-      "rank": 72,
+      "rank": 75,
       "name": "Barbora Nováková",
       "regNumber": "6360"
     },
     {
-      "rank": 72,
+      "rank": 75,
       "name": "Nikola Šestáková",
       "regNumber": "6364"
     },
     {
-      "rank": 72,
+      "rank": 75,
       "name": "Dorota Šestáková",
       "regNumber": "6363"
     },
     {
-      "rank": 72,
+      "rank": 75,
       "name": "Eva Špryslová",
       "regNumber": "7330"
     },
     {
-      "rank": 72,
+      "rank": 75,
       "name": "Irena Tomíšková",
       "club": "DC Sokolka Dobříš",
       "regNumber": "6436"
     },
     {
-      "rank": 72,
+      "rank": 75,
       "name": "Karolína Hochmanová",
       "regNumber": "1144"
     },
     {
-      "rank": 80,
+      "rank": 83,
       "name": "Miroslava Komanová",
       "club": "DC Vikings Blatná",
       "regNumber": "1068"
     },
     {
-      "rank": 81,
+      "rank": 84,
       "name": "Lenka Domaniková",
       "regNumber": "6853"
     },
     {
-      "rank": 82,
+      "rank": 85,
       "name": "Lenka Šimůnková",
       "club": "DC Vikings Blatná",
       "regNumber": "2173"
     },
     {
-      "rank": 82,
+      "rank": 85,
       "name": "Vanessa Pitelová",
       "regNumber": "7443"
     },
     {
-      "rank": 82,
+      "rank": 85,
       "name": "Ladislava Pitelová",
       "regNumber": "7441"
     },
     {
-      "rank": 85,
+      "rank": 88,
       "name": "Lucie Ditrychová",
       "club": "Desítka",
       "regNumber": "94"
     },
     {
-      "rank": 86,
+      "rank": 89,
       "name": "Helena Božiková",
       "regNumber": "6250"
     },
     {
-      "rank": 87,
+      "rank": 90,
       "name": "Patricie Pitelová",
       "regNumber": "7442"
     },
     {
-      "rank": 87,
+      "rank": 90,
       "name": "Lucie Reinišová",
       "club": "OKO Plzeň",
       "regNumber": "3726"
     },
     {
-      "rank": 87,
+      "rank": 90,
       "name": "Ludmila  Klaubová",
       "club": "Plaská Zvěř",
       "regNumber": "4572"
     },
     {
-      "rank": 87,
+      "rank": 90,
       "name": "Kristýna Sedláčková",
       "regNumber": "6477"
     },
     {
-      "rank": 87,
+      "rank": 90,
       "name": "Alice Hromádková",
       "club": "Piráti Podbořany",
       "regNumber": "4534"
     },
     {
-      "rank": 92,
+      "rank": 95,
       "name": "Gabriela Divišová",
       "regNumber": "7204"
     },
     {
-      "rank": 93,
+      "rank": 96,
       "name": "Vendula Šimčíková",
       "regNumber": "6817"
     },
     {
-      "rank": 93,
+      "rank": 96,
       "name": "Monika Žiačiková",
       "regNumber": "6502"
     },
     {
-      "rank": 93,
+      "rank": 96,
       "name": "Lucie Jirásková",
       "regNumber": "1367"
     },
     {
-      "rank": 96,
-      "name": "Lenka Chudobová",
-      "regNumber": "6421"
-    },
-    {
-      "rank": 96,
+      "rank": 99,
       "name": "Karla Wetterová",
       "regNumber": "6425"
     },
     {
-      "rank": 98,
+      "rank": 100,
       "name": "Lucie Václavíková",
       "regNumber": "7282"
     },
     {
-      "rank": 98,
+      "rank": 100,
       "name": "Dita Schmied",
       "regNumber": "6500"
     },
     {
-      "rank": 100,
+      "rank": 102,
       "name": "Renata Brandejsová",
       "club": "Tělocvičná jednota Sokol Lukavice",
       "regNumber": "3761"
     },
     {
-      "rank": 100,
+      "rank": 102,
       "name": "Zdeňka Zonová",
       "regNumber": "6851"
     },
     {
-      "rank": 102,
+      "rank": 104,
       "name": "Eliška Smékalová",
       "regNumber": "4024"
     },
     {
-      "rank": 102,
+      "rank": 104,
       "name": "Nela Rychlíková",
       "regNumber": "5184"
     },
     {
-      "rank": 104,
+      "rank": 106,
       "name": "Pavla Nováková",
       "club": "Plaská Zvěř",
       "regNumber": "5119"
     },
     {
-      "rank": 105,
+      "rank": 107,
       "name": "Iva Macháčková",
       "club": "Pojď mi hop",
       "regNumber": "2067"
     },
     {
-      "rank": 106,
+      "rank": 108,
       "name": "Jana Juráková",
       "regNumber": "5685"
     },
     {
-      "rank": 106,
+      "rank": 108,
       "name": "Petra Chytilová",
       "regNumber": "6231"
     },
     {
-      "rank": 106,
+      "rank": 108,
       "name": "Viktorie Axmannová",
       "regNumber": "6848"
     },
     {
-      "rank": 106,
+      "rank": 108,
       "name": "Kateřina Šildbergerová",
       "club": "Pojď mi hop",
       "regNumber": "2883"
     },
     {
-      "rank": 106,
+      "rank": 108,
       "name": "Klára Goldschmidtová",
       "regNumber": "7117"
     },
     {
-      "rank": 111,
+      "rank": 113,
       "name": "Andrea Homolová",
       "club": "Bumerang Team Plzeň",
       "regNumber": "5104"
     },
     {
-      "rank": 112,
+      "rank": 114,
       "name": "Jana Ullrichová",
       "club": "DARTS CLUB ORLOVÁ",
       "regNumber": "6607"
     },
     {
-      "rank": 112,
+      "rank": 114,
       "name": "Vlasta Nováková",
       "club": "Spolek neratovických šipkařů",
       "regNumber": "5519"
     },
     {
-      "rank": 114,
+      "rank": 116,
       "name": "Anna Krčmáriková",
       "regNumber": "4889"
     },
     {
-      "rank": 114,
+      "rank": 116,
       "name": "Renata Řeháková",
       "club": "Steel Darts Skalička",
       "regNumber": "2336"
     },
     {
-      "rank": 114,
+      "rank": 116,
       "name": "Pavla Petraniová",
       "club": "Plaská Zvěř",
       "regNumber": "7333"
     },
     {
-      "rank": 114,
+      "rank": 116,
       "name": "Michaela Zelenková",
       "club": "Steel Darts Club Petrovice",
       "regNumber": "3674"
     },
     {
-      "rank": 114,
+      "rank": 116,
       "name": "Pavla Jurigová",
       "club": "Guru-Caffé Nekonečný příběh ...",
       "regNumber": "2036"
     },
     {
-      "rank": 119,
+      "rank": 121,
       "name": "Pavlína Fürstová",
       "club": "Steel Gang Rokycany",
       "regNumber": "3445"
     },
     {
-      "rank": 119,
+      "rank": 121,
       "name": "Silvie Hronová",
       "regNumber": "6305"
     },
     {
-      "rank": 119,
+      "rank": 121,
       "name": "Eliška Steinová",
       "regNumber": "6417"
     },
     {
-      "rank": 119,
+      "rank": 121,
       "name": "Michaela Zahradníková",
       "regNumber": "104"
     },
     {
-      "rank": 119,
+      "rank": 121,
       "name": "Kateřina Čepelová",
       "regNumber": "309"
     },
     {
-      "rank": 119,
+      "rank": 121,
       "name": "Renata Slípková",
       "regNumber": "4877"
     },
     {
-      "rank": 119,
+      "rank": 121,
       "name": "Renata Nejezchlebová st.",
       "club": "DC Steelový Šílenci Teplice",
       "regNumber": "5945"
     },
     {
-      "rank": 119,
+      "rank": 121,
       "name": "Petra Nykodemová",
       "regNumber": "1089"
     },
     {
-      "rank": 119,
+      "rank": 121,
       "name": "Helena Krausová",
       "club": "Mouchy v medu",
       "regNumber": "5112"
     },
     {
-      "rank": 119,
+      "rank": 121,
       "name": "Kateřina Kupsová",
       "regNumber": "6800"
     },
     {
-      "rank": 119,
+      "rank": 121,
       "name": "Gabriela Pacltová",
       "regNumber": "5326"
     },
     {
-      "rank": 130,
+      "rank": 132,
       "name": "Hana Hozová",
       "regNumber": "3297"
     },
     {
-      "rank": 130,
+      "rank": 132,
       "name": "Lucie  Kluková",
       "regNumber": "7102"
     },
     {
-      "rank": 130,
+      "rank": 132,
       "name": "Simona Horváthová st",
       "regNumber": "5209"
     },
     {
-      "rank": 130,
+      "rank": 132,
       "name": "Sára Blahutová",
       "regNumber": "7407"
     },
     {
-      "rank": 130,
+      "rank": 132,
       "name": "Petra Vosková",
       "regNumber": "4244"
     },
     {
-      "rank": 130,
+      "rank": 132,
       "name": "Martina Sládková",
       "club": "Brněnská šipková z.s.",
       "regNumber": "3387"
     },
     {
-      "rank": 130,
+      "rank": 132,
       "name": "Gabriela Vítková",
       "club": "Ferrari Darts Kyjov",
       "regNumber": "6682"
