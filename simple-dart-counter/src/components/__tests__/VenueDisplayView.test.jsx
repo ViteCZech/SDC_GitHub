@@ -303,9 +303,19 @@ describe('VenueDisplayView', () => {
       return () => {};
     });
     renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
+    expect(screen.getByTestId('venue-display-status').getAttribute('data-state')).toBe('finished');
     expect(document.body.textContent).toContain('Celkové výsledky');
     expect(document.body.textContent).toContain('Nejvyšší zavření');
     expect(document.body.textContent).toContain('Celkem 180');
+  });
+
+  it('živý turnaj drží stav ready, ne finished', () => {
+    listenMock.mockImplementation((_pin, cb) => {
+      cb(liveDoc());
+      return () => {};
+    });
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
+    expect(screen.getByTestId('venue-display-status').getAttribute('data-state')).toBe('ready');
   });
 
   it('pro skupiny do 4 hráčů zobrazuje 8 tabulek na obrazovku', () => {

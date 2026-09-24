@@ -1515,7 +1515,9 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
 
   const showEmpty = invalidPin || doc === null;
   const showLoading = !invalidPin && doc === undefined;
-  const viewState = showEmpty ? 'empty' : showLoading ? 'loading' : 'ready';
+  // `finished` je samostatný stav (ukončený turnaj s medailisty), ne podmnožina `ready`.
+  // Zachovává cyklus empty → loading → ready / finished popsaný v GEMINI.md.
+  const viewState = showEmpty ? 'empty' : showLoading ? 'loading' : (tournamentFinished ? 'finished' : 'ready');
   const rotationRunning = !activeCall && slides.length > 1 && !showLoading && !showEmpty;
   const rotationElapsedMs = Math.max(0, clockMs - slideStartedAtMs);
   const rotationProgress = rotationRunning ? Math.min(1, rotationElapsedMs / activeSlideDurationMs) : 0;
@@ -1534,7 +1536,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
           <div className="min-w-0">
             <div className="flex items-center gap-3">
               <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">{tv(lang, 'title')}</p>
-              {pin && !invalidPin && doc !== null ? (
+              {pin && !invalidPin ? (
                 <VenueSyncIndicator syncStatus={syncStatus} />
               ) : null}
             </div>
