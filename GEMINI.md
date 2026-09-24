@@ -257,10 +257,12 @@ Veřejná TV obrazovka haly běžící v samostatném lazy chunku mimo orchestr�
     - **20 s** (`VENUE_SLIDE_DURATION_FINISHED_MS`): Závěrečná obrazovka turnaje.
   - Progress bar a sekundový odpočet v hlavičce plynule reflektují tuto dynamicky vypočítanou délku.
   - Plynulé CSS přechody mezi rotujícími slidy (CSS klíčové snímky `fade-in` 0.3s).
-- **Real-time stavový automat a kolotoč slidů:**
+  - **Real-time stavový automat a kolotoč slidů:**
   - Stavový cyklus: prázdný/neplatný PIN (`empty`) → načítání (`loading`) → živý přehled (`ready` / `live`) / ukončený turnaj (`finished`).
   - **Skupinové tabulky:** Dynamická mřížka (až 8 skupin na stránku dle velikosti skupin a počtu sloupců), body, skóre legů, leg difference, přehled živého a nadcházejícího zápasu skupiny.
+  - **Potlačení skupin po startu pavouka:** Jakmile jsou všechny skupiny dohrané (`areGroupsFinished`) a existuje pavouk nebo jakmile je v pavouku rozehrán první zápas (`isBracketStarted`), rotace skupinových tabulek se automaticky potlačí (`suppressGroupSlides`), aby TV zobrazovala pouze aktivní dění (živé terče a přehled pavouka).
   - **Živé terče a zápasy:** Karty terčů s probíhajícím (`current`) a příštím (`next`) zápasem, indikátor hráče na hodu, zbývající body (remaining), legové a setové skóre, 3-dart průměry (avg), jméno rozhodčího/počtáře a chybějící přítomnost hráčů pro check-in.
+  - **Fixní proporce mřížky terčů (`resolveVenueBoardGrid`):** Pevná míra sharingu plochy TV (2×2 pro zobrazení s pavoukem – kapacita 4; 3×2 pro celoobrazovkové terče – kapacita 6). Neúplný počet zápasů (např. 2 zápasy) neroztahuje karty přes celou obrazovku, ale zachovává standardní velikost slotů.
   - **Přehled pavouka:** Automatická detekce aktivní fáze (předkolo, čtvrtfinále, semifinále, finále), Best of formát a průběh dohraných zápasů.
   - **Souhrn turnaje (`finished`):** Po skončení turnaje automatické zobrazení medailistů a celkových statistik.
   - **Výzvy k terčům (`callQueue`):** Detekce nově nasazených zápasů na terče; zobrazí prioritní alert pruh (overlay) s odpočtem (`VENUE_CALL_MS`, 8 s), který dočasně pozastaví běžnou rotaci.
