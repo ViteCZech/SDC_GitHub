@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-09-23T04:03:00.000Z",
-    "effectiveDate": "2026-09-23",
-    "generatedAt": "2026-09-23 04:03",
-    "fetchedAt": "2026-09-23T09:51:35.100Z",
+    "updatedAt": "2026-09-24T04:03:00.000Z",
+    "effectiveDate": "2026-09-24",
+    "generatedAt": "2026-09-24 04:03",
+    "fetchedAt": "2026-09-24T09:51:32.996Z",
     "totalPlayers": 138
   },
   "players": [
@@ -340,7 +340,7 @@
       "regNumber": "6849"
     },
     {
-      "rank": 59,
+      "rank": 60,
       "name": "Jiřina Zahradníková",
       "club": "Vostrý koně Pardubice",
       "regNumber": "3182"
@@ -579,20 +579,20 @@
     },
     {
       "rank": 104,
+      "name": "Iva Macháčková",
+      "club": "Pojď mi hop",
+      "regNumber": "2067"
+    },
+    {
+      "rank": 104,
       "name": "Nela Rychlíková",
       "regNumber": "5184"
     },
     {
-      "rank": 106,
+      "rank": 107,
       "name": "Pavla Nováková",
       "club": "Plaská Zvěř",
       "regNumber": "5119"
-    },
-    {
-      "rank": 107,
-      "name": "Iva Macháčková",
-      "club": "Pojď mi hop",
-      "regNumber": "2067"
     },
     {
       "rank": 108,
