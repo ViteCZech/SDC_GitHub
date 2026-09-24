@@ -9,6 +9,7 @@ import {
   VENUE_CAROUSEL_MS,
   VENUE_GROUPS_PER_PAGE,
   VENUE_LISTEN_TIMEOUT_MS,
+  areGroupsFinished,
   boardsOccupancySignature,
   buildVenueFinishedSummary,
   buildVenueDisplayModel,
@@ -16,8 +17,10 @@ import {
   chunkVenuePages,
   detectVenueMatchCalls,
   formatTvPlayerName,
+  isBracketStarted,
   isVenueTournamentFinished,
   resolveVenueBoardColumns,
+  resolveVenueBoardGrid,
   resolveVenueSlideDurationMs,
   resolveVenueSyncStatus,
   venueBestOfFromWinLegs,
@@ -662,7 +665,7 @@ function BracketMatchCard({ match, lang, formatLabel }) {
   return <LiveMatchCard board={wrapped} lang={lang} formatLabel={formatLabel} compact />;
 }
 
-function BoardsGrid({ boards, lang, formatLabel }) {
+function BoardsGrid({ boards, lang, formatLabel, capacity = VENUE_BOARDS_PER_PAGE }) {
   if (!boards.length) {
     return (
       <p className="m-auto text-2xl font-black text-slate-600 uppercase tracking-widest text-center px-4">
@@ -670,11 +673,14 @@ function BoardsGrid({ boards, lang, formatLabel }) {
       </p>
     );
   }
-  const cols = resolveVenueBoardColumns(boards.length);
+  const grid = resolveVenueBoardGrid(capacity);
   return (
     <div
-      className="grid gap-3 xl:gap-4 h-full min-h-0 overflow-hidden auto-rows-fr"
-      style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+      className="grid gap-3 xl:gap-4 h-full min-h-0 overflow-hidden"
+      style={{
+        gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`,
+        gridTemplateRows: `repeat(${grid.rows}, minmax(0, 1fr))`,
+      }}
     >
       {boards.map((board) => (
         <LiveMatchCard key={board.board} board={board} lang={lang} formatLabel={formatLabel} />
@@ -1434,7 +1440,10 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
   const slides = useMemo(() => {
     if (tournamentFinished) return [{ type: 'finished' }];
     const out = [];
-    if (groupSlides.length > 0) out.push(...groupSlides);
+    const bracketStarted = isBracketStarted(model?.unpacked);
+    const groupsDone = areGroupsFinished(model?.unpacked?.groups, model?.unpacked?.groupMatches);
+    const suppressGroupSlides = bracketStarted || (groupsDone && bracketOverview.hasBracket);
+    if (!suppressGroupSlides && groupSlides.length > 0) out.push(...groupSlides);
     const boardPageSize = bracketOverview.hasBracket
       ? VENUE_BOARDS_PER_PAGE_WITH_BRACKET
       : VENUE_BOARDS_PER_PAGE;
@@ -1452,7 +1461,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
       }
     }
     return out;
-  }, [groupSlides, liveMatches, bracketOverview.hasBracket, tournamentFinished]);
+  }, [groupSlides, liveMatches, bracketOverview.hasBracket, tournamentFinished, model?.unpacked]);
 
   const slideCount = slides.length || 1;
   const slidePosition = ((screenIdx % slideCount) + slideCount) % slideCount;
@@ -1642,6 +1651,7 @@ export default function VenueDisplayView({ pin, lang = 'cs', invalidPin = false 
                       boards={activeSlide.boards || []}
                       lang={lang}
                       formatLabel={bracketOverview.hasBracket ? bracketOverview.formatLabel : groupBestOfLabel}
+                      capacity={bracketOverview.hasBracket ? VENUE_BOARDS_PER_PAGE_WITH_BRACKET : VENUE_BOARDS_PER_PAGE}
                     />
                   </div>
                 </section>

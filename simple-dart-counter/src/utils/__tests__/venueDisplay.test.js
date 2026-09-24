@@ -9,16 +9,20 @@ import {
   chunkVenuePages,
   detectVenueMatchCalls,
   formatTvPlayerName,
+  isBracketStarted,
+  areGroupsFinished,
   isVenueTournamentFinished,
   parseVenueDisplayRouteFromUrl,
   playVenueGong,
   resolveVenueBoardColumns,
+  resolveVenueBoardGrid,
   resolveVenueLang,
   resolveVenueSlideDurationMs,
   resolveVenueSyncStatus,
   unpackCloudTournament,
   venueBestOfFromWinLegs,
   VENUE_BOARDS_PER_PAGE,
+  VENUE_BOARDS_PER_PAGE_WITH_BRACKET,
   VENUE_GROUPS_PER_PAGE,
   VENUE_SLIDE_DURATION_BASE_MS,
   VENUE_SLIDE_DURATION_MID_MS,
@@ -255,6 +259,37 @@ describe('venueDisplay snapshot', () => {
     expect(resolveVenueBoardColumns(6)).toBe(3);
     expect(venueBestOfFromWinLegs(3)).toBe(5);
     expect(venueBestOfFromWinLegs(2)).toBe(3);
+  });
+
+  it('resolveVenueBoardGrid fixuje proporce slotů (sharing plochy)', () => {
+    expect(resolveVenueBoardGrid(1)).toEqual({ cols: 1, rows: 1 });
+    expect(resolveVenueBoardGrid(2)).toEqual({ cols: 2, rows: 2 });
+    expect(resolveVenueBoardGrid(VENUE_BOARDS_PER_PAGE_WITH_BRACKET)).toEqual({ cols: 2, rows: 2 });
+    expect(resolveVenueBoardGrid(VENUE_BOARDS_PER_PAGE)).toEqual({ cols: 3, rows: 2 });
+  });
+
+  it('isBracketStarted a areGroupsFinished správně detekují stav', () => {
+    const docWithBracket = unpackCloudTournament(
+      cloudDoc({
+        groupMatches: [
+          { matchId: 'm1', groupId: 'A', status: 'completed', player1Id: 'p1', player2Id: 'p2' },
+          { matchId: 'm2', groupId: 'A', status: 'completed', player1Id: 'p3', player2Id: 'p4' },
+        ],
+        tournamentBracket: [
+          {
+            round: 1,
+            matches: [
+              { id: 'b1', status: 'playing', player1Id: 'p1', player2Id: 'p3', board: 1 },
+            ],
+          },
+        ],
+      })
+    );
+    expect(areGroupsFinished(docWithBracket.groups, docWithBracket.groupMatches)).toBe(true);
+    expect(isBracketStarted(docWithBracket)).toBe(true);
+
+    const slides = buildVenueCarouselSlides(docWithBracket);
+    expect(slides.some((s) => s.type === 'groups')).toBe(false);
   });
 
   it('formatTvPlayerName adaptivně zkrátí jméno dvojice', () => {

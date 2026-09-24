@@ -31,6 +31,21 @@ export const VENUE_SLIDE_DURATION_DENSE_MS = 15_000;
 export const VENUE_SLIDE_DURATION_FINISHED_MS = 20_000;
 
 /**
+ * Určí mřížku terčů se zachováním pevné míry sharingu plochy TV:
+ * - Kapacita 4 (terče s pavoukem): 2 sloupce × 2 řádky (2×2).
+ * - Kapacita 6 (celoobrazovkové terče): 3 sloupce × 2 řádky (3×2).
+ * I při neúplném počtu zápasů (např. 2 zápasy) si každá karta zachová stejnou velikost jako při plném zobrazení.
+ * @param {number} [capacity=VENUE_BOARDS_PER_PAGE]
+ * @returns {{ cols: number, rows: number }}
+ */
+export function resolveVenueBoardGrid(capacity = VENUE_BOARDS_PER_PAGE) {
+  const cap = Number(capacity) || VENUE_BOARDS_PER_PAGE;
+  if (cap <= 1) return { cols: 1, rows: 1 };
+  if (cap <= 4) return { cols: 2, rows: 2 };
+  return { cols: 3, rows: 2 };
+}
+
+/**
  * Adaptivní délka rotace slidu podle množství a charakteru obsahu:
  * - 8 s pro 1–2 terče / malé tabulky
  * - 12 s pro 3–4 terče / plné tabulky skupin
@@ -275,11 +290,40 @@ function readLegs(m) {
   return { p1, p2 };
 }
 
-function groupsFinished(groups, groupMatches) {
+/**
+ * Ověří, zda jsou všechny zápasy ve všech skupinách dohrané (completed nebo walkover).
+ * @param {Array<object>} groups
+ * @param {Array<object>} groupMatches
+ * @returns {boolean}
+ */
+export function areGroupsFinished(groups, groupMatches) {
   if (!Array.isArray(groups) || groups.length === 0) return true;
   return groups.every((g) => {
     const gm = (groupMatches || []).filter((m) => (m.groupId ?? m.group) === g.groupId);
     return gm.length > 0 && gm.every(isTerminal);
+  });
+}
+export const groupsFinished = areGroupsFinished;
+
+/**
+ * Ověří, zda byl pavouk zahájen (alespoň jeden hratelný zápas v pavouku je rozehrán,
+ * checked_in na tabletu nebo dokončen).
+ * @param {object|null|undefined} unpacked
+ * @returns {boolean}
+ */
+export function isBracketStarted(unpacked) {
+  if (!unpacked) return false;
+  const bracketMatches = Array.isArray(unpacked.tournamentBracket)
+    ? unpacked.tournamentBracket.flatMap((r) => (Array.isArray(r?.matches) ? r.matches : []))
+    : [];
+  return bracketMatches.some((m) => {
+    if (!isPlayableMatch(m)) return false;
+    return (
+      m.status === 'playing' ||
+      m.status === 'in_progress' ||
+      m.tabletStatus === 'checked_in' ||
+      isTerminal(m)
+    );
   });
 }
 
@@ -361,7 +405,10 @@ export function buildVenueBoardSnapshots(unpacked) {
   const total = resolveTotalBoards(tournamentData);
   if (total <= 0) return [];
 
-  const inBracket = Array.isArray(tournamentBracket) && tournamentBracket.length > 0 && groupsFinished(groups, groupMatches);
+  const inBracket =
+    Array.isArray(tournamentBracket) &&
+    tournamentBracket.length > 0 &&
+    (isBracketStarted(unpacked) || groupsFinished(groups, groupMatches));
 
   const boards = [];
   for (let n = 1; n <= total; n += 1) {
@@ -407,10 +454,7 @@ export function buildVenueGroupSnapshots(unpacked) {
   const bracketMatches = Array.isArray(unpacked.tournamentBracket)
     ? unpacked.tournamentBracket.flatMap((r) => (Array.isArray(r?.matches) ? r.matches : []))
     : [];
-  const bracketStarted = bracketMatches.some((m) => {
-    if (!isPlayableMatch(m)) return false;
-    return m.status === 'playing' || m.status === 'in_progress' || isTerminal(m);
-  });
+  const bracketStarted = isBracketStarted(unpacked);
 
   return groups
     .map((group, index) => {
@@ -582,21 +626,27 @@ export function buildVenueCarouselSlides(unpacked) {
   const slides = [{ type: 'boards' }];
   if (!unpacked) return slides;
 
-  const standings = (unpacked.groups || [])
-    .map((g) => {
-      const gm = (unpacked.groupMatches || []).filter((m) => (m.groupId ?? m.group) === g.groupId);
-      return {
-        groupId: g.groupId,
-        name: String(g.name || g.label || g.groupId || ''),
-        rows: calculateGroupStandings(g.players || [], gm),
-      };
-    })
-    .filter((g) => Array.isArray(g.rows) && g.rows.length > 0);
+  const bracketStarted = isBracketStarted(unpacked);
+  const groupsDone = areGroupsFinished(unpacked.groups, unpacked.groupMatches);
+  const suppressGroupSlides = bracketStarted || (groupsDone && Array.isArray(unpacked.tournamentBracket) && unpacked.tournamentBracket.length > 0);
 
-  if (standings.length > 0) {
-    const perSlide = standings.length <= 2 ? standings.length : 2;
-    for (const batch of chunk(standings, perSlide)) {
-      slides.push({ type: 'groups', standings: batch });
+  if (!suppressGroupSlides) {
+    const standings = (unpacked.groups || [])
+      .map((g) => {
+        const gm = (unpacked.groupMatches || []).filter((m) => (m.groupId ?? m.group) === g.groupId);
+        return {
+          groupId: g.groupId,
+          name: String(g.name || g.label || g.groupId || ''),
+          rows: calculateGroupStandings(g.players || [], gm),
+        };
+      })
+      .filter((g) => Array.isArray(g.rows) && g.rows.length > 0);
+
+    if (standings.length > 0) {
+      const perSlide = standings.length <= 2 ? standings.length : 2;
+      for (const batch of chunk(standings, perSlide)) {
+        slides.push({ type: 'groups', standings: batch });
+      }
     }
   }
 

@@ -519,4 +519,119 @@ describe('VenueDisplayView', () => {
 
     vi.useRealTimers();
   });
+
+  it('po zahájení pavouka a dokončení skupin nerotuje tabulky skupin', () => {
+    vi.useFakeTimers();
+    listenMock.mockImplementation((_pin, cb) => {
+      cb({
+        ...liveDoc(),
+        groupMatches: [
+          {
+            matchId: 'm1',
+            groupId: 'A',
+            board: 1,
+            status: 'completed',
+            player1Id: 'p1',
+            player2Id: 'p2',
+            result: { p1Legs: 2, p2Legs: 0 },
+          },
+        ],
+        tournamentBracket: [
+          {
+            round: 1,
+            matches: [
+              {
+                id: 'b1',
+                board: 1,
+                status: 'playing',
+                player1Id: 'p1',
+                player2Id: 'p3',
+                player1Name: 'Jalůvka',
+                player2Name: 'Novák',
+                result: { p1Legs: 1, p2Legs: 0 },
+              },
+            ],
+          },
+        ],
+      });
+      return () => {};
+    });
+
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
+    // V pavouku by se vůbec neměly objevit tabulky skupin
+    expect(screen.queryByText('Tabulky skupin')).toBeNull();
+    expect(screen.getByText('Živé terče')).toBeTruthy();
+    expect(screen.getByText('Finále')).toBeTruthy();
+
+    // Posunout čas rotace - stále by neměly být vidět tabulky skupin
+    act(() => {
+      vi.advanceTimersByTime(25_000);
+    });
+    expect(screen.queryByText('Tabulky skupin')).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('BoardsGrid si drží fixní rozvržení buněk mřížky i při neúplném počtu zápasů', () => {
+    listenMock.mockImplementation((_pin, cb) => {
+      cb({
+        ...liveDoc(),
+        tournamentData: {
+          ...liveDoc().tournamentData,
+          numBoards: 4,
+        },
+        groupMatches: [
+          {
+            matchId: 'm1',
+            groupId: 'A',
+            board: 1,
+            status: 'playing',
+            player1Id: 'p1',
+            player2Id: 'p2',
+            result: { p1Legs: 1, p2Legs: 0 },
+          },
+          {
+            matchId: 'm2',
+            groupId: 'A',
+            board: 2,
+            status: 'playing',
+            player1Id: 'p2',
+            player2Id: 'p3',
+            result: { p1Legs: 0, p2Legs: 1 },
+          },
+        ],
+        tournamentBracket: [
+          {
+            round: 1,
+            matches: [
+              {
+                id: 'b1',
+                board: 1,
+                status: 'playing',
+                player1Id: 'p1',
+                player2Id: 'p3',
+                player1Name: 'Jalůvka',
+                player2Name: 'Novák',
+              },
+              {
+                id: 'b2',
+                board: 2,
+                status: 'playing',
+                player1Id: 'p2',
+                player2Id: 'p1',
+                player1Name: 'Armlich',
+                player2Name: 'Jalůvka',
+              },
+            ],
+          },
+        ],
+      });
+      return () => {};
+    });
+
+    renderWithAdapter(<VenueDisplayView pin="1234" lang="cs" />);
+    // BoardsGrid container má fixní grid-template-columns i grid-template-rows 2x2
+    const gridEl = document.querySelector('[style*="grid-template-columns: repeat(2, minmax(0, 1fr))"]');
+    expect(gridEl).toBeTruthy();
+    expect(gridEl.style.gridTemplateRows).toBe('repeat(2, minmax(0, 1fr))');
+  });
 });
