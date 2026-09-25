@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-09-24T04:03:00.000Z",
-    "effectiveDate": "2026-09-24",
-    "generatedAt": "2026-09-24 04:03",
-    "fetchedAt": "2026-09-24T09:51:32.996Z",
+    "updatedAt": "2026-09-25T10:03:00.000Z",
+    "effectiveDate": "2026-09-25",
+    "generatedAt": "2026-09-25 10:03",
+    "fetchedAt": "2026-09-25T10:07:25.202Z",
     "totalPlayers": 138
   },
   "players": [
@@ -553,6 +553,12 @@
     },
     {
       "rank": 100,
+      "name": "Renata Brandejsová",
+      "club": "Tělocvičná jednota Sokol Lukavice",
+      "regNumber": "3761"
+    },
+    {
+      "rank": 100,
       "name": "Lucie Václavíková",
       "regNumber": "7282"
     },
@@ -562,13 +568,7 @@
       "regNumber": "6500"
     },
     {
-      "rank": 102,
-      "name": "Renata Brandejsová",
-      "club": "Tělocvičná jednota Sokol Lukavice",
-      "regNumber": "3761"
-    },
-    {
-      "rank": 102,
+      "rank": 103,
       "name": "Zdeňka Zonová",
       "regNumber": "6851"
     },
