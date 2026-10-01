@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-09-30T10:03:00.000Z",
-    "effectiveDate": "2026-09-30",
-    "generatedAt": "2026-09-30 10:03",
-    "fetchedAt": "2026-09-30T11:03:31.520Z",
+    "updatedAt": "2026-10-01T10:03:00.000Z",
+    "effectiveDate": "2026-10-01",
+    "generatedAt": "2026-10-01 10:03",
+    "fetchedAt": "2026-10-01T11:30:07.178Z",
     "totalPlayers": 141
   },
   "players": [
@@ -351,7 +351,7 @@
       "regNumber": "6849"
     },
     {
-      "rank": 62,
+      "rank": 61,
       "name": "Jiřina Zahradníková",
       "club": "Vostrý koně Pardubice",
       "regNumber": "3182"
