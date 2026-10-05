@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-10-04T10:03:00.000Z",
-    "effectiveDate": "2026-10-04",
-    "generatedAt": "2026-10-04 10:03",
-    "fetchedAt": "2026-10-04T11:03:23.977Z",
+    "updatedAt": "2026-10-05T10:03:00.000Z",
+    "effectiveDate": "2026-10-05",
+    "generatedAt": "2026-10-05 10:03",
+    "fetchedAt": "2026-10-05T12:11:25.129Z",
     "totalPlayers": 140
   },
   "players": [
@@ -163,6 +163,12 @@
     },
     {
       "rank": 28,
+      "name": "Romana Csemerová",
+      "club": "Mouchy v medu",
+      "regNumber": "5086"
+    },
+    {
+      "rank": 28,
       "name": "Tereza Doubravová",
       "club": "PV-Knihovna Olomouc",
       "regNumber": "6233"
@@ -172,12 +178,6 @@
       "name": "Michaela Beranová",
       "club": "STEEL HUNTERS",
       "regNumber": "4517"
-    },
-    {
-      "rank": 30,
-      "name": "Romana Csemerová",
-      "club": "Mouchy v medu",
-      "regNumber": "5086"
     },
     {
       "rank": 31,
