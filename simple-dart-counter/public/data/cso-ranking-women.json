@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-10-08T10:03:00.000Z",
-    "effectiveDate": "2026-10-08",
-    "generatedAt": "2026-10-08 10:03",
-    "fetchedAt": "2026-10-08T11:54:43.343Z",
+    "updatedAt": "2026-10-09T10:03:00.000Z",
+    "effectiveDate": "2026-10-09",
+    "generatedAt": "2026-10-09 10:03",
+    "fetchedAt": "2026-10-09T11:46:33.357Z",
     "totalPlayers": 139
   },
   "players": [
@@ -163,15 +163,15 @@
     },
     {
       "rank": 28,
-      "name": "Romana Csemerová",
-      "club": "Mouchy v medu",
-      "regNumber": "5086"
-    },
-    {
-      "rank": 28,
       "name": "Michaela Beranová",
       "club": "STEEL HUNTERS",
       "regNumber": "4517"
+    },
+    {
+      "rank": 29,
+      "name": "Romana Csemerová",
+      "club": "Mouchy v medu",
+      "regNumber": "5086"
     },
     {
       "rank": 30,
@@ -346,7 +346,7 @@
       "regNumber": "6049"
     },
     {
-      "rank": 60,
+      "rank": 61,
       "name": "Tereza Šlichtová",
       "club": "Brněnská šipková z.s.",
       "regNumber": "5680"
@@ -564,12 +564,6 @@
     },
     {
       "rank": 102,
-      "name": "Renata Brandejsová",
-      "club": "Tělocvičná jednota Sokol Lukavice",
-      "regNumber": "3761"
-    },
-    {
-      "rank": 102,
       "name": "Martina Vańková",
       "club": "DC Vikingové Litoměřice",
       "regNumber": "6256"
@@ -583,6 +577,12 @@
       "rank": 102,
       "name": "Dita Schmied",
       "regNumber": "6500"
+    },
+    {
+      "rank": 105,
+      "name": "Renata Brandejsová",
+      "club": "Tělocvičná jednota Sokol Lukavice",
+      "regNumber": "3761"
     },
     {
       "rank": 106,
