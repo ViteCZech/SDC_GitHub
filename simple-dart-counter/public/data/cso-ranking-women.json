@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-10-09T10:03:00.000Z",
-    "effectiveDate": "2026-10-09",
-    "generatedAt": "2026-10-09 10:03",
-    "fetchedAt": "2026-10-09T11:46:33.357Z",
+    "updatedAt": "2026-10-10T10:03:00.000Z",
+    "effectiveDate": "2026-10-10",
+    "generatedAt": "2026-10-10 10:03",
+    "fetchedAt": "2026-10-10T11:04:15.596Z",
     "totalPlayers": 139
   },
   "players": [
@@ -163,15 +163,15 @@
     },
     {
       "rank": 28,
-      "name": "Michaela Beranová",
-      "club": "STEEL HUNTERS",
-      "regNumber": "4517"
-    },
-    {
-      "rank": 29,
       "name": "Romana Csemerová",
       "club": "Mouchy v medu",
       "regNumber": "5086"
+    },
+    {
+      "rank": 28,
+      "name": "Michaela Beranová",
+      "club": "STEEL HUNTERS",
+      "regNumber": "4517"
     },
     {
       "rank": 30,
@@ -564,30 +564,31 @@
     },
     {
       "rank": 102,
+      "name": "Kateřina Šildbergerová",
+      "club": "Pojď mi hop",
+      "regNumber": "2883"
+    },
+    {
+      "rank": 103,
       "name": "Martina Vańková",
       "club": "DC Vikingové Litoměřice",
       "regNumber": "6256"
     },
     {
-      "rank": 102,
+      "rank": 103,
       "name": "Lucie Václavíková",
       "regNumber": "7282"
     },
     {
-      "rank": 102,
+      "rank": 103,
       "name": "Dita Schmied",
       "regNumber": "6500"
     },
     {
-      "rank": 105,
+      "rank": 106,
       "name": "Renata Brandejsová",
       "club": "Tělocvičná jednota Sokol Lukavice",
       "regNumber": "3761"
-    },
-    {
-      "rank": 106,
-      "name": "Martina Solnařová",
-      "regNumber": "1509"
     },
     {
       "rank": 106,
@@ -596,38 +597,37 @@
       "regNumber": "2067"
     },
     {
-      "rank": 106,
+      "rank": 108,
+      "name": "Martina Solnařová",
+      "regNumber": "1509"
+    },
+    {
+      "rank": 108,
       "name": "Nela Rychlíková",
       "regNumber": "5184"
     },
     {
-      "rank": 109,
+      "rank": 110,
       "name": "Zdeňka Zonová",
       "regNumber": "6851"
     },
     {
-      "rank": 110,
+      "rank": 111,
       "name": "Jana Juráková",
       "regNumber": "5685"
     },
     {
-      "rank": 110,
+      "rank": 111,
       "name": "Petra Chytilová",
       "regNumber": "6231"
     },
     {
-      "rank": 110,
-      "name": "Kateřina Šildbergerová",
-      "club": "Pojď mi hop",
-      "regNumber": "2883"
-    },
-    {
-      "rank": 110,
+      "rank": 111,
       "name": "Klára Goldschmidtová",
       "regNumber": "7117"
     },
     {
-      "rank": 110,
+      "rank": 111,
       "name": "Pavla Nováková",
       "club": "Plaská Zvěř",
       "regNumber": "5119"
