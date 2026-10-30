@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "doubles",
-    "updatedAt": "2026-10-29T10:06:00.000Z",
-    "effectiveDate": "2026-10-29",
-    "generatedAt": "2026-10-29 10:06",
-    "fetchedAt": "2026-10-29T11:24:59.942Z",
+    "updatedAt": "2026-10-30T10:06:00.000Z",
+    "effectiveDate": "2026-10-30",
+    "generatedAt": "2026-10-30 10:06",
+    "fetchedAt": "2026-10-30T11:16:47.071Z",
     "totalPlayers": 1035
   },
   "players": [
