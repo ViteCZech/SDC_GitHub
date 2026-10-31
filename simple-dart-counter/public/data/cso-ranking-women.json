@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-10-30T10:03:00.000Z",
-    "effectiveDate": "2026-10-30",
-    "generatedAt": "2026-10-30 10:03",
-    "fetchedAt": "2026-10-30T11:16:45.875Z",
+    "updatedAt": "2026-10-31T10:03:00.000Z",
+    "effectiveDate": "2026-10-31",
+    "generatedAt": "2026-10-31 10:03",
+    "fetchedAt": "2026-10-31T10:50:02.418Z",
     "totalPlayers": 140
   },
   "players": [
@@ -114,20 +114,20 @@
     },
     {
       "rank": 19,
+      "name": "Anna Brandejsová",
+      "club": "Tělocvičná jednota Sokol Lukavice",
+      "regNumber": "7044"
+    },
+    {
+      "rank": 20,
       "name": "Andrea Ondová",
       "club": "Kašna Vraclav",
       "regNumber": "1228"
     },
     {
-      "rank": 20,
+      "rank": 21,
       "name": "Lucie Škardová",
       "regNumber": "7423"
-    },
-    {
-      "rank": 21,
-      "name": "Anna Brandejsová",
-      "club": "Tělocvičná jednota Sokol Lukavice",
-      "regNumber": "7044"
     },
     {
       "rank": 22,
@@ -489,7 +489,7 @@
       "regNumber": "6049"
     },
     {
-      "rank": 87,
+      "rank": 88,
       "name": "Lucie Ditrychová",
       "club": "Desítka",
       "regNumber": "94"
@@ -522,50 +522,50 @@
     },
     {
       "rank": 94,
-      "name": "Alice Hromádková",
-      "club": "Piráti Podbořany",
-      "regNumber": "4534"
-    },
-    {
-      "rank": 95,
-      "name": "Renata Řeháková",
-      "club": "Steel Darts Skalička",
-      "regNumber": "2336"
-    },
-    {
-      "rank": 96,
-      "name": "Lucie Jirásková",
-      "regNumber": "1367"
-    },
-    {
-      "rank": 96,
-      "name": "Jaroslava Skoumalová",
-      "club": "Steel Darts Jičín",
-      "regNumber": "2298"
-    },
-    {
-      "rank": 98,
-      "name": "Eliška Smékalová",
-      "regNumber": "4024"
-    },
-    {
-      "rank": 98,
-      "name": "Veronika Kocařová",
-      "regNumber": "6314"
-    },
-    {
-      "rank": 100,
-      "name": "Karla Wetterová",
-      "regNumber": "6425"
-    },
-    {
-      "rank": 101,
       "name": "Renata Brandejsová",
       "club": "Tělocvičná jednota Sokol Lukavice",
       "regNumber": "3761"
     },
     {
+      "rank": 94,
+      "name": "Alice Hromádková",
+      "club": "Piráti Podbořany",
+      "regNumber": "4534"
+    },
+    {
+      "rank": 96,
+      "name": "Renata Řeháková",
+      "club": "Steel Darts Skalička",
+      "regNumber": "2336"
+    },
+    {
+      "rank": 97,
+      "name": "Lucie Jirásková",
+      "regNumber": "1367"
+    },
+    {
+      "rank": 97,
+      "name": "Jaroslava Skoumalová",
+      "club": "Steel Darts Jičín",
+      "regNumber": "2298"
+    },
+    {
+      "rank": 99,
+      "name": "Eliška Smékalová",
+      "regNumber": "4024"
+    },
+    {
+      "rank": 99,
+      "name": "Veronika Kocařová",
+      "regNumber": "6314"
+    },
+    {
       "rank": 101,
+      "name": "Karla Wetterová",
+      "regNumber": "6425"
+    },
+    {
+      "rank": 102,
       "name": "Kateřina Šildbergerová",
       "club": "Pojď mi hop",
       "regNumber": "2883"
