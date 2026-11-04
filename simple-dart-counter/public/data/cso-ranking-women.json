@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-11-03T10:03:00.000Z",
-    "effectiveDate": "2026-11-03",
-    "generatedAt": "2026-11-03 10:03",
-    "fetchedAt": "2026-11-03T12:43:03.452Z",
+    "updatedAt": "2026-11-04T10:03:00.000Z",
+    "effectiveDate": "2026-11-04",
+    "generatedAt": "2026-11-04 10:03",
+    "fetchedAt": "2026-11-04T12:53:05.316Z",
     "totalPlayers": 140
   },
   "players": [
@@ -180,17 +180,17 @@
     },
     {
       "rank": 31,
+      "name": "Tereza Sedláčková",
+      "regNumber": "6108"
+    },
+    {
+      "rank": 31,
       "name": "Tereza Doubravová",
       "club": "PV-Knihovna Olomouc",
       "regNumber": "6233"
     },
     {
-      "rank": 32,
-      "name": "Tereza Sedláčková",
-      "regNumber": "6108"
-    },
-    {
-      "rank": 32,
+      "rank": 33,
       "name": "Žaneta Šmejcová",
       "regNumber": "5506"
     },
@@ -269,7 +269,7 @@
       "regNumber": "5293"
     },
     {
-      "rank": 46,
+      "rank": 47,
       "name": "Markéta Fryštacká",
       "club": "Black Panthers",
       "regNumber": "3815"
@@ -393,20 +393,20 @@
     },
     {
       "rank": 70,
-      "name": "Radka Langová",
-      "club": "Pivní Baroni",
-      "regNumber": "5751"
-    },
-    {
-      "rank": 71,
       "name": "Růžena Rýdelová",
       "regNumber": "6297"
     },
     {
-      "rank": 71,
+      "rank": 70,
       "name": "Marie Kropíková",
       "club": "Schovi Darts",
       "regNumber": "6466"
+    },
+    {
+      "rank": 70,
+      "name": "Radka Langová",
+      "club": "Pivní Baroni",
+      "regNumber": "5751"
     },
     {
       "rank": 73,
