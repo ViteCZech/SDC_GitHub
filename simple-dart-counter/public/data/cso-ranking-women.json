@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-11-04T10:03:00.000Z",
-    "effectiveDate": "2026-11-04",
-    "generatedAt": "2026-11-04 10:03",
-    "fetchedAt": "2026-11-04T12:53:05.316Z",
+    "updatedAt": "2026-11-05T10:03:00.000Z",
+    "effectiveDate": "2026-11-05",
+    "generatedAt": "2026-11-05 10:03",
+    "fetchedAt": "2026-11-05T13:01:34.332Z",
     "totalPlayers": 140
   },
   "players": [
@@ -309,13 +309,18 @@
     },
     {
       "rank": 54,
+      "name": "Gabriela Divišová",
+      "regNumber": "7204"
+    },
+    {
+      "rank": 54,
       "name": "Lenka Křivková",
       "regNumber": "5624"
     },
     {
-      "rank": 55,
-      "name": "Gabriela Divišová",
-      "regNumber": "7204"
+      "rank": 56,
+      "name": "Petra Hladíková",
+      "regNumber": "7580"
     },
     {
       "rank": 56,
@@ -323,12 +328,7 @@
       "regNumber": "4914"
     },
     {
-      "rank": 57,
-      "name": "Petra Hladíková",
-      "regNumber": "7580"
-    },
-    {
-      "rank": 57,
+      "rank": 58,
       "name": "Jitka Grebáčová",
       "regNumber": "3869"
     },
