@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-11-05T10:03:00.000Z",
-    "effectiveDate": "2026-11-05",
-    "generatedAt": "2026-11-05 10:03",
-    "fetchedAt": "2026-11-05T13:01:34.332Z",
+    "updatedAt": "2026-11-06T10:03:00.000Z",
+    "effectiveDate": "2026-11-06",
+    "generatedAt": "2026-11-06 10:03",
+    "fetchedAt": "2026-11-06T12:49:38.692Z",
     "totalPlayers": 140
   },
   "players": [
@@ -523,18 +523,18 @@
     },
     {
       "rank": 94,
-      "name": "Renata Brandejsová",
-      "club": "Tělocvičná jednota Sokol Lukavice",
-      "regNumber": "3761"
-    },
-    {
-      "rank": 94,
       "name": "Alice Hromádková",
       "club": "Piráti Podbořany",
       "regNumber": "4534"
     },
     {
-      "rank": 96,
+      "rank": 95,
+      "name": "Renata Brandejsová",
+      "club": "Tělocvičná jednota Sokol Lukavice",
+      "regNumber": "3761"
+    },
+    {
+      "rank": 95,
       "name": "Helena Božiková",
       "regNumber": "6250"
     },
