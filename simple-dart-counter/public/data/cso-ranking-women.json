@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-11-08T10:03:00.000Z",
-    "effectiveDate": "2026-11-08",
-    "generatedAt": "2026-11-08 10:03",
-    "fetchedAt": "2026-11-08T11:49:45.275Z",
+    "updatedAt": "2026-11-09T10:03:00.000Z",
+    "effectiveDate": "2026-11-09",
+    "generatedAt": "2026-11-09 10:03",
+    "fetchedAt": "2026-11-09T13:45:02.849Z",
     "totalPlayers": 140
   },
   "players": [
@@ -68,15 +68,15 @@
     },
     {
       "rank": 11,
-      "name": "Miroslava Richterová",
-      "club": "DC Ostrovani Šebestěnice",
-      "regNumber": "296"
-    },
-    {
-      "rank": 11,
       "name": "Renata Horáková",
       "club": "Pivní Baroni",
       "regNumber": "5753"
+    },
+    {
+      "rank": 12,
+      "name": "Miroslava Richterová",
+      "club": "DC Ostrovani Šebestěnice",
+      "regNumber": "296"
     },
     {
       "rank": 13,
@@ -153,7 +153,7 @@
       "regNumber": "5086"
     },
     {
-      "rank": 25,
+      "rank": 26,
       "name": "Dagmar Jandová",
       "regNumber": "7144"
     },
@@ -186,19 +186,19 @@
     },
     {
       "rank": 32,
+      "name": "Martina Holubová",
+      "club": "Kingsburry Darts",
+      "regNumber": "5625"
+    },
+    {
+      "rank": 32,
       "name": "Žaneta Šmejcová",
       "regNumber": "5506"
     },
     {
-      "rank": 33,
+      "rank": 34,
       "name": "Tereza Sedláčková",
       "regNumber": "6108"
-    },
-    {
-      "rank": 34,
-      "name": "Martina Holubová",
-      "club": "Kingsburry Darts",
-      "regNumber": "5625"
     },
     {
       "rank": 35,
@@ -253,35 +253,35 @@
     },
     {
       "rank": 44,
-      "name": "Alena Vestfálová",
-      "club": "DC Vikings Blatná",
-      "regNumber": "1069"
-    },
-    {
-      "rank": 45,
-      "name": "Monika Krotká",
-      "club": "Plaská Zvěř",
-      "regNumber": "4673"
-    },
-    {
-      "rank": 46,
-      "name": "Kateřina Vorochtová",
-      "regNumber": "5293"
-    },
-    {
-      "rank": 47,
       "name": "Lenka Horská",
       "club": "DC RR Kraslice",
       "regNumber": "2571"
     },
     {
+      "rank": 45,
+      "name": "Alena Vestfálová",
+      "club": "DC Vikings Blatná",
+      "regNumber": "1069"
+    },
+    {
+      "rank": 46,
+      "name": "Monika Krotká",
+      "club": "Plaská Zvěř",
+      "regNumber": "4673"
+    },
+    {
       "rank": 47,
+      "name": "Kateřina Vorochtová",
+      "regNumber": "5293"
+    },
+    {
+      "rank": 48,
       "name": "Eliška Panošová",
       "club": "Spolek neratovických šipkařů",
       "regNumber": "6171"
     },
     {
-      "rank": 47,
+      "rank": 48,
       "name": "Markéta Fryštacká",
       "club": "Black Panthers",
       "regNumber": "3815"
@@ -523,18 +523,18 @@
     },
     {
       "rank": 94,
-      "name": "Alice Hromádková",
-      "club": "Piráti Podbořany",
-      "regNumber": "4534"
-    },
-    {
-      "rank": 95,
       "name": "Renata Brandejsová",
       "club": "Tělocvičná jednota Sokol Lukavice",
       "regNumber": "3761"
     },
     {
-      "rank": 95,
+      "rank": 94,
+      "name": "Alice Hromádková",
+      "club": "Piráti Podbořany",
+      "regNumber": "4534"
+    },
+    {
+      "rank": 96,
       "name": "Helena Božiková",
       "regNumber": "6250"
     },
