@@ -1,10 +1,10 @@
 {
   "meta": {
     "gender": "women",
-    "updatedAt": "2026-11-17T10:03:00.000Z",
-    "effectiveDate": "2026-11-17",
-    "generatedAt": "2026-11-17 10:03",
-    "fetchedAt": "2026-11-17T14:14:40.812Z",
+    "updatedAt": "2026-11-18T10:03:00.000Z",
+    "effectiveDate": "2026-11-18",
+    "generatedAt": "2026-11-18 10:03",
+    "fetchedAt": "2026-11-18T13:46:46.259Z",
     "totalPlayers": 139
   },
   "players": [
@@ -281,7 +281,7 @@
       "regNumber": "6171"
     },
     {
-      "rank": 48,
+      "rank": 49,
       "name": "Markéta Fryštacká",
       "club": "Black Panthers",
       "regNumber": "3815"
